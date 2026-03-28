@@ -217,5 +217,6 @@ pip uninstall aiohttp filelock pydantic pytest pytest-asyncio pytest-cov -y
 
 ## 致谢
 
-- 原作者 [lingfengQAQ](https://github.com/lingfengQAQ)
-- [OpenCode](https://opencode.ai)
+- **[lingfengQAQ](https://github.com/lingfengQAQ)** - 原项目作者
+- **[OpenCode](https://opencode.ai)** - AI 编程助手框架
+- **[Cppys/OpenNovel](https://github.com/Cppys/OpenNovel)** - 番茄小说发布技术方案参考
