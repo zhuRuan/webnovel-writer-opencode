@@ -9,10 +9,93 @@ import socketserver
 import json
 import sqlite3
 import urllib.parse
+import logging
 from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any, List
+from datetime import datetime
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 PORT = 8086
 PROJECT_ROOT = None
+
+
+@dataclass
+class ProjectInfo:
+    """项目基本信息"""
+    title: str
+    genre: str
+    target_words: int
+    target_chapters: int
+
+
+@dataclass
+class ProgressInfo:
+    """进度信息"""
+    current_chapter: int
+    total_words: int
+    avg_words_per_chapter: float
+    percent: float
+
+
+@dataclass
+class HealthInfo:
+    """健康度信息"""
+    score: int
+    issues: List[str]
+    last_check: str
+
+
+@dataclass
+class ForeshadowingInfo:
+    """伏笔统计"""
+    total: int
+    unresolved: int
+    overdue: int
+    recent: List[Dict[str, Any]]
+
+
+@dataclass
+class OverviewResponse:
+    """概览响应"""
+    project: ProjectInfo
+    progress: ProgressInfo
+    health: HealthInfo
+    foreshadowing: ForeshadowingInfo
+    updated_at: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "project": {
+                "title": self.project.title,
+                "genre": self.project.genre,
+                "target_words": self.project.target_words,
+                "target_chapters": self.project.target_chapters,
+            },
+            "progress": {
+                "current_chapter": self.progress.current_chapter,
+                "total_words": self.progress.total_words,
+                "avg_words_per_chapter": self.progress.avg_words_per_chapter,
+                "percent": self.progress.percent,
+            },
+            "health": {
+                "score": self.health.score,
+                "issues": self.health.issues,
+                "last_check": self.health.last_check,
+            },
+            "foreshadowing": {
+                "total": self.foreshadowing.total,
+                "unresolved": self.foreshadowing.unresolved,
+                "overdue": self.foreshadowing.overdue,
+                "recent": self.foreshadowing.recent,
+            },
+            "updated_at": self.updated_at,
+        }
 
 
 class APIHandler(http.server.SimpleHTTPRequestHandler):
@@ -42,9 +125,12 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_relationships(params)
             elif path == '/api/review-metrics':
                 self.handle_review_metrics(params)
+            elif path == '/api/overview':
+                self.handle_overview()
             else:
                 self.send_error(404, 'Not Found')
         except Exception as e:
+            logger.exception("API request failed: %s", e)
             self.send_json({'error': str(e)}, 500)
 
     def send_json(self, data, status=200):
@@ -265,6 +351,183 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json([])
         finally:
             conn.close()
+
+    def handle_overview(self) -> None:
+        """
+        处理 /api/overview 请求。
+
+        返回项目概览数据，包含项目信息、进度、健康度和伏笔统计。
+        """
+        logger.info("Building overview for project: %s", PROJECT_ROOT)
+
+        try:
+            if not PROJECT_ROOT:
+                logger.warning("Project root not configured")
+                self.send_json({'error': '项目未初始化'}, 500)
+                return
+
+            state_file = PROJECT_ROOT / '.webnovel' / 'state.json'
+            if not state_file.exists():
+                logger.warning("State file not found: %s", state_file)
+                self.send_json({'error': '项目未初始化'}, 500)
+                return
+
+            state_data = json.loads(state_file.read_text(encoding='utf-8'))
+
+            overview = self._build_overview(state_data)
+            self.send_json(overview.to_dict())
+            logger.info("Overview built successfully")
+
+        except FileNotFoundError as e:
+            logger.warning("Project file missing: %s", e)
+            self.send_json({'error': '项目文件缺失'}, 500)
+        except PermissionError as e:
+            logger.error("Permission error: %s", e)
+            self.send_json({'error': '权限不足'}, 403)
+        except json.JSONDecodeError as e:
+            logger.error("Invalid JSON in state file: %s", e)
+            self.send_json({'error': '项目配置文件格式错误'}, 500)
+        except Exception as e:
+            logger.exception("Overview API exception: %s", e)
+            self.send_json({'error': '服务器错误'}, 500)
+
+    def _build_overview(self, state_data: Dict[str, Any]) -> OverviewResponse:
+        """构建概览响应数据"""
+        progress = state_data.get("progress", {})
+        project_info = state_data.get("project_info", {})
+
+        current_chapter = progress.get("current_chapter", 0)
+        total_words = progress.get("total_words", 0)
+        target_words = project_info.get("target_words", 2000000)
+        target_chapters = project_info.get("target_chapters", 1000)
+
+        avg_words = total_words / current_chapter if current_chapter > 0 else 0
+        percent = (total_words / target_words * 100) if target_words > 0 else 0
+
+        project = ProjectInfo(
+            title=project_info.get("title", "未命名项目"),
+            genre=project_info.get("genre", "未知"),
+            target_words=target_words,
+            target_chapters=target_chapters,
+        )
+
+        progress_info = ProgressInfo(
+            current_chapter=current_chapter,
+            total_words=total_words,
+            avg_words_per_chapter=round(avg_words, 1),
+            percent=round(percent, 1),
+        )
+
+        health = self._calculate_health(state_data, current_chapter)
+
+        foreshadowing = self._get_foreshadowing_info(state_data, current_chapter)
+
+        return OverviewResponse(
+            project=project,
+            progress=progress_info,
+            health=health,
+            foreshadowing=foreshadowing,
+            updated_at=datetime.now().isoformat(),
+        )
+
+    def _calculate_health(self, state_data: Dict[str, Any], current_chapter: int) -> HealthInfo:
+        """计算健康度"""
+        issues: List[str] = []
+
+        plot_threads = state_data.get("plot_threads", {})
+        if isinstance(plot_threads, dict):
+            foreshadowing = plot_threads.get("foreshadowing", [])
+            if isinstance(foreshadowing, list):
+                unresolved = sum(
+                    1 for f in foreshadowing
+                    if not self._is_resolved(f.get("status"))
+                )
+                if unresolved > 5:
+                    issues.append(f"存在 {unresolved} 条未回收伏笔")
+                if unresolved > 10:
+                    issues.append("伏笔过多，建议清理")
+
+        character_issues = self._check_character_issues(state_data, current_chapter)
+        issues.extend(character_issues)
+
+        score = max(0, 100 - len(issues) * 10)
+
+        return HealthInfo(
+            score=score,
+            issues=issues,
+            last_check=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+    def _is_resolved(self, status: Optional[str]) -> bool:
+        """判断伏笔是否已回收"""
+        if not status:
+            return False
+        resolved_statuses = {"已回收", "已解决", "已完成", "resolved", "done"}
+        return status in resolved_statuses
+
+    def _check_character_issues(self, state_data: Dict[str, Any], current_chapter: int) -> List[str]:
+        """检查角色问题"""
+        issues: List[str] = []
+
+        conn = self.get_db()
+        if not conn:
+            return issues
+
+        try:
+            rows = conn.execute(
+                "SELECT id, canonical_name, last_appearance FROM entities WHERE type = '角色'"
+            ).fetchall()
+
+            for row in rows:
+                last_app = row["last_appearance"] or 0
+                absence = current_chapter - last_app
+                if absence > 50:
+                    issues.append(f"角色 {row['canonical_name']} 掉线 {absence} 章")
+
+        except sqlite3.OperationalError:
+            pass
+        finally:
+            conn.close()
+
+        return issues
+
+    def _get_foreshadowing_info(self, state_data: Dict[str, Any], current_chapter: int) -> ForeshadowingInfo:
+        """获取伏笔统计信息"""
+        plot_threads = state_data.get("plot_threads", {})
+        foreshadowing_list: List[Dict[str, Any]] = []
+
+        if isinstance(plot_threads, dict):
+            foreshadowing_data = plot_threads.get("foreshadowing", [])
+            if isinstance(foreshadowing_data, list):
+                foreshadowing_list = foreshadowing_data
+
+        total = len(foreshadowing_list)
+        unresolved = sum(
+            1 for f in foreshadowing_list
+            if not self._is_resolved(f.get("status"))
+        )
+
+        overdue = 0
+        recent: List[Dict[str, Any]] = []
+        for f in foreshadowing_list:
+            if not self._is_resolved(f.get("status")):
+                planted = f.get("planted_chapter") or f.get("added_chapter") or 0
+                elapsed = current_chapter - planted
+                if elapsed > 20:
+                    overdue += 1
+                if len(recent) < 5:
+                    recent.append({
+                        "content": f.get("content", ""),
+                        "planted_chapter": planted,
+                        "status": f.get("status", "未回收"),
+                    })
+
+        return ForeshadowingInfo(
+            total=total,
+            unresolved=unresolved,
+            overdue=overdue,
+            recent=recent,
+        )
 
     def log_message(self, format, *args):
         if '/api/' in str(args):
