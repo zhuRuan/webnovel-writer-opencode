@@ -19,18 +19,20 @@ WORKSPACE_ROOT/
 
 ```
 .opencode/
-├── skills/              # 9个 Skills
+├── skills/              # 10个 Skills
 │   ├── webnovel-init/
 │   ├── webnovel-plan/
 │   ├── webnovel-write/
 │   ├── webnovel-review/
 │   ├── webnovel-export/
+│   ├── webnovel-publish/
 │   ├── webnovel-dashboard/
 │   ├── webnovel-query/
 │   ├── webnovel-resume/
 │   └── webnovel-learn/
 ├── scripts/             # Python 核心脚本
 │   ├── data_modules/    # 核心模块
+│   ├── publisher/       # 番茄小说发布模块
 │   └── webnovel.py     # CLI 入口
 ├── references/          # 参考文档
 │   ├── shared/         # 共享规范
@@ -66,13 +68,20 @@ python .opencode/scripts/webnovel.py index process-chapter --chapter 1
 # 索引统计
 python .opencode/scripts/webnovel.py index stats
 
-# 健康报告
+# 健康报告（Markdown）
 python .opencode/scripts/webnovel.py status --focus all
-python .opencode/scripts/webnovel.py status --focus urgency
+
+# 健康报告（JSON）
+python .opencode/scripts/status_reporter.py --json --pretty --project-root <项目路径>
 
 # 向量重建
 python .opencode/scripts/webnovel.py rag index-chapter --chapter 1
 python .opencode/scripts/webnovel.py rag stats
+
+# 番茄小说发布
+python .opencode/scripts/webnovel.py publish setup-browser
+python .opencode/scripts/webnovel.py publish list-books --project-root <项目路径>
+python .opencode/scripts/webnovel.py publish upload --book-id <ID> --range "1-10" --mode draft --project-root <项目路径>
 ```
 
 ## 测试
