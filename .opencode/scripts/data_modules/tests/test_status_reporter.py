@@ -233,3 +233,91 @@ def test_relationship_graph_prefers_index_db_data():
         assert "mermaid" in graph
         assert "药老" in graph
         assert "师徒" in graph
+
+
+def test_to_dict_returns_basic_stats():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config = DataModulesConfig.from_project_root(tmpdir)
+        config.ensure_dirs()
+        project_root = config.project_root
+
+        state = {
+            "progress": {"current_chapter": 100, "total_words": 300000},
+            "project_info": {"target_words": 500000},
+        }
+        _write_state(project_root, state)
+
+        reporter = StatusReporter(str(project_root))
+        assert reporter.load_state() is True
+
+        result = reporter.to_dict("basic")
+
+        assert "basic_stats" in result
+        assert result["basic_stats"]["current_chapter"] == 100
+        assert result["basic_stats"]["total_words"] == 300000
+        assert result["basic_stats"]["completion_percent"] == 60.0
+        assert result["focus"] == "basic"
+
+
+def test_to_dict_returns_foreshadowing():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config = DataModulesConfig.from_project_root(tmpdir)
+        config.ensure_dirs()
+        project_root = config.project_root
+
+        state = {
+            "progress": {"current_chapter": 120, "total_words": 360000},
+            "plot_threads": {
+                "foreshadowing": [
+                    {
+                        "content": "测试伏笔1",
+                        "status": "未回收",
+                        "tier": "核心",
+                        "planted_chapter": 20,
+                        "target_chapter": 80,
+                    },
+                    {
+                        "content": "测试伏笔2",
+                        "status": "已回收",
+                        "planted_chapter": 10,
+                        "target_chapter": 50,
+                    },
+                ]
+            },
+        }
+        _write_state(project_root, state)
+
+        reporter = StatusReporter(str(project_root))
+        assert reporter.load_state() is True
+
+        result = reporter.to_dict("foreshadowing")
+
+        assert "foreshadowing" in result
+        assert len(result["foreshadowing"]) == 1
+        assert result["foreshadowing"][0]["content"] == "测试伏笔1"
+
+
+def test_to_dict_json_serializable():
+    import json
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config = DataModulesConfig.from_project_root(tmpdir)
+        config.ensure_dirs()
+        project_root = config.project_root
+
+        state = {
+            "progress": {"current_chapter": 50, "total_words": 100000},
+            "project_info": {"target_words": 200000},
+        }
+        _write_state(project_root, state)
+
+        reporter = StatusReporter(str(project_root))
+        assert reporter.load_state() is True
+
+        result = reporter.to_dict("all")
+
+        json_str = json.dumps(result, ensure_ascii=False)
+        assert json_str is not None
+
+        parsed = json.loads(json_str)
+        assert parsed["basic_stats"]["current_chapter"] == 50

@@ -874,6 +874,98 @@ class StatusReporter:
 
         return "\n".join(report_lines)
 
+    def to_dict(self, focus: str = "all") -> Dict[str, Any]:
+        """
+        将报告转换为字典格式（JSON 输出用）。
+
+        Args:
+            focus: 分析焦点，可选值为 'all', 'basic', 'characters',
+                   'foreshadowing', 'urgency', 'pacing', 'strand', 'relationships'
+
+        Returns:
+            包含各项分析结果的字典
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info("Generating JSON dict with focus=%s", focus)
+
+        result: Dict[str, Any] = {
+            "generated_at": datetime.now().isoformat(),
+            "focus": focus,
+        }
+
+        try:
+            if focus in ["all", "basic"]:
+                result["basic_stats"] = self._get_basic_stats_dict()
+
+            if focus in ["all", "characters"]:
+                activity = self.analyze_characters()
+                dropped = {name: data for name, data in activity.items()
+                          if "掉线" in data["status"]}
+                result["characters"] = {
+                    "total": len(activity),
+                    "dropped": dropped,
+                    "active": {name: data for name, data in activity.items()
+                              if name not in dropped}
+                }
+
+            if focus in ["all", "foreshadowing"]:
+                result["foreshadowing"] = self.analyze_foreshadowing()
+
+            if focus in ["all", "foreshadowing", "urgency"]:
+                result["urgency"] = self.analyze_foreshadowing_urgency()
+
+            if focus in ["all", "pacing"]:
+                result["pacing"] = self.analyze_pacing()
+
+            if focus in ["all", "strand", "pacing"]:
+                result["strand"] = self.analyze_strand_weave()
+
+            if focus in ["all", "relationships"]:
+                result["relationships"] = self._get_relationships_dict()
+
+        except Exception as e:
+            logger.exception("Error generating JSON dict: %s", e)
+            result["error"] = str(e)
+
+        return result
+
+    def _get_basic_stats_dict(self) -> Dict[str, Any]:
+        """获取基本统计数据（字典格式）"""
+        if not self.state:
+            return {}
+
+        progress = self.state.get("progress", {})
+        current_chapter = progress.get("current_chapter", 0)
+        total_words = progress.get("total_words", 0)
+        target_words = self.state.get("project_info", {}).get("target_words", 2000000)
+
+        avg_words = total_words / current_chapter if current_chapter > 0 else 0
+        completion = (total_words / target_words * 100) if target_words > 0 else 0
+
+        return {
+            "current_chapter": current_chapter,
+            "total_words": total_words,
+            "avg_words_per_chapter": round(avg_words, 1),
+            "target_words": target_words,
+            "completion_percent": round(completion, 1),
+        }
+
+    def _get_relationships_dict(self) -> Dict[str, Any]:
+        """获取人际关系数据（字典格式）"""
+        if not self.state:
+            return {}
+
+        relationships = self.state.get("relationships", {})
+        if not isinstance(relationships, dict):
+            return {}
+
+        return {
+            "count": len(relationships),
+            "relationships": relationships,
+        }
+
     def _generate_basic_stats(self) -> List[str]:
         """生成基本统计"""
         if not self.state:
@@ -1164,6 +1256,10 @@ def main():
                                             'strand', 'relationships'],
                        default='all', help='分析焦点（新增 urgency, strand）')
     parser.add_argument('--project-root', default='.', help='项目根目录')
+    parser.add_argument('--json', action='store_true',
+                       help='输出 JSON 格式（替代 Markdown）')
+    parser.add_argument('--pretty', action='store_true',
+                       help='美化 JSON 输出（与 --json 配合使用）')
 
     args = parser.parse_args()
 
@@ -1189,25 +1285,45 @@ def main():
     print("\n📊 正在分析...")
 
     # 生成报告
-    report = reporter.generate_report(args.focus)
+    if args.json:
+        data = reporter.to_dict(args.focus)
+        output_file = Path(args.output)
+        if args.output == '.webnovel/health_report.md' and project_root != '.':
+            output_file = Path(project_root) / '.webnovel' / 'health_report.json'
+        output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # 保存报告
-    output_file = Path(args.output)
-    if args.output == '.webnovel/health_report.md' and project_root != '.':
-        output_file = Path(project_root) / '.webnovel' / 'health_report.md'
-    output_file.parent.mkdir(parents=True, exist_ok=True)
+        json_str = json.dumps(data, ensure_ascii=False, indent=2 if args.pretty else None)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(json_str)
 
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write(report)
+        print(f"\n✅ JSON 报告已生成: {output_file}")
+        if args.pretty:
+            print("\n" + "="*60)
+            print("📄 JSON 预览：\n")
+            print(json_str[:1000])
+            if len(json_str) > 1000:
+                print("\n...")
+            print("="*60)
+    else:
+        report = reporter.generate_report(args.focus)
 
-    print(f"\n✅ 健康报告已生成: {output_file}")
+        # 保存报告
+        output_file = Path(args.output)
+        if args.output == '.webnovel/health_report.md' and project_root != '.':
+            output_file = Path(project_root) / '.webnovel' / 'health_report.md'
+        output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # 预览报告（前 30 行）
-    print("\n" + "="*60)
-    print("📄 报告预览：\n")
-    print("\n".join(report.split("\n")[:30]))
-    print("\n...")
-    print("="*60)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(report)
+
+        print(f"\n✅ 健康报告已生成: {output_file}")
+
+        # 预览报告（前 30 行）
+        print("\n" + "="*60)
+        print("📄 报告预览：\n")
+        print("\n".join(report.split("\n")[:30]))
+        print("\n...")
+        print("="*60)
 
 if __name__ == "__main__":
     main()
