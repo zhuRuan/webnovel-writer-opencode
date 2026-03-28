@@ -2,39 +2,79 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
 # Virtual environments
 .venv/
 venv/
 ENV/
+env/
+.env/
 
 # IDE
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
 
 # Test artifacts
 .pytest_cache/
 .coverage
 htmlcov/
+.tox/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Temp
 *.tmp
 *.temp
+*.log
+*.swp
 
 # Webnovel Writer
 # 配置文件（包含 API Key）
-.env
 opencode.json
 prompts/
 
 # 项目运行时生成的数据（小说项目目录）
 # 以下是用户在运行 webnovel-init 后会生成的目录，应该忽略
-# 如果你想保留模板文件，可以移除这些注释
-# .webnovel/
-# 正文/
-# 大纲/
-# 设定集/
+.webnovel/
+正文/
+大纲/
+设定集/
+导出/
+
+# Playwright 浏览器数据（发布模块）
+.opencode/browser_user_data/
+.opencode/fanqie_auth_state.json

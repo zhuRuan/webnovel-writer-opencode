@@ -9,6 +9,9 @@ pydantic>=2.0.0
 # Optional (export feature)
 ebooklib>=0.5.0
 
+# Optional (publish to Fanqie Novel)
+playwright>=1.40.0
+
 # Testing
 pytest>=7.0.0
 pytest-cov>=4.1.0

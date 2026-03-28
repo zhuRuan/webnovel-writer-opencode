@@ -257,6 +257,10 @@ def main() -> None:
     p_export = sub.add_parser("export", help="正文导出工具")
     p_export.add_argument("args", nargs=argparse.REMAINDER)
 
+    # publish 命令（番茄小说发布）
+    p_publish = sub.add_parser("publish", help="番茄小说发布工具")
+    p_publish.add_argument("args", nargs=argparse.REMAINDER)
+
     # 兼容：允许 `--project-root` 出现在任意位置（减少 agents/skills 拼命令的出错率）
     from .cli_args import normalize_global_project_root
 
@@ -282,6 +286,12 @@ def main() -> None:
     # checkers 是审查器配置管理，不需要 project_root
     if tool == "checkers":
         raise SystemExit(_run_data_module("checkers_manager", rest))
+
+    # publish 命令中，setup-browser 不需要 project_root，其他命令需要
+    if tool == "publish":
+        if rest and rest[0] == "setup-browser":
+            raise SystemExit(_run_script("publish_manager.py", rest))
+        # 其他 publish 子命令需要 project_root
 
     # 其余工具：统一解析 project_root 后前置给下游
     project_root = _resolve_root(args.project_root)
@@ -320,6 +330,9 @@ def main() -> None:
 
     if tool == "export":
         raise SystemExit(_run_script("export_manager.py", [*forward_args, *rest]))
+
+    if tool == "publish":
+        raise SystemExit(_run_script("publish_manager.py", [*forward_args, *rest]))
 
     raise SystemExit(2)
 

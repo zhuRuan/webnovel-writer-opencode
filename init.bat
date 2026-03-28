@@ -4,7 +4,7 @@ chcp 65001 >nul 2>&1
 echo.
 echo ========================================
 echo   Webnovel Writer for OpenCode
-echo   Installer v1.0.0
+echo   Installer v1.2.0
 echo ========================================
 echo.
 
@@ -88,6 +88,9 @@ REM Cleanup source directory
 if exist "%SOURCE_DIR%" rmdir /S /Q "%SOURCE_DIR%" 2>nul
 
 rmdir /S /Q "%SOURCE_DIR%" 2>nul
+
+REM Cleanup accidental nul file (created by bash 2>nul redirect)
+if exist "nul" del /Q "nul"
 
 echo.
 echo ========================================

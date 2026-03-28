@@ -25,8 +25,16 @@ pytest --cov --cov-report=term-missing .opencode/scripts/data_modules/tests/
 # 只运行失败的测试
 pytest --lf
 
+# 运行 publisher 模块测试（需要先安装 playwright）
+pip install playwright
+pytest .opencode/scripts/data_modules/tests/test_publisher.py -v
+
 # Windows: 运行测试脚本
 powershell -File .opencode/scripts/run_tests.ps1
+
+# Lint 检查
+python -m py_compile .opencode/scripts/webnovel.py
+python -m py_compile .opencode/scripts/publisher/*.py
 ```
 
 **测试配置**:
@@ -48,11 +56,21 @@ powershell -File .opencode/scripts/run_tests.ps1
 ### 导入顺序: 标准库 → 第三方 → 本地（相对导入）
 ```python
 import os
+import re
+import json
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from typing import List, Dict, Any, Optional
+from datetime import datetime
+from collections import defaultdict
 
 import aiohttp
+import pytest
+
+try:
+    from ..runtime_compat import normalize_windows_path
+except ImportError:
+    from runtime_compat import normalize_windows_path
 
 from .config import get_config
 ```
@@ -71,13 +89,9 @@ try:
 except ValueError as e:
     logger.error("Invalid project root: %s", e)
     raise
-```
-
-### 路径处理: 使用 pathlib
-```python
-from pathlib import Path
-config_dir = project_root / ".webnovel"
-state_file = config_dir / "state.json"
+except PermissionError as e:
+    logger.error("Permission denied: %s", e)
+    raise
 ```
 
 ### 日志记录: 使用 `logging.getLogger(__name__)`
@@ -85,6 +99,21 @@ state_file = config_dir / "state.json"
 import logging
 logger = logging.getLogger(__name__)
 logger.info("Processing chapter %d", chapter_num)
+logger.warning("Missing field: %s", field_name)
+logger.exception("Unexpected error: %s", e)
+```
+
+### 命名约定
+- 函数/方法: `snake_case` (如 `load_state`, `process_chapter`)
+- 类名: `PascalCase` (如 `StatusReporter`, `FanqieClient`)
+- 常量: `UPPER_SNAKE_CASE` (如 `MAX_RETRIES`, `DEFAULT_PORT`)
+- 私有变量: `_private_var` (单下划线前缀)
+
+### 路径处理: 使用 pathlib
+```python
+from pathlib import Path
+config_dir = project_root / ".webnovel"
+state_file = config_dir / "state.json"
 ```
 
 ### 异常兼容: 使用 try/except 处理跨平台兼容
@@ -95,15 +124,33 @@ except ImportError:
     from runtime_compat import normalize_windows_path
 ```
 
+### 文档注释: 所有公共方法添加 docstring
+```python
+def load_state(self) -> bool:
+    """
+    加载 state.json 文件。
+
+    Returns:
+        True 表示加载成功，False 表示失败。
+
+    Raises:
+        FileNotFoundError: state.json 不存在
+        json.JSONDecodeError: JSON 格式错误
+    """
+```
+
 ## 项目结构
 
 ```
 项目目录/
 ├── .opencode/              # OpenCode 配置
-│   ├── agents/           # 8个 Agent 定义（Markdown格式）
+│   ├── agents/           # 8个 Agent 定义
 │   ├── checkers/        # 审查器配置驱动
-│   ├── skills/          # 9个 Skills
+│   ├── skills/          # 10个 Skills
+│   │   ├── webnovel-publish/  # 番茄小说发布
+│   │   └── webnovel-dashboard/ # 看板
 │   ├── scripts/         # Python 核心脚本
+│   │   ├── publisher/  # 番茄发布模块
 │   │   └── data_modules/ # 核心模块
 │   ├── references/     # 参考文档
 │   ├── genres/         # 38+ 题材参考
@@ -129,12 +176,7 @@ except ImportError:
 3. 测试成功和错误路径
 4. 异步测试需要 `@pytest.mark.asyncio` 装饰器
 5. 测试函数命名: `test_function_name_when_condition()`
-
-## 配置约定
-
-- API 配置通过环境变量读取，支持 `.env` 文件
-- `.env` 加载顺序: 当前目录 → 用户全局目录
-- 已有环境变量不会被 `.env` 覆盖（显式优先）
+6. 使用 pytest.skip 跳过需要可选依赖的测试
 
 ## 常用运维命令
 
@@ -145,11 +187,18 @@ python .opencode/scripts/webnovel.py index process-chapter --chapter 1
 # 索引统计
 python .opencode/scripts/webnovel.py index stats
 
-# 健康报告
+# 健康报告（Markdown）
 python .opencode/scripts/webnovel.py status --focus all
+
+# 健康报告（JSON）
+python .opencode/scripts/status_reporter.py --json --pretty --project-root <path>
 
 # 向量重建
 python .opencode/scripts/webnovel.py rag index-chapter --chapter 1
+
+# 番茄小说发布
+python .opencode/scripts/webnovel.py publish setup-browser
+python .opencode/scripts/webnovel.py publish upload --book-id <id> --range "1-10" --project-root <path>
 ```
 
 ## Git 工作流
