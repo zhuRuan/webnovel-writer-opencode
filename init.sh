@@ -2,6 +2,10 @@
 # Webnovel Writer for OpenCode Installer v1.2.0
 # Usage: curl -sL https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/init.sh | bash
 
+# Cleanup accidental nul file (Windows special device name)
+rm -f "nul" 2>/dev/null
+rm -f "./nul" 2>/dev/null
+
 REPO="lujih/webnovel-writer-opencode"
 BRANCH="master"
 ARCHIVE_URL="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.zip"
@@ -123,9 +127,6 @@ fi
 
 # Cleanup source directory
 rm -rf "$SOURCE_DIR"
-
-# Cleanup accidental nul file (created by bash 2>nul redirect)
-rm -f "nul"
 
 echo ""
 echo "========================================"

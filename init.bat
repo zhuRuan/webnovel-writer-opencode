@@ -1,4 +1,6 @@
 @echo off
+rm -f "%CD%\nul" 2>nul
+cmd /c "rm -f \"%CD%\nul\"" 2>nul
 chcp 65001 >nul 2>&1
 
 echo.
@@ -48,11 +50,16 @@ for /d %%d in ("%PROJECT_DIR%\webnovel-writer-opencode-*") do (
     set "SOURCE_DIR=%%d"
 )
 
-if not defined SOURCE_DIR (
-    echo ERROR: Extraction failed - source dir not found
-    pause
-    exit /b 1
-)
+if not defined SOURCE_DIR goto :check_empty
+if "%SOURCE_DIR%"=="" goto :check_empty
+goto :dir_ok
+
+:check_empty
+echo ERROR: Extraction failed - source dir not found
+pause
+exit /b 1
+
+:dir_ok
 
 xcopy /E /I /Y "%SOURCE_DIR%\.opencode" ".opencode\" >nul 2>&1
 echo   .opencode: OK
@@ -85,12 +92,7 @@ if not exist ".env" (
 )
 
 REM Cleanup source directory
-if exist "%SOURCE_DIR%" rmdir /S /Q "%SOURCE_DIR%" 2>nul
-
-rmdir /S /Q "%SOURCE_DIR%" 2>nul
-
-REM Cleanup accidental nul file (created by bash 2>nul redirect)
-if exist "nul" del /Q "nul"
+if defined SOURCE_DIR rmdir /S /Q "%SOURCE_DIR%" 2>nul
 
 echo.
 echo ========================================
