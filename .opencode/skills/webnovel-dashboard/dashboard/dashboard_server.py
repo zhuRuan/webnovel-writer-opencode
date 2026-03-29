@@ -124,48 +124,6 @@ class DualHandler(http.server.SimpleHTTPRequestHandler):
 def main():
     global PROJECT_ROOT, DASHBOARD_DIR
     
-    # 启动 API 服务器
-    dashboard_dir = os.path.dirname(os.path.abspath(__file__))
-    api_server_path = os.path.join(dashboard_dir, 'api_server.py')
-    project_root = os.path.dirname(dashboard_dir) if len(sys.argv) < 2 else sys.argv[1]
-    
-    if os.path.exists(api_server_path):
-        api_script = os.path.abspath(api_server_path)
-        project_arg = os.path.abspath(project_root) if project_root else os.path.dirname(dashboard_dir)
-        
-        # 检查 API 服务器是否已运行
-        import socket
-        api_running = False
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(1)
-            result = sock.connect_ex(('localhost', 8086))
-            api_running = result == 0
-            sock.close()
-        except:
-            pass
-        
-        if not api_running:
-            print("Starting API server...")
-            if sys.platform == "win32":
-                subprocess.Popen(
-                    [sys.executable, api_script, project_arg],
-                    creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
-                    close_fds=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-            else:
-                subprocess.Popen(
-                    [sys.executable, api_script, project_arg],
-                    start_new_session=True,
-                    close_fds=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-            import time
-            time.sleep(1.5)
-    
     # 处理命令行参数
     if "--detach" in sys.argv:
         # 后台启动自己

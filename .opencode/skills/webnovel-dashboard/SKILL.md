@@ -29,44 +29,25 @@ tags:
 
 ## 使用方式
 
-### 1. 启动看板（推荐）
+### 1. 基本启动
 
-需要启动**两个**服务器：
-- 前端服务器：端口 8085
-- API 服务器：端口 8086
-
-**Windows:**
-```batch
-@echo off
-REM 启动 API 服务器
-start "Dashboard API" python "path\to\api_server.py" "path\to\novel\project"
-REM 启动前端服务器  
-start "Dashboard" python "path\to\dashboard_server.py" "path\to\novel\project"
-```
-
-**Linux/Mac:**
+在任意位置运行：
 ```bash
-# 启动 API 服务器（后台运行）
-python /path/to/dashboard/api_server.py /path/to/novel/project &
-# 启动前端服务器（后台运行）
-python /path/to/dashboard/dashboard_server.py /path/to/novel/project &
+python /path/to/webnovel-dashboard/dashboard/dashboard_server.py
 ```
 
-### 2. 浏览器访问
+### 2. 指定项目目录
+
+```bash
+python /path/to/webnovel-dashboard/dashboard/dashboard_server.py /path/to/your/novel/project
+```
+
+### 3. 浏览器访问
 
 启动后浏览器自动打开，或手动访问：
 ```
 http://localhost:8085
 ```
-
-### 3. 端口说明
-
-| 服务器 | 端口 | 用途 |
-|--------|------|------|
-| dashboard_server.py | 8085 | 前端页面 |
-| api_server.py | 8086 | 数据 API |
-
-如果端口被占用，可以修改对应文件中的 `PORT` 变量。
 
 ## 功能模块
 

@@ -14,7 +14,17 @@ allowed-tools: Read Write Edit Grep Bash Task
 | --fast | Step 0 → 1 → 2A → 3 → 4 → 5 → 6 |
 | --minimal | Step 0 → 1 → 2A → 3 → 4 → 5 → 6 |
 
-**产出**：`正文/第NNNN章-{title}.md`、`review_metrics`、`.webnovel/summaries/chNNNN.md`
+**产出**：`正文/第N卷/第NNNN章-{title}.md`（自动适配卷目录）、`review_metrics`、`.webnovel/summaries/chNNNN.md`
+
+## 路径工具
+
+获取章节文件的默认路径（自动适配卷目录）：
+```bash
+CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter ${CHAPTER_NUM})
+echo "章节文件将写入: ${CHAPTER_PATH}"
+```
+
+**自动卷目录规则**：根据 `state.json` 的 `volumes_planned` 配置自动选择卷目录；未规划时默认 50 章/卷。
 
 ## 核心约束
 
@@ -61,6 +71,10 @@ allowed-tools: Read Write Edit Grep Bash Task
 SCRIPTS_DIR=".opencode/scripts"
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" preflight
 PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
+
+# 从 state.json 获取下一章章节号
+CHAPTER_NUM=$(python -X utf8 -c "import json; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json')); print(s['progress'].get('current_chapter', 1) + 1)")
+echo "将撰写第 ${CHAPTER_NUM} 章"
 ```
 
 **硬门槛**：preflight 必须成功。失败则阻断。
@@ -71,7 +85,13 @@ PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WO
 
 ### Step 2A：正文起草
 
-加载 `core-constraints.md`，输出纯正文到 `正文/第{chapter_padded}章.md`。
+```bash
+# 获取章节文件的默认路径（自动适配卷目录）
+CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter ${CHAPTER_NUM})
+echo "章节文件将写入: ${CHAPTER_PATH}"
+```
+
+加载 `core-constraints.md`，输出纯正文到 `${PROJECT_ROOT}/${CHAPTER_PATH}`。
 
 **约束**：禁止占位符、保留上章钩子、2000-2500字、中文叙事单元。
 
@@ -150,10 +170,14 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" wor
 执行前必须加载：
 ```bash
 cat "${SKILL_ROOT}/../../references/shared/core-constraints.md"
+
+# 获取章节文件的默认路径（自动适配卷目录）
+CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter ${CHAPTER_NUM})
+echo "章节文件将写入: ${CHAPTER_PATH}"
 ```
 
 硬要求：
-- 只输出纯正文到章节正文文件；若详细大纲已有章节名，优先使用 `正文/第{chapter_padded}章-{title_safe}.md`，否则回退为 `正文/第{chapter_padded}章.md`。
+- 只输出纯正文到 `${CHAPTER_PATH}` 指定的文件。
 - 默认按 2000-2500 字执行；若大纲为关键战斗章/高潮章/卷末章或用户明确指定，则按大纲/用户优先。
 - 禁止占位符正文（如 `[TODO]`、`[待补充]`）。
 - 保留承接关系：若上章有明确钩子，本章必须回应（可部分兑现）。
@@ -345,7 +369,7 @@ cat "${SKILL_ROOT}/references/writing/typesetting.md"
 
 使用 Task 调用 `data-agent`，参数：
 - `chapter`
-- `chapter_file` 必须传入实际章节文件路径；若详细大纲已有章节名，优先传 `正文/第{chapter_padded}章-{title_safe}.md`，否则传 `正文/第{chapter_padded}章.md`
+- `chapter_file` 必须传入实际章节文件路径（使用 `${CHAPTER_PATH}` 或 `find_chapter_file` 获取）
 - `review_score=Step 3 overall_score`
 - `project_root`
 - `storage_path=.webnovel/`
@@ -406,7 +430,7 @@ git -c i18n.commitEncoding=UTF-8 commit -m "第{chapter_num}章: {title}"
 
 未满足以下条件前，不得结束流程：
 
-1. 章节正文文件存在且非空：`正文/第{chapter_padded}章-{title_safe}.md` 或 `正文/第{chapter_padded}章.md`
+1. 章节正文文件存在且非空：`${PROJECT_ROOT}/${CHAPTER_PATH}`
 2. Step 3 已产出 `overall_score` 且 `review_metrics` 成功落库
 3. Step 4 已处理全部 `critical`，`high` 未修项有 deviation 记录
 4. Step 4 的 `anti_ai_force_check=pass`（基于全文检查；fail 时不得进入 Step 5）
@@ -419,7 +443,7 @@ git -c i18n.commitEncoding=UTF-8 commit -m "第{chapter_num}章: {title}"
 
 ```bash
 test -f "${PROJECT_ROOT}/.webnovel/state.json"
-test -f "${PROJECT_ROOT}/正文/第${chapter_padded}章.md"
+test -f "${PROJECT_ROOT}/${CHAPTER_PATH}"
 test -f "${PROJECT_ROOT}/.webnovel/summaries/ch${chapter_padded}.md"
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index get-recent-review-metrics --limit 1
 tail -n 1 "${PROJECT_ROOT}/.webnovel/observability/data_agent_timing.jsonl" || true
