@@ -1,0 +1,65 @@
+[
+  {
+    "name": "地摊老人",
+    "category": "次要角色",
+    "role": "疑似遗迹守望者 / 古书其他传承者",
+    "firstAppearance": "第1章（D-60，地摊）",
+    "realm": null
+  },
+  {
+    "name": "建筑工人三人组",
+    "category": "次要角色",
+    "role": "建筑工人 → 幸存者 → 陈默团队的成员",
+    "firstAppearance": "第42章",
+    "realm": null
+  },
+  {
+    "name": "林晓",
+    "category": "次要角色",
+    "role": "大学生 → 幸存者 → 陈默团队的成员",
+    "firstAppearance": "第27章（防空洞）",
+    "realm": null
+  },
+  {
+    "name": "赵敏",
+    "category": "次要角色",
+    "role": "大学生 → 幸存者",
+    "firstAppearance": "第42章",
+    "realm": null
+  },
+  {
+    "name": "防空洞守夜人",
+    "category": "次要角色",
+    "role": "疑似遗迹守望者成员",
+    "firstAppearance": "第9章（D-52，防空洞外）",
+    "realm": null
+  },
+  {
+    "name": "掠夺者团伙",
+    "category": "反派角色",
+    "role": "末世后形成的武装掠夺团体",
+    "firstAppearance": "",
+    "realm": null
+  },
+  {
+    "name": "蓝色影子",
+    "category": "反派角色",
+    "role": "未知（末世中的神秘存在）",
+    "firstAppearance": "第15章（D-46，陈默预知苏雨命运时看到）",
+    "realm": null
+  },
+  {
+    "name": "血色黄昏",
+    "category": "反派角色",
+    "role": "",
+    "firstAppearance": "第40章",
+    "realm": null
+  },
+  {
+    "name": "韩山",
+    "category": "反派角色",
+    "role": "血色黄昏组织首领",
+    "firstAppearance": "第41章",
+    "realm": null
+  }
+]

@@ -107,7 +107,9 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         params = urllib.parse.parse_qs(parsed.query)
 
         try:
-            if path == '/api/files/tree':
+            if path == '/api/files':
+                self.handle_files_list(params)
+            elif path == '/api/files/tree':
                 self.handle_file_tree()
             elif path == '/api/files/read':
                 self.handle_file_read(params)
@@ -127,6 +129,10 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_review_metrics(params)
             elif path == '/api/overview':
                 self.handle_overview()
+            elif path == '/api/characters':
+                self.handle_characters()
+            elif path == '/api/items':
+                self.handle_items()
             else:
                 self.send_error(404, 'Not Found')
         except Exception as e:
@@ -139,6 +145,34 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
+
+    def handle_files_list(self, params):
+        path = params.get('path', [''])[0]
+        if not path:
+            self.send_json({'error': '缺少 path 参数'}, 400)
+            return
+
+        full_path = (PROJECT_ROOT / path).resolve()
+        if not str(full_path).startswith(str(PROJECT_ROOT.resolve())):
+            self.send_json({'error': '非法路径'}, 403)
+            return
+
+        if not full_path.is_dir():
+            self.send_json({'error': '目录不存在'}, 404)
+            return
+
+        try:
+            files = []
+            for child in sorted(full_path.iterdir()):
+                if child.is_file():
+                    files.append({
+                        'name': child.name,
+                        'path': str(child.relative_to(PROJECT_ROOT)).replace('\\', '/'),
+                        'size': child.stat().st_size
+                    })
+            self.send_json(files)
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
 
     def handle_file_tree(self):
         result = {}
@@ -185,10 +219,10 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json({'error': '非法路径'}, 403)
             return
 
-        allowed = ['正文', '大纲', '设定集']
+        allowed = ['正文', '大纲', '设定集', '审查报告']
         rel = full_path.relative_to(PROJECT_ROOT)
         if rel.parts[0] not in allowed:
-            self.send_json({'error': '仅允许访问正文/大纲/设定集'}, 403)
+            self.send_json({'error': '仅允许访问正文/大纲/设定集/审查报告'}, 403)
             return
 
         if not full_path.is_file():
@@ -528,6 +562,136 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             overdue=overdue,
             recent=recent,
         )
+
+    def handle_characters(self):
+        """处理角色库请求"""
+        chars_dir = PROJECT_ROOT / '设定集' / '角色库'
+        characters = []
+        
+        if chars_dir.is_dir():
+            for category in ['主要角色', '次要角色', '反派角色']:
+                cat_dir = chars_dir / category
+                if cat_dir.is_dir():
+                    for md_file in cat_dir.glob('*.md'):
+                        try:
+                            content = md_file.read_text(encoding='utf-8')
+                            parsed = self._parse_character_file(content, category, md_file.stem)
+                            if parsed:
+                                characters.append(parsed)
+                        except Exception as e:
+                            logger.warning(f"Failed to parse character file {md_file}: {e}")
+        
+        self.send_json(characters)
+
+    def _parse_character_file(self, content: str, category: str, filename: str) -> Dict[str, Any]:
+        """解析角色卡文件"""
+        result = {
+            'name': filename,
+            'category': category,
+            'role': '',
+            'age': '',
+            'identity': '',
+            'first_appearance': '',
+            'keywords': '',
+            'personality': '',
+            'goal': '',
+            'ability': '',
+            'threat_level': ''
+        }
+        
+        current_section = ''
+        for line in content.split('\n'):
+            line = line.strip()
+            
+            if line.startswith('## '):
+                current_section = line[3:].strip()
+                continue
+            
+            if line.startswith('- '):
+                if '：' in line:
+                    key, value = line[2:].split('：', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    
+                    if key == '姓名':
+                        result['name'] = value
+                    elif key == '年龄':
+                        result['age'] = value
+                    elif key == '身份':
+                        result['identity'] = value
+                        result['role'] = value.split('→')[0].strip()
+                    elif '首次出场' in key:
+                        result['first_appearance'] = value
+                    elif key == '觉醒等级' or key == '境界/等级':
+                        result['ability'] = value
+                    elif key == '当前威胁' or key == '威胁程度':
+                        result['threat_level'] = value
+                
+                if current_section == '核心标签' and '关键词' in line:
+                    result['keywords'] = line.split('：')[-1].strip()
+                elif current_section == '性格与底色' and '核心性格' in line:
+                    result['personality'] = line.split('：')[-1].strip()
+                elif current_section == '动机与目标' and ('目标' in line or '渴望' in line):
+                    result['goal'] = line.split('：')[-1].strip()
+        
+        return result
+
+    def handle_items(self):
+        """处理物品库请求"""
+        items_dir = PROJECT_ROOT / '设定集' / '物品库'
+        items = []
+        
+        if items_dir.is_dir():
+            for md_file in items_dir.glob('**/*.md'):
+                try:
+                    content = md_file.read_text(encoding='utf-8')
+                    current_category = ''
+                    current_item = None
+                    
+                    for line in content.split('\n'):
+                        line = line.strip()
+                        
+                        if line.startswith('## '):
+                            current_category = line[3:].strip()
+                            continue
+                        
+                        if line.startswith('### '):
+                            if current_item and current_item.get('name'):
+                                items.append(current_item)
+                            current_item = {
+                                'name': line[4:].strip(),
+                                'category': current_category,
+                                'type': '',
+                                'source': '',
+                                'function': '',
+                                'status': '',
+                                'first_appearance': ''
+                            }
+                            continue
+                        
+                        if current_item and line.startswith('- ') and '：' in line:
+                            key, value = line[2:].split('：', 1)
+                            key = key.strip()
+                            value = value.strip()
+                            
+                            if key == '类型':
+                                current_item['type'] = value
+                            elif key == '来源':
+                                current_item['source'] = value
+                            elif key == '功能':
+                                current_item['function'] = value
+                            elif key == '状态':
+                                current_item['status'] = value
+                            elif '首次出场' in key:
+                                current_item['first_appearance'] = value
+                    
+                    if current_item and current_item.get('name'):
+                        items.append(current_item)
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to parse item file {md_file}: {e}")
+        
+        self.send_json(items)
 
     def log_message(self, format, *args):
         if '/api/' in str(args):

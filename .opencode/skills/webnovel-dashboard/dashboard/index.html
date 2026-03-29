@@ -9,9 +9,6 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <!-- D3.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <!-- Vis.js Timeline -->
-    <script src="https://unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
-    <link href="https://unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
@@ -126,24 +123,6 @@
             background: rgba(102, 126, 234, 0.2) !important;
         }
         
-        /* Timeline dark mode */
-        body.dark .vis-timeline {
-            background: var(--card-dark) !important;
-            border: 1px solid var(--border-dark) !important;
-        }
-        
-        body.dark .vis-time-axis .vis-text {
-            color: #94a3b8 !important;
-        }
-        
-        body.dark .vis-grid.vis-vertical {
-            border-left: 1px solid #334155 !important;
-        }
-        
-        body.dark .vis-label {
-            color: #e2e8f0 !important;
-        }
-        
         .gradient-text {
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             -webkit-background-clip: text;
@@ -230,28 +209,6 @@
             font-size: 12px;
             font-weight: 500;
             pointer-events: none;
-        }
-        
-        /* Timeline Styles */
-        .vis-timeline {
-            border: none !important;
-            font-family: 'Noto Sans SC', sans-serif !important;
-        }
-        
-        .vis-item {
-            border-color: var(--primary) !important;
-            background-color: var(--primary) !important;
-            color: white !important;
-            border-radius: 4px !important;
-        }
-        
-        .vis-item.vis-selected {
-            background-color: var(--primary-dark) !important;
-            border-color: var(--primary-dark) !important;
-        }
-        
-        .vis-time-axis .vis-text {
-            color: #64748b !important;
         }
         
         /* Scrollbar */
@@ -586,42 +543,7 @@
                 </div>
             </div>
 
-            <!-- 倒计时 -->
-            <div v-show="activeTab === 'countdown'" class="fade-in">
-                <h2 class="text-xl font-bold mb-4"><i class="fas fa-hourglass-half mr-2 text-red-500"></i>倒计时追踪器</h2>
-                
-                <!-- 倒计时事件 -->
-                <div class="space-y-4">
-                    <div v-for="event in countdownEvents" :key="event.name"
-                         class="card card-light p-4">
-                        <div class="flex items-center justify-between mb-3">
-                            <div>
-                                <h3 class="font-bold">{{ event.name }}</h3>
-                                <p class="text-sm opacity-60">{{ event.description }}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-3xl font-bold" :class="event.remaining <= 10 ? 'text-red-600' : 'text-blue-600'">
-                                    D-{{ event.remaining }}
-                                </p>
-                                <p class="text-xs opacity-60">{{ event.target }}</p>
-                            </div>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" :style="{ width: event.progress + '%' }"
-                                 :class="event.remaining <= 10 ? 'bg-red-500' : ''"></div>
-                        </div>
-                        <div class="flex justify-between text-xs opacity-60 mt-1">
-                            <span>起始: {{ event.start }}</span>
-                            <span>当前: {{ event.current }}</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div v-if="countdownEvents.length === 0" class="card card-light p-8 text-center opacity-60">
-                    <p>暂无倒计时事件</p>
-                    <p class="text-xs mt-1">从 chapter_meta 的 countdown 字段自动提取</p>
-                </div>
-            </div>
+
         </div>
                         </div>
                     </div>
@@ -945,34 +867,6 @@
                 
                 <div class="card card-light p-4" style="height: 550px;">
                     <div id="relationship-graph" class="w-full h-full"></div>
-                </div>
-            </div>
-
-            <!-- 故事时间线 -->
-            <div v-show="activeTab === 'timeline'" class="fade-in">
-                <h2 class="text-xl font-bold mb-4"><i class="fas fa-clock mr-2 text-indigo-500"></i>故事时间线</h2>
-                
-                <!-- 阶段图例 -->
-                <div class="card card-light p-3 mb-4">
-                    <div class="flex flex-wrap gap-4 text-xs">
-                        <div class="flex items-center gap-2">
-                            <div class="w-4 h-1 rounded bg-green-500"></div>
-                            <span>末世前（D-60 ~ D-1）</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <div class="w-4 h-1 rounded bg-amber-500"></div>
-                            <span>末世降临（D-0）</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <div class="w-4 h-1 rounded bg-red-500"></div>
-                            <span>末世后（D+1 ~）</span>
-                        </div>
-                    </div>
-                    <p class="text-xs opacity-50 mt-2">提示：滚轮缩放时间轴，拖拽移动</p>
-                </div>
-                
-                <div class="card card-light p-4">
-                    <div id="timeline" class="w-full" style="height: 420px;"></div>
                 </div>
             </div>
 
@@ -1398,21 +1292,23 @@
                 const foreshadowFilter = ref('all');
                 
                 const tabs = [
+                    // 第一组：总览与结构
                     { id: 'overview', name: '总览', icon: 'fas fa-home' },
                     { id: 'volume', name: '卷结构', icon: 'fas fa-layer-group' },
-                    { id: 'protagonist', name: '角色', icon: 'fas fa-users' },
-                    { id: 'foreshadow', name: '伏笔', icon: 'fas fa-gem' },
-                    { id: 'review', name: '审查', icon: 'fas fa-clipboard-check' },
-                    { id: 'relationship', name: '图谱', icon: 'fas fa-project-diagram' },
-                    { id: 'timeline', name: '时间线', icon: 'fas fa-clock' },
-                    { id: 'progress', name: '进度', icon: 'fas fa-chart-bar' },
                     { id: 'chapters', name: '章节', icon: 'fas fa-list-alt' },
+                    // 第二组：角色体系
+                    { id: 'protagonist', name: '角色', icon: 'fas fa-users' },
+                    { id: 'relationship', name: '图谱', icon: 'fas fa-project-diagram' },
                     { id: 'growth', name: '成长', icon: 'fas fa-chart-line' },
                     { id: 'factions', name: '势力', icon: 'fas fa-map-marked-alt' },
-                    { id: 'entities', name: '实体', icon: 'fas fa-book' },
+                    // 第三组：写作追踪
+                    { id: 'progress', name: '进度', icon: 'fas fa-chart-bar' },
+                    { id: 'foreshadow', name: '伏笔', icon: 'fas fa-gem' },
                     { id: 'reading', name: '追读力', icon: 'fas fa-fire' },
+                    // 第四组：质量与工具
+                    { id: 'review', name: '审查', icon: 'fas fa-clipboard-check' },
+                    { id: 'entities', name: '实体', icon: 'fas fa-book' },
                     { id: 'files', name: '文档', icon: 'fas fa-folder-open' },
-                    { id: 'countdown', name: '倒计时', icon: 'fas fa-hourglass-half' },
                 ];
                 
                 // 二级标签（更多菜单）- 已禁用，直接显示所有标签
@@ -1544,12 +1440,176 @@
                     { content: '临渊塔与遗迹的关联', planted: 3, target: 30, tier: '支线', status: '未回收' },
                 ]);
                 
-                const timelineData = ref([]);
                 const chapterMeta = ref({});
                 
                 // 审查数据
                 const reviewData = ref([]);
                 const reviewCharts = ref({ score: null, issues: null, radar: null });
+
+                // 解析审查报告Markdown文件
+                const parseReviewReport = (content, filename) => {
+                    const result = {
+                        chapters: filename.replace(/[^0-9-]/g, '') || 'unknown',
+                        overall_score: null,
+                        dimension_scores: {},
+                        severity_counts: {},
+                        critical_issues: [],
+                        reviewed_at: null,
+                        source: 'file'
+                    };
+
+                    // Format A: 提取综合评分 (e.g., | **综合评分** | **8.0** | **B+（良好）** |)
+                    const scoreMatchA = content.match(/\*\*综合评分\*\*.*?\*\*(\d+(?:\.\d+)?)\*\*/s);
+                    // Format B: 提取 Overall Score (e.g., **Overall Score**: 58 / 100)
+                    const scoreMatchB = content.match(/\*\*Overall Score\*\*.*?(\d+)\s*\/\s*100/i);
+                    // Alternative Format B: **Overall Score**: 58 / 100
+                    const scoreMatchB2 = content.match(/\*\*Overall Score\*\*:\s*(\d+)\s*\/\s*100/i);
+                    
+                    if (scoreMatchA) {
+                        result.overall_score = parseFloat(scoreMatchA[1]);
+                    } else if (scoreMatchB) {
+                        result.overall_score = parseFloat(scoreMatchB[1]);
+                    } else if (scoreMatchB2) {
+                        result.overall_score = parseFloat(scoreMatchB2[1]);
+                    }
+
+                    // 从表格中提取维度分数 - Format A (lines like | 爽点密度 | 7.5 | 良好 |)
+                    const dims = ['爽点密度', '设定一致性', '节奏控制', '人物塑造', '连贯性', '追读力'];
+                    
+                    // Format A: 标准格式 | 维度 | 分数 | 评价 |
+                    let dimMatches = content.match(/\|\s*(爽点密度|设定一致性|节奏控制|人物塑造|连贯性|追读力)\s*\|\s*(\d+(?:\.\d+)?)\s*\|/g);
+                    
+                    // Format B: 表格格式 | 爽点密度 | 5.0 | 缺少打脸爽点... |
+                    if (!dimMatches || dimMatches.length < 3) {
+                        dimMatches = content.match(/\|(爽点密度|设定一致性|节奏控制|人物塑造|连贯性|追读力)\|(\d+(?:\.\d+)?)/g);
+                    }
+                    
+                    if (dimMatches) {
+                        dimMatches.forEach(m => {
+                            const match = m.match(/\|(爽点密度|设定一致性|节奏控制|人物塑造|连贯性|追读力)\|(\d+(?:\.\d+)?)/);
+                            if (match) {
+                                const dimName = match[1].trim();
+                                const dimScore = parseFloat(match[2]);
+                                if (dims.includes(dimName)) {
+                                    result.dimension_scores[dimName] = dimScore;
+                                }
+                            }
+                        });
+                    }
+
+                    // Format A: 提取问题统计 (e.g., | 🔴 critical | 1 | 时间线矛盾 |)
+                    const criticalMatch = content.match(/🔴\s*critical\s*\|\s*(\d+)/i);
+                    const highMatch = content.match(/🟠\s*high\s*\|\s*(\d+)/i);
+                    const mediumMatch = content.match(/🟡\s*medium\s*\|\s*(\d+)/i);
+                    const lowMatch = content.match(/🟢\s*low\s*\|\s*(\d+)/i);
+
+                    if (criticalMatch) result.severity_counts.critical = parseInt(criticalMatch[1]);
+                    if (highMatch) result.severity_counts.high = parseInt(highMatch[1]);
+                    if (mediumMatch) result.severity_counts.medium = parseInt(mediumMatch[1]);
+                    if (lowMatch) result.severity_counts.low = parseInt(lowMatch[1]);
+
+                    // Format B: 从优先级表格统计问题数量
+                    if (Object.keys(result.severity_counts).length === 0) {
+                        // 统计🔴 高优先级问题数量
+                        const highPrioritySection = content.match(/### 🔴 高优先级.*?(?=###|$)/s);
+                        if (highPrioritySection) {
+                            const count = (highPrioritySection[0].match(/^\|\s*\d+\s*\|/gm) || []).length;
+                            if (count > 0) result.severity_counts.critical = count;
+                        }
+                        
+                        // 统计🟠 中优先级问题数量
+                        const mediumPrioritySection = content.match(/### 🟠 中优先级.*?(?=###|$)/s);
+                        if (mediumPrioritySection) {
+                            const count = (mediumPrioritySection[0].match(/^\|\s*\d+\s*\|/gm) || []).length;
+                            if (count > 0) result.severity_counts.high = count;
+                        }
+                        
+                        // 统计🟡 低优先级问题数量
+                        const lowPrioritySection = content.match(/### 🟡 低优先级.*?(?=###|$)/s);
+                        if (lowPrioritySection) {
+                            const count = (lowPrioritySection[0].match(/^\|\s*\d+\s*\|/gm) || []).length;
+                            if (count > 0) result.severity_counts.medium = count;
+                        }
+                    }
+
+                    // Format A: 提取严重问题
+                    const criticalSection = content.match(/## 严重问题.*?(?=##|$)/s);
+                    if (criticalSection) {
+                        const issues = criticalSection[0].match(/###\s*[^#\n]+/g);
+                        if (issues) {
+                            result.critical_issues = issues.map(i => i.replace(/###\s*[^:：]+[：:]\s*/, '').trim()).slice(0, 5);
+                        }
+                    }
+
+                    // Format B: 从高优先级部分提取问题
+                    if (result.critical_issues.length === 0) {
+                        const highPrioritySection = content.match(/### 🔴 高优先级.*?(?=###|$)/s);
+                        if (highPrioritySection) {
+                            const issues = highPrioritySection[0].match(/\|\s*\d+\s*\|\s*([^|]+)\s*\|/g);
+                            if (issues) {
+                                result.critical_issues = issues.slice(0, 5).map(i => {
+                                    const match = i.match(/\|\s*\d+\s*\|\s*([^|]+)\s*\|/);
+                                    return match ? match[1].trim() : '';
+                                }).filter(i => i);
+                            }
+                        }
+                    }
+
+                    // 提取审查日期 - Format A
+                    let dateMatch = content.match(/审查时间[：:]\s*(.+)/);
+                    // Format B
+                    if (!dateMatch) {
+                        dateMatch = content.match(/\*\*审查时间\*\*[：:]\s*(.+)/);
+                    }
+                    // Fallback: 从标题提取
+                    if (!dateMatch) {
+                        dateMatch = content.match(/^#\s*第\d+章.*?(\d{4}-\d{2}-\d{2})/m);
+                    }
+                    if (dateMatch) {
+                        result.reviewed_at = dateMatch[1].trim();
+                    }
+
+                    return result;
+                };
+
+                // 从文件加载审查报告
+                const loadReviewReportsFromFiles = async () => {
+                    try {
+                        const reviewPath = encodeURIComponent('审查报告');
+                        const resp = await fetch(`${API_BASE}/api/files?path=${reviewPath}`);
+                        if (resp.ok) {
+                            const files = await resp.json();
+                            const mdFiles = files.filter(f => f.name && f.name.endsWith('.md'));
+                            
+                            for (const file of mdFiles) {
+                                try {
+                                    const filePath = encodeURIComponent(`审查报告/${file.name}`);
+                                    const fileResp = await fetch(`${API_BASE}/api/files/read?path=${filePath}`);
+                                    if (fileResp.ok) {
+                                        const data = await fileResp.json();
+                                        const parsed = parseReviewReport(data.content, file.name);
+                                        
+                                        // 检查是否已存在相同章节的审查数据
+                                        const existingIndex = reviewData.value.findIndex(r => 
+                                            r.chapters === parsed.chapters && r.source === 'file'
+                                        );
+                                        
+                                        if (existingIndex === -1) {
+                                            reviewData.value.push(parsed);
+                                        } else {
+                                            // 合并数据，优先使用文件中的数据
+                                            reviewData.value[existingIndex] = { ...reviewData.value[existingIndex], ...parsed };
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn('Failed to load review file:', file.name, e);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to load review reports:', e);
+                    }
+                };
                 
                 const reviewStats = computed(() => {
                     if (reviewData.value.length === 0) return null;
@@ -1916,43 +1976,8 @@
                             }));
                         }
                         
-                        // 提取时间线数据
+                        // 提取章节元数据
                         chapterMeta.value = data.chapter_meta || {};
-                        const timelineItems = [];
-                        const baseDate = new Date('2024-06-01'); // 假设末世前60天是2024年6月1日
-                        
-                        for (const [chNum, chData] of Object.entries(data.chapter_meta || {})) {
-                            const chapter = parseInt(chNum);
-                            if (chapter > 50) break; // 只显示第1-50章
-                            
-                            // 从 countdown 解析天数
-                            let dayOffset = 0;
-                            const countdown = chData.countdown || '';
-                            const match = countdown.match(/D(-?\d+)/);
-                            if (match) {
-                                dayOffset = parseInt(match[1]);
-                            } else if (countdown.includes('无') || countdown === '') {
-                                // 末世后，默认 D+5 开始
-                                dayOffset = 5 + (chapter - 29) * 3;
-                            }
-                            
-                            // 计算日期
-                            const eventDate = new Date(baseDate);
-                            eventDate.setDate(baseDate.getDate() + dayOffset + 60); // D-60 开始
-                            
-                            timelineItems.push({
-                                id: chapter,
-                                content: chData.title || `第${chapter}章`,
-                                start: eventDate,
-                                chapter: chapter,
-                                timeAnchor: chData.time_anchor || '',
-                                satisfaction: chData.satisfaction || ''
-                            });
-                        }
-                        
-                        // 按章节排序
-                        timelineItems.sort((a, b) => a.chapter - b.chapter);
-                        timelineData.value = timelineItems;
                         
                         // 加载审查数据
                         if (data.review_checkpoints) {
@@ -1962,9 +1987,13 @@
                                 dimension_scores: r.dimension_scores || {},
                                 severity_counts: r.severity_counts || {},
                                 critical_issues: r.critical_issues || [],
-                                reviewed_at: r.reviewed_at
+                                reviewed_at: r.reviewed_at,
+                                source: 'state'
                             }));
                         }
+
+                        // 扫描审查报告目录并解析Markdown文件
+                        loadReviewReportsFromFiles();
 
                         lastUpdated.value = new Date().toLocaleString('zh-CN', { 
                             year: 'numeric', 
@@ -2219,143 +2248,6 @@
                     }
                 };
 
-                // Initialize Timeline - 使用小说内时间
-                const initTimeline = () => {
-                    const container = document.getElementById('timeline');
-                    if (!container) return;
-                    
-                    // 清除已有内容
-                    container.innerHTML = '';
-
-                    // 解析小说内时间
-                    const parseStoryTime = (timeAnchor, countdown, chapter) => {
-                        // 末世前时间：D-60 表示末世前60天
-                        const dMatch = countdown?.match(/D(-?\d+)/);
-                        if (dMatch) {
-                            const days = parseInt(dMatch[1]);
-                            return {
-                                label: days >= 0 ? `末世前${days}天` : `末世后${Math.abs(days)}天`,
-                                order: days,
-                                phase: days > 0 ? 'before' : 'after'
-                            };
-                        }
-                        
-                        // 末世后时间：末世第X天
-                        const postMatch = timeAnchor?.match(/末世第(\d+)天/);
-                        if (postMatch) {
-                            const days = parseInt(postMatch[1]);
-                            return {
-                                label: `末世第${days}天`,
-                                order: -days,
-                                phase: 'post'
-                            };
-                        }
-                        
-                        // 默认使用章节序号
-                        return {
-                            label: `第${chapter}章`,
-                            order: chapter,
-                            phase: 'unknown'
-                        };
-                    };
-
-                    // 从 chapterMeta 构建时间线数据
-                    const timelineItems = [];
-                    const chapters = chapterMeta.value;
-                    
-                    for (const [chNum, chData] of Object.entries(chapters)) {
-                        const chapter = parseInt(chNum);
-                        if (chapter > 31) break;
-                        
-                        const timeInfo = parseStoryTime(
-                            chData.time_anchor || '',
-                            chData.countdown || '',
-                            chapter
-                        );
-                        
-                        // 使用虚拟日期来排列（基于小说内时间顺序）
-                        const virtualDate = new Date('2024-01-01');
-                        virtualDate.setDate(virtualDate.getDate() + timeInfo.order + 100);
-                        
-                        timelineItems.push({
-                            id: chapter,
-                            content: chData.title || `第${chapter}章`,
-                            start: virtualDate,
-                            chapter: chapter,
-                            storyTime: timeInfo.label,
-                            timeAnchor: chData.time_anchor || '',
-                            satisfaction: chData.satisfaction || '',
-                            phase: timeInfo.phase
-                        });
-                    }
-                    
-                    timelineItems.sort((a, b) => a.chapter - b.chapter);
-
-                    // 如果没有数据，使用默认
-                    const items = new vis.DataSet(timelineItems.length > 0 ? timelineItems : [
-                        { id: 1, content: '第1章 地摊买书', start: new Date('2024-04-01'), storyTime: '末世前60天' },
-                        { id: 31, content: '第31章 探索古书', start: new Date('2024-05-31'), storyTime: '末世第7天' },
-                    ]);
-
-                    // 阶段颜色
-                    const getPhaseColor = (phase) => {
-                        switch(phase) {
-                            case 'before': return '#10b981';  // 末世前：绿色
-                            case 'after': return '#f59e0b';   // 末世初期：橙色
-                            case 'post': return '#ef4444';    // 末世后：红色
-                            default: return '#667eea';
-                        }
-                    };
-
-                    // 计算时间范围
-                    let minDate = new Date('2024-03-01');
-                    let maxDate = new Date('2024-07-01');
-                    
-                    if (items.length > 0) {
-                        const dates = items.get().map(item => new Date(item.start));
-                        minDate = new Date(Math.min(...dates));
-                        maxDate = new Date(Math.max(...dates));
-                        minDate.setDate(minDate.getDate() - 2);
-                        maxDate.setDate(maxDate.getDate() + 5);
-                    }
-
-                    const options = {
-                        height: '400px',
-                        start: minDate,
-                        end: maxDate,
-                        zoomMin: 1000 * 60 * 60 * 24 * 3,
-                        zoomMax: 1000 * 60 * 60 * 24 * 100,
-                        orientation: 'top',
-                        showCurrentTime: false,
-                        format: {
-                            minorLabels: () => '',
-                            majorLabels: () => ''
-                        },
-                        template: function(item, element, data) {
-                            const phaseColor = getPhaseColor(data.phase);
-                            return `<div class="timeline-item" style="padding: 6px 10px; border-left: 3px solid ${phaseColor}; background: ${phaseColor}15; border-radius: 4px;">
-                                <div class="font-bold text-sm">${data.content}</div>
-                                <div class="text-xs mt-1" style="color: ${phaseColor}; font-weight: 600;">
-                                    <i class="fas fa-clock mr-1"></i>${data.storyTime}
-                                </div>
-                            </div>`;
-                        }
-                    };
-
-                    try {
-                        const timeline = new vis.Timeline(container, items, options);
-                        
-                        // 添加阶段标签
-                        const phases = [
-                            { label: '末世前', color: '#10b981' },
-                            { label: '末世降临', color: '#f59e0b' },
-                            { label: '末世后', color: '#ef4444' }
-                        ];
-                    } catch (e) {
-                        console.error('Timeline init error:', e);
-                    }
-                };
-
                 // 写作进度统计
                 const writingStats = computed(() => {
                     const chapters = Object.values(chapterMeta.value);
@@ -2418,7 +2310,6 @@
                     { id: 'chapters', name: '章节速览', desc: '浏览所有章节', icon: 'fas fa-list-alt', bgColor: 'bg-teal-500' },
                     { id: 'characters', name: '角色管理', desc: '角色与实体', icon: 'fas fa-users', bgColor: 'bg-blue-500' },
                     { id: 'foreshadow', name: '伏笔追踪', desc: '伏笔状态', icon: 'fas fa-gem', bgColor: 'bg-amber-500' },
-                    { id: 'timeline', name: '时间线', desc: '故事时间轴', icon: 'fas fa-clock', bgColor: 'bg-indigo-500' },
                     { id: 'review', name: '审查报告', desc: '质量分析', icon: 'fas fa-clipboard-check', bgColor: 'bg-green-500' },
                     { id: 'writing', name: '写作统计', desc: '进度与字数', icon: 'fas fa-pen', bgColor: 'bg-pink-500' },
                     { id: 'files', name: '文档浏览', desc: '查看源文件', icon: 'fas fa-folder-open', bgColor: 'bg-yellow-500' },
@@ -2433,35 +2324,6 @@
                 const toggleFolder = (path) => {
                     expandedFolders.value[path] = !expandedFolders.value[path];
                 };
-                
-                // 倒计时
-                const countdownEvents = computed(() => {
-                    const events = [];
-                    const chapters = chapterMeta.value;
-                    const currentCh = progress.value.currentChapter;
-                    
-                    for (const [chNum, chData] of Object.entries(chapters)) {
-                        const countdown = chData.countdown || '';
-                        const match = countdown.match(/D(-?\d+)/);
-                        if (match) {
-                            const days = parseInt(match[1]);
-                            if (days > 0 && days <= 60) {
-                                const progressPercent = Math.round(((60 - days) / 60) * 100);
-                                events.push({
-                                    name: chData.title || `第${chNum}章`,
-                                    description: chData.satisfaction || '',
-                                    start: 'D-60',
-                                    current: `D-${days}`,
-                                    target: 'D-0 (末世降临)',
-                                    remaining: days,
-                                    progress: progressPercent
-                                });
-                            }
-                        }
-                    }
-                    
-                    return events.sort((a, b) => a.remaining - b.remaining);
-                });
                 
                 // API 调用函数
                 const API_BASE = 'http://localhost:8086';
@@ -2523,6 +2385,59 @@
                     }
                 };
                 
+                // 从设定集加载角色数据
+                const loadCharactersFromSettings = async () => {
+                    try {
+                        const resp = await fetch(`${API_BASE}/api/characters`);
+                        if (resp.ok) {
+                            const chars = await resp.json();
+                            // 合并到 otherCharacters（避免重复）
+                            const existingNames = new Set(otherCharacters.value.map(c => c.name));
+                            for (const char of chars) {
+                                if (!existingNames.has(char.name)) {
+                                    otherCharacters.value.push({
+                                        name: char.name,
+                                        role: char.role || char.identity,
+                                        category: char.category,
+                                        realm: char.ability,
+                                        firstAppearance: char.first_appearance
+                                    });
+                                    existingNames.add(char.name);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Failed to load characters from settings:', e);
+                    }
+                };
+                
+                // 从设定集加载物品数据
+                const loadItemsFromSettings = async () => {
+                    try {
+                        const resp = await fetch(`${API_BASE}/api/items`);
+                        if (resp.ok) {
+                            const itemsData = await resp.json();
+                            // 合并到 items（避免重复）
+                            const existingNames = new Set(items.value.map(i => i.name));
+                            for (const item of itemsData) {
+                                if (!existingNames.has(item.name)) {
+                                    items.value.push({
+                                        name: item.name,
+                                        role: item.function || item.type,
+                                        type: item.type,
+                                        status: item.status,
+                                        source: item.source,
+                                        firstAppearance: item.first_appearance
+                                    });
+                                    existingNames.add(item.name);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Failed to load items from settings:', e);
+                    }
+                };
+                
                 // 格式化 JSON
                 const formatJSON = (str) => {
                     try {
@@ -2549,10 +2464,17 @@
                         
                         // 解析小说内时间
                         let storyTime = '';
-                        const dMatch = countdown.match(/D(-?\d+)/);
+                        // 匹配 D-数字 或 D+数字 格式
+                        const dMatch = countdown.match(/D([-+]?)(\d+)/);
                         if (dMatch) {
-                            const days = parseInt(dMatch[1]);
-                            storyTime = days >= 0 ? `末世前${days}天` : `末世后${Math.abs(days)}天`;
+                            const sign = dMatch[1];
+                            const days = parseInt(dMatch[2]);
+                            // D- 表示末世前，D+ 或空表示末世后
+                            if (sign === '-') {
+                                storyTime = `末世前${days}天`;
+                            } else {
+                                storyTime = days === 0 ? '末世降临' : `末世第${days}天`;
+                            }
                         } else {
                             const postMatch = chData.time_anchor?.match(/末世第(\d+)天/);
                             if (postMatch) storyTime = `末世第${postMatch[1]}天`;
@@ -2710,9 +2632,6 @@
                             if (activeTab.value === 'relationship') {
                                 initRelationshipGraph();
                             }
-                            if (activeTab.value === 'timeline') {
-                                initTimeline();
-                            }
                             if (activeTab.value === 'review') {
                                 initReviewCharts();
                             }
@@ -2732,9 +2651,6 @@
                         setTimeout(() => {
                             if (newTab === 'relationship') {
                                 initRelationshipGraph();
-                            }
-                            if (newTab === 'timeline') {
-                                initTimeline();
                             }
                             if (newTab === 'review') {
                                 initReviewCharts();
@@ -2772,7 +2688,6 @@
                     nextTick(() => {
                         setTimeout(() => {
                             initRelationshipGraph();
-                            initTimeline();
                         }, 100);
                     });
                 });
@@ -2863,8 +2778,6 @@
                     loadFile,
                     expandedFolders,
                     toggleFolder,
-                    // 新增：倒计时
-                    countdownEvents,
                     // 新增：更多菜单
                     moreTabs,
                     showMoreMenu,
