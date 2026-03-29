@@ -30,8 +30,8 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                      OpenCode                               │
 ├─────────────────────────────────────────────────────────────┤
-│  Skills (9个): init / plan / write / review / export /     │
-│                dashboard / query / resume / learn           │
+│  Skills (10个): init / plan / write / review / export /    │
+│                dashboard / query / resume / learn / publish│
 ├─────────────────────────────────────────────────────────────┤
 │  Agents (8个): context-agent / data-agent /                 │
 │                 6 维 Checker                                 │

@@ -59,6 +59,8 @@ WORKSPACE_ROOT/
 
 ## 常用运维命令
 
+详细命令说明见 [rag-and-config.md](./rag-and-config.md) 和 [commands.md](./commands.md)。
+
 ```bash
 # 进入小说项目目录后
 
