@@ -10,9 +10,9 @@ allowed-tools: Read Write Edit Grep Bash Task
 
 | 模式 | 流程 |
 |------|------|
-| 标准 | Step 0 → 1 → 2A → 2B → 3 → 4 → 5 → 6 |
-| --fast | Step 0 → 1 → 2A → 3 → 4 → 5 → 6 |
-| --minimal | Step 0 → 1 → 2A → 3 → 4 → 5 → 6 |
+| 标准 | Step 0 → 0.5 → 1 → 2A → 2B → 3 → 4 → 5 → 6 |
+| --fast | Step 0 → 0.5 → 1 → 2A → 3 → 4 → 5 → 6 |
+| --minimal | Step 0 → 0.5 → 1 → 2A → 3 → 4 → 5 → 6 |
 
 **产出**：`正文/第N卷/第NNNN章-{title}.md`（自动适配卷目录）、`review_metrics`、`.webnovel/summaries/chNNNN.md`
 
@@ -36,8 +36,8 @@ echo "章节文件将写入: ${CHAPTER_PATH}"
 ## 引用加载等级（strict, lazy）
 
 - L0：未进入对应步骤前，不加载任何参考文件。
-- L1：每步仅加载该步“必读”文件。
-- L2：仅在触发条件满足时加载“条件必读/可选”文件。
+- L1：每步仅加载该步"必读"文件。
+- L2：仅在触发条件满足时加载"条件必读/可选"文件。
 
 路径约定：
 - `references/...` 相对当前 skill 目录。
@@ -79,59 +79,6 @@ echo "将撰写第 ${CHAPTER_NUM} 章"
 
 **硬门槛**：preflight 必须成功。失败则阻断。
 
-### Step 1：Context Agent
-
-使用 Task 调用 `context-agent`，生成创作执行包（任务书 + Context Contract + 直写提示词）。
-
-### Step 2A：正文起草
-
-```bash
-# 获取章节文件的默认路径（自动适配卷目录）
-CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter ${CHAPTER_NUM})
-echo "章节文件将写入: ${CHAPTER_PATH}"
-```
-
-加载 `core-constraints.md`，输出纯正文到 `${PROJECT_ROOT}/${CHAPTER_PATH}`。
-
-**约束**：禁止占位符、保留上章钩子、2000-2500字、中文叙事单元。
-
-### Step 2B：风格适配（--fast/--minimal 跳过）
-
-加载 `style-adapter.md`，只做表达层转译，不改剧情事实。
-
-### Step 3：审查
-
-**动态加载审查器**（从 registry.yaml）：
-```bash
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode {standard|minimal|full} --format json
-```
-
-**审查器配置**：
-- `core`：始终执行（consistency-checker、continuity-checker、ooc-checker）
-- `conditional`：满足触发条件时执行（reader-pull-checker、high-point-checker、pacing-checker）
-
-**执行规则**：
-1. 加载 registry.yaml 获取审查器列表和分类
-2. 根据模式（standard/minimal/full）确定应执行的审查器
-3. 使用 Task 并行调用各审查器
-4. 审查器输出必须符合 schema.yaml 格式
-5. critical > 0 则修复后才能进入 Step 4
-
-### Step 4：润色
-
-加载 `polish-guide.md` + `typesetting.md`。按序修复 critical/high/medium/low，执行 Anti-AI 终检。
-
-### Step 5：Data Agent
-
-使用 Task 调用 `data-agent`，执行实体提取、状态回写、场景切片、RAG 索引。
-
-### Step 6：Git 备份
-
-```bash
-git add . && git commit -m "第{chapter_num}章: {title}"
-```
-- “已就绪输入”与“缺失输入”清单；缺失则阻断并提示先补齐。
-
 ### Step 0.5：工作流断点记录（best-effort，不阻断）
 
 ```bash
@@ -146,7 +93,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" wor
 - 任何记录失败只记警告，不阻断写作。
 - 每个 Step 执行结束后，同样需要 `complete-step`（失败不阻断）。
 
-### Step 1：Context Agent（内置 Context Contract，生成直写执行包）
+### Step 1：Context Agent
 
 使用 Task 调用 `context-agent`，参数：
 - `chapter`
@@ -159,11 +106,11 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" wor
 - 输出必须同时包含：
   - 7 板块任务书（目标/冲突/承接/角色/场景约束/伏笔/追读力）；
   - Context Contract 全字段（目标/阻力/代价/本章变化/未闭合问题/开头类型/情绪节奏/信息密度/过渡章判定/追读力设计）；
-  - Step 2A 可直接消费的“写作执行包”（章节节拍、不可变事实清单、禁止事项、终检清单）。
-- 合同与任务书出现冲突时，以“大纲与设定约束更严格者”为准。
+  - Step 2A 可直接消费的"写作执行包"（章节节拍、不可变事实清单、禁止事项、终检清单）。
+- 合同与任务书出现冲突时，以"大纲与设定约束更严格者"为准。
 
 输出：
-- 单一“创作执行包”（任务书 + Context Contract + 直写提示词），供 Step 2A 直接消费，不再拆分独立 Step 1.5。
+- 单一"创作执行包"（任务书 + Context Contract + 直写提示词），供 Step 2A 直接消费，不再拆分独立 Step 1.5。
 
 ### Step 2A：正文起草
 
@@ -200,7 +147,7 @@ cat "${SKILL_ROOT}/references/style-adapter.md"
 
 硬要求：
 - 只做表达层转译，不改剧情事实、事件顺序、角色行为结果、设定规则。
-- 对“模板腔、说明腔、机械腔”做定向改写，为 Step 4 留出问题修复空间。
+- 对"模板腔、说明腔、机械腔"做定向改写，为 Step 4 留出问题修复空间。
 
 输出：
 - 风格化正文（覆盖原章节文件）。
@@ -468,4 +415,4 @@ tail -n 1 "${PROJECT_ROOT}/.webnovel/observability/data_agent_timing.jsonl" || t
    - 审查缺失：只重跑 Step 3 并落库；
    - 润色失真：恢复 Step 2A 输出并重做 Step 4；
    - 摘要/状态缺失：只重跑 Step 5；
-3. 重新执行“验证与交付”全部检查，通过后结束。
+3. 重新执行"验证与交付"全部检查，通过后结束。
