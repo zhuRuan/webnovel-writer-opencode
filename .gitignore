@@ -78,3 +78,6 @@ prompts/
 # Playwright 浏览器数据（发布模块）
 .opencode/browser_user_data/
 .opencode/fanqie_auth_state.json
+
+# 推广素材（本地生成）
+webnovel-promo/

@@ -108,7 +108,8 @@ class PublisherManager:
         if not chapters_dir.is_dir():
             raise PublisherError(f"正文目录不存在: {chapters_dir}")
 
-        chapter_files = sorted(chapters_dir.glob("*.txt"))
+        # 递归搜索所有 .md 和 .txt 文件
+        chapter_files = sorted(chapters_dir.rglob("*.md")) + sorted(chapters_dir.rglob("*.txt"))
         if not chapter_files:
             raise PublisherError(f"未找到章节文件: {chapters_dir}")
 
@@ -136,7 +137,7 @@ class PublisherManager:
         for path in selected:
             content = path.read_text(encoding="utf-8")
             content = self._clean_chapter_content(content)
-            title = path.stem
+            title = self._extract_chapter_title(path)
             chapter_num = extract_chapter_num(path)
             chapters.append({
                 "chapter_number": chapter_num,
@@ -145,6 +146,19 @@ class PublisherManager:
             })
 
         return chapters
+
+    def _extract_chapter_title(self, path: Path) -> str:
+        """从文件名提取章节标题
+
+        "第0044章-遗迹深处" → "遗迹深处"
+        "第0001章-地摊买书" → "地摊买书"
+        """
+        stem = path.stem
+        if "-" in stem:
+            parts = stem.split("-", 1)
+            if len(parts) > 1:
+                return parts[1].strip()
+        return stem
 
     def _clean_chapter_content(self, content: str) -> str:
         """清理章节内容"""
@@ -267,6 +281,53 @@ async def cmd_create_book(
         await manager.close()
 
 
+def _cleanup_txt_files(project_root: Path, range_spec: str) -> int:
+    """清理上传后残留的 .txt 文件（仅删除有对应 .md 的 .txt）"""
+    chapters_dir = project_root / "正文"
+    if not chapters_dir.is_dir():
+        return 0
+
+    txt_files = list(chapters_dir.glob("*.txt"))
+    if not txt_files:
+        return 0
+
+    def extract_chapter_num(path: Path) -> int:
+        nums = "".join(c for c in path.stem if c.isdigit())
+        return int(nums) if nums else 0
+
+    if range_spec.lower() == "all":
+        selected = txt_files
+    elif "-" in range_spec:
+        start, end = range_spec.split("-")
+        selected = [f for f in txt_files if int(start) <= extract_chapter_num(f) <= int(end)]
+    elif "," in range_spec:
+        nums = [int(n) for n in range_spec.split(",")]
+        selected = [f for f in txt_files if extract_chapter_num(f) in nums]
+    else:
+        selected = [f for f in txt_files if extract_chapter_num(f) == int(range_spec)]
+
+    cleaned = 0
+    for txt_path in selected:
+        md_path = txt_path.with_suffix(".md")
+        if md_path.exists():
+            deleted = True
+        else:
+            # 检查第1卷目录（章节可能在正文/或正文/第1卷/）
+            md_in_subdir = (project_root / "正文" / "第1卷" / txt_path.name).with_suffix(".md")
+            if md_in_subdir.exists():
+                md_path = md_in_subdir
+                deleted = True
+            else:
+                deleted = False
+        if deleted:
+            try:
+                txt_path.unlink()
+                cleaned += 1
+            except OSError:
+                pass
+    return cleaned
+
+
 async def cmd_upload(
     project_root: Optional[Path],
     book_id: str,
@@ -284,8 +345,14 @@ async def cmd_upload(
 
         print(f"\n上传完成: 成功 {success_count}, 失败 {fail_count}\n")
         for r in results:
-            status = "✓" if r.get("success") else "✗"
-            print(f"  {status} {r.get('message', '')}")
+            status = "OK" if r.get("success") else "FAIL"
+            print(f"  [{status}] {r.get('message', '')}")
+
+        if success_count > 0 and project_root:
+            cleaned = _cleanup_txt_files(project_root, range_spec)
+            if cleaned:
+                print(f"\n已清理 {cleaned} 个临时 .txt 文件")
+
         return 0 if fail_count == 0 else 1
     except Exception as e:
         logger.exception("上传章节失败: %s", e)
