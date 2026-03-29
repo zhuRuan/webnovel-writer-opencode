@@ -158,63 +158,64 @@ cat "${SKILL_ROOT}/references/style-adapter.md"
 
 执行前加载审查器配置：
 ```bash
-# 获取标准模式审查器列表
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode standard --format json
+# 获取当前模式审查器列表（standard/minimal/full）
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode ${MODE} --format json
 
 # 验证审查器配置完整性
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers validate
 ```
 
+其中 `${MODE}` 根据写作模式确定：standard（默认）、minimal（--minimal）、full（--full）。
+
 审查器配置来源：`../../checkers/registry.yaml`（配置） + `../../agents/*.md`（实现）
 
-**模式判定**：
-- `--minimal`：`--mode minimal`（只执行核心审查器）
-- `--fast`/标准：`--mode standard`（执行核心 + 条件命中）
+**模式判定**（来自 registry.yaml `modes` 配置）：
+- `--minimal`：`--mode minimal`（只执行 core 类别审查器）
+- `--fast`/标准：`--mode standard`（执行 core + conditional 类别）
+- `--full`：`--mode full`（强制启用所有 conditional 审查器）
 
-**审查器分类**：
-- 核心审查器（始终执行）：由 registry.yaml 中 `category: core` 定义
-- 条件审查器（满足任一条件则执行）：
+**审查器分类**（来自 registry.yaml）：
+- 核心审查器（`category: core`）：始终执行，由 registry.yaml 的 `triggers: []` 定义
+- 条件审查器（`category: conditional`）：满足 triggers 条件时执行：
   - `reader-pull-checker`：非过渡章、有未闭合问题
   - `high-point-checker`：关键章/高潮章、有战斗/打脸/反转信号
   - `pacing-checker`：章号 >= 10 或节奏失衡风险
 
+**审查器完整配置**请参考 `registry.yaml` 的 `checkers` 节点。
+
 #### 3.2 调用审查器（关键）
 
+**加载审查器配置**：
+```bash
+# 加载 registry.yaml 获取完整配置（包括 invoke_template）
+cat "${SKILL_ROOT}/../../checkers/registry.yaml"
+
+# 根据模式获取应执行的审查器列表
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode {standard|minimal|full} --format json
+```
+
+**动态构建 Task 调用**：
+1. 从 registry.yaml 的 `checkers` 节点获取每个审查器的 `invoke_template`
+2. 替换模板中的占位符：`{chapter}`、`{chapter_file}`、`{PROJECT_ROOT}`
+3. 使用 Task 工具并行调用各审查器
+
 **⚠️ 重要约束**：
-- 必须让 OpenCode 加载 agent 文件的完整定义
+- 必须让 OpenCode 加载 agent 文件的完整定义（registry.yaml 的 `file` 字段指向 .opencode/agents/*.md）
 - **不要**在 prompt 中包含具体检查项、JSON 模板、评分标准
 - prompt 中只传递必要参数（章节号、文件路径、项目根）
 - 如需传递额外上下文（如上章钩子、大纲标签），只放在 prompt 最后作为"背景信息"
 
-**Task 调用模板**：
+**Task 调用示例**（动态替换 invoke_template）：
 ```
 并行调用审查器（使用 Task 工具）：
 
 Task 1:
-  - agent/subagent: consistency-checker
+  - agent/subagent: {checker_id}
   - prompt: |
-      对第 {chapter} 章执行设定一致性审查。
+      {invoke_template}
       - 章节文件：{chapter_file}
       - 项目根：{PROJECT_ROOT}
-      - 审查器实现见：.opencode/agents/consistency-checker.md（由 registry.yaml 的 file 字段指定）
-
-Task 2:
-  - agent/subagent: continuity-checker
-  - prompt: |
-      对第 {chapter} 章执行连贯性审查。
-      - 章节文件：{chapter_file}
-      - 项目根：{PROJECT_ROOT}
-      - 审查器实现见：.opencode/agents/continuity-checker.md（由 registry.yaml 的 file 字段指定）
-
-Task 3:
-  - agent/subagent: ooc-checker
-  - prompt: |
-      对第 {chapter} 章执行人物OOC审查。
-      - 章节文件：{chapter_file}
-      - 项目根：{PROJECT_ROOT}
-      - 审查器实现见：.opencode/agents/ooc-checker.md（由 registry.yaml 的 file 字段指定）
-
-（条件审查器若有触发，按同样方式调用）
+      - 审查器定义见：.opencode/agents/{checker_id}.md
 ```
 
 #### 3.3 审查器输出格式约束
