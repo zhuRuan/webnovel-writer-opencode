@@ -6,21 +6,48 @@ IndexChapterMixin extracted from IndexManager.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
 class IndexChapterMixin:
-    def add_chapter(self, meta: ChapterMeta):
-        """添加/更新章节元数据"""
+
+    def _compute_chapter_hash(self, meta: ChapterMeta) -> str:
+        """计算章节内容哈希（用于增量检测）"""
+        content = f"{meta.title}|{meta.location}|{meta.word_count}|{meta.summary}|{len(meta.characters)}"
+        return hashlib.md5(content.encode("utf-8")).hexdigest()
+
+    def _get_chapter_hash(self, chapter: int) -> Optional[str]:
+        """获取章节已有哈希"""
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT content_hash FROM chapters WHERE chapter = ?", (chapter,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    def add_chapter(self, meta: ChapterMeta, incremental: bool = True):
+        """添加/更新章节元数据
+
+        Args:
+            meta: 章节元数据
+            incremental: 是否启用增量检测（默认 True）
+        """
+        content_hash = self._compute_chapter_hash(meta)
+
+        if incremental:
+            existing_hash = self._get_chapter_hash(meta.chapter)
+            if existing_hash and existing_hash == content_hash:
+                return
+
         with self._get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO chapters
-                (chapter, title, location, word_count, characters, summary)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (chapter, title, location, word_count, characters, summary, content_hash, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """,
                 (
                     meta.chapter,
@@ -29,6 +56,7 @@ class IndexChapterMixin:
                     meta.word_count,
                     json.dumps(meta.characters, ensure_ascii=False),
                     meta.summary,
+                    content_hash,
                 ),
             )
             conn.commit()
@@ -61,6 +89,36 @@ class IndexChapterMixin:
                 self._row_to_dict(row, parse_json=["characters"])
                 for row in cursor.fetchall()
             ]
+
+    def get_chapters_needing_reindex(self, chapters: List[int]) -> List[int]:
+        """获取需要重新索引的章节列表（增量检测）
+
+        Args:
+            chapters: 待检查的章节列表
+
+        Returns:
+            实际需要重新索引的章节列表
+        """
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            result = []
+            for ch in chapters:
+                cursor.execute(
+                    "SELECT content_hash, updated_at FROM chapters WHERE chapter = ?",
+                    (ch,),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    result.append(ch)
+            return result
+
+    def get_max_chapter(self) -> int:
+        """获取最大章节号"""
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT MAX(chapter) FROM chapters")
+            row = cursor.fetchone()
+            return row[0] or 0
 
     # ==================== 场景操作 ====================
 
@@ -241,15 +299,19 @@ class IndexChapterMixin:
         word_count: int,
         entities: List[Dict],
         scenes: List[Dict],
+        incremental: bool = True,
     ) -> Dict[str, int]:
         """
         处理章节数据，批量写入索引
+
+        Args:
+            incremental: 是否启用增量检测（默认 True）
 
         返回写入统计
         """
         from .index_manager import ChapterMeta, SceneMeta
 
-        stats = {"chapters": 0, "scenes": 0, "appearances": 0}
+        stats = {"chapters": 0, "scenes": 0, "appearances": 0, "incremental": incremental}
 
         # 提取出场角色
         characters = [e.get("id") for e in entities if e.get("type") == "角色"]
@@ -262,8 +324,9 @@ class IndexChapterMixin:
                 location=location,
                 word_count=word_count,
                 characters=characters,
-                summary="",  # 可后续由 Data Agent 生成
-            )
+                summary="",
+            ),
+            incremental=incremental,
         )
         stats["chapters"] = 1
 

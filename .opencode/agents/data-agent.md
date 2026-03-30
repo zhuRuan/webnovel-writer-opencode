@@ -165,8 +165,13 @@ hook_strength: "strong"
 python .opencode/scripts/webnovel.py --project-root "{project_root}" rag index-chapter \
   --chapter 100 \
   --scenes '[...]' \
-  --summary "本章摘要文本"
+  --summary "本章摘要文本" \
+  --incremental
 ```
+
+**增量索引**：
+- 默认启用 `--incremental`，仅更新变化的切片，大幅降低大规模项目的索引时间
+- 首次索引或需要全量重建时，使用 `--no-incremental`
 
 **父子索引规则**：
 - 父块: `chunk_type='summary'`, `chunk_id='ch0100_summary'`

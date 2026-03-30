@@ -4,6 +4,13 @@
 
 Webnovel Writer 是基于 OpenCode 的长篇网文 AI 创作系统，降低 AI 写作中的"遗忘"和"幻觉"，支持长周期连载创作。
 
+## 快速开始
+
+```bash
+# 推荐：跨平台安装（Linux/macOS/Windows）
+python install.py
+```
+
 ## 构建/测试/开发命令
 
 ```bash
@@ -156,8 +163,9 @@ def load_state(self) -> bool:
 │   ├── genres/           # 38+ 题材参考
 │   └── templates/        # 输出模板
 ├── opencode.json        # Agent 配置
-├── .env                 # API 配置
-└── init.sh / init.bat  # 安装脚本
+├── .env                 # API 配置（模板）
+├── install.py          # 跨平台安装脚本
+└── requirements.txt    # Python 依赖
 ```
 
 ## 关键约定

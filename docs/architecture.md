@@ -75,5 +75,5 @@
 │   └── templates/       # 输出模板
 ├── opencode.json          # Agents 配置
 ├── .env                   # API 配置
-└── init.sh / init.bat    # 安装脚本
+└── install.py             # 跨平台安装脚本
 ```

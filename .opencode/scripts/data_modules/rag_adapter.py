@@ -16,6 +16,7 @@ import json
 import math
 import logging
 import shutil
+import hashlib
 from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
@@ -37,7 +38,7 @@ from .observability import safe_append_perf_timing, safe_log_tool_call
 
 logger = logging.getLogger(__name__)
 
-RAG_SCHEMA_VERSION = "2"
+RAG_SCHEMA_VERSION = "3"
 VECTOR_REQUIRED_COLUMNS = (
     "chunk_id",
     "chapter",
@@ -47,7 +48,9 @@ VECTOR_REQUIRED_COLUMNS = (
     "parent_chunk_id",
     "chunk_type",
     "source_file",
+    "content_hash",
     "created_at",
+    "updated_at",
 )
 
 
@@ -166,7 +169,9 @@ class RAGAdapter:
                 parent_chunk_id TEXT,
                 chunk_type TEXT DEFAULT 'scene',
                 source_file TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                content_hash TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
@@ -215,7 +220,9 @@ class RAGAdapter:
                 parent_chunk_id TEXT,
                 chunk_type TEXT DEFAULT 'scene',
                 source_file TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                content_hash TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
@@ -376,9 +383,29 @@ class RAGAdapter:
 
     # ==================== 向量存储 ====================
 
-    async def store_chunks(self, chunks: List[Dict]) -> int:
+    def _compute_content_hash(self, content: str) -> str:
+        """计算内容哈希（用于增量检测）"""
+        return hashlib.md5(content.encode("utf-8")).hexdigest()
+
+    def _get_chunk_hash(self, chunk_id: str) -> Optional[str]:
+        """获取已有 chunk 的哈希"""
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT content_hash FROM vectors WHERE chunk_id = ?", (chunk_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    async def store_chunks(
+        self,
+        chunks: List[Dict],
+        incremental: bool = True,
+    ) -> int:
         """
         存储场景切片的向量
+
+        Args:
+            chunks: 切片列表
+            incremental: 是否启用增量检测（默认 True）
 
         chunks 格式:
         [
@@ -397,38 +424,41 @@ class RAGAdapter:
         if not chunks:
             return 0
 
-        # 提取内容用于嵌入
-        contents = [c.get("content", "") for c in chunks]
+        filtered_chunks = []
+        if incremental:
+            for chunk in chunks:
+                chunk_type = chunk.get("chunk_type") or "scene"
+                chunk_id = chunk.get("chunk_id")
+                if not chunk_id:
+                    if chunk_type == "summary":
+                        chunk_id = f"ch{int(chunk['chapter']):04d}_summary"
+                    else:
+                        chunk_id = f"ch{int(chunk['chapter']):04d}_s{int(chunk['scene_index'])}"
+                content = chunk.get("content", "")
+                new_hash = self._compute_content_hash(content)
+                existing_hash = self._get_chunk_hash(chunk_id)
+                if existing_hash and existing_hash == new_hash:
+                    continue
+                filtered_chunks.append(chunk)
+        else:
+            filtered_chunks = chunks
 
-        # 调用 API 获取嵌入向量（可能包含 None 表示失败）
+        if not filtered_chunks:
+            return 0
+
+        contents = [c.get("content", "") for c in filtered_chunks]
         embeddings = await self.api_client.embed_batch(contents)
 
         if not embeddings:
             return 0
 
-        # 存储到数据库（跳过嵌入失败的 chunk）
         stored = 0
         skipped = 0
         errors = []
         with self._get_conn() as conn:
             cursor = conn.cursor()
 
-            for chunk, embedding in zip(chunks, embeddings):
-                if embedding is None:
-                    # 嵌入失败，跳过该 chunk（仅存储 BM25 索引供关键词检索）
-                    skipped += 1
-                    chunk_id = chunk.get("chunk_id")
-                    if not chunk_id:
-                        if chunk.get("chunk_type") == "summary":
-                            chunk_id = f"ch{int(chunk['chapter']):04d}_summary"
-                        else:
-                            chunk_id = f"ch{int(chunk['chapter']):04d}_s{int(chunk['scene_index'])}"
-                    try:
-                        self._update_bm25_index(cursor, chunk_id, chunk.get("content", ""))
-                    except Exception as e:
-                        errors.append(f"BM25 index failed for {chunk_id}: {e}")
-                    continue
-
+            for chunk, embedding in zip(filtered_chunks, embeddings):
                 chunk_type = chunk.get("chunk_type") or "scene"
                 chunk_id = chunk.get("chunk_id")
                 if not chunk_id:
@@ -437,27 +467,37 @@ class RAGAdapter:
                     else:
                         chunk_id = f"ch{int(chunk['chapter']):04d}_s{int(chunk['scene_index'])}"
 
-                # 将向量序列化为 bytes
+                content = chunk.get("content", "")
+                content_hash = self._compute_content_hash(content)
+
+                if embedding is None:
+                    skipped += 1
+                    try:
+                        self._update_bm25_index(cursor, chunk_id, content)
+                    except Exception as e:
+                        errors.append(f"BM25 index failed for {chunk_id}: {e}")
+                    continue
+
                 embedding_bytes = self._serialize_embedding(embedding)
 
                 cursor.execute("""
                     INSERT OR REPLACE INTO vectors
-                    (chunk_id, chapter, scene_index, content, embedding, parent_chunk_id, chunk_type, source_file)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (chunk_id, chapter, scene_index, content, embedding, parent_chunk_id, chunk_type, source_file, content_hash, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """, (
                     chunk_id,
                     chunk["chapter"],
                     chunk.get("scene_index", 0) if chunk_type == "scene" else 0,
-                    chunk.get("content", ""),
+                    content,
                     embedding_bytes,
                     chunk.get("parent_chunk_id"),
                     chunk_type,
                     chunk.get("source_file"),
+                    content_hash,
                 ))
 
-                # 同时更新 BM25 索引
                 try:
-                    self._update_bm25_index(cursor, chunk_id, chunk.get("content", ""))
+                    self._update_bm25_index(cursor, chunk_id, content)
                 except Exception as e:
                     errors.append(f"BM25 index failed for {chunk_id}: {e}")
 
@@ -469,7 +509,6 @@ class RAGAdapter:
                 logger.error("SQLite commit failed: %s", e)
                 errors.append(f"SQLite commit failed: {e}")
 
-        # 输出警告日志
         if skipped > 0:
             logger.warning(
                 "Vector embedding: %s stored, %s skipped (embedding failed)",
@@ -477,8 +516,7 @@ class RAGAdapter:
                 skipped,
             )
         if errors:
-
-            for err in errors[:5]:  # 最多显示5条
+            for err in errors[:5]:
                 logger.warning("%s", err)
 
         return stored
@@ -1407,6 +1445,19 @@ def main():
     index_parser.add_argument("--chapter", type=int, required=True)
     index_parser.add_argument("--scenes", required=True, help="JSON 格式的场景列表")
     index_parser.add_argument("--summary", required=False, help="章节摘要文本")
+    index_parser.add_argument(
+        "--incremental",
+        dest="incremental",
+        action="store_true",
+        default=True,
+        help="启用增量索引（默认开启）",
+    )
+    index_parser.add_argument(
+        "--no-incremental",
+        dest="incremental",
+        action="store_false",
+        help="禁用增量索引（全量重建）",
+    )
 
     # 搜索
     search_parser = subparsers.add_parser("search")
@@ -1513,9 +1564,9 @@ def main():
                 }
             )
 
-        stored = asyncio.run(adapter.store_chunks(chunks))
+        stored = asyncio.run(adapter.store_chunks(chunks, incremental=args.incremental))
         skipped = len(chunks) - stored
-        result = {"stored": stored, "skipped": skipped, "total": len(chunks)}
+        result = {"stored": stored, "skipped": skipped, "total": len(chunks), "incremental": args.incremental}
         if skipped > 0:
             emit_success(result, message="indexed_with_warnings", chapter=args.chapter)
         else:

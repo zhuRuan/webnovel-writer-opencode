@@ -248,7 +248,9 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                     word_count INTEGER,
                     characters TEXT,
                     summary TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    content_hash TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
@@ -619,6 +621,24 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
 
             conn.commit()
 
+        self._migrate_schema()
+
+    def _migrate_schema(self):
+        """迁移 schema（添加新字段到已有表）"""
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("PRAGMA table_info(chapters)")
+            chapters_cols = {row[1] for row in cursor.fetchall()}
+
+            if "content_hash" not in chapters_cols:
+                cursor.execute("ALTER TABLE chapters ADD COLUMN content_hash TEXT")
+
+            if "updated_at" not in chapters_cols:
+                cursor.execute("ALTER TABLE chapters ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+
+            conn.commit()
+
     @contextmanager
     def _get_conn(self):
         """获取数据库连接"""
@@ -674,6 +694,33 @@ def main():
     process_parser.add_argument("--word-count", type=int, required=True)
     process_parser.add_argument("--entities", required=True, help="JSON 格式的实体列表")
     process_parser.add_argument("--scenes", required=True, help="JSON 格式的场景列表")
+    process_parser.add_argument(
+        "--incremental",
+        dest="incremental",
+        action="store_true",
+        default=True,
+        help="启用增量索引（默认开启）",
+    )
+    process_parser.add_argument(
+        "--no-incremental",
+        dest="incremental",
+        action="store_false",
+        help="禁用增量索引（全量重建）",
+    )
+
+    # 更新索引（增量/全量）
+    update_index_parser = subparsers.add_parser("update-index")
+    update_index_parser.add_argument("--chapter", type=int, help="指定章节号")
+    update_index_parser.add_argument(
+        "--recent",
+        type=int,
+        help="更新最近 N 章",
+    )
+    update_index_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="全量重建（忽略增量优化）",
+    )
 
     # ==================== v5.1 引入命令 ====================
 
@@ -950,8 +997,75 @@ def main():
             word_count=args.word_count,
             entities=entities,
             scenes=scenes,
+            incremental=args.incremental,
         )
         emit_success(stats, message="chapter_processed", chapter=args.chapter)
+
+    elif args.command == "update-index":
+        from .rag_adapter import RAGAdapter
+
+        rag_adapter = RAGAdapter(config)
+        chapters_to_update = []
+
+        if args.chapter:
+            chapters_to_update = [args.chapter]
+        elif args.recent:
+            max_ch = manager.get_max_chapter()
+            chapters_to_update = list(range(max(args.recent, 1), max_ch + 1))
+        else:
+            emit_error("NO_TARGET", "请指定 --chapter 或 --recent")
+            return
+
+        incremental = not args.full
+
+        updated = 0
+        skipped = 0
+        for ch in chapters_to_update:
+            chapter_meta = manager.get_chapter(ch)
+            if not chapter_meta:
+                skipped += 1
+                continue
+
+            scenes = manager.get_scenes_by_chapter(ch)
+            if not scenes:
+                skipped += 1
+                continue
+
+            chunks = []
+            if chapter_meta.get("summary"):
+                chunks.append({
+                    "chapter": ch,
+                    "scene_index": 0,
+                    "content": chapter_meta["summary"],
+                    "chunk_type": "summary",
+                    "chunk_id": f"ch{ch:04d}_summary",
+                    "source_file": f"summaries/ch{ch:04d}.md",
+                })
+
+            for sc in scenes:
+                scene_index = sc.get("scene_index", 0)
+                chunks.append({
+                    "chapter": ch,
+                    "scene_index": scene_index,
+                    "content": sc.get("summary", ""),
+                    "chunk_type": "scene",
+                    "chunk_id": f"ch{ch:04d}_s{scene_index}",
+                    "parent_chunk_id": f"ch{ch:04d}_summary",
+                    "source_file": f"正文/第{ch:04d}章.md#scene_{scene_index}",
+                })
+
+            import asyncio
+            stored = asyncio.run(rag_adapter.store_chunks(chunks, incremental=incremental))
+            if stored > 0:
+                updated += 1
+
+        result = {
+            "updated": updated,
+            "skipped": skipped,
+            "total": len(chapters_to_update),
+            "incremental": incremental,
+        }
+        emit_success(result, message="index_updated")
 
     # ==================== v5.1 引入命令处理 ====================
 
