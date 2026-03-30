@@ -70,6 +70,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" exp
 | `--volume` | 按卷导出 | `1`, `2` |
 | `--output` | 输出路径 | `小说.md`, `导出/第一卷.txt` |
 | `--author` | 作者名 | 仅 EPUB 需要 |
+| `--cover` | 封面图路径 | `cover.jpg`, `images/封面.png` |
+| `--style` | 自定义 CSS | `style.css` |
+| `--cover-size` | 封面裁剪尺寸 | `1200x1600` |
 
 ### Step 3：验证
 
@@ -115,6 +118,50 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" wor
 | 未找到章节 | `正文/` 目录不存在 | 先用 `/webnovel-write` 创建章节 |
 | 导出失败 | ebooklib 未安装 | `pip install ebooklib` |
 | 格式不支持 | 用了不支持的格式 | 使用 markdown/txt/epub |
+
+## 封面和样式配置
+
+### 自动检测
+
+EPUB 导出时会自动检测以下文件：
+- `{project_root}/cover.jpg` - 封面图片
+- `{project_root}/style.css` - 自定义样式
+
+### 自定义 CSS 示例
+
+```css
+/* 首行缩进（默认样式）*/
+body {
+    font-family: "SimSun", "Songti SC", serif;
+    line-height: 1.8;
+    text-indent: 2em;
+    margin: 1em;
+}
+h1, h2, h3 {
+    text-align: center;
+    text-indent: 0;
+}
+```
+
+### 封面裁剪
+
+封面会自动裁剪到标准尺寸（默认 1200x1600），使用居中裁剪。
+
+### 使用示例
+
+```bash
+# 使用默认封面和样式
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export --format epub
+
+# 指定自定义封面
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export --format epub --cover images/my_cover.jpg
+
+# 指定自定义样式
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export --format epub --style my_style.css
+
+# 同时指定封面和样式
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export --format epub --cover cover.jpg --style style.css --cover-size 1200x1600 --author "作者名"
+```
 
 ## 依赖
 

@@ -97,6 +97,7 @@
 /webnovel-export --format markdown
 /webnovel-export --range 1-10 --format epub
 /webnovel-export --volume 1 --format txt
+/webnovel-export --format epub --cover cover.jpg --style style.css --author "作者名"
 ```
 
 参数：
@@ -108,6 +109,9 @@
 | `--volume` | 导出指定卷 |
 | `--output` | 输出文件路径 |
 | `--author` | 作者名（仅 EPUB 需要） |
+| `--cover` | 封面图路径（仅 EPUB，默认检测项目根目录/cover.jpg） |
+| `--style` | 自定义 CSS 路径（仅 EPUB，默认检测项目根目录/style.css） |
+| `--cover-size` | 封面裁剪尺寸（仅 EPUB，格式如 1200x1600） |
 
 ## `/webnovel-publish`
 
