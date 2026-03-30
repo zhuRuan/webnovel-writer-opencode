@@ -1,5 +1,7 @@
 # Webnovel Writer for OpenCode
 
+> 遇到问题？先查阅 [常见问题](./docs/FAQ.md)
+
 [![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![OpenCode](https://img.shields.io/badge/OpenCode-Compatible-purple.svg)](https://opencode.ai)
 [![GitHub Stars](https://img.shields.io/github/stars/lujih/webnovel-writer-opencode)](https://github.com/lujih/webnovel-writer-opencode/stargazers)
