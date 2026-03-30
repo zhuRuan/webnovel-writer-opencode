@@ -29,6 +29,8 @@ allowed-tools: Read Grep Bash AskUserQuestion
 - 前端服务器：端口 8085
 - API 服务器：端口 8086
 
+> **智能端口管理**: 启动时会自动检查端口占用情况，如果端口被占用会自动尝试释放。如果释放失败会提示您手动关闭占用程序。
+
 **Windows:**
 ```batch
 @echo off
@@ -45,6 +47,12 @@ python /path/to/dashboard/api_server.py /path/to/novel/project &
 # 启动前端服务器（后台运行）
 python /path/to/dashboard/dashboard_server.py /path/to/novel/project &
 ```
+
+**推荐方式（自动管理端口）:**
+```bash
+python /path/to/dashboard/dashboard_server.py /path/to/novel/project
+```
+此方式会自动检查并尝试释放被占用的端口。
 
 ### 2. 浏览器访问
 
@@ -148,4 +156,14 @@ webnovel-dashboard/
 - 检查 `.webnovel/state.json` 文件是否存在
 
 ### 端口被占用
-- 修改 `dashboard_server.py` 中的 `PORT` 变量
+- **自动处理**: 启动时会自动检测并尝试释放被占用的端口
+- **手动处理**: 如果自动释放失败，请手动关闭占用端口的程序（8085 或 8086）
+- **查看占用**: 使用以下命令查看端口占用：
+  - Windows: `netstat -ano | findstr ":8085"` 或 `netstat -ano | findstr ":8086"`
+  - Linux/Mac: `lsof -i :8085` 或 `lsof -i :8086`
+- **修改端口**: 如需使用其他端口，可修改 `dashboard_server.py` 和 `api_server.py` 中的 `PORT` 变量
+
+### 需要安装 psutil（可选但推荐）
+- 自动释放端口功能需要 psutil 库
+- 安装命令: `pip install psutil`
+- 如果未安装，脚本会提示手动关闭占用端口的程序

@@ -14,10 +14,66 @@ import json
 import re
 
 PORT = 8085
+API_PORT = 8086
 
 # 全局变量
 PROJECT_ROOT = None
 DASHBOARD_DIR = None
+
+
+def is_port_in_use(port: int) -> bool:
+    """检查端口是否已被占用"""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1)
+        return s.connect_ex(('localhost', port)) == 0
+
+
+def kill_process_on_port(port: int) -> bool:
+    """杀死占用指定端口的进程"""
+    import psutil
+    import signal
+    
+    for conn in psutil.net_connections():
+        if conn.laddr.port == port and conn.status == 'LISTEN':
+            try:
+                proc = psutil.Process(conn.pid)
+                print(f"正在终止占用端口 {port} 的进程: {proc.name()} (PID: {conn.pid})")
+                proc.send_signal(signal.SIGTERM)
+                proc.wait(timeout=3)
+                return True
+            except psutil.NoSuchProcess:
+                pass
+            except Exception as e:
+                print(f"无法终止进程: {e}")
+                return False
+    return False
+
+
+def check_and_free_port(port: int, port_name: str = "端口") -> bool:
+    """检查并尝试释放端口"""
+    if not is_port_in_use(port):
+        return True
+    
+    print(f"[警告] {port_name} {port} 已被占用!")
+    print(f"尝试自动终止旧进程...")
+    
+    try:
+        if kill_process_on_port(port):
+            import time
+            time.sleep(0.5)
+            if is_port_in_use(port):
+                print(f"[错误] 无法释放 {port_name} {port}，请手动关闭占用该端口的程序后重试")
+                return False
+            print(f"[成功] {port_name} {port} 已释放")
+            return True
+        else:
+            print(f"[错误] 无法自动释放 {port_name} {port}")
+            return False
+    except ImportError:
+        print(f"[错误] 需要安装 psutil 库来自动管理进程: pip install psutil")
+        print(f"[提示] 请手动关闭占用 {port_name} {port} 的程序后重试")
+        return False
 
 
 def scan_character_library(project_root):
@@ -124,6 +180,10 @@ class DualHandler(http.server.SimpleHTTPRequestHandler):
 def main():
     global PROJECT_ROOT, DASHBOARD_DIR
     
+    # 启动前检查端口
+    if not check_and_free_port(PORT, "前端端口"):
+        return
+    
     # 启动 API 服务器
     dashboard_dir = os.path.dirname(os.path.abspath(__file__))
     api_server_path = os.path.join(dashboard_dir, 'api_server.py')
@@ -134,16 +194,7 @@ def main():
         project_arg = os.path.abspath(project_root) if project_root else os.path.dirname(dashboard_dir)
         
         # 检查 API 服务器是否已运行
-        import socket
-        api_running = False
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(1)
-            result = sock.connect_ex(('localhost', 8086))
-            api_running = result == 0
-            sock.close()
-        except:
-            pass
+        api_running = is_port_in_use(API_PORT)
         
         if not api_running:
             print("Starting API server...")

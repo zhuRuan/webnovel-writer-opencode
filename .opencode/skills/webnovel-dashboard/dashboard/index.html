@@ -1051,6 +1051,230 @@
                 </div>
             </div>
 
+            <!-- 审查器设置 -->
+            <div v-show="activeTab === 'checker-config'" class="fade-in">
+                <h2 class="text-xl font-bold mb-4"><i class="fas fa-sliders-h mr-2 text-indigo-500"></i>审查器设置</h2>
+
+                <!-- 说明 -->
+                <div class="card card-light p-4 mb-4 border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-indigo-500 mt-1"></i>
+                        <div class="text-sm">
+                            <p class="font-medium mb-1">参数调整说明</p>
+                            <p class="opacity-70 text-xs">这些参数控制章节审查时的质量门禁阈值。调整后，新生成的审查报告将使用新参数。修改会保存到项目配置中。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 题材信息 -->
+                <div class="card card-light p-4 mb-4 border border-indigo-200 dark:border-indigo-800">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-sm opacity-60">当前题材：</span>
+                            <span class="font-bold">{{ checkerConfigInfo.genre }}</span>
+                            <span class="ml-3 text-xs opacity-50">参数来源：{{ checkerConfigInfo.source }}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button @click="resetCheckerConfig" class="px-3 py-1 rounded text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                                <i class="fas fa-undo mr-1"></i>恢复默认
+                            </button>
+                            <button @click="saveCheckerConfig" class="px-4 py-1 rounded text-sm gradient-bg text-white hover:opacity-90 transition">
+                                <i class="fas fa-save mr-1"></i>保存配置
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 保存提示 -->
+                <div v-if="checkerConfigMessage" class="mb-4 p-3 rounded-lg text-sm"
+                     :class="checkerConfigMessage.type === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'">
+                    {{ checkerConfigMessage.text }}
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- 钩子配置 -->
+                    <div class="card card-light p-5">
+                        <h3 class="font-bold mb-3"><i class="fas fa-anchor mr-2 text-blue-500"></i>钩子配置</h3>
+                        <p class="text-xs opacity-50 mb-3">控制章末悬念的设计要求</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    钩子强度基准
+                                    <span class="ml-1 text-blue-500 cursor-help" title="设定章节末尾钩子的最低强度要求">ⓘ</span>
+                                </label>
+                                <select v-model="checkerParams.hook_config.strength_baseline"
+                                        class="w-full px-3 py-2 rounded border dark:bg-gray-700 dark:border-gray-600">
+                                    <option value="strong">强 - 每章必须有强悬念</option>
+                                    <option value="medium">中 - 每章至少有中等悬念</option>
+                                    <option value="weak">弱 - 允许弱悬念</option>
+                                </select>
+                                <p class="text-xs opacity-40 mt-1">影响：追读力评分中钩子质量的判定标准</p>
+                            </div>
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    过渡章豁免上限
+                                    <span class="ml-1 text-blue-500 cursor-help" title="允许连续多少章可以降低钩子要求">ⓘ</span>
+                                    <span class="ml-2 font-bold text-blue-600">{{ checkerParams.hook_config.transition_allowance }} 章</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.hook_config.transition_allowance"
+                                       min="1" max="5" step="1" class="w-full">
+                                <p class="text-xs opacity-40 mt-1">连续过渡章过多会导致读者流失，建议 ≤3 章</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 爽点配置 -->
+                    <div class="card card-light p-5">
+                        <h3 class="font-bold mb-3"><i class="fas fa-fire mr-2 text-orange-500"></i>爽点配置</h3>
+                        <p class="text-xs opacity-50 mb-3">控制打脸、装逼、升级等爽点的密度要求</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    每章爽点密度
+                                    <span class="ml-1 text-orange-500 cursor-help" title="每章应包含的爽点数量">ⓘ</span>
+                                </label>
+                                <select v-model="checkerParams.coolpoint_config.density_per_chapter"
+                                        class="w-full px-3 py-2 rounded border dark:bg-gray-700 dark:border-gray-600">
+                                    <option value="high">高 - 每章2+个爽点（快节奏爽文）</option>
+                                    <option value="medium">中 - 每章1个爽点（标准节奏）</option>
+                                    <option value="low">低 - 允许0-1个爽点（慢热型）</option>
+                                </select>
+                                <p class="text-xs opacity-40 mt-1">修仙/慢热题材可选"低"，爽文建议选"高"</p>
+                            </div>
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    Combo爽点间隔
+                                    <span class="ml-1 text-orange-500 cursor-help" title="连续爽点之间的推荐章节数">ⓘ</span>
+                                    <span class="ml-2 font-bold text-orange-600">{{ checkerParams.coolpoint_config.combo_interval }} 章</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.coolpoint_config.combo_interval"
+                                       min="1" max="20" step="1" class="w-full">
+                                <p class="text-xs opacity-40 mt-1">连续爽点会降低效果，建议间隔几章再安排</p>
+                            </div>
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    里程碑爽点间隔
+                                    <span class="ml-1 text-orange-500 cursor-help" title="大高潮/突破等里程碑爽点的推荐间隔">ⓘ</span>
+                                    <span class="ml-2 font-bold text-orange-600">{{ checkerParams.coolpoint_config.milestone_interval }} 章</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.coolpoint_config.milestone_interval"
+                                       min="5" max="30" step="1" class="w-full">
+                                <p class="text-xs opacity-40 mt-1">大高潮间隔不宜过长，10-15章一次较合适</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 微兑现配置 -->
+                    <div class="card card-light p-5">
+                        <h3 class="font-bold mb-3"><i class="fas fa-check-circle mr-2 text-green-500"></i>微兑现配置</h3>
+                        <p class="text-xs opacity-50 mb-3">控制小目标达成、能力展示等"小爽点"的频率</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    每章最低微兑现数
+                                    <span class="ml-1 text-green-500 cursor-help" title="每章应有多少个小目标/小成就">ⓘ</span>
+                                    <span class="ml-2 font-bold text-green-600">{{ checkerParams.micropayoff_config.min_per_chapter }} 个</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.micropayoff_config.min_per_chapter"
+                                       min="0" max="5" step="1" class="w-full">
+                                <p class="text-xs opacity-40 mt-1">如：发现一个新信息、学会一个小技能、获得一点资源</p>
+                            </div>
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    过渡章最低微兑现数
+                                    <span class="ml-1 text-green-500 cursor-help" title="过渡章节的最低要求可以降低">ⓘ</span>
+                                    <span class="ml-2 font-bold text-green-600">{{ checkerParams.micropayoff_config.transition_min }} 个</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.micropayoff_config.transition_min"
+                                       min="0" max="3" step="1" class="w-full">
+                                <p class="text-xs opacity-40 mt-1">过渡章可以适当减少，但不要完全没有</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 节奏红线 -->
+                    <div class="card card-light p-5">
+                        <h3 class="font-bold mb-3"><i class="fas fa-tachometer-alt mr-2 text-red-500"></i>节奏红线</h3>
+                        <p class="text-xs opacity-50 mb-3">超过这些阈值会触发"节奏失衡"警告</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    停滞阈值
+                                    <span class="ml-1 text-red-500 cursor-help" title="连续多少章无实质性进展算停滞">ⓘ</span>
+                                    <span class="ml-2 font-bold text-red-600">{{ checkerParams.pacing_config.stagnation_threshold }} 章</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.pacing_config.stagnation_threshold"
+                                       min="1" max="10" step="1" class="w-full">
+                                <p class="text-xs opacity-40 mt-1">主角实力/情节无提升的章节数，建议3-5章</p>
+                            </div>
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    Quest线最大连续
+                                    <span class="ml-1 text-red-500 cursor-help" title="主线任务连续多少章会疲劳">ⓘ</span>
+                                    <span class="ml-2 font-bold text-red-600">{{ checkerParams.pacing_config.strand_quest_max }} 章</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.pacing_config.strand_quest_max"
+                                       min="1" max="20" step="1" class="w-full">
+                                <p class="text-xs opacity-40 mt-1">全是主线会单调，需穿插感情线/支线</p>
+                            </div>
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    Fire线最大断档
+                                    <span class="ml-1 text-red-500 cursor-help" title="感情线/女性角色多少章没出场算断档">ⓘ</span>
+                                    <span class="ml-2 font-bold text-red-600">{{ checkerParams.pacing_config.strand_fire_gap_max }} 章</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.pacing_config.strand_fire_gap_max"
+                                       min="5" max="30" step="1" class="w-full">
+                                <p class="text-xs opacity-40 mt-1">感情线断档太久会流失女读者，建议≤15章</p>
+                            </div>
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    过渡章最大连续
+                                    <span class="ml-1 text-red-500 cursor-help" title="纯过渡章连续多少章算过度">ⓘ</span>
+                                    <span class="ml-2 font-bold text-red-600">{{ checkerParams.pacing_config.transition_max_consecutive }} 章</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.pacing_config.transition_max_consecutive"
+                                       min="1" max="10" step="1" class="w-full">
+                                <p class="text-xs opacity-40 mt-1">连续太多过渡章会没有高潮，建议≤2章</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 约束豁免 -->
+                    <div class="card card-light p-5">
+                        <h3 class="font-bold mb-3"><i class="fas fa-shield-alt mr-2 text-purple-500"></i>约束豁免</h3>
+                        <p class="text-xs opacity-50 mb-3">控制"欠读者债"和豁免审查的规则</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    债务倍率
+                                    <span class="ml-1 text-purple-500 cursor-help" title="每章未兑现的期待会累积债务，债务越多后续惩罚越重">ⓘ</span>
+                                    <span class="ml-2 font-bold text-purple-600">{{ checkerParams.override_config.debt_multiplier.toFixed(1) }}</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.override_config.debt_multiplier"
+                                       min="0.5" max="2.0" step="0.1" class="w-full">
+                                <div class="flex justify-between text-xs opacity-40 mt-1">
+                                    <span>宽松(0.5)</span>
+                                    <span>标准(1.0)</span>
+                                    <span>严格(2.0)</span>
+                                </div>
+                                <p class="text-xs opacity-40 mt-1">倍率越高，欠债惩罚越严，爽文建议用标准或严格</p>
+                            </div>
+                            <div>
+                                <label class="text-sm opacity-70 block mb-1">
+                                    偿还窗口
+                                    <span class="ml-1 text-purple-500 cursor-help" title="欠下的期待/承诺需要在多少章内兑现">ⓘ</span>
+                                    <span class="ml-2 font-bold text-purple-600">{{ checkerParams.override_config.payback_window_default }} 章</span>
+                                </label>
+                                <input type="range" v-model.number="checkerParams.override_config.payback_window_default"
+                                       min="1" max="20" step="1" class="w-full">
+                                <p class="text-xs opacity-40 mt-1">承诺太久不兑现读者会弃书，建议3-5章</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 实体词典 -->
             <div v-show="activeTab === 'entities'" class="fade-in">
                 <h2 class="text-xl font-bold mb-4"><i class="fas fa-book mr-2 text-purple-500"></i>实体词典</h2>
@@ -1307,6 +1531,7 @@
                     { id: 'reading', name: '追读力', icon: 'fas fa-fire' },
                     // 第四组：质量与工具
                     { id: 'review', name: '审查', icon: 'fas fa-clipboard-check' },
+                    { id: 'checker-config', name: '审查器设置', icon: 'fas fa-sliders-h' },
                     { id: 'entities', name: '实体', icon: 'fas fa-book' },
                     { id: 'files', name: '文档', icon: 'fas fa-folder-open' },
                 ];
@@ -2437,7 +2662,77 @@
                         console.log('Failed to load items from settings:', e);
                     }
                 };
-                
+
+                // 审查器配置
+                const checkerConfigInfo = ref({ genre: '', source: '' });
+                const checkerParams = ref({
+                    hook_config: { strength_baseline: 'medium', transition_allowance: 2 },
+                    coolpoint_config: { density_per_chapter: 'high', combo_interval: 5, milestone_interval: 10 },
+                    micropayoff_config: { min_per_chapter: 2, transition_min: 1 },
+                    pacing_config: { stagnation_threshold: 3, strand_quest_max: 5, strand_fire_gap_max: 15, transition_max_consecutive: 2 },
+                    override_config: { debt_multiplier: 1.0, payback_window_default: 3 },
+                });
+                const checkerConfigMessage = ref(null);
+
+                const loadCheckerConfig = async () => {
+                    try {
+                        const resp = await fetch(`${API_BASE}/api/checkers/config`);
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            checkerConfigInfo.value = { genre: data.genre, source: data.source };
+                            checkerParams.value = data.params;
+                        }
+                    } catch (e) {
+                        console.log('Failed to load checker config:', e);
+                    }
+                };
+
+                const saveCheckerConfig = async () => {
+                    checkerConfigMessage.value = null;
+                    try {
+                        // 构建 overrides 对象（扁平化 key）
+                        const overrides = {};
+                        for (const [section, params] of Object.entries(checkerParams.value)) {
+                            for (const [key, value] of Object.entries(params)) {
+                                overrides[`${section}.${key}`] = value;
+                            }
+                        }
+
+                        const resp = await fetch(`${API_BASE}/api/checkers/config`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ overrides }),
+                        });
+
+                        if (resp.ok) {
+                            checkerConfigMessage.value = { type: 'success', text: '配置已保存' };
+                            setTimeout(() => { checkerConfigMessage.value = null; }, 3000);
+                        } else {
+                            const err = await resp.json();
+                            checkerConfigMessage.value = { type: 'error', text: err.error || '保存失败' };
+                        }
+                    } catch (e) {
+                        checkerConfigMessage.value = { type: 'error', text: '网络错误: ' + e.message };
+                    }
+                };
+
+                const resetCheckerConfig = async () => {
+                    try {
+                        const resp = await fetch(`${API_BASE}/api/checkers/config`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ overrides: {} }),
+                        });
+                        if (resp.ok) {
+                            await loadCheckerConfig();
+                            checkerConfigMessage.value = { type: 'success', text: '已恢复默认配置' };
+                            setTimeout(() => { checkerConfigMessage.value = null; }, 3000);
+                        }
+                    } catch (e) {
+                        checkerConfigMessage.value = { type: 'error', text: '恢复失败: ' + e.message };
+                    }
+                };
+
                 // 格式化 JSON
                 const formatJSON = (str) => {
                     try {
@@ -2670,6 +2965,9 @@
                             if (newTab === 'files') {
                                 loadFileTree();
                             }
+                            if (newTab === 'checker-config') {
+                                loadCheckerConfig();
+                            }
                         }, 300);
                     });
                 });
@@ -2793,7 +3091,14 @@
                     exportPDF,
                     getFactionBorderColor,
                     getFactionBgColor,
-                    getFactionIcon
+                    getFactionIcon,
+                    // 新增：审查器设置
+                    checkerConfigInfo,
+                    checkerParams,
+                    checkerConfigMessage,
+                    loadCheckerConfig,
+                    saveCheckerConfig,
+                    resetCheckerConfig
                 };
             }
         }).mount('#app');

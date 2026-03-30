@@ -10,6 +10,7 @@ import json
 import sqlite3
 import urllib.parse
 import logging
+import re
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
@@ -23,6 +24,44 @@ logger = logging.getLogger(__name__)
 
 PORT = 8086
 PROJECT_ROOT = None
+
+
+def is_port_in_use(port: int) -> bool:
+    """检查端口是否已被占用"""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
+
+
+def get_port_process(pid: int) -> str:
+    """获取占用端口的进程信息"""
+    import psutil
+    try:
+        proc = psutil.Process(pid)
+        return f"{proc.name()} (PID: {pid})"
+    except:
+        return f"PID: {pid}"
+
+
+def kill_process_on_port(port: int) -> bool:
+    """杀死占用指定端口的进程"""
+    import psutil
+    import signal
+    
+    for conn in psutil.net_connections():
+        if conn.laddr.port == port and conn.status == 'LISTEN':
+            try:
+                proc = psutil.Process(conn.pid)
+                print(f"正在终止占用端口 {port} 的进程: {proc.name()} (PID: {conn.pid})")
+                proc.send_signal(signal.SIGTERM)
+                proc.wait(timeout=3)
+                return True
+            except psutil.NoSuchProcess:
+                pass
+            except Exception as e:
+                print(f"无法终止进程: {e}")
+                return False
+    return False
 
 
 @dataclass
@@ -133,11 +172,33 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_characters()
             elif path == '/api/items':
                 self.handle_items()
+            elif path == '/api/checkers/config':
+                self.handle_checker_config_get()
             else:
                 self.send_error(404, 'Not Found')
         except Exception as e:
             logger.exception("API request failed: %s", e)
             self.send_json({'error': str(e)}, 500)
+
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+
+        try:
+            if path == '/api/checkers/config':
+                self.handle_checker_config_post()
+            else:
+                self.send_error(404, 'Not Found')
+        except Exception as e:
+            logger.exception("API POST failed: %s", e)
+            self.send_json({'error': str(e)}, 500)
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
 
     def send_json(self, data, status=200):
         self.send_response(status)
@@ -693,6 +754,244 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         
         self.send_json(items)
 
+    # ============================================================
+    # 审查器配置 API
+    # ============================================================
+
+    # 参数校验规则
+    CHECKER_PARAM_RULES = {
+        'hook_config.strength_baseline': {'type': 'enum', 'values': ['strong', 'medium', 'weak']},
+        'hook_config.transition_allowance': {'type': 'int', 'min': 1, 'max': 5},
+        'coolpoint_config.density_per_chapter': {'type': 'enum', 'values': ['high', 'medium', 'low']},
+        'coolpoint_config.combo_interval': {'type': 'int', 'min': 1, 'max': 20},
+        'coolpoint_config.milestone_interval': {'type': 'int', 'min': 5, 'max': 30},
+        'micropayoff_config.min_per_chapter': {'type': 'int', 'min': 0, 'max': 5},
+        'micropayoff_config.transition_min': {'type': 'int', 'min': 0, 'max': 3},
+        'pacing_config.stagnation_threshold': {'type': 'int', 'min': 1, 'max': 10},
+        'pacing_config.strand_quest_max': {'type': 'int', 'min': 1, 'max': 20},
+        'pacing_config.strand_fire_gap_max': {'type': 'int', 'min': 5, 'max': 30},
+        'pacing_config.transition_max_consecutive': {'type': 'int', 'min': 1, 'max': 10},
+        'override_config.debt_multiplier': {'type': 'float', 'min': 0.5, 'max': 2.0},
+        'override_config.payback_window_default': {'type': 'int', 'min': 1, 'max': 20},
+    }
+
+    # shuangwen fallback 参数
+    DEFAULT_PARAMS = {
+        'hook_config': {
+            'strength_baseline': 'medium',
+            'transition_allowance': 2,
+        },
+        'coolpoint_config': {
+            'density_per_chapter': 'high',
+            'combo_interval': 5,
+            'milestone_interval': 10,
+        },
+        'micropayoff_config': {
+            'min_per_chapter': 2,
+            'transition_min': 1,
+        },
+        'pacing_config': {
+            'stagnation_threshold': 3,
+            'strand_quest_max': 5,
+            'strand_fire_gap_max': 15,
+            'transition_max_consecutive': 2,
+        },
+        'override_config': {
+            'debt_multiplier': 1.0,
+            'payback_window_default': 3,
+        },
+    }
+
+    def handle_checker_config_get(self):
+        """GET /api/checkers/config - 返回当前生效的审查器参数"""
+        # 读取 genre
+        genre = '末世+异能'
+        state_file = PROJECT_ROOT / '.webnovel' / 'state.json'
+        if state_file.exists():
+            try:
+                state = json.loads(state_file.read_text(encoding='utf-8'))
+                genre = state.get('project_info', {}).get('genre', genre)
+            except Exception:
+                pass
+
+        # 尝试从 genre-profiles.md 解析对应 profile
+        profile_source = 'shuangwen (默认)'
+        profile_params = self._parse_genre_profile(genre)
+        if profile_params:
+            profile_source = genre
+        else:
+            profile_params = self.DEFAULT_PARAMS
+
+        # 读取用户覆盖值
+        overrides = {}
+        if state_file.exists():
+            try:
+                state = json.loads(state_file.read_text(encoding='utf-8'))
+                overrides = state.get('genre_overrides', {})
+            except Exception:
+                pass
+
+        # 合并：overrides 覆盖 profile
+        merged_params = {}
+        for section, defaults in profile_params.items():
+            merged_params[section] = dict(defaults)
+        for key, value in overrides.items():
+            parts = key.split('.', 1)
+            if len(parts) == 2:
+                section, param = parts
+                if section in merged_params:
+                    merged_params[section][param] = value
+
+        self.send_json({
+            'genre': genre,
+            'source': profile_source,
+            'params': merged_params,
+            'overrides': overrides,
+        })
+
+    def _parse_genre_profile(self, genre: str) -> Optional[Dict[str, Any]]:
+        """从 genre-profiles.md 解析指定题材的参数配置"""
+        profiles_file = PROJECT_ROOT / '.opencode' / 'references' / 'genre-profiles.md'
+        if not profiles_file.exists():
+            return None
+
+        content = profiles_file.read_text(encoding='utf-8')
+
+        # 映射中文题材名到 profile id
+        genre_map = {
+            '爽文': 'shuangwen', '系统流': 'shuangwen',
+            '修仙': 'xianxia', '玄幻': 'xianxia',
+            '都市': 'urban-power',
+            '言情': 'romance',
+            '悬疑': 'mystery',
+            '历史': 'history-travel',
+            '游戏': 'game-lit',
+            '规则怪谈': 'rule-horror',
+            '末世': 'post-apocalyptic',
+        }
+
+        profile_id = None
+        for key, pid in genre_map.items():
+            if key in genre:
+                profile_id = pid
+                break
+
+        if not profile_id:
+            return None
+
+        # 查找 profile YAML block
+        # 格式: ### 2.X 题材名 (profile_id)\n\n```yaml\n...\n```
+        pattern = rf'id:\s*{re.escape(profile_id)}.*?```yaml\s*\n(.*?)```'
+        match = re.search(pattern, content, re.DOTALL)
+        if not match:
+            return None
+
+        yaml_block = match.group(1)
+        try:
+            # 手动解析关键字段（避免依赖 yaml 库）
+            params = dict(self.DEFAULT_PARAMS)
+            current_section = None
+
+            for line in yaml_block.split('\n'):
+                stripped = line.strip()
+                if not stripped or stripped.startswith('#') or stripped.startswith('id:') or stripped.startswith('name:') or stripped.startswith('description:') or stripped.startswith('tags:'):
+                    continue
+
+                # 检测 section 头
+                if stripped.endswith(':') and not stripped.startswith('-') and ':' not in stripped[1:-1]:
+                    current_section = stripped[:-1].strip()
+                    continue
+
+                if current_section and ':' in stripped:
+                    key, val = stripped.split(':', 1)
+                    key = key.strip().lstrip('- ')
+                    val = val.strip()
+
+                    if current_section in params:
+                        # 类型转换
+                        if val in ('true', 'True'):
+                            val = True
+                        elif val in ('false', 'False'):
+                            val = False
+                        elif val.replace('.', '', 1).isdigit():
+                            val = float(val) if '.' in val else int(val)
+                        elif val in ('high', 'medium', 'low', 'strong', 'weak'):
+                            pass  # 保持字符串
+                        else:
+                            continue  # 跳过非标量值
+
+                        params[current_section][key] = val
+
+            return params
+        except Exception as e:
+            logger.warning(f"Failed to parse genre profile for {genre}: {e}")
+            return None
+
+    def handle_checker_config_post(self):
+        """POST /api/checkers/config - 保存用户调整的参数"""
+        # 读取请求体
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(content_length).decode('utf-8')
+
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self.send_json({'error': '无效的 JSON'}, 400)
+            return
+
+        overrides = data.get('overrides', {})
+        if not isinstance(overrides, dict):
+            self.send_json({'error': 'overrides 必须是对象'}, 400)
+            return
+
+        # 校验每个参数
+        errors = []
+        validated = {}
+        for key, value in overrides.items():
+            if key not in self.CHECKER_PARAM_RULES:
+                errors.append(f'未知参数: {key}')
+                continue
+
+            rule = self.CHECKER_PARAM_RULES[key]
+            if rule['type'] == 'enum':
+                if value not in rule['values']:
+                    errors.append(f'{key} 必须是 {rule["values"]} 之一，收到: {value}')
+                    continue
+            elif rule['type'] == 'int':
+                if not isinstance(value, int):
+                    errors.append(f'{key} 必须是整数')
+                    continue
+                if value < rule['min'] or value > rule['max']:
+                    errors.append(f'{key} 范围: {rule["min"]}-{rule["max"]}，收到: {value}')
+                    continue
+            elif rule['type'] == 'float':
+                if not isinstance(value, (int, float)):
+                    errors.append(f'{key} 必须是数字')
+                    continue
+                if value < rule['min'] or value > rule['max']:
+                    errors.append(f'{key} 范围: {rule["min"]}-{rule["max"]}，收到: {value}')
+                    continue
+
+            validated[key] = value
+
+        if errors:
+            self.send_json({'error': '; '.join(errors)}, 400)
+            return
+
+        # 写入 state.json
+        state_file = PROJECT_ROOT / '.webnovel' / 'state.json'
+        state = {}
+        if state_file.exists():
+            try:
+                state = json.loads(state_file.read_text(encoding='utf-8'))
+            except Exception:
+                pass
+
+        state['genre_overrides'] = validated
+        state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
+
+        self.send_json({'success': True, 'overrides': validated})
+
     def log_message(self, format, *args):
         if '/api/' in str(args):
             print(f"[API] {args[0]}")
@@ -723,6 +1022,27 @@ def main():
         idx = args.index('--port')
         if idx + 1 < len(args):
             PORT = int(args[idx + 1])
+
+    # 检查端口占用
+    if is_port_in_use(PORT):
+        print(f"[警告] 端口 {PORT} 已被占用!")
+        print(f"尝试自动终止旧进程...")
+        
+        try:
+            if kill_process_on_port(PORT):
+                import time
+                time.sleep(0.5)
+                if is_port_in_use(PORT):
+                    print(f"[错误] 无法释放端口 {PORT}，请手动关闭占用该端口的程序后重试")
+                    return
+                print(f"[成功] 端口 {PORT} 已释放")
+            else:
+                print(f"[错误] 无法自动释放端口 {PORT}")
+                return
+        except ImportError:
+            print(f"[错误] 需要安装 psutil 库来自动管理进程: pip install psutil")
+            print(f"[提示] 请手动关闭占用端口 {PORT} 的程序后重试")
+            return
 
     print(f"项目根目录: {PROJECT_ROOT}")
     print(f"API 服务器启动在: http://localhost:{PORT}")
