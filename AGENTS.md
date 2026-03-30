@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-Webnovel Writer 是一个基于 OpenCode 的长篇网文 AI 创作系统，目标降低 AI 写作中的"遗忘"和"幻觉"，支持长周期连载创作。
+Webnovel Writer 是基于 OpenCode 的长篇网文 AI 创作系统，降低 AI 写作中的"遗忘"和"幻觉"，支持长周期连载创作。
 
 ## 构建/测试/开发命令
 
@@ -144,17 +144,17 @@ def load_state(self) -> bool:
 ```
 项目目录/
 ├── .opencode/              # OpenCode 配置
-│   ├── agents/           # 8个 Agent 定义
-│   ├── checkers/        # 审查器配置驱动
-│   ├── skills/          # 10个 Skills
+│   ├── agents/           # Agent 定义
+│   ├── checkers/         # 审查器配置驱动
+│   ├── skills/           # 10个 Skills
 │   │   ├── webnovel-publish/  # 番茄小说发布
 │   │   └── webnovel-dashboard/ # 看板
-│   ├── scripts/         # Python 核心脚本
+│   ├── scripts/          # Python 核心脚本
 │   │   ├── publisher/  # 番茄发布模块
 │   │   └── data_modules/ # 核心模块
-│   ├── references/     # 参考文档
-│   ├── genres/         # 38+ 题材参考
-│   └── templates/      # 输出模板
+│   ├── references/       # 参考文档
+│   ├── genres/           # 38+ 题材参考
+│   └── templates/        # 输出模板
 ├── opencode.json        # Agent 配置
 ├── .env                 # API 配置
 └── init.sh / init.bat  # 安装脚本
