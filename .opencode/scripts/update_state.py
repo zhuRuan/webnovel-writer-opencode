@@ -54,6 +54,8 @@ from runtime_compat import enable_windows_utf8_stdio
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from logger import get_logger, setup_logging
+
 # ============================================================================
 # 安全修复：导入安全工具函数（P1 MEDIUM）
 # ============================================================================
@@ -391,6 +393,9 @@ class StateUpdater:
         return True
 
 def main():
+    setup_logging()
+    logger = get_logger(__name__)
+
     parser = argparse.ArgumentParser(
         description="安全更新 state.json",
         formatter_class=argparse.RawDescriptionHelpFormatter,

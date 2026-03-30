@@ -14,7 +14,6 @@
 import argparse
 import asyncio
 import json
-import logging
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -29,11 +28,7 @@ from publisher import (
     get_default_user_data_dir,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+from logger import get_logger, setup_logging
 
 
 class PublisherManager:
@@ -363,6 +358,9 @@ async def cmd_upload(
 
 
 def main() -> None:
+    setup_logging()
+    logger = get_logger(__name__)
+
     parser = argparse.ArgumentParser(description="番茄小说发布器")
     parser.add_argument("--project-root", help="项目根目录")
 

@@ -32,6 +32,7 @@ from typing import Optional
 
 from runtime_compat import normalize_windows_path
 from project_locator import resolve_project_root, write_current_project_pointer, update_global_registry_current_project
+from logger import get_logger, setup_logging
 
 
 def _scripts_dir() -> Path:
@@ -187,6 +188,8 @@ def cmd_use(args: argparse.Namespace) -> int:
 
 
 def main() -> None:
+    setup_logging()
+    logger = get_logger(__name__)
     parser = argparse.ArgumentParser(description="webnovel unified CLI")
     parser.add_argument("--project-root", help="书项目根目录或工作区根目录（可选，默认自动检测）")
 

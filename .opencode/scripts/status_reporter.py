@@ -89,6 +89,7 @@ from collections import defaultdict
 from project_locator import resolve_project_root
 from chapter_paths import extract_chapter_num_from_filename
 from runtime_compat import enable_windows_utf8_stdio
+from logger import get_logger, setup_logging
 
 # 导入配置
 try:
@@ -1227,6 +1228,9 @@ class StatusReporter:
 
 def main():
     import argparse
+
+    setup_logging()
+    logger = get_logger(__name__)
 
     _enable_windows_utf8_stdio()
 

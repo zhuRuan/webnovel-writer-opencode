@@ -34,6 +34,9 @@ from typing import Dict, Any, List
 
 from .config import get_config, DataModulesConfig
 from .sql_state_manager import SQLStateManager, EntityData
+from logger import get_logger, setup_logging
+
+logger = get_logger(__name__)
 
 
 def migrate_state_to_sqlite(
@@ -66,7 +69,7 @@ def migrate_state_to_sqlite(
     state_file = config.state_file
     if not state_file.exists():
         if verbose:
-            print(f"❌ state.json 不存在: {state_file}")
+            logger.error("state.json 不存在: %s", state_file)
         return stats
 
     with open(state_file, 'r', encoding='utf-8') as f:
@@ -74,14 +77,14 @@ def migrate_state_to_sqlite(
 
     if verbose:
         file_size = state_file.stat().st_size / 1024
-        print(f"📄 读取 state.json ({file_size:.1f} KB)")
+        logger.info("读取 state.json (%.1f KB)", file_size)
 
     # 备份
     if backup and not dry_run:
         backup_file = state_file.with_suffix(f".json.backup-{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         shutil.copy(state_file, backup_file)
         if verbose:
-            print(f"💾 已备份到: {backup_file}")
+            logger.info("已备份到: %s", backup_file)
 
     # 初始化 SQLStateManager
     sql_manager = SQLStateManager(config)

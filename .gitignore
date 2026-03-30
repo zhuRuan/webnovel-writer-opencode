@@ -59,8 +59,10 @@ Thumbs.db
 # Temp
 *.tmp
 *.temp
-*.log
 *.swp
+
+# Logs
+logs/
 
 # Webnovel Writer
 # 配置文件（包含 API Key）
