@@ -174,6 +174,8 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_items()
             elif path == '/api/checkers/config':
                 self.handle_checker_config_get()
+            elif path == '/api/foreshadowing/due':
+                self.handle_foreshadowing_due()
             else:
                 self.send_error(404, 'Not Found')
         except Exception as e:
@@ -326,6 +328,54 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json([])
         finally:
             conn.close()
+
+    def handle_foreshadowing_due(self):
+        """GET /api/foreshadowing/due - 返回到期和即将到期的伏笔"""
+        try:
+            state_file = PROJECT_ROOT / '.webnovel' / 'state.json'
+            if not state_file.exists():
+                self.send_json({'error': '项目未初始化'}, 404)
+                return
+
+            data = json.loads(state_file.read_text(encoding='utf-8'))
+            current_chapter = data.get('progress', {}).get('current_chapter', 0)
+            foreshadowings = data.get('plot_threads', {}).get('foreshadowing', [])
+
+            due = []          # 已过期
+            upcoming = []     # 即将到期
+
+            for f in foreshadowings:
+                status = f.get('status', '')
+                if status not in ['未回收', '']:
+                    continue
+
+                target = f.get('target_chapter')
+                if target is None:
+                    continue
+
+                if current_chapter >= target:
+                    due.append({
+                        'content': f.get('content', ''),
+                        'planted': f.get('planted_chapter', 0),
+                        'target': target,
+                        'overdue': current_chapter - target
+                    })
+                elif target - current_chapter <= 10:
+                    upcoming.append({
+                        'content': f.get('content', ''),
+                        'planted': f.get('planted_chapter', 0),
+                        'target': target,
+                        'remaining': target - current_chapter
+                    })
+
+            self.send_json({
+                'due': due,
+                'upcoming': upcoming,
+                'current_chapter': current_chapter
+            })
+        except Exception as e:
+            logger.exception("Failed to get due foreshadowing")
+            self.send_json({'error': str(e)}, 500)
 
     def handle_state_changes(self, params):
         conn = self.get_db()
