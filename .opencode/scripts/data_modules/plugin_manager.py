@@ -16,6 +16,7 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -623,16 +624,67 @@ class PluginManager:
         Returns:
             是否成功
         """
+        import subprocess
+        import zipfile
+        import io
+        import urllib.request
+        import time
+
         try:
             import tempfile
-            import git
 
             temp_dir = tempfile.mkdtemp()
-            repo = git.Repo.clone_from(repo_url, temp_dir)
+            repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
+            
+            branches = ["main", "master"]
+            source_dir = None
+            
+            for branch in branches:
+                zip_url = repo_url.replace(".git", f"/archive/refs/heads/{branch}.zip")
+                logger.info(f"尝试下载: {zip_url}")
+                
+                try:
+                    req = urllib.request.Request(zip_url, headers={"User-Agent": "Webnovel-Writer"})
+                    with urllib.request.urlopen(req, timeout=15) as resp:
+                        if resp.getcode() == 200:
+                            zip_data = resp.read()
+                            logger.info(f"下载成功, 大小: {len(zip_data)} bytes")
+                            
+                            zip_path = Path(temp_dir) / "repo.zip"
+                            with open(zip_path, "wb") as f:
+                                f.write(zip_data)
+                            
+                            extract_dir = Path(temp_dir) / branch
+                            with zipfile.ZipFile(zip_path, "r") as zf:
+                                zf.extractall(extract_dir)
+                            
+                            extracted_items = list(extract_dir.iterdir())
+                            logger.info(f"解压后文件: {[i.name for i in extracted_items]}")
+                            if extracted_items:
+                                source_dir = extracted_items[0]
+                                logger.info(f"源代码目录: {source_dir}")
+                                
+                                manifest_path = source_dir / "manifest.json"
+                                if not manifest_path.exists():
+                                    for subitem in source_dir.iterdir():
+                                        if subitem.is_dir() and (subitem / "manifest.json").exists():
+                                            source_dir = subitem
+                                            break
+                                
+                                if (source_dir / "manifest.json").exists():
+                                    break
+                except Exception as e:
+                    logger.warning(f"下载 {branch} 分支失败: {e}")
+                    continue
+            
+            if source_dir is None:
+                print("错误: 无法从仓库下载代码（可能仓库为空或分支不存在）")
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return False
 
-            manifest_path = Path(temp_dir) / "manifest.json"
+            manifest_path = source_dir / "manifest.json"
             if not manifest_path.exists():
-                shutil.rmtree(temp_dir)
+                shutil.rmtree(temp_dir, ignore_errors=True)
                 print("错误: 无效的插件，缺少 manifest.json")
                 return False
 
@@ -643,22 +695,37 @@ class PluginManager:
             plugin_name = (
                 plugin_id.replace(".", "_")
                 if plugin_id
-                else repo_url.split("/")[-1].replace(".git", "")
+                else repo_name
             )
             target_dir = self.plugins_dir / plugin_name
+            target_dir.mkdir(parents=True, exist_ok=True)
 
-            if target_dir.exists():
+            if (self.plugins_dir / plugin_name.replace("_", "-")).exists():
+                old_plugin_dir = self.plugins_dir / plugin_name.replace("_", "-")
                 backup_dir = self.plugins_dir / f"{plugin_name}.backup"
-                shutil.move(str(target_dir), str(backup_dir))
+                if backup_dir.exists():
+                    shutil.rmtree(backup_dir, ignore_errors=True)
+                shutil.move(str(old_plugin_dir), str(backup_dir))
 
-            shutil.move(temp_dir, str(target_dir))
+            for item in source_dir.iterdir():
+                if item.name in [".git", "__pycache__", "repo.zip", "main", "master"]:
+                    continue
+                dest = target_dir / item.name
+                if item.is_dir():
+                    shutil.copytree(item, dest, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, dest)
+
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            time.sleep(0.5)
+            
             print(f"插件 {plugin_id or plugin_name} 安装成功！")
             print("提示: 使用 /webnovel-plugin reload 或 python webnovel.py plugin reload 重新加载插件")
             return True
 
-        except ImportError:
-            print("错误: 需要 GitPython 才能从 Git 安装插件")
-            print("请运行: pip install GitPython")
+        except FileNotFoundError:
+            print("错误: 未找到 git 命令")
+            print("请确保已安装 Git 并将其添加到 PATH")
             return False
         except Exception as e:
             print(f"安装失败: {e}")

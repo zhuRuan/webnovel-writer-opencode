@@ -189,6 +189,8 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         try:
             if path == '/api/checkers/config':
                 self.handle_checker_config_post()
+            elif path == '/api/files/write':
+                self.handle_file_write()
             else:
                 self.send_error(404, 'Not Found')
         except Exception as e:
@@ -297,6 +299,48 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json({'path': path, 'content': content})
         except UnicodeDecodeError:
             self.send_json({'error': '二进制文件，无法预览'}, 400)
+
+    def handle_file_write(self):
+        """处理文件写入请求"""
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self.send_json({'error': '请求体为空'}, 400)
+            return
+            
+        body = self.rfile.read(content_length).decode('utf-8')
+        
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self.send_json({'error': '无效的 JSON'}, 400)
+            return
+        
+        path = data.get('path')
+        content = data.get('content')
+        
+        if not path or content is None:
+            self.send_json({'error': '缺少 path 或 content 参数'}, 400)
+            return
+        
+        full_path = (PROJECT_ROOT / path).resolve()
+        if not str(full_path).startswith(str(PROJECT_ROOT.resolve())):
+            self.send_json({'error': '非法路径'}, 403)
+            return
+        
+        allowed_dirs = ['正文', '大纲', '设定集', '审查报告']
+        rel = full_path.relative_to(PROJECT_ROOT)
+        if rel.parts[0] not in allowed_dirs:
+            self.send_json({'error': f'仅允许写入 {"/".join(allowed_dirs)} 目录'}, 403)
+            return
+        
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            full_path.write_text(content, encoding='utf-8')
+            self.send_json({'success': True, 'path': path})
+        except Exception as e:
+            logger.exception("Failed to write file")
+            self.send_json({'error': str(e)}, 500)
 
     def get_db(self):
         db_path = PROJECT_ROOT / '.webnovel' / 'index.db'

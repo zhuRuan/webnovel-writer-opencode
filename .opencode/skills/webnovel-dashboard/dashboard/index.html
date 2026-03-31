@@ -1570,7 +1570,14 @@
 
             <!-- 文档浏览 -->
             <div v-show="activeTab === 'files'" class="fade-in">
-                <h2 class="text-xl font-bold mb-4"><i class="fas fa-folder-open mr-2 text-yellow-500"></i>文档浏览</h2>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold"><i class="fas fa-folder-open mr-2 text-yellow-500"></i>文档浏览</h2>
+                    <button @click="toggleEditMode" class="px-3 py-1.5 rounded-lg text-sm transition"
+                            :class="editMode ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700'">
+                        <i :class="editMode ? 'fas fa-eye' : 'fas fa-edit'"></i>
+                        {{ editMode ? '预览模式' : '编辑模式' }}
+                    </button>
+                </div>
                 
                 <div class="flex gap-4" style="height: calc(100vh - 250px); min-height: 400px;">
                     <!-- 文件树 -->
@@ -1627,13 +1634,35 @@
                     
                     <!-- 文件内容 -->
                     <div class="card card-light p-4 flex-1 overflow-y-auto">
-                        <div v-if="selectedFilePath" class="mb-2">
+                        <div v-if="selectedFilePath" class="mb-2 flex justify-between items-center">
                             <span class="text-sm opacity-60">{{ selectedFilePath }}</span>
+                            <div v-if="editMode && fileContent !== undefined" class="flex gap-2">
+                                <button @click="saveFile" :disabled="isSaving"
+                                        class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                                        :class="{'opacity-50': isSaving}">
+                                    <i class="fas fa-save mr-1"></i>{{ isSaving ? '保存中...' : '保存' }}
+                                </button>
+                                <button @click="editMode = false" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm">
+                                    <i class="fas fa-times mr-1"></i>取消
+                                </button>
+                            </div>
                         </div>
-                        <pre v-if="fileContent" class="whitespace-pre-wrap text-sm font-mono">{{ fileContent }}</pre>
-                        <div v-else class="text-center opacity-60 py-20">
-                            <i class="fas fa-file-alt text-4xl mb-4"></i>
-                            <p>选择左侧文件以预览内容</p>
+                        
+                        <!-- 预览模式 -->
+                        <div v-if="!editMode">
+                            <pre v-if="fileContent" class="whitespace-pre-wrap text-sm font-mono">{{ fileContent }}</pre>
+                            <div v-else class="text-center opacity-60 py-20">
+                                <i class="fas fa-file-alt text-4xl mb-4"></i>
+                                <p>选择左侧文件以预览内容</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 编辑模式 -->
+                        <div v-else>
+                            <textarea v-model="editingContent" 
+                                      class="w-full h-full min-h-[400px] p-4 font-mono text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                      :class="isDark ? 'bg-gray-800 text-gray-200 border-gray-700' : 'bg-white text-gray-800 border-gray-300'"
+                                      placeholder="在此编辑文件内容..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -1677,6 +1706,55 @@
                         }
                     } catch (e) {
                         console.log('Failed to load due foreshadowing:', e);
+                    }
+                };
+                
+                // 编辑模式相关
+                const editMode = ref(false);
+                const editingContent = ref('');
+                const currentFilePath = ref('');
+                const isSaving = ref(false);
+
+                const toggleEditMode = () => {
+                    editMode.value = !editMode.value;
+                    if (!editMode.value) {
+                        if (editingContent.value !== fileContent.value && fileContent.value !== '') {
+                            if (confirm('有未保存的更改，是否放弃？')) {
+                                editingContent.value = fileContent.value;
+                            } else {
+                                editMode.value = true;
+                            }
+                        }
+                    } else {
+                        editingContent.value = fileContent.value;
+                        currentFilePath.value = selectedFilePath.value;
+                    }
+                };
+
+                const saveFile = async () => {
+                    if (!currentFilePath.value) return;
+                    isSaving.value = true;
+                    try {
+                        const response = await fetch(`${API_BASE}/api/files/write`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                path: currentFilePath.value,
+                                content: editingContent.value
+                            })
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            fileContent.value = editingContent.value;
+                            editMode.value = false;
+                            alert('保存成功');
+                        } else {
+                            alert('保存失败: ' + result.error);
+                        }
+                    } catch (error) {
+                        alert('网络错误: ' + error.message);
+                    } finally {
+                        isSaving.value = false;
                     }
                 };
                 
@@ -2859,6 +2937,8 @@
                 
                 const loadFile = async (path) => {
                     selectedFilePath.value = path;
+                    editMode.value = false;
+                    editingContent.value = '';
                     try {
                         const resp = await fetch(`${API_BASE}/api/files/read?path=${encodeURIComponent(path)}`);
                         if (resp.ok) {
@@ -3394,6 +3474,12 @@
                     handleMoreClick,
                     handleClickOutside,
                     quickLinks,
+                    // 编辑模式
+                    editMode,
+                    editingContent,
+                    isSaving,
+                    toggleEditMode,
+                    saveFile,
                     // 工具函数
                     formatJSON,
                     lastUpdated,
