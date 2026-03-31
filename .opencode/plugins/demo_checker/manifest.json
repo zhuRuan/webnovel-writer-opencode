@@ -1,0 +1,22 @@
+{
+  "id": "com_example_demo_checker",
+  "name": "敏感词检查器",
+  "version": "1.0.0",
+  "description": "演示插件：检查章节中是否包含敏感词",
+  "author": "Webnovel Writer",
+  "license": "MIT",
+  "core_api_version": ">=2.0.0,<3.0.0",
+  "entry_points": {
+    "checkers": [
+      {
+        "id": "sensitive-word-checker",
+        "class": "checkers.sensitive_checker.SensitiveWordChecker",
+        "category": "content",
+        "description": "敏感词检查"
+      }
+    ]
+  },
+  "permissions": [
+    "read:chapters"
+  ]
+}
