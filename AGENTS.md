@@ -219,6 +219,12 @@ python .opencode/scripts/webnovel.py plugin info <plugin-id>
 # 卸载插件
 python .opencode/scripts/webnovel.py plugin remove <plugin-id>
 
+# 重新加载所有插件
+python .opencode/scripts/webnovel.py plugin reload
+
+# 重新加载指定插件
+python .opencode/scripts/webnovel.py plugin reload <plugin-id>
+
 # 在 OpenCode 中使用
 /webnovel-plugin list
 /webnovel-plugin install <source>

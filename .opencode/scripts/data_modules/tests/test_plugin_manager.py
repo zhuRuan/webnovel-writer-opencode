@@ -132,6 +132,102 @@ class TestPluginManager:
         if checker_class:
             assert checker_class is not None
 
+    def test_unload_plugin_removes_extensions(self, tmp_path):
+        """测试卸载插件后扩展点被移除"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager
+
+        pm = PluginManager(tmp_path)
+
+        pm.extensions["checkers"].append({
+            "id": "test-checker",
+            "class": None,
+            "plugin_id": "com_test_reload"
+        })
+        pm.loaded_plugins["com_test_reload"] = {
+            "name": "test_plugin",
+            "manifest": {"id": "com_test_reload"}
+        }
+
+        result = pm.unload_plugin("com_test_reload")
+        assert result is True
+
+        checkers_after = [ext for ext in pm.extensions["checkers"] if ext.get("plugin_id") == "com_test_reload"]
+        assert len(checkers_after) == 0
+        assert "com_test_reload" not in pm.loaded_plugins
+
+    def test_reload_all(self, tmp_path):
+        """测试重载所有插件"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager
+
+        pm = PluginManager(tmp_path)
+
+        pm.extensions["checkers"].append({
+            "id": "test-checker-all",
+            "class": None,
+            "plugin_id": "com_test_reload_all"
+        })
+        pm.loaded_plugins["com_test_reload_all"] = {
+            "name": "test_reload_all",
+            "manifest": {"id": "com_test_reload_all"}
+        }
+
+        pm.reload_all()
+        assert len(pm.loaded_plugins) == 0
+
+    def test_reload_single_plugin(self, tmp_path):
+        """测试重载单个插件"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager
+
+        plugins_dir = tmp_path / ".opencode" / "plugins"
+        plugins_dir.mkdir(parents=True)
+
+        test_plugin = plugins_dir / "test_single_reload"
+        test_plugin.mkdir()
+        manifest = test_plugin / "manifest.json"
+        manifest_data = {
+            "id": "com_test_single_reload",
+            "name": "测试单插件重载",
+            "version": "1.0.0",
+            "author": "tester",
+            "entry_points": {
+                "checkers": [
+                    {"id": "test-checker-single", "class": "checkers.TestChecker", "description": "测试"}
+                ]
+            },
+            "permissions": ["read:chapters"]
+        }
+        manifest.write_text(json.dumps(manifest_data), encoding="utf-8")
+
+        init_file = test_plugin / "__init__.py"
+        init_file.write_text("", encoding="utf-8")
+        checkers_dir = test_plugin / "checkers"
+        checkers_dir.mkdir()
+        checker_file = checkers_dir / "__init__.py"
+        checker_file.write_text("", encoding="utf-8")
+
+        pm = PluginManager(tmp_path)
+        pm.load_all_plugins()
+
+        result = pm.reload_plugin("com_test_single_reload")
+        assert result is True
+
+    def test_reloading_flag(self, tmp_path):
+        """测试重载期间阻止插件调用"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager
+
+        pm = PluginManager(tmp_path)
+
+        pm._reloading = True
+        try:
+            with pytest.raises(RuntimeError, match="插件正在重载中"):
+                pm.get_checker("any")
+        finally:
+            pm._reloading = False
+
 
 class TestPluginBase:
     """插件基类测试"""

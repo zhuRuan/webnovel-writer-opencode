@@ -15,6 +15,7 @@ allowed-tools: Read Write Edit Grep Bash
 | `/webnovel-plugin install <source>` | 安装插件（Git URL 或本地路径） |
 | `/webnovel-plugin remove <id>` | 卸载插件 |
 | `/webnovel-plugin reload` | 重新加载所有插件 |
+| `/webnovel-plugin reload <id>` | 重新加载指定插件 |
 
 ## 路径工具
 
@@ -73,6 +74,9 @@ $PLUGIN_CLI remove <plugin-id>
 # 重新加载所有插件
 PLUGIN_CLI="python -X utf8 \"${SCRIPTS_DIR}/webnovel.py\" plugin"
 $PLUGIN_CLI reload
+
+# 重新加载指定插件
+$PLUGIN_CLI reload <plugin-id>
 ```
 
 ## 常见问题

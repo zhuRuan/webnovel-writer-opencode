@@ -55,6 +55,21 @@ class BaseAgent(ABC):
         """
         return True
 
+    async def on_load(self, plugin_manager) -> None:
+        """
+        插件加载时调用（可选）
+
+        Args:
+            plugin_manager: 插件管理器实例
+        """
+        pass
+
+    async def on_unload(self) -> None:
+        """
+        插件卸载时调用（可选），用于清理资源
+        """
+        pass
+
 
 class BaseSkill(ABC):
     """Skill 抽象基类
@@ -97,6 +112,21 @@ class BaseSkill(ABC):
         """
         return "没有提供帮助信息"
 
+    async def on_load(self, plugin_manager) -> None:
+        """
+        插件加载时调用（可选）
+
+        Args:
+            plugin_manager: 插件管理器实例
+        """
+        pass
+
+    async def on_unload(self) -> None:
+        """
+        插件卸载时调用（可选），用于清理资源
+        """
+        pass
+
 
 class BaseChecker(ABC):
     """Checker 抽象基类
@@ -125,6 +155,21 @@ class BaseChecker(ABC):
 
         Returns:
             检查结果字典，包含 passed/issues/score/suggestions
+        """
+        pass
+
+    async def on_load(self, plugin_manager) -> None:
+        """
+        插件加载时调用（可选）
+
+        Args:
+            plugin_manager: 插件管理器实例
+        """
+        pass
+
+    async def on_unload(self) -> None:
+        """
+        插件卸载时调用（可选），用于清理资源
         """
         pass
 
@@ -221,3 +266,18 @@ class BasePublisher(ABC):
         """
         self.authenticated = False
         return True
+
+    async def on_load(self, plugin_manager) -> None:
+        """
+        插件加载时调用（可选）
+
+        Args:
+            plugin_manager: 插件管理器实例
+        """
+        pass
+
+    async def on_unload(self) -> None:
+        """
+        插件卸载时调用（可选），用于清理资源
+        """
+        pass

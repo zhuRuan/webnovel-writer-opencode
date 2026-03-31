@@ -56,6 +56,7 @@ class PluginManager:
         }
         self._ensure_plugins_dir()
         self._loaded = False
+        self._reloading = False
 
     def _ensure_plugins_dir(self) -> None:
         """确保插件目录存在"""
@@ -415,10 +416,113 @@ class PluginManager:
         """
         重新加载所有插件
         """
-        self.loaded_plugins.clear()
-        self.extensions = {k: [] for k in self.extensions}
-        self._loaded = False
-        self.load_all_plugins()
+        self._reloading = True
+        try:
+            plugin_ids = list(self.loaded_plugins.keys())
+            for pid in plugin_ids:
+                self.unload_plugin(pid)
+            self._loaded = False
+            self.load_all_plugins()
+        finally:
+            self._reloading = False
+
+    def _check_reloading(self) -> None:
+        """检查是否正在重载"""
+        if self._reloading:
+            raise RuntimeError("插件正在重载中，请稍后再试")
+
+    def _remove_extensions(self, plugin_id: str) -> None:
+        """
+        从各扩展点列表中移除该插件注册的内容
+
+        Args:
+            plugin_id: 插件 ID
+        """
+        for ext_type in self.extensions:
+            self.extensions[ext_type] = [
+                ext for ext in self.extensions[ext_type]
+                if ext.get("plugin_id") != plugin_id
+            ]
+        logger.info(f"已移除插件 {plugin_id} 注册的扩展点")
+
+    def _clear_module_cache(self, plugin_name: str) -> None:
+        """
+        清除插件模块缓存
+
+        Args:
+            plugin_name: 插件目录名
+        """
+        prefix = plugin_name.replace("-", "_")
+        to_remove = [m for m in sys.modules if m.startswith(prefix)]
+        for name in to_remove:
+            del sys.modules[name]
+        if to_remove:
+            logger.info(f"已清除 {len(to_remove)} 个模块缓存: {to_remove}")
+
+    def unload_plugin(self, plugin_id: str) -> bool:
+        """
+        卸载指定插件
+
+        Args:
+            plugin_id: 插件 ID
+
+        Returns:
+            是否成功
+        """
+        if plugin_id not in self.loaded_plugins:
+            logger.warning(f"插件 {plugin_id} 未加载")
+            return False
+
+        plugin = self.loaded_plugins[plugin_id]
+        plugin_name = plugin.get("name", plugin_id)
+
+        self._remove_extensions(plugin_id)
+
+        self._clear_module_cache(plugin_name)
+
+        del self.loaded_plugins[plugin_id]
+        logger.info(f"插件 {plugin_id} 已卸载")
+        return True
+
+    def reload_plugin(self, plugin_id: str) -> bool:
+        """
+        重载指定插件
+
+        Args:
+            plugin_id: 插件 ID 或名称
+
+        Returns:
+            是否成功
+        """
+        self._reloading = True
+        try:
+            was_loaded = plugin_id in self.loaded_plugins
+            if was_loaded:
+                plugin_name = self.loaded_plugins[plugin_id].get("name", plugin_id)
+                self.unload_plugin(plugin_id)
+            else:
+                plugin_name = None
+                for name, data in self.loaded_plugins.items():
+                    if data["manifest"].get("name") == plugin_id:
+                        plugin_name = data.get("name", plugin_id)
+                        break
+                if not plugin_name:
+                    for item in self.plugins_dir.iterdir():
+                        if item.is_dir():
+                            manifest = self.load_manifest(item.name)
+                            if manifest and (
+                                manifest.get("id") == plugin_id
+                                or manifest.get("name") == plugin_id
+                            ):
+                                plugin_name = item.name
+                                break
+
+            if not plugin_name:
+                return False
+
+            return self.load_plugin(plugin_name)
+        finally:
+            self._reloading = False
 
     def get_agent(self, agent_id: str):
         """
@@ -430,6 +534,7 @@ class PluginManager:
         Returns:
             Agent 类，未找到返回 None
         """
+        self._check_reloading()
         for agent in self.extensions["agents"]:
             if agent["id"] == agent_id:
                 return agent["class"]
@@ -445,6 +550,7 @@ class PluginManager:
         Returns:
             Skill 类，未找到返回 None
         """
+        self._check_reloading()
         for skill in self.extensions["skills"]:
             if skill["command"] == command:
                 return skill["class"]
@@ -460,6 +566,7 @@ class PluginManager:
         Returns:
             Checker 类，未找到返回 None
         """
+        self._check_reloading()
         for checker in self.extensions["checkers"]:
             if checker["id"] == checker_id:
                 return checker["class"]
@@ -475,6 +582,7 @@ class PluginManager:
         Returns:
             Publisher 类，未找到返回 None
         """
+        self._check_reloading()
         for publisher in self.extensions["publishers"]:
             if publisher["id"] == publisher_id:
                 return publisher["class"]
@@ -607,7 +715,8 @@ def main() -> None:
     p_remove.add_argument("plugin_id", help="插件 ID 或名称")
     p_remove.set_defaults(func=cmd_remove)
 
-    p_reload = sub.add_parser("reload", help="重新加载所有插件")
+    p_reload = sub.add_parser("reload", help="重新加载插件")
+    p_reload.add_argument("plugin_id", nargs="?", help="插件 ID（可选，不指定则重载所有）")
     p_reload.set_defaults(func=cmd_reload)
 
     args = parser.parse_args()
@@ -750,5 +859,12 @@ def cmd_remove(pm: PluginManager, args: argparse.Namespace) -> None:
 
 def cmd_reload(pm: PluginManager, args: argparse.Namespace) -> None:
     """reload 命令"""
-    pm.reload_all()
-    print(f"已重新加载 {len(pm.loaded_plugins)} 个插件")
+    if args.plugin_id:
+        if pm.reload_plugin(args.plugin_id):
+            print(f"插件 {args.plugin_id} 已重新加载")
+        else:
+            print(f"插件 {args.plugin_id} 未找到或加载失败")
+            raise SystemExit(1)
+    else:
+        pm.reload_all()
+        print(f"已重新加载 {len(pm.loaded_plugins)} 个插件")
