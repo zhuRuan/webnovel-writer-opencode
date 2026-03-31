@@ -300,6 +300,59 @@ python .opencode/scripts/webnovel.py plugin list
 python .opencode/scripts/webnovel.py plugin install https://github.com/username/plugin.git
 ```
 
+## 插件市场
+
+### 什么是插件市场
+
+插件市场是一个集中管理插件的索引服务，用户可以通过插件名称一键安装社区插件，无需手动查找 Git 仓库地址。
+
+### 使用市场安装插件
+
+```bash
+# 从市场安装插件（插件名）
+python .opencode/scripts/webnovel.py plugin install <plugin-name>
+
+# 从市场安装（插件 ID）
+python .opencode/scripts/webnovel.py plugin install <plugin-id>
+
+# 强制刷新市场缓存后安装
+python .opencode/scripts/webnovel.py plugin install <plugin-name> --force
+```
+
+### 从 Git URL 安装（原有方式）
+
+```bash
+# 从 Git 仓库安装
+python .opencode/scripts/webnovel.py plugin install https://github.com/username/plugin.git
+
+# 从本地路径安装
+python .opencode/scripts/webnovel.py plugin install /path/to/plugin
+```
+
+### 发布插件到市场
+
+1. 将插件代码推送到独立的 Git 仓库（如 GitHub）。
+2. 向插件市场索引仓库提交 PR，在 `plugins.json` 中添加插件条目：
+
+```json
+{
+  "id": "com_example_my_plugin",
+  "name": "我的插件",
+  "description": "插件功能描述",
+  "author": "作者名",
+  "license": "MIT",
+  "repo": "https://github.com/username/my-plugin.git",
+  "tags": ["checker", "content"]
+}
+```
+
+3. 等待维护者合并 PR。合并后，用户即可通过市场安装。
+
+### 插件市场索引
+
+- 官方网站：https://github.com/webnovel-writer/plugins
+- 缓存位置：`.opencode/cache/plugins.json`
+
 ## 调试技巧
 
 1. **查看日志**：插件加载时会输出日志，使用 `--verbose` 查看详细信息

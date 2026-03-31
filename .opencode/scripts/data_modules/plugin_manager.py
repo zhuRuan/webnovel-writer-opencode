@@ -31,6 +31,10 @@ ALLOWED_PERMISSIONS: Set[str] = {
     "network:requests",
 }
 
+MARKET_INDEX_URL = "https://raw.githubusercontent.com/webnovel-writer/plugins/main/plugins.json"
+MARKET_CACHE_DIR = ".opencode/cache"
+MARKET_CACHE_FILE = "plugins.json"
+
 
 class PluginManager:
     """插件管理器核心类"""
@@ -524,6 +528,173 @@ class PluginManager:
         finally:
             self._reloading = False
 
+    def _get_market_index(self, force: bool = False) -> dict:
+        """
+        获取市场索引，优先使用缓存
+
+        Args:
+            force: 是否强制刷新缓存
+
+        Returns:
+            市场索引数据
+        """
+        cache_path = self.project_root / MARKET_CACHE_DIR / MARKET_CACHE_FILE
+
+        if not force and cache_path.exists():
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+
+        try:
+            import urllib.request
+
+            logger.info(f"正在获取市场索引: {MARKET_INDEX_URL}")
+            req = urllib.request.Request(MARKET_INDEX_URL, headers={"User-Agent": "Webnovel-Writer"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            logger.info("市场索引已更新")
+            return data
+        except Exception as e:
+            logger.warning(f"获取市场索引失败: {e}，尝试使用缓存")
+            if cache_path.exists():
+                try:
+                    with open(cache_path, "r", encoding="utf-8") as f:
+                        return json.load(f)
+                except Exception:
+                    pass
+            print(f"错误: 无法连接到插件市场 ({MARKET_INDEX_URL})")
+            print("请检查网络连接，或访问 https://github.com/webnovel-writer/plugins 手动安装插件")
+            return None
+
+    def install_from_market(self, name_or_id: str) -> bool:
+        """
+        从市场安装插件
+
+        Args:
+            name_or_id: 插件名称或 ID
+
+        Returns:
+            是否成功
+        """
+        print(f"正在市场查找插件: {name_or_id}")
+
+        index = self._get_market_index()
+        if index is None:
+            return False
+
+        plugins = index.get("plugins", [])
+
+        plugin = None
+        for p in plugins:
+            if p.get("id") == name_or_id or p.get("name") == name_or_id:
+                plugin = p
+                break
+
+        if not plugin:
+            print(f"错误: 市场未找到插件 '{name_or_id}'")
+            print("请访问 https://github.com/webnovel-writer/plugins 查看插件列表")
+            return False
+
+        repo_url = plugin.get("repo")
+        if not repo_url:
+            print(f"错误: 插件 {plugin.get('name')} 未提供仓库地址")
+            return False
+
+        print(f"找到插件: {plugin.get('name')} ({plugin.get('id')})")
+        print(f"作者: {plugin.get('author', '未知')}")
+        print(f"仓库: {repo_url}")
+        print()
+
+        return self._install_from_git(repo_url)
+
+    def _install_from_git(self, repo_url: str) -> bool:
+        """
+        从 Git 仓库安装插件
+
+        Args:
+            repo_url: Git 仓库 URL
+
+        Returns:
+            是否成功
+        """
+        try:
+            import tempfile
+            import git
+
+            temp_dir = tempfile.mkdtemp()
+            repo = git.Repo.clone_from(repo_url, temp_dir)
+
+            manifest_path = Path(temp_dir) / "manifest.json"
+            if not manifest_path.exists():
+                shutil.rmtree(temp_dir)
+                print("错误: 无效的插件，缺少 manifest.json")
+                return False
+
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+
+            plugin_id = manifest.get("id", "")
+            plugin_name = (
+                plugin_id.replace(".", "_")
+                if plugin_id
+                else repo_url.split("/")[-1].replace(".git", "")
+            )
+            target_dir = self.plugins_dir / plugin_name
+
+            if target_dir.exists():
+                backup_dir = self.plugins_dir / f"{plugin_name}.backup"
+                shutil.move(str(target_dir), str(backup_dir))
+
+            shutil.move(temp_dir, str(target_dir))
+            print(f"插件 {plugin_id or plugin_name} 安装成功！")
+            print("提示: 使用 /webnovel-plugin reload 或 python webnovel.py plugin reload 重新加载插件")
+            return True
+
+        except ImportError:
+            print("错误: 需要 GitPython 才能从 Git 安装插件")
+            print("请运行: pip install GitPython")
+            return False
+        except Exception as e:
+            print(f"安装失败: {e}")
+            return False
+
+    def _install_from_local(self, source_path: Path) -> bool:
+        """
+        从本地路径安装插件
+
+        Args:
+            source_path: 插件目录路径
+
+        Returns:
+            是否成功
+        """
+        manifest_path = source_path / "manifest.json"
+        if not manifest_path.exists():
+            print("错误: 无效的插件，缺少 manifest.json")
+            return False
+
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+
+        plugin_id = manifest.get("id", source_path.name)
+        plugin_name = plugin_id.replace(".", "_")
+        target_dir = self.plugins_dir / plugin_name
+
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        shutil.copytree(source_path, target_dir)
+
+        self.install_dependencies(plugin_name)
+        print(f"插件 {plugin_name} 安装成功！")
+        print("提示: 使用 /webnovel-plugin reload 或 python webnovel.py plugin reload 重新加载插件")
+        return True
+
     def get_agent(self, agent_id: str):
         """
         获取指定 Agent 类
@@ -707,8 +878,9 @@ def main() -> None:
     p_info.add_argument("plugin_id", help="插件 ID 或名称")
     p_info.set_defaults(func=cmd_info)
 
-    p_install = sub.add_parser("install", help="安装插件（Git URL 或本地路径）")
-    p_install.add_argument("source", help="Git URL 或本地路径")
+    p_install = sub.add_parser("install", help="安装插件（市场名称、Git URL 或本地路径）")
+    p_install.add_argument("source", help="插件名、Git URL 或本地路径")
+    p_install.add_argument("--force", action="store_true", help="强制刷新市场索引缓存")
     p_install.set_defaults(func=cmd_install)
 
     p_remove = sub.add_parser("remove", help="卸载插件")
@@ -784,68 +956,22 @@ ID: {info.get('id', 'N/A')}
 def cmd_install(pm: PluginManager, args: argparse.Namespace) -> None:
     """install 命令"""
     source = args.source
-    plugins_dir = pm.plugins_dir
+    force_refresh = getattr(args, "force", False)
 
     if source.startswith("http") or source.startswith("git@"):
-        try:
-            import tempfile
-            import git
-
-            temp_dir = tempfile.mkdtemp()
-            repo = git.Repo.clone_from(source, temp_dir)
-
-            manifest_path = Path(temp_dir) / "manifest.json"
-            if not manifest_path.exists():
-                shutil.rmtree(temp_dir)
-                print("错误: 无效的插件，缺少 manifest.json")
-                raise SystemExit(1)
-
-            with open(manifest_path) as f:
-                manifest = json.load(f)
-
-            plugin_id = manifest.get("id", "")
-            plugin_name = plugin_id.replace(".", "_") if plugin_id else source.split("/")[-1].replace(".git", "")
-            target_dir = plugins_dir / plugin_name
-
-            if target_dir.exists():
-                backup_dir = plugins_dir / f"{plugin_name}.backup"
-                shutil.move(str(target_dir), str(backup_dir))
-
-            shutil.move(temp_dir, str(target_dir))
-            print(f"插件 {plugin_id or plugin_name} 安装成功！请重启 OpenCode 或重新加载插件。")
-
-        except ImportError:
-            print("错误: 需要 GitPython 才能从 Git 安装插件")
-            print("请运行: pip install GitPython")
+        result = pm._install_from_git(source)
+        if not result:
             raise SystemExit(1)
-        except Exception as e:
-            print(f"安装失败: {e}")
+    elif Path(source).exists():
+        result = pm._install_from_local(Path(source))
+        if not result:
             raise SystemExit(1)
-
     else:
-        source_path = normalize_windows_path(source)
-        if not source_path.exists():
-            print(f"错误: 路径不存在: {source}")
+        if force_refresh:
+            pm._get_market_index(force=True)
+        result = pm.install_from_market(source)
+        if not result:
             raise SystemExit(1)
-
-        manifest_path = source_path / "manifest.json"
-        if not manifest_path.exists():
-            print("错误: 无效的插件，缺少 manifest.json")
-            raise SystemExit(1)
-
-        with open(manifest_path) as f:
-            manifest = json.load(f)
-
-        plugin_id = manifest.get("id", source_path.name)
-        plugin_name = plugin_id.replace(".", "_")
-        target_dir = plugins_dir / plugin_name
-
-        if target_dir.exists():
-            shutil.rmtree(target_dir)
-        shutil.copytree(source_path, target_dir)
-
-        pm.install_dependencies(plugin_name)
-        print(f"插件 {plugin_name} 安装成功！请重启 OpenCode 或重新加载插件。")
 
 
 def cmd_remove(pm: PluginManager, args: argparse.Namespace) -> None:

@@ -51,12 +51,17 @@ $PLUGIN_CLI info <plugin-id>
 ### 安装插件
 
 ```bash
-# 从 Git URL 安装
+# 从市场安装（插件名或 ID）
 PLUGIN_CLI="python -X utf8 \"${SCRIPTS_DIR}/webnovel.py\" plugin"
+$PLUGIN_CLI install <plugin-name>
+
+# 强制刷新市场缓存后安装
+$PLUGIN_CLI install <plugin-name> --force
+
+# 从 Git URL 安装
 $PLUGIN_CLI install https://github.com/user/plugin.git
 
 # 从本地路径安装
-PLUGIN_CLI="python -X utf8 \"${SCRIPTS_DIR}/webnovel.py\" plugin"
 $PLUGIN_CLI install ../my-plugin
 ```
 

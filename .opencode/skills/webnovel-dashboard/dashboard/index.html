@@ -16,19 +16,41 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
         :root {
             --primary: #667eea;
             --primary-dark: #764ba2;
             --accent: #f093fb;
+            
+            /* 语义化颜色 - 替代混用的红色 */
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --warning: #f59e0b;
+            --warning-light: #fef3c7;
+            --danger: #ef4444;
+            --danger-light: #fee2e2;
+            
             --bg-light: #f8fafc;
             --bg-dark: #0f172a;
             --card-light: #ffffff;
             --card-dark: #1e293b;
             --text-light: #1e293b;
             --text-dark: #e2e8f0;
+            --text-muted-light: #64748b;
+            --text-muted-dark: #94a3b8;
             --border-light: #e2e8f0;
             --border-dark: #334155;
+            
+            /* 圆角规范 */
+            --radius-sm: 0.5rem;
+            --radius-md: 0.75rem;
+            --radius-lg: 1rem;
+            --radius-xl: 1.25rem;
+            --radius-2xl: 1.5rem;
         }
         
         * {
@@ -38,8 +60,9 @@
         }
         
         body {
-            font-family: 'Noto Sans SC', 'Segoe UI', sans-serif;
+            font-family: 'Inter', 'Noto Sans SC', 'Segoe UI', sans-serif;
             transition: all 0.3s ease;
+            line-height: 1.6;
         }
         
         body.light {
@@ -66,7 +89,7 @@
         body.dark .text-gray-500,
         body.dark .text-gray-600,
         body.dark .opacity-60 {
-            color: #94a3b8 !important;
+            color: var(--text-muted-dark) !important;
         }
         
         body.dark .bg-gray-50,
@@ -86,7 +109,7 @@
         }
         
         body.dark .nav-tab:not(.active) {
-            color: #94a3b8 !important;
+            color: var(--text-muted-dark) !important;
         }
         
         body.dark .nav-tab:not(.active):hover {
@@ -107,13 +130,13 @@
         }
         
         body.dark footer {
-            color: #64748b !important;
+            color: var(--text-muted-dark) !important;
         }
         
         body.dark .fa-sync-alt,
         body.dark .fa-sun,
         body.dark .fa-moon {
-            color: #94a3b8 !important;
+            color: var(--text-muted-dark) !important;
         }
         
         body.dark .fa-sync-alt:hover,
@@ -121,6 +144,38 @@
         body.dark .fa-moon:hover {
             color: #e2e8f0 !important;
             background: rgba(102, 126, 234, 0.2) !important;
+        }
+        
+        /* 悬停动效 */
+        .hover-lift {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 20px -4px rgba(0, 0, 0, 0.15);
+        }
+        
+        body.dark .hover-lift:hover {
+            box-shadow: 0 12px 20px -4px rgba(0, 0, 0, 0.4);
+        }
+        
+        /* 骨架屏动画 */
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        .skeleton {
+            background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: var(--radius-md);
+        }
+        
+        body.dark .skeleton {
+            background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+            background-size: 200% 100%;
         }
         
         .gradient-text {
@@ -135,18 +190,20 @@
         }
         
         .card {
-            border-radius: 16px;
+            border-radius: var(--radius-2xl);
             transition: all 0.3s ease;
         }
         
         .card-light {
             background: var(--card-light);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            border-radius: var(--radius-2xl);
         }
         
         .card-dark {
             background: var(--card-dark);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+            border-radius: var(--radius-2xl);
         }
         
         body.dark .card-dark:hover {
@@ -160,7 +217,7 @@
         
         .nav-tab {
             padding: 0.75rem 1.5rem;
-            border-radius: 8px;
+            border-radius: var(--radius-xl);
             cursor: pointer;
             transition: all 0.2s ease;
             font-weight: 500;
@@ -230,6 +287,47 @@
             background: #475569;
         }
         
+        /* 隐藏滚动条但保持滚动功能 */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* 打印样式 */
+        @media print {
+            body { background: white !important; color: black !important; }
+            .card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            header, footer, button, .nav-tab, .more-menu-trigger { display: none !important; }
+            .card-light { background: white !important; }
+            
+            /* 隐藏图表 canvas 边框/阴影 */
+            canvas { 
+                box-shadow: none !important;
+                border: none !important;
+                filter: none !important;
+            }
+            
+            /* 确保卡片内所有文字为黑色 */
+            .card, .card-light, .card-dark, body, * {
+                color: black !important;
+                background: white !important;
+                border-color: #ddd !important;
+            }
+            
+            /* 隐藏不必要的交互元素 */
+            .more-menu, .dropdown, .popup, .fixed { display: none !important; }
+            
+            /* 强制显示进度条填充 */
+            .progress-fill { background: #667eea !important; }
+            
+            /* 显示内容区域 */
+            .max-w-7xl { max-width: 100% !important; }
+            .px-6 { padding-left: 0 !important; padding-right: 0 !important; }
+        }
+        
         /* Animation */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -281,14 +379,16 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button @click="refreshData" class="px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition" title="刷新数据">
+                    <button @click="refreshData" class="px-4 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2" :class="{ 'opacity-75': loading }">
                         <i class="fas fa-sync-alt" :class="{ 'animate-spin': loading }"></i>
+                        <span v-if="loading" class="text-xs">更新中</span>
+                        <span v-else-if="lastRefreshed" class="text-xs text-[var(--success)]"><i class="fas fa-check"></i> 已更新</span>
                     </button>
-                    <button @click="toggleTheme" class="px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition" title="切换主题">
+                    <button @click="toggleTheme" class="px-4 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition" title="切换主题">
                         <i :class="isDark ? 'fas fa-sun' : 'fas fa-moon'"></i>
                     </button>
-                    <button @click="exportPDF" class="px-4 py-2 gradient-bg text-white rounded-lg hover:opacity-90 transition" title="导出PDF">
-                        <i class="fas fa-download mr-2"></i>导出
+                    <button @click="exportToPrint" class="px-4 py-2 gradient-bg text-white rounded-xl hover:opacity-90 transition flex items-center gap-2" title="打印导出">
+                        <i class="fas fa-print"></i><span class="hidden sm:inline">导出</span>
                     </button>
                 </div>
             </div>
@@ -296,76 +396,90 @@
 
         <!-- Stats Cards -->
         <div class="max-w-7xl mx-auto px-6 py-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="card card-light p-5 fade-in" style="animation-delay: 0.1s">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="card card-light p-6 hover-lift fade-in" style="animation-delay: 0.1s">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                            <i class="fas fa-check-circle text-green-600 dark:text-green-400 text-xl"></i>
+                        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                            <i class="fas fa-check-circle text-white text-xl"></i>
                         </div>
-                        <div>
-                            <p class="text-sm opacity-60">已完成</p>
-                            <p class="text-2xl font-bold">{{ progress.currentChapter }} 章</p>
+                        <div class="min-w-0">
+                            <p class="text-sm text-[var(--text-muted-light)] dark:text-[var(--text-muted-dark)]">已完成章节</p>
+                            <p class="text-3xl font-bold text-green-600 dark:text-green-400">{{ progress.currentChapter }}<span class="text-lg opacity-60">章</span></p>
+                            <p class="text-xs text-[var(--text-muted-light)] dark:text-[var(--text-muted-dark)]">目标 450 章</p>
                         </div>
                     </div>
                 </div>
-                <div class="card card-light p-5 fade-in" style="animation-delay: 0.2s">
+                <div class="card card-light p-6 hover-lift fade-in" style="animation-delay: 0.2s">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                            <i class="fas fa-pen text-blue-600 dark:text-blue-400 text-xl"></i>
+                        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                            <i class="fas fa-pen text-white text-xl"></i>
                         </div>
-                        <div>
-                            <p class="text-sm opacity-60">已写字数</p>
-                            <p class="text-2xl font-bold">{{ formatNumber(progress.totalWords) }}</p>
+                        <div class="min-w-0">
+                            <p class="text-sm text-[var(--text-muted-light)] dark:text-[var(--text-muted-dark)]">已写字数</p>
+                            <p class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{ formatNumber(progress.totalWords) }}</p>
+                            <p class="text-xs text-[var(--text-muted-light)] dark:text-[var(--text-muted-dark)]">目标 {{ formatNumber(project.targetWords) }}</p>
                         </div>
                     </div>
                 </div>
-                <div class="card card-light p-5 fade-in" style="animation-delay: 0.3s">
+                <div class="card card-light p-6 hover-lift fade-in" style="animation-delay: 0.3s">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
-                            <i class="fas fa-percentage text-purple-600 dark:text-purple-400 text-xl"></i>
+                        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg">
+                            <i class="fas fa-percentage text-white text-xl"></i>
                         </div>
-                        <div>
-                            <p class="text-sm opacity-60">当前进度</p>
-                            <p class="text-2xl font-bold">{{ progress.percent }}%</p>
+                        <div class="min-w-0">
+                            <p class="text-sm text-[var(--text-muted-light)] dark:text-[var(--text-muted-dark)]">当前进度</p>
+                            <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">{{ progress.percent }}<span class="text-lg opacity-60">%</span></p>
+                            <p class="text-xs text-[var(--text-muted-light)] dark:text-[var(--text-muted-dark)]">完成还需 {{ progress.estimatedDays }} 天</p>
                         </div>
                     </div>
                 </div>
-                <div class="card card-light p-5 fade-in" style="animation-delay: 0.4s">
+                <div class="card card-light p-6 hover-lift fade-in" style="animation-delay: 0.4s">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
-                            <i class="fas fa-calendar text-orange-600 dark:text-orange-400 text-xl"></i>
+                        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
+                            <i class="fas fa-gem text-white text-xl"></i>
                         </div>
-                        <div>
-                            <p class="text-sm opacity-60">预计完本</p>
-                            <p class="text-2xl font-bold">{{ progress.estimatedDays }} 天</p>
+                        <div class="min-w-0">
+                            <p class="text-sm text-[var(--text-muted-light)] dark:text-[var(--text-muted-dark)]">未回收伏笔</p>
+                            <p class="text-3xl font-bold text-amber-600 dark:text-amber-400">{{ foreshadowStats.undone }}</p>
+                            <p class="text-xs text-[var(--text-muted-light)] dark:text-[var(--text-muted-dark)]">已回收 {{ foreshadowStats.done }} 个</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Navigation Tabs - Apple Style Segmented Control -->
+                <!-- Navigation Tabs -->
         <div class="max-w-7xl mx-auto px-6">
             <div class="flex justify-center mb-6">
-                <div class="inline-flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1 gap-1 overflow-x-auto max-w-full relative">
-                    <button v-for="tab in tabs" :key="tab.id" 
-                         @click="tab.id === 'more' ? toggleMoreMenu() : (activeTab = tab.id)"
-                         class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap"
+                <div class="inline-flex bg-gray-100 dark:bg-gray-800 rounded-2xl p-1.5 gap-1 max-w-full relative scrollbar-hide" style="overflow-x: auto; overflow: visible;">
+                    <button v-for="tab in mainTabs" :key="tab.id" 
+                         @click="activeTab = tab.id"
+                         class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap"
                          :class="activeTab === tab.id 
-                             ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
-                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'">
-                        <i :class="tab.icon" class="text-xs"></i>
+                             ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-md' 
+                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-700/50'">
+                        <i :class="tab.icon" class="text-sm"></i>
                         <span>{{ tab.name }}</span>
                     </button>
                     <!-- 更多下拉菜单 -->
+                    <button id="moreMenuBtn" 
+                            @click="handleMoreClick"
+                            class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600"
+                            :class="showMoreMenu 
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-md' 
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-700/50'">
+                        <i class="fas fa-ellipsis-h text-sm"></i>
+                        <span>更多</span>
+                    </button>
                     <div v-if="showMoreMenu" 
-                         class="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border dark:border-gray-700 p-2 z-50 min-w-[160px]"
+                         style="position: absolute; top: 100%; right: 0; margin-top: 8px; background: white; border-radius: 12px; z-index: 9999; min-width: 180px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: 1px solid #e5e7eb;"
+                         class="dark:bg-gray-800 dark:border-gray-700"
                          @click.stop>
                         <button v-for="item in moreTabs" :key="item.id"
                                 @click="activeTab = item.id; showMoreMenu = false"
-                                class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition hover:bg-gray-100 dark:hover:bg-gray-700"
-                                :class="activeTab === item.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'">
-                            <i :class="item.icon" class="text-xs w-4"></i>
+                                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition hover:bg-gray-100 dark:hover:bg-gray-700"
+                                :class="activeTab === item.id ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300'">
+                            <i :class="item.icon" class="text-sm w-5 text-center"></i>
                             <span>{{ item.name }}</span>
                         </button>
                     </div>
@@ -861,6 +975,9 @@
                                 <span>所在</span>
                             </div>
                         </div>
+                    </div>
+                    <div v-if="graphNodeLimitReached" class="mt-3 text-xs text-amber-500 dark:text-amber-400 border-t pt-2">
+                        <i class="fas fa-info-circle mr-1"></i>仅显示部分节点（最多50个），完整图谱请精简数据源
                     </div>
                     <p class="text-xs opacity-50 mt-2">提示：滚轮缩放，拖拽移动节点</p>
                 </div>
@@ -1502,6 +1619,7 @@
         <!-- Footer -->
         <footer class="text-center py-8 opacity-60 text-sm">
             <p>小说架构看板 · 自动生成 · 最后更新: {{ lastUpdated }}</p>
+            <p class="text-xs opacity-50 mt-1">数据来源: 项目文件 (state.json) 及 API</p>
         </footer>
     </div>
 
@@ -1510,35 +1628,35 @@
 
         createApp({
             setup() {
+                const API_BASE = 'http://localhost:8086';
+                
                 const isDark = ref(false);
                 const loading = ref(false);
                 const activeTab = ref('volume');
                 const foreshadowFilter = ref('all');
                 
-                const tabs = [
-                    // 第一组：总览与结构
+                // 核心标签（直接显示）
+                const mainTabs = [
                     { id: 'overview', name: '总览', icon: 'fas fa-home' },
                     { id: 'volume', name: '卷结构', icon: 'fas fa-layer-group' },
-                    { id: 'chapters', name: '章节', icon: 'fas fa-list-alt' },
-                    // 第二组：角色体系
                     { id: 'protagonist', name: '角色', icon: 'fas fa-users' },
+                    { id: 'foreshadow', name: '伏笔', icon: 'fas fa-gem' },
+                    { id: 'progress', name: '进度', icon: 'fas fa-chart-bar' },
+                    { id: 'review', name: '审查', icon: 'fas fa-clipboard-check' },
+                ];
+                
+                // 更多菜单中的标签
+                const moreTabs = [
+                    { id: 'chapters', name: '章节', icon: 'fas fa-list-alt' },
                     { id: 'relationship', name: '图谱', icon: 'fas fa-project-diagram' },
                     { id: 'growth', name: '成长', icon: 'fas fa-chart-line' },
                     { id: 'factions', name: '势力', icon: 'fas fa-map-marked-alt' },
-                    // 第三组：写作追踪
-                    { id: 'progress', name: '进度', icon: 'fas fa-chart-bar' },
-                    { id: 'foreshadow', name: '伏笔', icon: 'fas fa-gem' },
                     { id: 'reading', name: '追读力', icon: 'fas fa-fire' },
-                    // 第四组：质量与工具
-                    { id: 'review', name: '审查', icon: 'fas fa-clipboard-check' },
                     { id: 'checker-config', name: '审查器设置', icon: 'fas fa-sliders-h' },
                     { id: 'entities', name: '实体', icon: 'fas fa-book' },
                     { id: 'files', name: '文档', icon: 'fas fa-folder-open' },
                 ];
                 
-                // 二级标签（更多菜单）- 已禁用，直接显示所有标签
-                const moreTabs = [];
-
                 const project = ref({
                     title: '末世降临：我在地摊买了本成神指南',
                     genre: '末世+异能',
@@ -1876,6 +1994,22 @@
                                 score: r.overall_score
                             }));
                         
+                        const chartTooltipConfig = {
+                            enabled: true,
+                            backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                            titleColor: '#fff',
+                            bodyColor: '#cbd5e1',
+                            borderColor: '#475569',
+                            borderWidth: 1,
+                            padding: 12,
+                            cornerRadius: 8,
+                            titleFont: { size: 13, weight: 'bold' },
+                            bodyFont: { size: 12 },
+                            callbacks: {
+                                label: (context) => ` ${context.parsed.y ?? context.parsed}`
+                            }
+                        };
+                        
                         reviewCharts.value.score = new Chart(scoreCtx, {
                             type: 'line',
                             data: {
@@ -1886,15 +2020,27 @@
                                     borderColor: '#667eea',
                                     backgroundColor: 'rgba(102, 126, 234, 0.1)',
                                     fill: true,
-                                    tension: 0.3
+                                    tension: 0.3,
+                                    pointBackgroundColor: '#667eea',
+                                    pointBorderColor: '#fff',
+                                    pointBorderWidth: 2,
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6
                                 }]
                             },
                             options: {
                                 responsive: true,
                                 maintainAspectRatio: false,
-                                plugins: { legend: { display: false } },
+                                plugins: { 
+                                    legend: { display: false },
+                                    tooltip: chartTooltipConfig
+                                },
                                 scales: {
                                     y: { min: 0, max: 100 }
+                                },
+                                interaction: {
+                                    intersect: false,
+                                    mode: 'index'
                                 }
                             }
                         });
@@ -1928,7 +2074,17 @@
                                 responsive: true,
                                 maintainAspectRatio: false,
                                 plugins: {
-                                    legend: { position: 'bottom' }
+                                    legend: { position: 'bottom' },
+                                    tooltip: {
+                                        enabled: true,
+                                        backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                                        titleColor: '#fff',
+                                        bodyColor: '#cbd5e1',
+                                        borderColor: '#475569',
+                                        borderWidth: 1,
+                                        padding: 12,
+                                        cornerRadius: 8
+                                    }
                                 }
                             }
                         });
@@ -1949,14 +2105,34 @@
                                     data: Object.values(dims),
                                     backgroundColor: 'rgba(102, 126, 234, 0.2)',
                                     borderColor: '#667eea',
-                                    pointBackgroundColor: '#667eea'
+                                    pointBackgroundColor: '#667eea',
+                                    pointBorderColor: '#fff',
+                                    pointBorderWidth: 2,
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6
                                 }]
                             },
                             options: {
                                 responsive: true,
                                 maintainAspectRatio: false,
                                 scales: {
-                                    r: { min: 0, max: 10 }
+                                    r: { 
+                                        min: 0, 
+                                        max: 10,
+                                        ticks: { backdropColor: 'transparent' }
+                                    }
+                                },
+                                plugins: {
+                                    tooltip: {
+                                        enabled: true,
+                                        backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                                        titleColor: '#fff',
+                                        bodyColor: '#cbd5e1',
+                                        borderColor: '#475569',
+                                        borderWidth: 1,
+                                        padding: 12,
+                                        cornerRadius: 8
+                                    }
                                 }
                             }
                         });
@@ -2006,6 +2182,8 @@
                 ]);
 
                 const lastUpdated = ref(new Date().toLocaleString('zh-CN'));
+                const lastRefreshed = ref(null);
+                const graphNodeLimitReached = ref(false);
 
                 // Methods
                 const toggleTheme = () => {
@@ -2096,28 +2274,34 @@
                         if (!response.ok) throw new Error('Network response was not ok');
                         const data = await response.json();
                         
-                        project.value = {
-                            title: data.project.title,
-                            genre: data.project.genre,
-                            targetWords: data.project.target_words
-                        };
+                        if (data.project) {
+                            project.value = {
+                                title: data.project.title || '未命名项目',
+                                genre: data.project.genre || '未知类型',
+                                targetWords: data.project.target_words || 1000000
+                            };
+                        }
                         
-                        progress.value = {
-                            currentChapter: data.progress.current_chapter,
-                            totalWords: data.progress.total_words,
-                            percent: Math.round((data.progress.current_chapter / 450) * 100),
-                            estimatedDays: Math.round((450 - data.progress.current_chapter) * 0.5)
-                        };
+                        if (data.progress) {
+                            progress.value = {
+                                currentChapter: data.progress.current_chapter || 0,
+                                totalWords: data.progress.total_words || 0,
+                                percent: Math.round(((data.progress.current_chapter || 0) / 450) * 100),
+                                estimatedDays: Math.round((450 - (data.progress.current_chapter || 0)) * 0.5)
+                            };
+                        }
                         
-                        protagonist.value = {
-                            name: data.protagonist_state.name,
-                            realm: data.protagonist_state.power.realm,
-                            layer: data.protagonist_state.power.layer,
-                            location: data.protagonist_state.location.current,
-                            goldenFinger: data.protagonist_state.golden_finger.name + ' Lv.' + data.protagonist_state.golden_finger.level,
-                            flaw: '过度谨慎导致的"冷眼旁观"',
-                            nextGoal: data.protagonist_state.power.bottleneck
-                        };
+                        if (data.protagonist_state) {
+                            protagonist.value = {
+                                name: data.protagonist_state.name || '未知主角',
+                                realm: data.protagonist_state.power?.realm || '普通人',
+                                layer: data.protagonist_state.power?.layer || 1,
+                                location: data.protagonist_state.location?.current || '未知',
+                                goldenFinger: (data.protagonist_state.golden_finger?.name || '无') + ' Lv.' + (data.protagonist_state.golden_finger?.level || 1),
+                                flaw: '过度谨慎导致的"冷眼旁观"',
+                                nextGoal: data.protagonist_state.power?.bottleneck || '暂无目标'
+                            };
+                        }
                         
                         // 读取女主信息
                         if (data.relationships) {
@@ -2232,6 +2416,8 @@
                         // 保持使用默认值，不显示错误
                     }
                     loading.value = false;
+                    lastRefreshed.value = new Date();
+                    lastUpdated.value = new Date().toLocaleString('zh-CN');
                 };
 
                 const formatNumber = (num) => {
@@ -2244,6 +2430,10 @@
 
                 const exportPDF = () => {
                     alert('导出功能开发中...');
+                };
+                
+                const exportToPrint = () => {
+                    window.print();
                 };
 
                 const getFactionBorderColor = (type) => {
@@ -2291,28 +2481,38 @@
                     const width = Math.max(rawWidth - 32, 400);
                     const height = Math.max(rawHeight - 32, 300);
                     
+                    // 节点限制
+                    const MAX_NODES = 50;
+                    const displayNodes = [];
+                    
                     // 动态构建节点和关系
                     const nodes = [];
                     const links = [];
                     const nodeMap = new Set();
                     
-                    // 添加主角
-                    nodes.push({ id: protagonist.value.name, group: 'protagonist', radius: 40, realm: protagonist.value.realm });
+                    // 添加主角（始终显示）
+                    const protagonistNode = { id: protagonist.value.name, group: 'protagonist', radius: 40, realm: protagonist.value.realm };
+                    nodes.push(protagonistNode);
                     nodeMap.add(protagonist.value.name);
+                    displayNodes.push(protagonistNode);
                     
                     // 添加女主
-                    if (heroine.value.name) {
-                        nodes.push({ id: heroine.value.name, group: 'heroine', radius: 30, role: heroine.value.role });
+                    if (heroine.value.name && nodes.length < MAX_NODES) {
+                        const heroineNode = { id: heroine.value.name, group: 'heroine', radius: 30, role: heroine.value.role };
+                        nodes.push(heroineNode);
                         nodeMap.add(heroine.value.name);
+                        displayNodes.push(heroineNode);
                         links.push({ source: protagonist.value.name, target: heroine.value.name, type: 'love', label: '羁绊' });
                     }
                     
                     // 添加其他角色
                     for (const char of otherCharacters.value) {
-                        if (!nodeMap.has(char.name)) {
+                        if (!nodeMap.has(char.name) && nodes.length < MAX_NODES) {
                             const group = char.category === '反派角色' ? 'villain' : (char.category === '主要角色' ? 'main' : 'support');
-                            nodes.push({ id: char.name, group, radius: group === 'villain' ? 25 : 20, role: char.role });
+                            const charNode = { id: char.name, group, radius: group === 'villain' ? 25 : 20, role: char.role };
+                            nodes.push(charNode);
                             nodeMap.add(char.name);
+                            displayNodes.push(charNode);
                             // 反派与主角的敌对关系
                             if (group === 'villain') {
                                 links.push({ source: protagonist.value.name, target: char.name, type: 'enemy', label: '敌对' });
@@ -2322,26 +2522,29 @@
                     
                     // 添加地点
                     for (const loc of locations.value) {
-                        if (!nodeMap.has(loc.name)) {
-                            nodes.push({ id: loc.name, group: 'location', radius: 18, role: loc.role });
+                        if (!nodeMap.has(loc.name) && nodes.length < MAX_NODES) {
+                            const locNode = { id: loc.name, group: 'location', radius: 18, role: loc.role };
+                            nodes.push(locNode);
                             nodeMap.add(loc.name);
+                            displayNodes.push(locNode);
                             links.push({ source: protagonist.value.name, target: loc.name, type: 'location', label: '所在' });
                         }
                     }
                     
                     // 添加物品
                     for (const item of items.value) {
-                        if (!nodeMap.has(item.name)) {
-                            nodes.push({ id: item.name, group: 'item', radius: 15, role: item.role });
+                        if (!nodeMap.has(item.name) && nodes.length < MAX_NODES) {
+                            const itemNode = { id: item.name, group: 'item', radius: 15, role: item.role };
+                            nodes.push(itemNode);
                             nodeMap.add(item.name);
+                            displayNodes.push(itemNode);
                             links.push({ source: protagonist.value.name, target: item.name, type: 'own', label: '拥有' });
                         }
                     }
                     
-                    // 特殊关系：临渊塔与上古遗迹
-                    if (nodeMap.has('临渊塔') && nodeMap.has('上古遗迹')) {
-                        links.push({ source: '临渊塔', target: '上古遗迹', type: 'contain', label: '包含' });
-                    }
+                    // 记录是否还有更多节点未显示
+                    const hasMoreNodes = nodes.length < (1 + (heroine.value.name ? 1 : 0) + otherCharacters.value.length + locations.value.length + items.value.length);
+                    graphNodeLimitReached.value = hasMoreNodes;
 
                     container.innerHTML = '';
                     
@@ -2382,7 +2585,7 @@
                         .force('link', d3.forceLink(links).id(d => d.id).distance(120))
                         .force('charge', d3.forceManyBody().strength(-400))
                         .force('center', d3.forceCenter(width / 2, height / 2))
-                        .force('collision', d3.forceCollide().radius(d => d.radius + 15));
+                        .force('collision', d3.forceCollide().radius(d => d.radius + 20));
 
                     // 绘制连线
                     const link = g.append('g')
@@ -2529,6 +2732,19 @@
                     showMoreMenu.value = !showMoreMenu.value;
                 };
                 
+                const handleMoreClick = (e) => {
+                    e.stopPropagation();
+                    toggleMoreMenu();
+                };
+                
+                // 点击外部关闭更多菜单
+                const handleClickOutside = (e) => {
+                    const navContainer = document.querySelector('.inline-flex.bg-gray-100');
+                    if (navContainer && !navContainer.contains(e.target)) {
+                        showMoreMenu.value = false;
+                    }
+                };
+                
                 // 快捷入口
                 const quickLinks = [
                     { id: 'volume', name: '卷结构', desc: '查看卷进度', icon: 'fas fa-layer-group', bgColor: 'bg-purple-500' },
@@ -2551,7 +2767,6 @@
                 };
                 
                 // API 调用函数
-                const API_BASE = 'http://localhost:8086';
                 
                 const loadEntities = async () => {
                     try {
@@ -2836,13 +3051,29 @@
                                     data: chapters.map(c => c.wordCount),
                                     backgroundColor: 'rgba(102, 126, 234, 0.6)',
                                     borderColor: '#667eea',
-                                    borderWidth: 1
+                                    borderWidth: 1,
+                                    borderRadius: 6
                                 }]
                             },
                             options: {
                                 responsive: true,
                                 maintainAspectRatio: false,
-                                plugins: { legend: { display: false } },
+                                plugins: { 
+                                    legend: { display: false },
+                                    tooltip: {
+                                        enabled: true,
+                                        backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                                        titleColor: '#fff',
+                                        bodyColor: '#cbd5e1',
+                                        borderColor: '#475569',
+                                        borderWidth: 1,
+                                        padding: 12,
+                                        cornerRadius: 8,
+                                        callbacks: {
+                                            label: (ctx) => ` 字数: ${ctx.parsed.y}`
+                                        }
+                                    }
+                                },
                                 scales: {
                                     y: { beginAtZero: true }
                                 }
@@ -2884,13 +3115,36 @@
                                     borderColor: '#f43f5e',
                                     backgroundColor: 'rgba(244, 63, 94, 0.1)',
                                     fill: true,
-                                    tension: 0.3
+                                    tension: 0.3,
+                                    pointBackgroundColor: '#f43f5e',
+                                    pointBorderColor: '#fff',
+                                    pointBorderWidth: 2,
+                                    pointRadius: 3,
+                                    pointHoverRadius: 5
                                 }]
                             },
                             options: {
                                 responsive: true,
                                 maintainAspectRatio: false,
-                                plugins: { legend: { display: false } },
+                                plugins: { 
+                                    legend: { display: false },
+                                    tooltip: {
+                                        enabled: true,
+                                        backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                                        titleColor: '#fff',
+                                        bodyColor: '#cbd5e1',
+                                        borderColor: '#475569',
+                                        borderWidth: 1,
+                                        padding: 12,
+                                        cornerRadius: 8,
+                                        callbacks: {
+                                            label: (ctx) => {
+                                                const realms = ['', '感气', '引气', '筑基', '开光', '融合', '辟谷', '金丹', '元婴', '化神'];
+                                                return ` 境界: ${realms[Math.floor(ctx.parsed.y)] || ''}`;
+                                            }
+                                        }
+                                    }
+                                },
                                 scales: {
                                     y: {
                                         ticks: {
@@ -2918,6 +3172,9 @@
                         document.body.classList.add('dark');
                         document.body.classList.remove('light');
                     }
+                    
+                    // 点击外部关闭更多菜单
+                    document.addEventListener('click', handleClickOutside);
                     
                     refreshData();
                     
@@ -3026,7 +3283,7 @@
                     isDark,
                     loading,
                     activeTab,
-                    tabs,
+                    mainTabs,
                     project,
                     progress,
                     protagonist,
@@ -3080,6 +3337,8 @@
                     moreTabs,
                     showMoreMenu,
                     toggleMoreMenu,
+                    handleMoreClick,
+                    handleClickOutside,
                     quickLinks,
                     // 工具函数
                     formatJSON,
