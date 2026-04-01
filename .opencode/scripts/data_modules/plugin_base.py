@@ -13,6 +13,98 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 
+class BaseHook(ABC):
+    """Hook 抽象基类
+
+    Hook 是工作流钩子，允许插件在写作/审查流程的关键节点注入逻辑。
+    插件可通过继承此类并注册到 manifest.json 来添加自定义钩子。
+    
+    钩子点说明：
+    - before_write: 写作前（Step 0 预检后）
+    - after_context: 上下文生成后（Step 1 后）
+    - before_draft: 起草前（Step 2A 前）
+    - after_draft: 起草后（Step 2A 后，风格适配前）
+    - before_review: 审查前（Step 3 前）
+    - after_review: 审查后（Step 3 后，润色前）
+    - before_polish: 润色前（Step 4 前）
+    - after_polish: 润色后（Step 4 后）
+    - before_data_write: 数据回写前（Step 5 前）
+    - after_data_write: 数据回写后（Step 5 后）
+    """
+
+    HOOK_POINTS = [
+        "before_write",
+        "after_context",
+        "before_draft",
+        "after_draft",
+        "before_review",
+        "after_review",
+        "before_polish",
+        "after_polish",
+        "before_data_write",
+        "after_data_write",
+    ]
+
+    def __init__(self, context: Dict[str, Any] = None):
+        """
+        初始化 Hook
+
+        Args:
+            context: 包含 config、project_root 等的上下文字典
+        """
+        self.context = context or {}
+        self.config = self.context.get("config", {})
+
+    @abstractmethod
+    async def trigger(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        执行钩子逻辑
+
+        Args:
+            context: 包含当前流程上下文（如章节内容、审查结果等）
+
+        Returns:
+            修改后的上下文，传递给下一个钩子或流程步骤
+        """
+        pass
+
+    def get_hook_points(self) -> List[str]:
+        """
+        返回钩子触发点列表（可选）
+
+        Returns:
+            钩子点名称列表
+        """
+        return []
+
+    def validate_context(self, context: Dict[str, Any]) -> bool:
+        """
+        验证输入上下文是否合法（可选）
+
+        Args:
+            context: 输入上下文
+
+        Returns:
+            是否通过验证
+        """
+        return True
+
+    async def on_load(self, plugin_manager) -> None:
+        """
+        插件加载时调用（可选）
+
+        Args:
+            plugin_manager: 插件管理器实例
+        """
+        pass
+
+    async def on_unload(self) -> None:
+        """
+        插件卸载时调用（可选），用于清理资源
+        """
+        pass
+
+
 class BaseAgent(ABC):
     """Agent 抽象基类
 

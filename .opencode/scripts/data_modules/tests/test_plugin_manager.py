@@ -246,3 +246,128 @@ class TestPluginBase:
 
         checker = TestChecker({"threshold": 50})
         assert checker.config["threshold"] == 50
+
+
+class TestHookSystem:
+    """工作流钩子系统测试"""
+
+    def test_hook_dispatcher_init(self, tmp_path):
+        """测试 HookDispatcher 初始化"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager, HookDispatcher
+
+        pm = PluginManager(tmp_path)
+        dispatcher = pm.hook_dispatcher
+
+        assert isinstance(dispatcher, HookDispatcher)
+        assert dispatcher.pm is pm
+
+    async def mock_hook_trigger(self, context):
+        context["executed"] = True
+        return context
+
+    def test_hook_registration(self, tmp_path):
+        """测试钩子注册"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager
+
+        class MockHook:
+            async def trigger(self, context):
+                context["executed"] = True
+                return context
+
+        pm = PluginManager(tmp_path)
+        hook = MockHook()
+
+        pm.hook_dispatcher.register(hook, ["after_review", "before_polish"], "test_plugin")
+
+        hooks = pm.hook_dispatcher.list_hooks()
+        assert "after_review" in hooks
+        assert "before_polish" in hooks
+
+    @pytest.mark.asyncio
+    async def test_hook_dispatch(self, tmp_path):
+        """测试钩子调度"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager
+
+        class TestHook:
+            async def trigger(self, context):
+                context["modified"] = True
+                return context
+
+        pm = PluginManager(tmp_path)
+        hook = TestHook()
+
+        pm.hook_dispatcher.register(hook, ["after_review"], "test")
+
+        context = {"chapter": 1}
+        result = await pm.hook_dispatcher.dispatch("after_review", context)
+
+        assert result["modified"] is True
+
+    @pytest.mark.asyncio
+    async def test_hook_dispatch_exception_handling(self, tmp_path):
+        """测试钩子异常处理"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager
+
+        class FailingHook:
+            async def trigger(self, context):
+                raise ValueError("Hook failed")
+
+        class SuccessHook:
+            async def trigger(self, context):
+                context["success"] = True
+                return context
+
+        pm = PluginManager(tmp_path)
+        pm.hook_dispatcher.register(FailingHook(), ["after_review"], "failing")
+        pm.hook_dispatcher.register(SuccessHook(), ["after_review"], "success")
+
+        context = {"chapter": 1}
+        result = await pm.hook_dispatcher.dispatch("after_review", context, strict=False)
+
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_hook_dispatch_strict_mode(self, tmp_path):
+        """测试严格模式"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager
+
+        class FailingHook:
+            async def trigger(self, context):
+                raise ValueError("Hook failed")
+
+        pm = PluginManager(tmp_path)
+        pm.hook_dispatcher.register(FailingHook(), ["after_review"], "failing")
+
+        context = {"chapter": 1}
+        with pytest.raises(ValueError, match="Hook failed"):
+            await pm.hook_dispatcher.dispatch("after_review", context, strict=True)
+
+    def test_hook_list_empty(self, tmp_path):
+        """测试空钩子列表"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager
+
+        pm = PluginManager(tmp_path)
+        hooks = pm.hook_dispatcher.list_hooks()
+
+        assert hooks == {}
+
+    def test_get_hooks_for_point(self, tmp_path):
+        """测试获取指定钩子点"""
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from data_modules.plugin_manager import PluginManager
+
+        class TestHook:
+            pass
+
+        pm = PluginManager(tmp_path)
+        pm.hook_dispatcher.register(TestHook(), ["after_review"], "test")
+
+        hooks = pm.hook_dispatcher.get_hooks_for_point("after_review")
+        assert len(hooks) == 1
+        assert hooks[0]["plugin_id"] == "test"

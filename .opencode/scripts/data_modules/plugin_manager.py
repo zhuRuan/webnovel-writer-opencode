@@ -18,6 +18,7 @@ import json
 import logging
 import shutil
 import sys
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -58,7 +59,9 @@ class PluginManager:
             "checkers": [],
             "publishers": [],
             "templates": [],
+            "hooks": [],
         }
+        self.hook_dispatcher = HookDispatcher(self)
         self._ensure_plugins_dir()
         self._loaded = False
         self._reloading = False
@@ -286,6 +289,31 @@ class PluginManager:
                     "plugin_id": plugin_id,
                 }
             )
+
+        for hook_def in entry_points.get("hooks", []):
+            hook_class = self._get_class(module, hook_def.get("class", ""))
+            if hook_class:
+                triggers = hook_def.get("trigger_on", [])
+                hook_id = hook_def.get("id")
+                description = hook_def.get("description", "")
+
+                try:
+                    hook_instance = hook_class({"config": hook_def})
+                    if triggers:
+                        self.hook_dispatcher.register(hook_instance, triggers, plugin_id)
+
+                    self.extensions["hooks"].append(
+                        {
+                            "id": hook_id,
+                            "class": hook_class,
+                            "triggers": triggers,
+                            "description": description,
+                            "plugin_id": plugin_id,
+                        }
+                    )
+                    logger.info(f"已注册钩子 {hook_id} 到 {triggers}")
+                except Exception as e:
+                    logger.warning(f"实例化钩子 {hook_id} 失败: {e}")
 
     def load_plugin(self, plugin_name: str) -> bool:
         """
@@ -906,6 +934,97 @@ class PluginManager:
             return False
 
 
+class HookDispatcher:
+    """工作流钩子调度器
+
+    负责注册和执行工作流钩子，允许插件在写作/审查流程的关键节点注入逻辑。
+    """
+
+    def __init__(self, pm: PluginManager):
+        """
+        初始化调度器
+
+        Args:
+            pm: 插件管理器实例
+        """
+        self.pm = pm
+        self._hooks: Dict[str, List[Any]] = defaultdict(list)
+
+    def register(self, hook: Any, triggers: List[str], plugin_id: str) -> None:
+        """
+        注册钩子
+
+        Args:
+            hook: 钩子实例
+            triggers: 触发点列表
+            plugin_id: 插件 ID
+        """
+        for point in triggers:
+            if point not in self._hooks:
+                self._hooks[point] = []
+            self._hooks[point].append({
+                "hook": hook,
+                "plugin_id": plugin_id
+            })
+        logger.info(f"已注册钩子 {getattr(hook, '__class__', hook)} 到 {triggers}")
+
+    async def dispatch(self, hook_point: str, context: Dict[str, Any], strict: bool = False) -> Dict[str, Any]:
+        """
+        调度钩子点
+
+        Args:
+            hook_point: 钩子点名称
+            context: 上下文数据
+            strict: 是否严格模式（失败时终止）
+
+        Returns:
+            处理后的上下文
+        """
+        hooks = self._hooks.get(hook_point, [])
+        if not hooks:
+            return context
+
+        for item in hooks:
+            hook = item["hook"]
+            plugin_id = item["plugin_id"]
+            try:
+                context = await hook.trigger(context)
+                logger.debug(f"钩子 {plugin_id} 在 {hook_point} 执行完成")
+            except Exception as e:
+                logger.error(f"钩子 {plugin_id} 在 {hook_point} 执行失败: {e}")
+                if strict:
+                    raise
+
+        return context
+
+    def list_hooks(self) -> Dict[str, List[str]]:
+        """
+        列出所有已注册的钩子
+
+        Returns:
+            字典，键为钩子点，值为钩子标识列表
+        """
+        result = defaultdict(list)
+        for point, items in self._hooks.items():
+            for item in items:
+                hook = item["hook"]
+                hook_id = getattr(hook, '__class__', type(hook)).__name__
+                result[point].append(f"{item['plugin_id']}:{hook_id}")
+        return dict(result)
+
+    def get_hooks_for_point(self, hook_point: str) -> List[Dict[str, Any]]:
+        """
+        获取指定钩子点的所有钩子
+
+        Args:
+            hook_point: 钩子点名称
+
+        Returns:
+            钩子列表
+        """
+        return self._hooks.get(hook_point, [])
+
+
 def get_plugin_manager(project_root: Optional[Path] = None) -> PluginManager:
     """
     获取全局 PluginManager 实例
@@ -1061,3 +1180,123 @@ def cmd_reload(pm: PluginManager, args: argparse.Namespace) -> None:
     else:
         pm.reload_all()
         print(f"已重新加载 {len(pm.loaded_plugins)} 个插件")
+
+
+def cmd_hook_list(pm: PluginManager, args: argparse.Namespace) -> None:
+    """hook list 命令"""
+    hooks = pm.hook_dispatcher.list_hooks()
+    if not hooks:
+        print("没有已注册的钩子")
+        return
+
+    print("已注册的钩子：")
+    print()
+    for point, hook_list in sorted(hooks.items()):
+        print(f"  {point}:")
+        for hook_id in hook_list:
+            print(f"    - {hook_id}")
+        print()
+
+
+def cmd_hook_run(pm: PluginManager, args: argparse.Namespace) -> None:
+    """hook run 命令"""
+    import json as json_module
+
+    hook_point = args.point
+    if hook_point not in pm.hook_dispatcher._hooks:
+        print(f"错误: 钩子点 '{hook_point}' 没有已注册的钩子")
+        raise SystemExit(1)
+
+    input_file = args.input
+    output_file = args.output
+    strict = args.strict
+
+    context = {}
+    if input_file:
+        if input_file.startswith("@"):
+            input_path = Path(input_file[1:])
+        else:
+            input_path = Path(input_file)
+
+        if not input_path.exists():
+            print(f"错误: 输入文件不存在: {input_path}")
+            raise SystemExit(1)
+
+        try:
+            with open(input_path, "r", encoding="utf-8") as f:
+                context = json_module.load(f)
+        except json_module.JSONDecodeError as e:
+            print(f"错误: 输入文件不是有效的 JSON: {e}")
+            raise SystemExit(1)
+
+    import asyncio
+
+    async def run_hook():
+        return await pm.hook_dispatcher.dispatch(hook_point, context, strict=strict)
+
+    result_context = asyncio.run(run_hook())
+
+    if output_file:
+        output_path = Path(output_file[1:]) if output_file.startswith("@") else Path(output_file)
+        with open(output_path, "w", encoding="utf-8") as f:
+            json_module.dump(result_context, f, ensure_ascii=False, indent=2)
+        print(f"结果已写入: {output_path}")
+    else:
+        print(json_module.dumps(result_context, ensure_ascii=False, indent=2))
+
+
+def main() -> None:
+    """CLI 入口"""
+    import argparse
+    import shutil
+
+    parser = argparse.ArgumentParser(description="插件管理工具")
+    parser.add_argument("--project-root", help="项目根目录")
+
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_list = sub.add_parser("list", help="列出已安装插件")
+    p_list.set_defaults(func=cmd_list)
+
+    p_info = sub.add_parser("info", help="查看插件详情")
+    p_info.add_argument("plugin_id", help="插件 ID 或名称")
+    p_info.set_defaults(func=cmd_info)
+
+    p_install = sub.add_parser("install", help="安装插件（市场名称、Git URL 或本地路径）")
+    p_install.add_argument("source", help="插件名、Git URL 或本地路径")
+    p_install.add_argument("--force", action="store_true", help="强制刷新市场索引缓存")
+    p_install.set_defaults(func=cmd_install)
+
+    p_remove = sub.add_parser("remove", help="卸载插件")
+    p_remove.add_argument("plugin_id", help="插件 ID 或名称")
+    p_remove.set_defaults(func=cmd_remove)
+
+    p_reload = sub.add_parser("reload", help="重新加载插件")
+    p_reload.add_argument("plugin_id", nargs="?", help="插件 ID（可选，不指定则重载所有）")
+    p_reload.set_defaults(func=cmd_reload)
+
+    p_hook = sub.add_parser("hook", help="工作流钩子管理")
+    p_hook_sub = p_hook.add_subparsers(dest="hook_command", required=True)
+
+    p_hook_list = p_hook_sub.add_parser("list", help="列出所有已注册的钩子")
+    p_hook_list.set_defaults(func=cmd_hook_list)
+
+    p_hook_run = p_hook_sub.add_parser("run", help="执行特定钩子点")
+    p_hook_run.add_argument("--point", required=True, help="钩子点名称")
+    p_hook_run.add_argument("--input", help="输入 JSON 文件（使用 @ 前缀表示文件路径）")
+    p_hook_run.add_argument("--output", help="输出 JSON 文件（使用 @ 前缀表示文件路径）")
+    p_hook_run.add_argument("--strict", action="store_true", help="严格模式：钩子失败时终止")
+    p_hook_run.set_defaults(func=cmd_hook_run)
+
+    args = parser.parse_args()
+
+    project_root = args.project_root
+    if project_root:
+        project_root = normalize_windows_path(project_root)
+    else:
+        project_root = Path.cwd()
+
+    pm = PluginManager(project_root)
+    pm.load_all_plugins()
+
+    args.func(pm, args)
