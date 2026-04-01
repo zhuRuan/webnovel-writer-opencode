@@ -168,13 +168,17 @@ def download_opencode():
         z.extractall(script_dir)
     zip_file.unlink()
 
-    # 找到解压目录并移动 .opencode
+    # 找到解压目录并复制 .opencode 到正确位置
     for item in script_dir.iterdir():
         if item.is_dir() and item.name.startswith("webnovel-writer"):
             opencode_src = item / ".opencode"
             if opencode_src.exists():
                 log_info("安装 .opencode 配置...")
-                shutil.move(str(opencode_src), ".opencode")
+                # 先删除旧的 .opencode，再复制新的
+                dest = Path(".opencode")
+                if dest.exists():
+                    shutil.rmtree(dest)
+                shutil.copytree(opencode_src, dest)
                 # 删除解压目录
                 shutil.rmtree(item)
                 return
