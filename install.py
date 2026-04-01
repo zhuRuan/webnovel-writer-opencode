@@ -16,6 +16,29 @@ from typing import List, Optional
 REPO = "lujih/webnovel-writer-opencode"
 BRANCH = "master"
 
+
+# ---------- 自更新 ----------
+def self_update():
+    """从 GitHub 下载最新版本的安装脚本并替换"""
+    script_path = Path(__file__).resolve()
+    url = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/install.py"
+    
+    try:
+        log_info("检查更新...")
+        tmp_file = script_path.parent / "install_new.py"
+        urllib.request.urlretrieve(url, tmp_file)
+        
+        # 替换脚本
+        tmp_file.replace(script_path)
+        log_info("已更新到最新版本，重新运行...")
+        
+        # 重新执行新脚本
+        os.execv(sys.executable, [sys.executable, str(script_path)])
+    except Exception as e:
+        # 更新失败，继续使用当前版本
+        log_warn(f"自更新失败，使用当前版本: {e}")
+
+
 # ---------- 颜色输出（支持 Windows） ----------
 class Colors:
     if platform.system() == "Windows":
@@ -243,6 +266,9 @@ def main():
     print("  Webnovel Writer for OpenCode 安装脚本")
     print("=" * 50)
     print()
+
+    # 先自更新
+    self_update()
 
     check_dependencies()
 
