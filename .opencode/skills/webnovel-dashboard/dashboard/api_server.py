@@ -176,8 +176,10 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_checker_config_get()
             elif path == '/api/foreshadowing/due':
                 self.handle_foreshadowing_due()
-            elif path == '/api/foreshadow':
-                self.handle_foreshadow_get()
+            elif path == '/api/foreshadowings':
+                self.handle_foreshadowings()
+            elif path == '/api/timeline/events':
+                self.handle_timeline_events()
             else:
                 self.send_error(404, 'Not Found')
         except Exception as e:
@@ -193,8 +195,6 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_checker_config_post()
             elif path == '/api/files/write':
                 self.handle_file_write()
-            elif path == '/api/foreshadow':
-                self.handle_foreshadow_post()
             else:
                 self.send_error(404, 'Not Found')
         except Exception as e:
@@ -425,96 +425,108 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             logger.exception("Failed to get due foreshadowing")
             self.send_json({'error': str(e)}, 500)
 
-    def handle_foreshadow_get(self):
-        """GET /api/foreshadow - 获取所有伏笔列表"""
+    def handle_foreshadowings(self):
+        """GET /api/foreshadowings - 返回完整伏笔列表用于甘特图"""
         try:
             state_file = PROJECT_ROOT / '.webnovel' / 'state.json'
             if not state_file.exists():
-                self.send_json([])
+                self.send_json({'error': '项目未初始化'}, 404)
                 return
-            state = json.loads(state_file.read_text(encoding='utf-8'))
-            foreshadowing = state.get('plot_threads', {}).get('foreshadowing', [])
-            self.send_json(foreshadowing)
+
+            data = json.loads(state_file.read_text(encoding='utf-8'))
+            current_chapter = data.get('progress', {}).get('current_chapter', 0)
+            foreshadowings = data.get('plot_threads', {}).get('foreshadowing', [])
+            
+            result = []
+            for f in foreshadowings:
+                planted = f.get('planted_chapter', 0) or f.get('planted', 0)
+                target = f.get('target_chapter') or f.get('target', 0)
+                status = f.get('status', '未回收')
+               回收 = f.get('回收_chapter', '')
+                
+                result.append({
+                    'id': f.get('content', '')[:20],  # 使用内容前20字符作为ID
+                    'content': f.get('content', ''),
+                    'planted': planted,
+                    'target': target,
+                    'payoff': 回收 if 回收 else None,  # 回收章节
+                    'status': status,
+                    'tier': f.get('tier', '支线'),
+                    'isOverdue': status == '未回收' and current_chapter > target,
+                    'isUrgent': status == '未回收' and (target - current_chapter) <= 10
+                })
+            
+            self.send_json({
+                'foreshadowings': result,
+                'current_chapter': current_chapter,
+                'total': len(result)
+            })
         except Exception as e:
-            logger.exception("Failed to get foreshadowing")
+            logger.exception("Failed to get foreshadowings")
             self.send_json({'error': str(e)}, 500)
 
-    def handle_foreshadow_post(self):
-        """POST /api/foreshadow - 处理伏笔的创建、更新、删除"""
-        content_length = int(self.headers.get('Content-Length', 0))
-        if content_length == 0:
-            self.send_json({'error': '请求体为空'}, 400)
-            return
-        body = self.rfile.read(content_length).decode('utf-8')
+    def handle_timeline_events(self):
+        """GET /api/timeline/events - 返回时间线事件"""
         try:
-            data = json.loads(body)
-        except json.JSONDecodeError:
-            self.send_json({'error': '无效的 JSON'}, 400)
-            return
+            state_file = PROJECT_ROOT / '.webnovel' / 'state.json'
+            if not state_file.exists():
+                self.send_json({'error': '项目未初始化'}, 404)
+                return
 
-        method = data.get('_method', 'POST').upper()
-        
-        state_file = PROJECT_ROOT / '.webnovel' / 'state.json'
-        if not state_file.exists():
-            self.send_json({'error': '项目未初始化'}, 400)
-            return
-        
-        try:
-            state = json.loads(state_file.read_text(encoding='utf-8'))
-            foreshadowing = state.setdefault('plot_threads', {}).setdefault('foreshadowing', [])
+            data = json.loads(state_file.read_text(encoding='utf-8'))
+            events = []
             
-            if method == 'POST':
-                new_foreshadow = {
-                    'id': str(int(datetime.now().timestamp() * 1000)),
-                    'content': data.get('content', ''),
-                    'planted_chapter': data.get('planted_chapter', 0),
-                    'target_chapter': data.get('target_chapter', 0),
-                    'tier': data.get('tier', '支线'),
-                    'status': data.get('status', '未回收'),
-                    'added_at': datetime.now().strftime('%Y-%m-%d'),
-                }
-                foreshadowing.append(new_foreshadow)
-                state['plot_threads']['foreshadowing'] = foreshadowing
-                state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
-                self.send_json({'success': True, 'data': new_foreshadow})
-                
-            elif method == 'PUT':
-                fid = data.get('id')
-                if not fid:
-                    self.send_json({'error': '缺少 id'}, 400)
-                    return
-                for i, f in enumerate(foreshadowing):
-                    if f.get('id') == fid:
-                        foreshadowing[i].update({
-                            'content': data.get('content', f.get('content')),
-                            'planted_chapter': data.get('planted_chapter', f.get('planted_chapter')),
-                            'target_chapter': data.get('target_chapter', f.get('target_chapter')),
-                            'tier': data.get('tier', f.get('tier')),
-                            'status': data.get('status', f.get('status')),
+            # 从 chapter_meta 提取事件
+            chapter_meta = data.get('chapter_meta', {})
+            for ch, meta in chapter_meta.items():
+                if isinstance(meta, dict):
+                    title = meta.get('title', '')
+                    # 提取章节号
+                    ch_num = int(''.join(filter(str.isdigit, str(ch))) or 0)
+                    
+                    # 提取 strand 类型
+                    strand = meta.get('strand', '未知')
+                    
+                    # 提取关键事件描述
+                    satisfaction = meta.get('satisfaction', '')
+                    summary = meta.get('summary', '')
+                    
+                    if ch_num > 0:
+                        events.append({
+                            'chapter': ch_num,
+                            'title': title,
+                            'type': strand,
+                            'description': satisfaction or summary or '',
+                            'time_anchor': meta.get('time_anchor', '')
                         })
-                        state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
-                        self.send_json({'success': True, 'data': foreshadowing[i]})
-                        return
-                self.send_json({'error': '伏笔不存在'}, 404)
-                
-            elif method == 'DELETE':
-                fid = data.get('id')
-                if not fid:
-                    self.send_json({'error': '缺少 id'}, 400)
-                    return
-                original_len = len(foreshadowing)
-                foreshadowing = [f for f in foreshadowing if f.get('id') != fid]
-                if len(foreshadowing) == original_len:
-                    self.send_json({'error': '伏笔不存在'}, 404)
-                    return
-                state['plot_threads']['foreshadowing'] = foreshadowing
-                state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
-                self.send_json({'success': True})
-            else:
-                self.send_json({'error': '不支持的方法'}, 405)
-                
+            
+            # 从 key_events 提取额外事件
+            key_events = data.get('key_events', [])
+            for e in key_events:
+                events.append({
+                    'chapter': e.get('chapter', 0),
+                    'title': e.get('title', ''),
+                    'type': e.get('type', '主线'),
+                    'description': e.get('description', ''),
+                    'time_anchor': e.get('time_anchor', '')
+                })
+            
+            # 按章节排序
+            events.sort(key=lambda x: x.get('chapter', 0))
+            
+            # 统计各类型事件数量
+            type_counts = {}
+            for e in events:
+                t = e.get('type', '未知')
+                type_counts[t] = type_counts.get(t, 0) + 1
+            
+            self.send_json({
+                'events': events,
+                'total': len(events),
+                'type_counts': type_counts
+            })
         except Exception as e:
-            logger.exception("Failed to handle foreshadow")
+            logger.exception("Failed to get timeline events")
             self.send_json({'error': str(e)}, 500)
 
     def handle_state_changes(self, params):

@@ -15,6 +15,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -497,6 +499,24 @@
             <div v-show="activeTab === 'overview'" class="fade-in">
                 <h2 class="text-xl font-bold mb-6"><i class="fas fa-home mr-2 text-blue-500"></i>总览</h2>
                 
+                <!-- 紧急建议横幅 -->
+                <div v-if="urgentSuggestions && urgentSuggestions.length > 0" class="bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 p-4 mb-6 rounded-lg">
+                    <div class="flex items-start">
+                        <i class="fas fa-exclamation-triangle text-red-600 mt-1 mr-3"></i>
+                        <div class="flex-1">
+                            <p class="font-bold text-red-800 dark:text-red-300 mb-2">⚠️ 紧急建议</p>
+                            <div class="space-y-2">
+                                <div v-for="(item, idx) in urgentSuggestions" :key="idx"
+                                     class="flex items-center gap-2 text-sm text-red-700 dark:text-red-300 cursor-pointer hover:underline"
+                                     @click="activeTab = item.tab">
+                                    <span class="w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center flex-shrink-0">{{ idx + 1 }}</span>
+                                    <span>{{ item.text }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- 核心统计 -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div class="card card-light p-5 text-center cursor-pointer hover:shadow-lg transition" @click="activeTab = 'chapters'">
@@ -753,19 +773,14 @@
             <div v-show="activeTab === 'foreshadow'" class="space-y-4 fade-in">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-xl font-bold"><i class="fas fa-gem mr-2 text-amber-500"></i>伏笔追踪 ({{ foreshadowing.length }})</h2>
-                    <div class="flex gap-2">
-                        <button @click="openForeshadowModal()" class="px-4 py-2 gradient-bg text-white rounded-lg hover:opacity-90 transition">
-                            <i class="fas fa-plus mr-2"></i>新增伏笔
-                        </button>
-                        <select v-model="foreshadowFilter" class="px-3 py-2 rounded-lg border dark:bg-gray-700">
-                            <option value="all">全部</option>
-                            <option value="core">核心伏笔</option>
-                            <option value="branch">支线伏笔</option>
-                            <option value="undone">未回收</option>
-                            <option value="done">已回收</option>
-                            <option value="urgent">即将到期</option>
-                        </select>
-                    </div>
+                    <select v-model="foreshadowFilter" class="px-3 py-2 rounded-lg border dark:bg-gray-700">
+                        <option value="all">全部</option>
+                        <option value="core">核心伏笔</option>
+                        <option value="branch">支线伏笔</option>
+                        <option value="undone">未回收</option>
+                        <option value="done">已回收</option>
+                        <option value="urgent">即将到期</option>
+                    </select>
                 </div>
                 <!-- 伏笔统计 -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -843,17 +858,9 @@
                                     <p class="text-xs opacity-50 mt-1">进度: {{ item.progress }}%</p>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <span class="badge" :class="item.status === '已回收' ? 'badge-done' : 'badge-branch'">
-                                    {{ item.status }}
-                                </span>
-                                <button @click="openForeshadowModal(item)" class="text-blue-500 hover:text-blue-700" title="编辑">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button @click="deleteForeshadow(item)" class="text-red-500 hover:text-red-700" title="删除">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </div>
+                            <span class="badge" :class="item.status === '已回收' ? 'badge-done' : 'badge-branch'">
+                                {{ item.status }}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -1202,6 +1209,59 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- 伏笔甘特图 -->
+            <div v-show="activeTab === 'gantt'" class="fade-in">
+                <h2 class="text-xl font-bold mb-4"><i class="fas fa-stream mr-2 text-purple-500"></i>伏笔甘特图</h2>
+                
+                <div class="card card-light p-4 mb-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold"><i chart-items-center mr-2"></i>伏笔时间跨度</h3>
+                        <span class="text-xs opacity-60">横轴：章节 | 纵轴：伏笔</span>
+                    </div>
+                    <div id="foreshadowGantt" style="width: 100%; height: 500px;"></div>
+                </div>
+                
+                <div class="card card-light p-4">
+                    <h3 class="font-bold mb-3"><i class="fas fa-info-circle mr-2 text-blue-500"></i>图例说明</h3>
+                    <div class="flex gap-4 text-sm">
+                        <div class="flex items-center gap-2">
+                            <span class="w-4 h-4 rounded bg-green-500"></span>
+                            <span>已回收</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-4 h-4 rounded bg-orange-500"></span>
+                            <span>进行中</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-4 h-4 rounded bg-red-500"></span>
+                            <span>已过期</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-4 h-4 rounded bg-yellow-500"></span>
+                            <span>即将到期</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 时间线 -->
+            <div v-show="activeTab === 'timeline'" class="fade-in">
+                <h2 class="text-xl font-bold mb-4"><i class="fas fa-route mr-2 text-teal-500"></i>时间线</h2>
+                
+                <div class="card card-light p-4 mb-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold"><i class="fas fa-clock mr-2"></i>关键事件分布</h3>
+                        <span class="text-xs opacity-60">按章节展示关键事件</span>
+                    </div>
+                    <div id="timelineChart" style="width: 100%; height: 400px;"></div>
+                </div>
+                
+                <div class="card card-light p-4">
+                    <h3 class="font-bold mb-3"><i class="fas fa-chart-pie mr-2 text-blue-500"></i>事件类型统计</h3>
+                    <div id="timelineStats" class="flex flex-wrap gap-4"></div>
                 </div>
             </div>
 
@@ -1581,43 +1641,6 @@
                 </div>
             </div>
 
-            <!-- 设定一致性检查 -->
-            <div v-show="activeTab === 'consistency'" class="fade-in">
-                <h2 class="text-xl font-bold mb-4"><i class="fas fa-check-double mr-2 text-blue-500"></i>设定一致性检查报告</h2>
-                
-                <div v-if="consistencyIssues.length === 0" class="card card-light p-8 text-center">
-                    <p class="text-gray-500">暂无设定一致性问题，继续加油！</p>
-                </div>
-                
-                <div v-else class="space-y-3">
-                    <div v-for="(issue, idx) in consistencyIssues" :key="idx" 
-                         class="card card-light p-4 hover:shadow-md transition">
-                        <div class="flex items-start gap-3">
-                            <div class="mt-1">
-                                <span class="inline-block w-6 h-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">!</span>
-                            </div>
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2 flex-wrap mb-1">
-                                    <span class="text-sm font-semibold text-red-600">设定矛盾</span>
-                                    <span class="text-xs text-gray-400">{{ issue.severity === 'critical' ? '严重' : '警告' }}</span>
-                                    <button @click="jumpToChapter(issue.chapters[0])" 
-                                            class="text-xs text-blue-500 hover:text-blue-700 underline">
-                                        跳转到第 {{ issue.chapters[0] }} 章
-                                    </button>
-                                    <span v-if="issue.chapters[1] && issue.chapters[1] !== issue.chapters[0]" class="text-xs text-gray-400">
-                                        (涉及第 {{ issue.chapters[0] }}-{{ issue.chapters[1] }} 章)
-                                    </span>
-                                </div>
-                                <p class="text-sm">{{ issue.description }}</p>
-                                <p v-if="issue.source?.reviewed_at" class="text-xs text-gray-400 mt-2">
-                                    报告时间: {{ issue.source.reviewed_at }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- 文档浏览 -->
             <div v-show="activeTab === 'files'" class="fade-in">
                 <div class="flex justify-between items-center mb-4">
@@ -1719,107 +1742,6 @@
             </div>
         </div>
 
-        <!-- 伏笔编辑弹窗 -->
-        <div v-if="showForeshadowModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="closeForeshadowModal">
-            <div class="card card-light p-6 w-full max-w-md mx-4">
-                <h3 class="text-lg font-bold mb-4">{{ editingForeshadow ? '编辑伏笔' : '新增伏笔' }}</h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-1">伏笔内容 <span class="text-red-500">*</span></label>
-                        <textarea v-model="foreshadowForm.content" rows="3" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" placeholder="简要描述伏笔"></textarea>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">埋设章节</label>
-                            <input type="number" v-model.number="foreshadowForm.planted_chapter" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">目标回收章节</label>
-                            <input type="number" v-model.number="foreshadowForm.target_chapter" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">等级</label>
-                            <select v-model="foreshadowForm.tier" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
-                                <option value="核心">核心</option>
-                                <option value="支线">支线</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">状态</label>
-                            <select v-model="foreshadowForm.status" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
-                                <option value="未回收">未回收</option>
-                                <option value="已回收">已回收</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex justify-end gap-3 mt-6">
-                    <button @click="closeForeshadowModal" class="px-4 py-2 bg-gray-300 dark:bg-gray-600 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition">取消</button>
-                    <button @click="saveForeshadow" class="px-4 py-2 gradient-bg text-white rounded-lg hover:opacity-90 transition">保存</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- AI 写作建议 -->
-        <div v-show="activeTab === 'ai-suggestions'" class="fade-in">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold"><i class="fas fa-robot mr-2 text-purple-500"></i>AI 写作建议</h2>
-                <div class="flex gap-2">
-                    <select v-model="suggestionFilter" class="px-3 py-2 rounded-lg border dark:bg-gray-700 text-sm">
-                        <option value="all">全部类型</option>
-                        <option value="爽点">爽点</option>
-                        <option value="钩子">钩子</option>
-                        <option value="设定">设定</option>
-                        <option value="伏笔">伏笔</option>
-                        <option value="角色">角色</option>
-                        <option value="节奏">节奏</option>
-                    </select>
-                    <button @click="resetDismissed" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm">
-                        <i class="fas fa-undo-alt mr-1"></i>重置忽略
-                    </button>
-                </div>
-            </div>
-            
-            <div v-if="filteredSuggestions.length === 0" class="card card-light p-8 text-center">
-                <i class="fas fa-check-circle text-green-500 text-4xl mb-4"></i>
-                <p>暂无写作建议，继续加油！</p>
-            </div>
-            
-            <div v-else class="space-y-3">
-                <div v-for="sug in filteredSuggestions" :key="sug.id" 
-                     class="card card-light p-4 hover:shadow-md transition">
-                    <div class="flex items-start gap-3">
-                        <div class="mt-1">
-                            <i v-if="sug.severity === 'error'" class="fas fa-times-circle text-red-500 text-xl"></i>
-                            <i v-else-if="sug.severity === 'warning'" class="fas fa-exclamation-triangle text-orange-500 text-xl"></i>
-                            <i v-else class="fas fa-info-circle text-blue-500 text-xl"></i>
-                        </div>
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2 flex-wrap mb-1">
-                                <span class="text-sm font-semibold" :class="{
-                                    'text-red-600': sug.severity === 'error',
-                                    'text-orange-600': sug.severity === 'warning',
-                                    'text-blue-600': sug.severity === 'info'
-                                }">{{ sug.title }}</span>
-                                <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{{ sug.type }}</span>
-                                <button v-if="sug.chapter" @click="jumpToChapter(sug.chapter)" 
-                                        class="text-xs text-blue-500 hover:text-blue-700 underline">
-                                    跳转到第 {{ sug.chapter }} 章
-                                </button>
-                                <span v-if="sug.reviewedAt" class="text-xs text-gray-400">报告时间: {{ sug.reviewedAt }}</span>
-                            </div>
-                            <p class="text-sm">{{ sug.description }}</p>
-                        </div>
-                        <button @click="dismissSuggestion(sug.id)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="忽略">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Footer -->
         <footer class="text-center py-8 opacity-60 text-sm">
             <p>小说架构看板 · 自动生成 · 最后更新: {{ lastUpdated }}</p>
@@ -1838,47 +1760,6 @@
                 const loading = ref(false);
                 const activeTab = ref('volume');
                 const foreshadowFilter = ref('all');
-                
-                // AI 建议相关
-                const healthIssues = ref([]);
-                const dismissedSuggestions = ref(new Set());
-                const suggestionFilter = ref('all');
-                
-                const loadHealthIssues = async () => {
-                    try {
-                        const resp = await fetch(`${API_BASE}/api/overview`);
-                        if (resp.ok) {
-                            const data = await resp.json();
-                            healthIssues.value = data.health?.issues || [];
-                        }
-                    } catch (e) {
-                        console.log('Failed to load health issues:', e);
-                    }
-                };
-                
-                const loadDismissedSuggestions = () => {
-                    try {
-                        const saved = localStorage.getItem('dismissed_suggestions');
-                        if (saved) {
-                            dismissedSuggestions.value = new Set(JSON.parse(saved));
-                        }
-                    } catch (e) {}
-                };
-                
-                const dismissSuggestion = (id) => {
-                    dismissedSuggestions.value.add(id);
-                    localStorage.setItem('dismissed_suggestions', JSON.stringify([...dismissedSuggestions.value]));
-                };
-                
-                const resetDismissed = () => {
-                    dismissedSuggestions.value.clear();
-                    localStorage.removeItem('dismissed_suggestions');
-                };
-                
-                const extractFirstChapter = (chaptersStr) => {
-                    const nums = extractChapterNumbers(chaptersStr);
-                    return nums.length ? nums[0] : null;
-                };
                 
                 // 伏笔到期提醒
                 const dueForeshadowCount = ref(0);
@@ -1899,146 +1780,6 @@
                     } catch (e) {
                         console.log('Failed to load due foreshadowing:', e);
                     }
-                };
-                
-                // 伏笔编辑相关
-                const showForeshadowModal = ref(false);
-                const editingForeshadow = ref(null);
-                const foreshadowForm = ref({
-                    content: '',
-                    planted_chapter: null,
-                    target_chapter: null,
-                    tier: '支线',
-                    status: '未回收'
-                });
-
-                const openForeshadowModal = (item = null) => {
-                    if (item) {
-                        editingForeshadow.value = item;
-                        foreshadowForm.value = {
-                            content: item.content,
-                            planted_chapter: item.planted || item.planted_chapter,
-                            target_chapter: item.target || item.target_chapter,
-                            tier: item.tier,
-                            status: item.status
-                        };
-                    } else {
-                        editingForeshadow.value = null;
-                        foreshadowForm.value = {
-                            content: '',
-                            planted_chapter: progress.value.currentChapter,
-                            target_chapter: progress.value.currentChapter + 10,
-                            tier: '支线',
-                            status: '未回收'
-                        };
-                    }
-                    showForeshadowModal.value = true;
-                };
-
-                const closeForeshadowModal = () => {
-                    showForeshadowModal.value = false;
-                };
-
-                const saveForeshadow = async () => {
-                    const payload = {
-                        content: foreshadowForm.value.content,
-                        planted_chapter: parseInt(foreshadowForm.value.planted_chapter) || 0,
-                        target_chapter: parseInt(foreshadowForm.value.target_chapter) || 0,
-                        tier: foreshadowForm.value.tier,
-                        status: foreshadowForm.value.status
-                    };
-                    if (editingForeshadow.value) {
-                        payload.id = editingForeshadow.value.id;
-                        payload._method = 'PUT';
-                    } else {
-                        payload._method = 'POST';
-                    }
-                    try {
-                        const resp = await fetch(`${API_BASE}/api/foreshadow`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        const result = await resp.json();
-                        if (result.success) {
-                            await refreshData();
-                            closeForeshadowModal();
-                        } else {
-                            alert('保存失败: ' + result.error);
-                        }
-                    } catch (e) {
-                        alert('网络错误: ' + e.message);
-                    }
-                };
-
-                const deleteForeshadow = async (item) => {
-                    if (!confirm(`确认删除伏笔"${item.content}"吗？`)) return;
-                    try {
-                        const resp = await fetch(`${API_BASE}/api/foreshadow`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: item.id, _method: 'DELETE' })
-                        });
-                        const result = await resp.json();
-                        if (result.success) {
-                            await refreshData();
-                        } else {
-                            alert('删除失败: ' + result.error);
-                        }
-                    } catch (e) {
-                        alert('网络错误: ' + e.message);
-                    }
-                };
-                
-                // 辅助函数：提取章节编号
-                const extractChapterNumbers = (chaptersStr) => {
-                    if (!chaptersStr) return [];
-                    const match = chaptersStr.match(/(\d+)/g);
-                    if (!match) return [];
-                    return match.map(n => parseInt(n));
-                };
-                
-                // 设定一致性相关问题
-                const consistencyIssues = computed(() => {
-                    const issues = [];
-                    const dims = ['设定一致性', '时间线', '战力', '地点', '身份', '矛盾', '不一致', '冲突'];
-                    
-                    for (const review of reviewData.value) {
-                        const chapterNums = extractChapterNumbers(review.chapters);
-                        
-                        if (review.critical_issues && Array.isArray(review.critical_issues)) {
-                            for (const issue of review.critical_issues) {
-                                const isSettingRelated = dims.some(dim => 
-                                    (typeof issue === 'string' && issue.includes(dim)) ||
-                                    (typeof issue === 'object' && issue.content && issue.content.includes(dim))
-                                );
-                                if (isSettingRelated) {
-                                    issues.push({
-                                        chapters: chapterNums,
-                                        description: typeof issue === 'string' ? issue : (issue.content || JSON.stringify(issue)),
-                                        severity: 'critical',
-                                        source: review
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    
-                    return issues.sort((a, b) => (a.chapters[0] || 0) - (b.chapters[0] || 0));
-                });
-                
-                // 跳转到章节
-                const jumpToChapter = (chapterNum) => {
-                    if (!chapterNum) return;
-                    activeTab.value = 'chapters';
-                    chapterFilter.value.strand = 'all';
-                    chapterFilter.value.phase = 'all';
-                    nextTick(() => {
-                        const chapter = filteredChapters.value.find(c => c.chapter === chapterNum);
-                        if (chapter) {
-                            selectedChapter.value = chapter;
-                        }
-                    });
                 };
                 
                 // 编辑模式相关
@@ -2104,14 +1845,14 @@
                 const moreTabs = [
                     { id: 'chapters', name: '章节', icon: 'fas fa-list-alt' },
                     { id: 'relationship', name: '图谱', icon: 'fas fa-project-diagram' },
+                    { id: 'gantt', name: '伏笔甘特图', icon: 'fas fa-stream' },
+                    { id: 'timeline', name: '时间线', icon: 'fas fa-route' },
                     { id: 'growth', name: '成长', icon: 'fas fa-chart-line' },
                     { id: 'factions', name: '势力', icon: 'fas fa-map-marked-alt' },
                     { id: 'reading', name: '追读力', icon: 'fas fa-fire' },
-                    { id: 'consistency', name: '设定一致性', icon: 'fas fa-check-double' },
                     { id: 'checker-config', name: '审查器设置', icon: 'fas fa-sliders-h' },
                     { id: 'entities', name: '实体', icon: 'fas fa-book' },
                     { id: 'files', name: '文档', icon: 'fas fa-folder-open' },
-                    { id: 'ai-suggestions', name: 'AI 建议', icon: 'fas fa-robot' },
                 ];
                 
                 const project = ref({
@@ -2629,165 +2370,55 @@
                     };
                 });
 
-                const aiSuggestions = computed(() => {
+                // 紧急建议计算
+                const urgentSuggestions = computed(() => {
                     const suggestions = [];
-                    const currentCh = progress.value.currentChapter;
+                    const currentCh = progress.value?.currentChapter || 0;
+                    const reviews = reviewData.value || [];
+                    const fs = foreshadowing.value || [];
                     
-                    // 1. 爽点密度不足（从审查报告中提取维度分数）
-                    for (const review of reviewData.value) {
-                        const dimScore = review.dimension_scores?.['爽点密度'];
-                        if (dimScore !== undefined && dimScore < 6) {
-                            const chapters = review.chapters;
+                    // 1. 从审查报告中获取严重问题 (critical)
+                    const criticalReviews = reviews
+                        .filter(r => r.severity_counts && r.severity_counts.critical > 0)
+                        .sort((a, b) => {
+                            const chA = parseInt(a.chapters.match(/\d+/)?.[0] || 0);
+                            const chB = parseInt(b.chapters.match(/\d+/)?.[0] || 0);
+                            return chB - chA;
+                        });
+                    
+                    for (const review of criticalReviews) {
+                        const ch = review.chapters.match(/\d+/)?.[0] || review.chapters;
+                        const issueCount = review.severity_counts.critical || 0;
+                        const issues = review.critical_issues || [];
+                        
+                        for (let i = 0; i < Math.min(issueCount, 2); i++) {
                             suggestions.push({
-                                id: `coolpoint-${Date.now()}-${Math.random()}`,
-                                type: '爽点',
-                                severity: 'warning',
-                                title: '爽点密度偏低',
-                                description: `第 ${chapters} 章的爽点密度得分仅为 ${dimScore}，建议增加打脸、装逼或升级等爽点情节。`,
-                                chapter: extractFirstChapter(chapters),
-                                reviewedAt: review.reviewed_at,
+                                text: `第${ch}章存在 ${issueCount} 个严重问题${issues[i] ? '：' + issues[i] : ''}`,
+                                tab: 'review'
+                            });
+                        }
+                        
+                        if (suggestions.length >= 3) break;
+                    }
+                    
+                    // 2. 如果还不够 3 条，获取过期的伏笔
+                    if (suggestions.length < 3) {
+                        const overdueForeshadows = fs
+                            .filter(f => {
+                                const chaptersLeft = f.target - currentCh;
+                                return chaptersLeft < 0 && f.status === '未回收';
+                            })
+                            .slice(0, 3 - suggestions.length);
+                        
+                        for (const f of overdueForeshadows) {
+                            suggestions.push({
+                                text: `伏笔 "${f.content.slice(0, 15)}..." 已过期 ${currentCh - f.target} 章`,
+                                tab: 'foreshadow'
                             });
                         }
                     }
                     
-                    // 2. 钩子强度偏弱（从追读力数据统计弱钩子）
-                    const weakHooks = readingPowerData.value.filter(d => d.hook_strength === 'weak');
-                    for (const item of weakHooks.slice(0, 5)) {
-                        suggestions.push({
-                            id: `hook-${item.chapter}`,
-                            type: '钩子',
-                            severity: 'info',
-                            title: '章末钩子偏弱',
-                            description: `第 ${item.chapter} 章钩子强度为"弱"，可能降低追读率。建议强化悬念或埋下新伏笔。`,
-                            chapter: item.chapter,
-                        });
-                    }
-                    
-                    // 3. 设定矛盾（从 consistencyIssues 中获取）
-                    for (const issue of consistencyIssues.value) {
-                        suggestions.push({
-                            id: `consistency-${issue.chapters[0]}-${Math.random()}`,
-                            type: '设定',
-                            severity: 'error',
-                            title: '设定矛盾',
-                            description: issue.description,
-                            chapter: issue.chapters[0],
-                        });
-                    }
-                    
-                    // 4. 伏笔过期/即将到期
-                    for (const f of foreshadowing.value) {
-                        if (f.status === '未回收') {
-                            const remaining = f.target - currentCh;
-                            if (remaining < 0) {
-                                suggestions.push({
-                                    id: `foreshadow-overdue-${f.planted}`,
-                                    type: '伏笔',
-                                    severity: 'error',
-                                    title: '伏笔已过期',
-                                    description: `伏笔"${f.content}"原定第 ${f.target} 章回收，已超期 ${-remaining} 章，请尽快处理。`,
-                                    chapter: f.target,
-                                });
-                            } else if (remaining <= 5) {
-                                suggestions.push({
-                                    id: `foreshadow-urgent-${f.planted}`,
-                                    type: '伏笔',
-                                    severity: 'warning',
-                                    title: '伏笔即将到期',
-                                    description: `伏笔"${f.content}"还有 ${remaining} 章到回收期，建议提前安排。`,
-                                    chapter: f.target,
-                                });
-                            }
-                        }
-                    }
-                    
-                    // 5. 角色掉线（从健康度问题中提取）
-                    for (const issue of healthIssues.value) {
-                        if (typeof issue === 'string' && issue.includes('掉线')) {
-                            suggestions.push({
-                                id: `character-absent-${Date.now()}-${Math.random()}`,
-                                type: '角色',
-                                severity: 'warning',
-                                title: '角色掉线',
-                                description: issue,
-                                chapter: null,
-                            });
-                        }
-                    }
-                    
-                    // 6. 节奏失衡（连续过渡章）
-                    let transitionCount = 0;
-                    let transitionStart = 0;
-                    for (const ch of filteredChapters.value) {
-                        if (ch.strand === 'transition' || ch.strand === 'Transition') {
-                            if (transitionCount === 0) transitionStart = ch.chapter;
-                            transitionCount++;
-                            if (transitionCount >= 3) {
-                                suggestions.push({
-                                    id: `pacing-transition-${ch.chapter}`,
-                                    type: '节奏',
-                                    severity: 'warning',
-                                    title: '连续过渡章过多',
-                                    description: `从第 ${ch.chapter - transitionCount + 1} 章到第 ${ch.chapter} 章连续 ${transitionCount} 章为过渡章，可能导致读者疲劳。建议穿插爽点或推进主线。`,
-                                    chapter: ch.chapter,
-                                });
-                                transitionCount = 0;
-                            }
-                        } else {
-                            transitionCount = 0;
-                        }
-                    }
-                    
-                    // 7. 主线过长（连续 Quest 线）
-                    let questCount = 0;
-                    for (const ch of filteredChapters.value) {
-                        if (ch.strand === 'Quest') {
-                            questCount++;
-                            if (questCount >= 10) {
-                                suggestions.push({
-                                    id: `pacing-quest-${ch.chapter}`,
-                                    type: '节奏',
-                                    severity: 'info',
-                                    title: '主线连续过长',
-                                    description: `已经连续 ${questCount} 章推进主线，建议穿插感情线或支线，丰富故事层次。`,
-                                    chapter: ch.chapter,
-                                });
-                                questCount = 0;
-                            }
-                        } else {
-                            questCount = 0;
-                        }
-                    }
-                    
-                    // 去重（基于描述）
-                    const unique = [];
-                    const seen = new Set();
-                    for (const s of suggestions) {
-                        if (!seen.has(s.description)) {
-                            seen.add(s.description);
-                            unique.push(s);
-                        }
-                    }
-                    
-                    return unique.sort((a, b) => {
-                        if (a.severity === 'error' && b.severity !== 'error') return -1;
-                        if (a.severity !== 'error' && b.severity === 'error') return 1;
-                        if (a.severity === 'warning' && b.severity !== 'warning') return -1;
-                        if (a.severity !== 'warning' && b.severity === 'warning') return 1;
-                        return (a.chapter || 0) - (b.chapter || 0);
-                    });
-                });
-
-                const visibleSuggestions = computed(() => {
-                    return aiSuggestions.value.filter(s => !dismissedSuggestions.value.has(s.id));
-                });
-
-                const filteredSuggestions = computed(() => {
-                    let items = visibleSuggestions.value;
-                    if (suggestionFilter.value !== 'all') {
-                        items = items.filter(s => s.type === suggestionFilter.value);
-                    }
-                    return items;
+                    return suggestions.slice(0, 3);
                 });
 
                 const factions = ref([
@@ -3036,8 +2667,6 @@
                     loading.value = false;
                     lastRefreshed.value = new Date();
                     lastUpdated.value = new Date().toLocaleString('zh-CN');
-                    
-                    loadHealthIssues();
                 };
 
                 const formatNumber = (num) => {
@@ -3653,7 +3282,7 @@
                 };
                 
                 // Chart.js 实例
-                const progressCharts = ref({ wordCount: null, realmGrowth: null });
+                const progressCharts = ref({ wordCount: null, realmGrowth: null, gantt: null, timeline: null });
                 
                 // 初始化写作进度图表
                 const initProgressCharts = () => {
@@ -3753,32 +3382,240 @@
                                     tooltip: {
                                         enabled: true,
                                         backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                                        titleColor: '#fff',
-                                        bodyColor: '#cbd5e1',
-                                        borderColor: '#475569',
-                                        borderWidth: 1,
-                                        padding: 12,
-                                        cornerRadius: 8,
                                         callbacks: {
                                             label: (ctx) => {
-                                                const realms = ['', '感气', '引气', '筑基', '开光', '融合', '辟谷', '金丹', '元婴', '化神'];
-                                                return ` 境界: ${realms[Math.floor(ctx.parsed.y)] || ''}`;
+                                                const realmNames = ['', '感气', '引气', '筑基', '开光', '融合', '辟谷', '金丹', '元婴', '化神'];
+                                                return `境界: ${realmNames[Math.floor(ctx.raw)] || '未知'}`;
                                             }
                                         }
                                     }
                                 },
                                 scales: {
-                                    y: {
+                                    y: { 
+                                        min: 0,
+                                        max: 10,
                                         ticks: {
                                             callback: (value) => {
-                                                const realms = ['', '感气', '引气', '筑基', '开光', '融合', '辟谷', '金丹', '元婴', '化神'];
-                                                return realms[Math.floor(value)] || '';
+                                                const realmNames = ['', '感气', '引气', '筑基', '开光', '融合', '辟谷', '金丹', '元婴', '化神'];
+                                                return realmNames[value] || '';
                                             }
                                         }
                                     }
                                 }
                             }
                         });
+                    }
+                };
+                
+                // 伏笔甘特图
+                const ganttChart = ref(null);
+                const initForeshadowGantt = async () => {
+                    const container = document.getElementById('foreshadowGantt');
+                    if (!container) return;
+                    
+                    if (ganttChart.value) {
+                        ganttChart.value.dispose();
+                    }
+                    
+                    try {
+                        const resp = await fetch(`${API_BASE}/api/foreshadowings`);
+                        if (!resp.ok) throw new Error('Failed to fetch');
+                        const data = await resp.json();
+                        
+                        const foreshadowings = data.foreshadowings || [];
+                        const currentCh = data.current_chapter || 0;
+                        const maxCh = Math.max(currentCh, ...foreshadowings.map(f => f.target || 0), ...foreshadowings.map(f => f.planted || 0));
+                        
+                        // 准备数据
+                        const categories = foreshadowings.map(f => f.content.slice(0, 15) + (f.content.length > 15 ? '...' : ''));
+                        
+                        // 颜色映射
+                        const getColor = (f) => {
+                            if (f.status === '已回收') return '#10b981'; // 绿色
+                            if (f.isOverdue) return '#ef4444'; // 红色 - 已过期
+                            if (f.isUrgent) return '#f59e0b'; // 黄色 - 即将到期
+                            return '#f97316'; // 橙色 - 进行中
+                        };
+                        
+                        const chartData = foreshadowings.map((f, idx) => ({
+                            name: categories[idx],
+                            value: [idx, f.planted || 0, f.payoff || f.target || currentCh],
+                            itemStyle: { color: getColor(f) },
+                            info: f
+                        }));
+                        
+                        ganttChart.value = echarts.init(container);
+                        ganttChart.value.setOption({
+                            tooltip: {
+                                trigger: 'item',
+                                formatter: (params) => {
+                                    const info = params.data.info;
+                                    return `<b>${info.content}</b><br/>
+                                        埋下: 第${info.planted}章<br/>
+                                        目标: 第${info.target}章${info.payoff ? '<br/>回收: 第' + info.payoff + '章' : ''}<br/>
+                                        状态: ${info.status}<br/>
+                                        等级: ${info.tier}`;
+                                }
+                            },
+                            grid: {
+                                left: '15%',
+                                right: '10%',
+                                top: '10%',
+                                bottom: '15%'
+                            },
+                            xAxis: {
+                                type: 'value',
+                                name: '章节',
+                                min: 0,
+                                max: maxCh + 10,
+                                splitLine: { show: true, lineStyle: { type: 'dashed' } }
+                            },
+                            yAxis: {
+                                type: 'category',
+                                data: categories,
+                                axisLabel: { fontSize: 10 }
+                            },
+                            series: [{
+                                type: 'custom',
+                                renderItem: (params, api) => {
+                                    const yIndex = api.value(0);
+                                    const start = api.value(1);
+                                    const end = api.value(2);
+                                    const y = api.coord([0, yIndex])[1];
+                                    const startX = api.coord([start, 0])[0];
+                                    const endX = api.coord([end, 0])[0];
+                                    const height = api.size([0, 1])[1] * 0.6;
+                                    
+                                    return {
+                                        type: 'rect',
+                                        shape: {
+                                            x: startX,
+                                            y: y - height / 2,
+                                            width: Math.max(endX - startX, 20),
+                                            height: height,
+                                            r: 4
+                                        },
+                                        style: api.style()
+                                    };
+                                },
+                                encode: {
+                                    x: [1, 2],
+                                    y: 0
+                                },
+                                data: chartData
+                            }]
+                        });
+                    } catch (e) {
+                        console.error('Failed to init foreshadow gantt:', e);
+                        container.innerHTML = '<div class="text-center text-gray-500 p-4">暂无伏笔数据</div>';
+                    }
+                };
+                
+                // 时间线图表
+                const timelineChart = ref(null);
+                const initTimelineChart = async () => {
+                    const container = document.getElementById('timelineChart');
+                    const statsContainer = document.getElementById('timelineStats');
+                    if (!container) return;
+                    
+                    if (timelineChart.value) {
+                        timelineChart.value.dispose();
+                    }
+                    
+                    try {
+                        const resp = await fetch(`${API_BASE}/api/timeline/events`);
+                        if (!resp.ok) throw new Error('Failed to fetch');
+                        const data = await resp.json();
+                        
+                        const events = data.events || [];
+                        
+                        // 类型颜色映射
+                        const typeColorMap = {
+                            'Quest': '#667eea',
+                            'Fire': '#f43f5e',
+                            'Constellation': '#8b5cf6',
+                            '主线': '#667eea',
+                            '支线': '#10b981',
+                            '情感': '#f43f5e',
+                            '战斗': '#ef4444',
+                            '未知': '#64748b'
+                        };
+                        
+                        // 准备散点数据
+                        const scatterData = events.map(e => ({
+                            value: [e.chapter, 0],
+                            name: e.title,
+                            info: e
+                        }));
+                        
+                        timelineChart.value = echarts.init(container);
+                        timelineChart.value.setOption({
+                            tooltip: {
+                                trigger: 'item',
+                                formatter: (params) => {
+                                    const info = params.data.info;
+                                    return `<b>${info.title}</b><br/>
+                                        章节: 第${info.chapter}章<br/>
+                                        类型: ${info.type}<br/>
+                                        ${info.time_anchor ? '时间锚: ' + info.time_anchor : ''}<br/>
+                                        ${info.description ? '描述: ' + info.description.slice(0, 50) : ''}`;
+                                }
+                            },
+                            grid: {
+                                left: '5%',
+                                right: '5%',
+                                top: '15%',
+                                bottom: '15%'
+                            },
+                            xAxis: {
+                                type: 'value',
+                                name: '章节',
+                                min: 0,
+                                splitLine: { show: true, lineStyle: { type: 'dashed' } }
+                            },
+                            yAxis: {
+                                type: 'category',
+                                data: ['事件'],
+                                show: false
+                            },
+                            series: [{
+                                type: 'scatter',
+                                symbolSize: 15,
+                                data: scatterData,
+                                itemStyle: {
+                                    color: (params) => typeColorMap[params.data.info.type] || '#64748b'
+                                },
+                                label: {
+                                    show: true,
+                                    position: 'top',
+                                    formatter: (params) => params.data.name.slice(0, 8),
+                                    fontSize: 9
+                                }
+                            }]
+                        });
+                        
+                        // 显示统计信息
+                        if (statsContainer && data.type_counts) {
+                            const typeColors = {
+                                'Quest': 'bg-blue-500',
+                                'Fire': 'bg-red-500',
+                                'Constellation': 'bg-purple-500',
+                                '主线': 'bg-blue-500',
+                                '支线': 'bg-green-500',
+                                '情感': 'bg-red-500',
+                                '战斗': 'bg-red-600',
+                                '未知': 'bg-gray-500'
+                            };
+                            statsContainer.innerHTML = Object.entries(data.type_counts).map(([type, count]) => `
+                                <div class="flex items-center gap-2 px-3 py-1 rounded ${typeColors[type] || 'bg-gray-500'} text-white text-sm">
+                                    <span>${type}</span>
+                                    <span class="font-bold">${count}</span>
+                                </div>
+                            `).join('');
+                        }
+                    } catch (e) {
+                        console.error('Failed to init timeline chart:', e);
+                        container.innerHTML = '<div class="text-center text-gray-500 p-4">暂无时间线数据</div>';
                     }
                 };
 
@@ -3800,7 +3637,6 @@
                     
                     refreshData();
                     loadDueForeshadowing();
-                    loadDismissedSuggestions();
                     
                     // 默认初始化当前 tab 的内容
                     nextTick(() => {
@@ -3848,6 +3684,12 @@
                             }
                             if (newTab === 'files') {
                                 loadFileTree();
+                            }
+                            if (newTab === 'gantt') {
+                                initForeshadowGantt();
+                            }
+                            if (newTab === 'timeline') {
+                                initTimelineChart();
                             }
                             if (newTab === 'checker-config') {
                                 loadCheckerConfig();
@@ -3911,6 +3753,7 @@
                     loading,
                     activeTab,
                     mainTabs,
+                    moreTabs,
                     project,
                     progress,
                     protagonist,
@@ -3932,13 +3775,6 @@
                     foreshadowFilter,
                     filteredForeshadowing,
                     foreshadowStats,
-                    showForeshadowModal,
-                    editingForeshadow,
-                    foreshadowForm,
-                    openForeshadowModal,
-                    closeForeshadowModal,
-                    saveForeshadow,
-                    deleteForeshadow,
                     dueForeshadowCount,
                     upcomingForeshadowCount,
                     dueForeshadowList,
@@ -3946,8 +3782,6 @@
                     loadDueForeshadowing,
                     reviewData,
                     reviewStats,
-                    consistencyIssues,
-                    jumpToChapter,
                     factions,
                     writingStats,
                     chapterFilter,
@@ -3955,15 +3789,8 @@
                     filteredChapters,
                     keyEvents,
                     showChapterDetail,
-                    getStrandBadgeClass,
-                    // 新增：实体词典
-                    characterSubTab,
-                    entitiesList,
-                    entityTypeFilter,
-                    entityTypes,
-                    filteredEntities,
-                    selectedEntity,
-                    entityStateChanges,
+                    graphNodeLimitReached,
+                    urgentSuggestions,
                     // 新增：追读力
                     readingPowerData,
                     readingPowerStats,
@@ -4005,15 +3832,8 @@
                     loadCheckerConfig,
                     saveCheckerConfig,
                     resetCheckerConfig,
-                    // 新增：AI 建议
-                    healthIssues,
-                    dismissedSuggestions,
-                    suggestionFilter,
-                    aiSuggestions,
-                    visibleSuggestions,
-                    filteredSuggestions,
-                    dismissSuggestion,
-                    resetDismissed
+                    // 紧急建议
+                    urgentSuggestions
                 };
             }
         }).mount('#app');
