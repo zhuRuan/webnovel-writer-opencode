@@ -291,5 +291,12 @@ def main():
     print("  3. 运行 /webnovel-init 开始新项目")
     print()
 
+    # 自删除安装脚本
+    script_path = Path(__file__).resolve()
+    try:
+        script_path.unlink()
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     main()
