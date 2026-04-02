@@ -1,6 +1,11 @@
 ---
 name: webnovel-write
-description: 撰写网文章节。用于用户说"写一章"、"写第X章"、"继续写"、"创作章节"、"起草章节"时，或执行/webnovel-write命令。默认产出2000-2500字，包含完整流程：上下文搜集 → 起草 → 审查 → 润色 → 数据回写。确保审查和状态回写闭环，避免上下文丢失。配合--fast跳过风格转译，--minimal仅基础审查。
+description: |
+  撰写网文章节。当用户说"写一章"、"写第X章"、"继续写"、"创作章节"、"起草章节"时，
+  或执行/webnovel-write命令时**必须使用此 skill**。默认产出2000-2500字，包含完整流程：
+  预检 → 上下文搜集 → 起草 → 审查 → 润色 → 数据回写 → Git备份 → 强制终止确认。
+  **禁止在无用户明确指令情况下自动循环写下一章**。
+  配合--fast跳过风格转译，--minimal仅基础审查。
 allowed-tools: Read Write Edit Grep Bash Task
 ---
 
@@ -10,9 +15,9 @@ allowed-tools: Read Write Edit Grep Bash Task
 
 | 模式 | 流程 |
 |------|------|
-| 标准 | Step 0 → 0.5 → 1 → 2A → 2B → 3 → 4 → 5 → 6 |
-| --fast | Step 0 → 0.5 → 1 → 2A → 3 → 4 → 5 → 6 |
-| --minimal | Step 0 → 0.5 → 1 → 2A → 3 → 4 → 5 → 6 |
+| 标准 | Step 0 → 0.5 → 1 → 2A → 2B → 3 → 4 → 5 → 6 → **Step 7** |
+| --fast | Step 0 → 0.5 → 1 → 2A → 3 → 4 → 5 → 6 → **Step 7** |
+| --minimal | Step 0 → 0.5 → 1 → 2A → 3 → 4 → 5 → 6 → **Step 7** |
 
 **产出**：`正文/第N卷/第NNNN章-{title}.md`（自动适配卷目录）、`review_metrics`、`.webnovel/summaries/chNNNN.md`
 
@@ -53,8 +58,8 @@ echo "章节文件将写入: ${CHAPTER_PATH}"
 | `references/polish-guide.md` | 问题修复、Anti-AI | Step 4 |
 | `references/writing/typesetting.md` | 排版规则 | Step 4 |
 | `references/style-adapter.md` | 风格转译 | Step 2B |
-
-条件加载：题材配置、钩子库、战斗/对话/场景专项指南（见完整版）
+| `references/step-1.5-contract.md` | Context Contract 模板 | Step 1 输出验证 |
+| `references/core-constraints.md` | 中文写作约束 | Step 2A |
 
 ## 工具
 
@@ -415,18 +420,26 @@ git -c i18n.commitEncoding=UTF-8 commit -m "第{chapter_num}章: {title}"
 
 ### Step 7：工作流终止确认（强制）
 
-完成 Step 6 后，执行以下检查：
+完成 Step 6 后，**必须执行此步骤**：
 
 ```bash
 # 检查是否有用户明确的下一步指令
 if [ -z "${AUTO_CONTINUE}" ]; then
-    echo "⚠️ 工作流终止，等待用户明确指令"
-    echo "如需继续写下一章，请说'写第54章'或'继续写'"
-    echo "## 本次写作完成"
-    echo "- 章节: 第${CHAPTER_NUM}章"
+    echo "========================================"
+    echo "⚠️  工作流终止，等待用户明确指令"
+    echo "========================================"
+    echo "如需继续写下一章，请明确说："
+    echo "  - '写第54章'"
+    echo "  - '继续写'"
+    echo "  - '/webnovel-write --chapter 54'"
+    echo ""
+    echo "## 第${CHAPTER_NUM}章写作完成"
+    echo "- 章节文件: ${CHAPTER_PATH}"
     echo "- 状态: ✅ 已完成"
     echo "- 下一步: 等待用户指令"
-    exit 0
+    echo "========================================"
+    # 工作流结束，不再执行任何后续步骤
+    return 0 2>/dev/null || true
 fi
 ```
 
