@@ -33,7 +33,8 @@ def self_update():
         log_info("已更新到最新版本，重新运行...")
         
         # 重新执行新脚本
-        os.execv(sys.executable, [sys.executable, str(script_path)])
+        subprocess.run([sys.executable, str(script_path)])
+        sys.exit(0)
     except Exception as e:
         # 更新失败，继续使用当前版本
         log_warn(f"自更新失败，使用当前版本: {e}")
