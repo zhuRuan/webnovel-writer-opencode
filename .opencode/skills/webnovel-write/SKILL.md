@@ -72,12 +72,24 @@ SCRIPTS_DIR=".opencode/scripts"
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" preflight
 PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
 
-# 从 state.json 获取下一章章节号
-CHAPTER_NUM=$(python -X utf8 -c "import json; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json')); print(s['progress'].get('current_chapter', 1) + 1)")
+# 优先级：用户指定章节号 > state.json 自动计算
+if [ -n "${CHAPTER_NUM}" ]; then
+    echo "使用用户指定章节号: ${CHAPTER_NUM}"
+else
+    CHAPTER_NUM=$(python -X utf8 -c "import json; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json')); print(s['progress'].get('current_chapter', 0) + 1)")
+    echo "从 state.json 自动获取下一章: ${CHAPTER_NUM}"
+fi
+
+# 确保章节号为整数
+CHAPTER_NUM=$((10#${CHAPTER_NUM}))
 echo "将撰写第 ${CHAPTER_NUM} 章"
 ```
 
 **硬门槛**：preflight 必须成功。失败则阻断。
+
+**章节号优先级**：
+1. 用户通过命令参数指定（如 `--chapter 53`）
+2. 从 state.json 的 `progress.current_chapter` 自动计算下一章
 
 ### Step 0.5：工作流断点记录（best-effort，不阻断）
 
@@ -373,6 +385,33 @@ git -c i18n.commitEncoding=UTF-8 commit -m "第{chapter_num}章: {title}"
 - 提交时机：验证、回写、清理全部完成后最后执行。
 - 提交信息默认中文，格式：`第{chapter_num}章: {title}`。
 - 若 commit 失败，必须给出失败原因与未提交文件范围。
+
+## 工作流终止规则（强制）
+
+完成 Step 6 后，当前写作任务**必须终止**，除非满足以下条件之一：
+
+1. 用户明确要求"继续写下一章"或"写第X章"
+2. 用户执行 `/webnovel-write` 命令并指定章节号
+
+**禁止行为**：
+- ❌ 不得自动读取 state.json 启动下一章
+- ❌ 不得在无用户指令情况下循环回到 Step 0
+- ❌ 不得将"写完一章"作为"继续写下一章"的触发条件
+- ❌ 不得在完成第N章后自动执行第N+1章
+
+## 任务完成报告
+
+每个写作任务完成后，输出以下格式的报告：
+
+```markdown
+## 第{chapter}章写作完成
+
+- **章节文件**: {chapter_path}
+- **字数**: 约{words}字
+- **审查分数**: {overall_score}
+- **状态**: ✅ 已通过 / ⚠️ 需修改
+- **下一步**: 等待用户指令
+```
 
 ## 充分性闸门（必须通过）
 
