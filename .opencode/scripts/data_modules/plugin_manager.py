@@ -70,6 +70,54 @@ class PluginManager:
         """确保插件目录存在"""
         self.plugins_dir.mkdir(parents=True, exist_ok=True)
 
+    def _state_file(self) -> Path:
+        """插件启用/禁用状态文件路径"""
+        return self.project_root / ".opencode" / "plugins" / "state.json"
+
+    def _load_state(self) -> dict:
+        """加载插件状态（禁用列表）"""
+        state = {}
+        sf = self._state_file()
+        if sf.exists():
+            try:
+                state = json.loads(sf.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        return state.get("disabled", {})
+
+    def _save_state(self, disabled: dict):
+        """保存插件状态（禁用列表）"""
+        sf = self._state_file()
+        sf.parent.mkdir(parents=True, exist_ok=True)
+        sf.write_text(
+            json.dumps({"disabled": disabled}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    def is_plugin_enabled(self, plugin_id: str) -> bool:
+        """检查插件是否已启用"""
+        disabled = self._load_state()
+        return plugin_id not in disabled
+
+    def set_plugin_enabled(self, plugin_id: str, enabled: bool):
+        """设置插件启用/禁用状态"""
+        disabled = self._load_state()
+        if enabled:
+            disabled.pop(plugin_id, None)
+        else:
+            disabled[plugin_id] = True
+        self._save_state(disabled)
+        if enabled and plugin_id not in self.loaded_plugins:
+            # 尝试加载（需要找到目录名）
+            for item in self.plugins_dir.iterdir():
+                if item.is_dir():
+                    m = self.load_manifest(item.name)
+                    if m and m.get("id") == plugin_id:
+                        self.load_plugin(item.name)
+                        break
+        elif not enabled and plugin_id in self.loaded_plugins:
+            self.unload_plugin(plugin_id)
+
     def discover_plugins(self) -> List[str]:
         """
         发现所有插件
@@ -431,13 +479,16 @@ class PluginManager:
 
     def load_all_plugins(self) -> None:
         """
-        加载所有插件
+        加载所有插件（跳过已禁用的）
         """
         if self._loaded:
             return
 
+        disabled = self._load_state()
         plugin_names = self.discover_plugins()
-        sorted_names = self._resolve_deps(plugin_names)
+        # 跳过禁用的插件
+        active_names = [n for n in plugin_names if n not in disabled]
+        sorted_names = self._resolve_deps(active_names)
 
         for name in sorted_names:
             self.load_plugin(name)
@@ -856,21 +907,29 @@ class PluginManager:
 
     def list_plugins(self) -> List[Dict[str, Any]]:
         """
-        列出已加载插件信息
+        列出已安装插件信息（含启用状态）
 
         Returns:
             插件信息列表
         """
         result = []
-        for plugin_id, data in self.loaded_plugins.items():
-            manifest = data["manifest"]
+        for item in self.plugins_dir.iterdir():
+            if not item.is_dir() or not (item / "manifest.json").exists():
+                continue
+            manifest = self.load_manifest(item.name)
+            if not manifest:
+                continue
+            plugin_id = manifest.get("id", item.name)
+            enabled = self.is_plugin_enabled(plugin_id)
             result.append(
                 {
                     "id": plugin_id,
-                    "name": manifest.get("name"),
+                    "name": manifest.get("name", item.name),
                     "version": manifest.get("version"),
                     "author": manifest.get("author"),
                     "description": manifest.get("description"),
+                    "enabled": enabled,
+                    "installed_path": str(item),
                 }
             )
         return result

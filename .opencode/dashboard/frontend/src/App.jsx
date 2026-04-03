@@ -68,6 +68,7 @@ export default function App() {
                 {page === 'chapters' && <ChaptersPage key={refreshKey} />}
                 {page === 'files' && <FilesPage />}
                 {page === 'reading' && <ReadingPowerPage key={refreshKey} />}
+                {page === 'plugins' && <PluginsPage key={refreshKey} />}
             </main>
         </div>
     )
@@ -80,6 +81,7 @@ const NAV_ITEMS = [
     { id: 'chapters', icon: '📝', label: '章节一览' },
     { id: 'files', icon: '📁', label: '文档浏览' },
     { id: 'reading', icon: '🔥', label: '追读力' },
+    { id: 'plugins', icon: '📦', label: '插件管理' },
 ]
 
 const FULL_DATA_GROUPS = [
@@ -550,6 +552,225 @@ function ReadingPowerPage() {
                 </div>
                 {data.length === 0 ? <div className="empty-state"><div className="empty-icon">🔥</div><p>暂无追读力数据</p></div> : null}
             </div>
+        </>
+    )
+}
+
+
+// ====================================================================
+// 页面 7：插件管理
+// ====================================================================
+
+function PluginsPage() {
+    const [plugins, setPlugins] = useState([])
+    const [market, setMarket] = useState([])
+    const [installSource, setInstallSource] = useState('')
+    const [installing, setInstalling] = useState(false)
+    const [configModal, setConfigModal] = useState({ open: false, id: null, json: '' })
+    const [toast, setToast] = useState(null)
+
+    useEffect(() => {
+        fetchJSON('/api/plugins').then(setPlugins).catch(() => setPlugins([]))
+        fetchJSON('/api/plugins/market').then(setMarket).catch(() => setMarket([]))
+    }, [])
+
+    function showToast(msg, type = 'success') {
+        setToast({ msg, type })
+        setTimeout(() => setToast(null), 3000)
+    }
+
+    async function doInstall(source) {
+        if (!source.trim()) return
+        setInstalling(true)
+        try {
+            const res = await fetchJSON('/api/plugins/install', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source }),
+            })
+            showToast(res.message || '安装成功')
+            setInstallSource('')
+            const updated = await fetchJSON('/api/plugins')
+            setPlugins(updated)
+        } catch (e) {
+            showToast('安装失败: ' + e.message, 'error')
+        } finally {
+            setInstalling(false)
+        }
+    }
+
+    async function togglePlugin(id, enable) {
+        try {
+            await fetchJSON(`/api/plugins/${encodeURIComponent(id)}/${enable ? 'enable' : 'disable'}`, { method: 'POST' })
+            showToast(enable ? '已启用' : '已禁用')
+            setPlugins(await fetchJSON('/api/plugins'))
+        } catch (e) {
+            showToast('操作失败: ' + e.message, 'error')
+        }
+    }
+
+    async function uninstallPlugin(id) {
+        if (!confirm(`确定卸载插件 ${id}？`)) return
+        try {
+            await fetchJSON(`/api/plugins/${encodeURIComponent(id)}`, { method: 'DELETE' })
+            showToast('已卸载')
+            setPlugins(await fetchJSON('/api/plugins'))
+        } catch (e) {
+            showToast('卸载失败: ' + e.message, 'error')
+        }
+    }
+
+    async function openConfig(id) {
+        try {
+            const cfg = await fetchJSON(`/api/plugins/${encodeURIComponent(id)}/config`)
+            setConfigModal({ open: true, id, json: JSON.stringify(cfg, null, 2) })
+        } catch (e) {
+            showToast('读取配置失败: ' + e.message, 'error')
+        }
+    }
+
+    async function saveConfig() {
+        try {
+            const cfg = JSON.parse(configModal.json)
+            await fetchJSON(`/api/plugins/${encodeURIComponent(configModal.id)}/config`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cfg),
+            })
+            showToast('配置已保存')
+            setConfigModal({ open: false, id: null, json: '' })
+        } catch (e) {
+            showToast('保存失败: ' + e.message, 'error')
+        }
+    }
+
+    return (
+        <>
+            <div className="page-header">
+                <h2>📦 插件管理</h2>
+                <span className="card-badge badge-blue">{plugins.length} 个已安装</span>
+            </div>
+
+            {/* 安装表单 */}
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-title">安装新插件</span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                        className="filter-input"
+                        placeholder="插件名称 / Git URL / 本地路径"
+                        value={installSource}
+                        onChange={e => setInstallSource(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && doInstall(installSource)}
+                        style={{ flex: 1, padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)' }}
+                    />
+                    <button className="btn btn-primary" disabled={installing} onClick={() => doInstall(installSource)}>
+                        {installing ? '安装中…' : '安装'}
+                    </button>
+                </div>
+            </div>
+
+            {/* 已安装插件 */}
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-title">已安装插件</span>
+                </div>
+                {plugins.length === 0 ? (
+                    <div className="empty-state"><div className="empty-icon">📭</div><p>暂无已安装插件</p></div>
+                ) : (
+                    <div className="table-wrap">
+                        <table className="data-table">
+                            <thead><tr><th>名称</th><th>版本</th><th>描述</th><th>状态</th><th>操作</th></tr></thead>
+                            <tbody>
+                                {plugins.map(p => (
+                                    <tr key={p.id}>
+                                        <td>{p.name || p.id}</td>
+                                        <td><code style={{ fontSize: '0.8rem' }}>{p.version}</code></td>
+                                        <td className="truncate" style={{ maxWidth: 300 }}>{p.description || '—'}</td>
+                                        <td>
+                                            <span className={`card-badge ${p.enabled ? 'badge-green' : 'badge-red'}`}>
+                                                {p.enabled ? '启用' : '禁用'}
+                                            </span>
+                                        </td>
+                                        <td style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                                            <button
+                                                className={`btn btn-sm ${p.enabled ? 'btn-danger' : 'btn-success'}`}
+                                                onClick={() => togglePlugin(p.id, !p.enabled)}
+                                            >
+                                                {p.enabled ? '禁用' : '启用'}
+                                            </button>
+                                            <button className="btn btn-sm btn-primary" onClick={() => openConfig(p.id)}>配置</button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => uninstallPlugin(p.id)}>卸载</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* 市场插件 */}
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-title">市场插件</span>
+                </div>
+                {market.length === 0 ? (
+                    <div className="empty-state"><div className="empty-icon">🌐</div><p>暂无市场数据（检查网络连接）</p></div>
+                ) : (
+                    <div className="table-wrap">
+                        <table className="data-table">
+                            <thead><tr><th>名称</th><th>描述</th><th>作者</th><th>操作</th></tr></thead>
+                            <tbody>
+                                {market.map(p => (
+                                    <tr key={p.id}>
+                                        <td>{p.name}</td>
+                                        <td className="truncate" style={{ maxWidth: 400 }}>{p.description || '—'}</td>
+                                        <td>{p.author || '—'}</td>
+                                        <td>
+                                            <button className="btn btn-sm btn-primary" onClick={() => doInstall(p.id)}>安装</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* 配置弹窗 */}
+            {configModal.open && (
+                <div className="modal-overlay" onClick={() => setConfigModal({ open: false, id: null, json: '' })}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.5rem', maxWidth: 600, width: '90%' }}>
+                        <div className="card-header">
+                            <span className="card-title">插件配置: {configModal.id}</span>
+                        </div>
+                        <textarea
+                            value={configModal.json}
+                            onChange={e => setConfigModal(prev => ({ ...prev, json: e.target.value }))}
+                            style={{ width: '100%', minHeight: 250, marginTop: '1rem', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'monospace', fontSize: '0.85rem', resize: 'vertical' }}
+                        />
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-primary" style={{ background: '#64748b' }} onClick={() => setConfigModal({ open: false, id: null, json: '' })}>取消</button>
+                            <button className="btn btn-primary" onClick={saveConfig}>保存</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Toast */}
+            {toast && (
+                <div style={{
+                    position: 'fixed', bottom: '2rem', right: '2rem', padding: '0.75rem 1.25rem',
+                    borderRadius: '8px', fontSize: '0.9rem', zIndex: 200,
+                    background: toast.type === 'error' ? '#7f1d1d' : '#166534',
+                    color: toast.type === 'error' ? '#f87171' : '#4ade80',
+                    border: `1px solid ${toast.type === 'error' ? '#ef4444' : '#22c55e'}`,
+                }}>
+                    {toast.msg}
+                </div>
+            )}
         </>
     )
 }

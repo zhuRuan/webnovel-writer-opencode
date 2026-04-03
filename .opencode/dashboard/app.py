@@ -5,7 +5,9 @@ Webnovel Dashboard - FastAPI 主应用
 """
 
 import asyncio
+import hashlib
 import json
+import re
 import sqlite3
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
@@ -52,6 +54,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     async def _lifespan(_: FastAPI):
         webnovel = _webnovel_dir()
         if webnovel.is_dir():
+            _sync_chapters_from_source(_project_root)
             _watcher.start(webnovel, asyncio.get_running_loop())
         try:
             yield
@@ -78,6 +81,71 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         if not state_path.is_file():
             raise HTTPException(404, "state.json 不存在")
         return json.loads(state_path.read_text(encoding="utf-8"))
+
+    # ===========================================================
+    # API：插件管理
+    # ===========================================================
+
+    from .plugin_bridge import (
+        list_plugins,
+        get_market_index,
+        install_plugin,
+        uninstall_plugin,
+        set_plugin_enabled,
+        get_plugin_config,
+        save_plugin_config,
+    )
+
+    @app.get("/api/plugins")
+    def api_list_plugins():
+        """列出所有已安装插件（含启用状态）。"""
+        return list_plugins(_get_project_root())
+
+    @app.get("/api/plugins/market")
+    def api_market_plugins(force: bool = False):
+        """获取市场插件列表。"""
+        return get_market_index(_get_project_root(), force=force)
+
+    @app.post("/api/plugins/install")
+    def api_install_plugin(source: str):
+        """安装插件（支持市场名称、Git URL 或本地路径）。"""
+        try:
+            result = install_plugin(_get_project_root(), source)
+            return {"success": True, "message": f"插件 {result} 安装成功"}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.delete("/api/plugins/{plugin_id}")
+    def api_uninstall_plugin(plugin_id: str):
+        """卸载插件。"""
+        try:
+            uninstall_plugin(_get_project_root(), plugin_id)
+            return {"success": True, "message": f"插件 {plugin_id} 已卸载"}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.post("/api/plugins/{plugin_id}/enable")
+    def api_enable_plugin(plugin_id: str):
+        """启用插件。"""
+        set_plugin_enabled(_get_project_root(), plugin_id, enabled=True)
+        return {"success": True}
+
+    @app.post("/api/plugins/{plugin_id}/disable")
+    def api_disable_plugin(plugin_id: str):
+        """禁用插件。"""
+        set_plugin_enabled(_get_project_root(), plugin_id, enabled=False)
+        return {"success": True}
+
+    @app.get("/api/plugins/{plugin_id}/config")
+    def api_get_plugin_config(plugin_id: str):
+        """获取插件配置。"""
+        return get_plugin_config(_get_project_root(), plugin_id)
+
+    @app.put("/api/plugins/{plugin_id}/config")
+    def api_save_plugin_config(plugin_id: str, config: dict):
+        """保存插件配置。"""
+        save_plugin_config(_get_project_root(), plugin_id, config)
+        return {"success": True}
 
     # ===========================================================
     # API：实体数据库（index.db 只读查询）
@@ -177,6 +245,11 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         with closing(_get_db()) as conn:
             rows = conn.execute("SELECT * FROM chapters ORDER BY chapter ASC").fetchall()
             return [dict(r) for r in rows]
+
+    @app.post("/api/sync-chapters")
+    def sync_chapters():
+        """手动触发章节索引同步（从正文文件补全缺失章节）。"""
+        return _sync_chapters_from_source(_project_root)
 
     @app.get("/api/scenes")
     def list_scenes(chapter: Optional[int] = None, limit: int = 500):
@@ -396,6 +469,261 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         return StreamingResponse(_gen(), media_type="text/event-stream")
 
     # ===========================================================
+    # 插件管理页面
+    # ===========================================================
+
+    @app.get("/plugins")
+    def plugin_manager_page():
+        """插件管理可视化页面。"""
+        html_content = """<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>插件管理 - Webnovel Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .nav { background: #1e293b; padding: 1rem 2rem; display: flex; align-items: center; gap: 1.5rem; border-bottom: 1px solid #334155; }
+        .nav a { color: #94a3b8; text-decoration: none; font-size: 0.9rem; }
+        .nav a:hover { color: #e2e8f0; }
+        .nav .active { color: #38bdf8; font-weight: 600; }
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
+        h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f1f5f9; }
+        h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #cbd5e1; }
+        .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid #334155; font-size: 0.9rem; }
+        th { color: #94a3b8; font-weight: 500; }
+        td { color: #e2e8f0; }
+        .btn { padding: 0.4rem 0.9rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.15s; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-success:hover { background: #16a34a; }
+        .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+        .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500; }
+        .badge-green { background: #166534; color: #4ade80; }
+        .badge-red { background: #7f1d1d; color: #f87171; }
+        .install-form { display: flex; gap: 0.5rem; }
+        .install-form input { flex: 1; padding: 0.6rem 1rem; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 0.9rem; }
+        .install-form input:focus { outline: none; border-color: #3b82f6; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 100; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #1e293b; padding: 2rem; border-radius: 12px; width: 90%; max-width: 600px; border: 1px solid #334155; }
+        .modal h3 { margin-bottom: 1rem; color: #f1f5f9; }
+        .modal textarea { width: 100%; min-height: 250px; padding: 1rem; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.85rem; resize: vertical; }
+        .modal textarea:focus { outline: none; border-color: #3b82f6; }
+        .modal-actions { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end; }
+        .toast { position: fixed; bottom: 2rem; right: 2rem; padding: 0.8rem 1.2rem; border-radius: 8px; font-size: 0.9rem; z-index: 200; animation: slideIn 0.3s ease; }
+        .toast-success { background: #166534; color: #4ade80; border: 1px solid #22c55e; }
+        .toast-error { background: #7f1d1d; color: #f87171; border: 1px solid #ef4444; }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .empty { text-align: center; padding: 2rem; color: #64748b; }
+        .loading { text-align: center; padding: 2rem; color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/">📊 看板</a>
+        <a href="/plugins" class="active">📦 插件管理</a>
+        <a href="/docs">📖 API 文档</a>
+    </div>
+    <div class="container">
+        <h1>📦 插件管理</h1>
+        <div class="card">
+            <h2>安装新插件</h2>
+            <div class="install-form">
+                <input type="text" id="installSource" placeholder="插件名称 / Git URL / 本地路径">
+                <button class="btn btn-primary" onclick="installPlugin()">安装</button>
+            </div>
+        </div>
+        <div class="card">
+            <h2>已安装插件</h2>
+            <div id="pluginsList" class="loading">加载中...</div>
+        </div>
+        <div class="card">
+            <h2>市场插件</h2>
+            <div id="marketList" class="loading">加载中...</div>
+        </div>
+    </div>
+    <div id="configModal" class="modal-overlay">
+        <div class="modal">
+            <h3 id="configTitle">插件配置</h3>
+            <textarea id="configEditor"></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-primary" style="background:#64748b" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveConfig()">保存</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        let currentPluginId = null;
+        async function fetchJSON(url, options = {}) {
+            const res = await fetch(url, options);
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(res.status + ' ' + text);
+            }
+            return res.json();
+        }
+        function toast(msg, type = 'success') {
+            const t = document.createElement('div');
+            t.className = 'toast toast-' + type;
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+        function esc(s) {
+            if (!s) return '';
+            return String(s).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+        }
+        async function loadPlugins() {
+            const el = document.getElementById('pluginsList');
+            try {
+                const plugins = await fetchJSON('/api/plugins');
+                if (!plugins.length) {
+                    el.innerHTML = '<div class="empty">暂无已安装插件</div>';
+                    return;
+                }
+                let html = '<table><thead><tr><th>名称</th><th>版本</th><th>描述</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+                for (const p of plugins) {
+                    const statusBadge = p.enabled
+                        ? '<span class="badge badge-green">启用</span>'
+                        : '<span class="badge badge-red">禁用</span>';
+                    const toggleBtn = p.enabled
+                        ? '<button class="btn btn-sm btn-danger" onclick="togglePlugin(\\''+esc(p.id)+'\\', false)">禁用</button>'
+                        : '<button class="btn btn-sm btn-success" onclick="togglePlugin(\\''+esc(p.id)+'\\', true)">启用</button>';
+                    html += '<tr>'
+                        + '<td>' + esc(p.name) + '</td>'
+                        + '<td>' + esc(p.version) + '</td>'
+                        + '<td>' + esc(p.description) + '</td>'
+                        + '<td>' + statusBadge + '</td>'
+                        + '<td style="display:flex;gap:0.4rem">'
+                        + toggleBtn
+                        + ' <button class="btn btn-sm btn-primary" onclick="editConfig(\\''+esc(p.id)+'\\')">配置</button>'
+                        + ' <button class="btn btn-sm btn-danger" onclick="uninstallPlugin(\\''+esc(p.id)+'\\')">卸载</button>'
+                        + '</td></tr>';
+                }
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = '<div class="empty">加载失败: ' + esc(e.message) + '</div>';
+            }
+        }
+        async function loadMarket() {
+            const el = document.getElementById('marketList');
+            try {
+                const data = await fetchJSON('/api/plugins/market');
+                if (!data || !data.length) {
+                    el.innerHTML = '<div class="empty">暂无市场插件（检查网络连接）</div>';
+                    return;
+                }
+                let html = '<table><thead><tr><th>名称</th><th>描述</th><th>作者</th><th>操作</th></tr></thead><tbody>';
+                for (const p of data) {
+                    html += '<tr>'
+                        + '<td>' + esc(p.name) + '</td>'
+                        + '<td>' + esc(p.description) + '</td>'
+                        + '<td>' + esc(p.author) + '</td>'
+                        + '<td><button class="btn btn-sm btn-primary" onclick="installMarket(\\''+esc(p.id)+'\\')">安装</button></td></tr>';
+                }
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = '<div class="empty">加载失败: ' + esc(e.message) + '</div>';
+            }
+        }
+        async function installPlugin() {
+            const source = document.getElementById('installSource').value.trim();
+            if (!source) return;
+            try {
+                const res = await fetchJSON('/api/plugins/install', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({source})
+                });
+                toast(res.message || '安装成功');
+                document.getElementById('installSource').value = '';
+                loadPlugins();
+            } catch (e) {
+                toast('安装失败: ' + e.message, 'error');
+            }
+        }
+        async function installMarket(pluginId) {
+            try {
+                const res = await fetchJSON('/api/plugins/install', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({source: pluginId})
+                });
+                toast(res.message || '安装成功');
+                loadPlugins();
+            } catch (e) {
+                toast('安装失败: ' + e.message, 'error');
+            }
+        }
+        async function uninstallPlugin(pluginId) {
+            if (!confirm('确定要卸载插件 ' + pluginId + ' 吗？')) return;
+            try {
+                await fetchJSON('/api/plugins/' + encodeURIComponent(pluginId), {method: 'DELETE'});
+                toast('插件已卸载');
+                loadPlugins();
+            } catch (e) {
+                toast('卸载失败: ' + e.message, 'error');
+            }
+        }
+        async function togglePlugin(pluginId, enable) {
+            const endpoint = enable ? 'enable' : 'disable';
+            try {
+                await fetchJSON('/api/plugins/' + encodeURIComponent(pluginId) + '/' + endpoint, {method: 'POST'});
+                toast(enable ? '插件已启用' : '插件已禁用');
+                loadPlugins();
+            } catch (e) {
+                toast('操作失败: ' + e.message, 'error');
+            }
+        }
+        async function editConfig(pluginId) {
+            currentPluginId = pluginId;
+            try {
+                const config = await fetchJSON('/api/plugins/' + encodeURIComponent(pluginId) + '/config');
+                document.getElementById('configTitle').textContent = '插件配置: ' + pluginId;
+                document.getElementById('configEditor').value = JSON.stringify(config, null, 2);
+                document.getElementById('configModal').classList.add('active');
+            } catch (e) {
+                toast('读取配置失败: ' + e.message, 'error');
+            }
+        }
+        async function saveConfig() {
+            try {
+                const config = JSON.parse(document.getElementById('configEditor').value);
+                await fetchJSON('/api/plugins/' + encodeURIComponent(currentPluginId) + '/config', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+                toast('配置已保存');
+                closeModal();
+            } catch (e) {
+                toast('保存失败: ' + e.message, 'error');
+            }
+        }
+        function closeModal() {
+            document.getElementById('configModal').classList.remove('active');
+            currentPluginId = null;
+        }
+        document.getElementById('configModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+        loadPlugins();
+        loadMarket();
+    </script>
+</body>
+</html>"""
+        return HTMLResponse(content=html_content)
+
+    # ===========================================================
     # 前端静态文件托管
     # ===========================================================
 
@@ -419,6 +747,105 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             )
 
     return app
+
+
+# ---------------------------------------------------------------------------
+# 章节自动同步（Dashboard 启动时 / 手动触发）
+# ---------------------------------------------------------------------------
+
+def _sync_chapters_from_source(project_root: Path | None) -> dict:
+    """扫描正文目录，补全 index.db 中缺失的章节记录。
+
+    返回 {"added": N, "skipped": N, "total": N, "errors": [...]}
+    """
+    if project_root is None:
+        return {"added": 0, "skipped": 0, "total": 0, "errors": ["项目根目录未配置"]}
+
+    db_path = project_root / ".webnovel" / "index.db"
+    if not db_path.is_file():
+        return {"added": 0, "skipped": 0, "total": 0, "errors": ["index.db 不存在"]}
+
+    # 查找正文目录
+    zhengwen_dir = project_root / "正文"
+    if not zhengwen_dir.is_dir():
+        return {"added": 0, "skipped": 0, "total": 0, "errors": ["正文目录不存在"]}
+
+    # 递归收集所有 第*.md 文件
+    md_files = sorted(zhengwen_dir.rglob("第*.md"))
+    if not md_files:
+        return {"added": 0, "skipped": 0, "total": 0, "errors": ["未找到正文章节文件"]}
+
+    # 读取已有章节号
+    conn = sqlite3.connect(str(db_path))
+    cursor = conn.cursor()
+    try:
+        existing = set(r[0] for r in cursor.execute("SELECT chapter FROM chapters").fetchall())
+    except sqlite3.OperationalError:
+        existing = set()
+
+    added = 0
+    skipped = 0
+    errors = []
+
+    for mf in md_files:
+        m = re.match(r"第(\d+)章", mf.name)
+        if not m:
+            continue
+        ch_num = int(m.group(1))
+
+        if ch_num in existing:
+            skipped += 1
+            continue
+
+        try:
+            content = mf.read_text(encoding="utf-8")
+        except Exception as e:
+            errors.append(f"Ch{ch_num}: 读取失败 {e}")
+            continue
+
+        # 提取标题
+        first_line = content.split("\n")[0]
+        title_match = re.match(r"# 第\d+章 (.+)", first_line)
+        title = title_match.group(1).strip() if title_match else ""
+
+        # 计算中文字数
+        lines = content.split("\n")
+        text_lines = [l for l in lines if l.strip() and not l.strip().startswith("#")]
+        word_count = sum(
+            len(re.findall(r"[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]", line))
+            for line in text_lines
+        )
+
+        # 提取前 500 字作为摘要
+        body_start = content.find("\n\n", content.find("\n", content.find("\n") + 1) + 1)
+        if body_start == -1:
+            body_start = 0
+        else:
+            body_start += 2
+        summary = content[body_start:body_start + 500].strip().replace("\n", " ")
+
+        content_hash = hashlib.md5(
+            f"{title}||{word_count}|{summary}|0".encode("utf-8")
+        ).hexdigest()
+
+        try:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO chapters
+                (chapter, title, location, word_count, characters, summary, content_hash, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                """,
+                (ch_num, title, "", word_count, "[]", summary, content_hash),
+            )
+            added += 1
+        except Exception as e:
+            errors.append(f"Ch{ch_num}: 写入失败 {e}")
+
+    conn.commit()
+    total = cursor.execute("SELECT COUNT(*) FROM chapters").fetchone()[0]
+    conn.close()
+
+    return {"added": added, "skipped": skipped, "total": total, "errors": errors}
 
 
 # ---------------------------------------------------------------------------
