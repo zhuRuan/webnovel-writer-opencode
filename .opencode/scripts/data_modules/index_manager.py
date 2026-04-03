@@ -909,6 +909,7 @@ def main():
 
     # 保存章节追读力元数据
     save_rp_parser = subparsers.add_parser("save-chapter-reading-power")
+    save_rp_parser.add_argument("--chapter", type=int, required=True, help="章节号")
     save_rp_parser.add_argument(
         "--data", required=True, help="JSON 格式的章节追读力元数据"
     )
@@ -1402,7 +1403,7 @@ def main():
     elif args.command == "save-chapter-reading-power":
         data = load_json_arg(args.data)
         meta = ChapterReadingPowerMeta(
-            chapter=data["chapter"],
+            chapter=args.chapter,
             hook_type=data.get("hook_type", ""),
             hook_strength=data.get("hook_strength", "medium"),
             coolpoint_patterns=data.get("coolpoint_patterns", []),
@@ -1414,7 +1415,7 @@ def main():
             debt_balance=data.get("debt_balance", 0.0),
         )
         manager.save_chapter_reading_power(meta)
-        emit_success({"chapter": meta.chapter}, message="reading_power_saved")
+        emit_success({"chapter": args.chapter}, message="reading_power_saved")
 
     else:
         emit_error("UNKNOWN_COMMAND", "未指定有效命令", suggestion="请查看 --help")

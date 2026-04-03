@@ -125,6 +125,32 @@ python .opencode/scripts/webnovel.py --project-root "{project_root}" state proce
 - 更新 `disambiguation_warnings/pending`
 - **新增 `chapter_meta`**（钩子/模式/结束状态）
 
+### Step D2: 保存章节追读力数据（从审查结果获取）
+
+**注意**：追读力数据由 reader-pull-checker 在审查阶段生成，存储在审查报告的 `review_metrics` 中。
+
+```bash
+# 从 review_metrics 中提取追读力数据
+python .opencode/scripts/webnovel.py --project-root "{project_root}" index get-recent-review-metrics --limit 1
+```
+
+**数据来源**：
+- 读取 `.webnovel/tmp/review_metrics.json` 或通过 CLI 获取
+- 提取 `hook_type`、`hook_content`、`hook_strength`、`coolpoint_patterns` 等字段
+
+**保存命令**：
+```bash
+python .opencode/scripts/webnovel.py --project-root "{project_root}" index save-chapter-reading-power \
+  --chapter {chapter} \
+  --data '{
+    "hook_type": "...",
+    "hook_strength": "...",
+    "coolpoint_patterns": [...],
+    "micropayoffs": [...],
+    "is_transition": false
+  }'
+```
+
 ### Step E: 生成章节摘要文件
 
 **输出路径**: `.webnovel/summaries/ch{NNNN}.md`
