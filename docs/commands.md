@@ -140,7 +140,7 @@
 
 ## `/webnovel-dashboard`
 
-用途：启动小说架构看板，可视化展示卷结构、角色状态、伏笔追踪、审查报告。
+用途：启动可视化小说管理面板（只读 Web Dashboard），实时查看项目状态、实体图谱与章节内容。
 
 示例：
 
@@ -155,3 +155,20 @@
 - 伏笔状态管理
 - 审查分数展示
 - 时间线和势力版图
+- 关系图谱（3D 力导向图）
+- 正文/大纲/设定集文件浏览
+
+底层命令：
+
+```bash
+python .opencode/scripts/webnovel.py --project-root <项目路径> dashboard
+python .opencode/scripts/webnovel.py --project-root <项目路径> dashboard --port 9000 --no-browser
+```
+
+参数：
+
+| 参数 | 说明 |
+|------|------|
+| `--host` | 监听地址（默认 127.0.0.1） |
+| `--port` | 监听端口（默认 8765） |
+| `--no-browser` | 不自动打开浏览器 |

@@ -30,6 +30,7 @@ WORKSPACE_ROOT/
 │   ├── webnovel-query/
 │   ├── webnovel-resume/
 │   └── webnovel-learn/
+├── dashboard/           # 可视化面板（FastAPI + React）
 ├── scripts/             # Python 核心脚本
 │   ├── data_modules/    # 核心模块
 │   ├── publisher/       # 番茄小说发布模块
@@ -84,6 +85,9 @@ python .opencode/scripts/webnovel.py rag stats
 python .opencode/scripts/webnovel.py publish setup-browser
 python .opencode/scripts/webnovel.py publish list-books --project-root <项目路径>
 python .opencode/scripts/webnovel.py publish upload --book-id <ID> --range "1-10" --mode draft --project-root <项目路径>
+
+# 可视化看板
+python .opencode/scripts/webnovel.py --project-root <项目路径> dashboard
 ```
 
 ## 测试

@@ -1,169 +1,93 @@
 ---
 name: webnovel-dashboard
-description: 小说架构看板 - 可视化展示小说的卷结构、角色状态、伏笔追踪、审查报告、时间线和势力版图。支持任意webnovel项目。
-allowed-tools: Read Grep Bash AskUserQuestion
+description: 启动可视化小说管理面板（只读 Web Dashboard），实时查看项目状态、实体图谱与章节内容。
+allowed-tools: Bash Read
 ---
 
-# webnovel-dashboard
+# Webnovel Dashboard
 
-小说架构看板 - 可视化展示小说的各项数据
+## 目标
 
-## 特性
+在本地启动一个 **只读** Web 面板，用于可视化查看当前小说项目的：
+- 创作进度与 Strand 节奏分布
+- 设定词典（角色/地点/势力等实体）
+- 关系图谱
+- 章节与大纲内容浏览
+- 追读力分析数据
 
-- **通用设计**: 适用于任何使用 webnovel 项目结构的小说
-- **自动检测**: 自动查找项目中的数据文件
-- **实时刷新**: 点击刷新按钮即可更新最新数据
-- **审查集成**: 直接展示章节审查分数和维度评分
+面板通过 `watchdog` 监听 `.webnovel/` 目录变更并实时刷新，不对项目做任何修改。
 
-## 数据要求
+## 执行步骤
 
-项目根目录需包含以下文件之一：
-- `.webnovel/state.json` - 主要数据文件
-- `novel.txt` - 备用数据文件
+### Step 0：环境确认
 
-## 使用方式
-
-### 1. 启动看板（推荐）
-
-需要启动**两个**服务器：
-- 前端服务器：端口 8085
-- API 服务器：端口 8086
-
-> **智能端口管理**: 启动时会自动检查端口占用情况，如果端口被占用会自动尝试释放。如果释放失败会提示您手动关闭占用程序。
-
-**Windows:**
-```batch
-@echo off
-REM 启动 API 服务器
-start "Dashboard API" python "path\to\api_server.py" "path\to\novel\project"
-REM 启动前端服务器  
-start "Dashboard" python "path\to\dashboard_server.py" "path\to\novel\project"
-```
-
-**Linux/Mac:**
 ```bash
-# 启动 API 服务器（后台运行）
-python /path/to/dashboard/api_server.py /path/to/novel/project &
-# 启动前端服务器（后台运行）
-python /path/to/dashboard/dashboard_server.py /path/to/novel/project &
+export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
+
+# 确定 .opencode 目录位置（优先使用项目级，其次用户级）
+if [ -d "${WORKSPACE_ROOT}/.opencode/dashboard" ]; then
+  export OPENCODE_DIR="${WORKSPACE_ROOT}/.opencode"
+elif [ -d "${HOME}/.opencode/dashboard" ]; then
+  export OPENCODE_DIR="${HOME}/.opencode"
+else
+  echo "ERROR: 未找到 dashboard 模块" >&2
+  exit 1
+fi
+export DASHBOARD_DIR="${OPENCODE_DIR}/dashboard"
+export SCRIPTS_DIR="${OPENCODE_DIR}/scripts"
 ```
 
-**推荐方式（自动管理端口）:**
+### Step 1：安装依赖（首次）
+
 ```bash
-python /path/to/dashboard/dashboard_server.py /path/to/novel/project
-```
-此方式会自动检查并尝试释放被占用的端口。
-
-### 2. 浏览器访问
-
-启动后浏览器自动打开，或手动访问：
-```
-http://localhost:8085
+python -m pip install -r "${DASHBOARD_DIR}/requirements.txt" --quiet
 ```
 
-### 3. 端口说明
+### Step 2：解析项目根目录
 
-| 服务器 | 端口 | 用途 |
-|--------|------|------|
-| dashboard_server.py | 8085 | 前端页面 |
-| api_server.py | 8086 | 数据 API |
+```bash
+export PROJECT_ROOT="$(python "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
+echo "项目路径: ${PROJECT_ROOT}"
 
-如果端口被占用，可以修改对应文件中的 `PORT` 变量。
-
-## 功能模块
-
-| 模块 | 说明 |
-|------|------|
-| 统计概览 | 已完成章节、字数、进度百分比 |
-| 卷结构 | 显示各卷进度 |
-| 角色状态 | 主角、女主、其他角色、场景、物品 |
-| 伏笔追踪 | 伏笔列表及状态 |
-| 审查报告 | 章节审查分数、维度评分、问题统计 |
-| 角色图谱 | D3.js 交互式关系图 |
-| 时间线 | 故事时间线 |
-| 势力版图 | 势力分布卡片 |
-
-## 文件结构
-
-```
-webnovel-dashboard/
-├── SKILL.md
-└── dashboard/
-    ├── index.html          # 看板主页面
-    └── dashboard_server.py # 启动脚本
+# 前端 dist 已随插件发布；若缺失说明安装包异常
+if [ ! -f "${DASHBOARD_DIR}/frontend/dist/index.html" ]; then
+  echo "ERROR: 缺少前端构建产物 ${DASHBOARD_DIR}/frontend/dist/index.html" >&2
+  echo "请重新安装插件或联系维护者修复发布包。" >&2
+  exit 1
+fi
 ```
 
-## 数据来源
+### Step 3：启动 Dashboard
 
-看板从以下位置读取数据（按优先级）：
-1. `config.js` - 配置文件（由启动脚本生成）
-2. `.webnovel/state.json` - webnovel 项目标准数据文件
+推荐方式（通过 webnovel.py 统一入口）：
 
-### state.json 期望结构
-
-```json
-{
-  "project": {
-    "title": "小说标题",
-    "genre": "小说类型",
-    "target_words": 1000000
-  },
-  "progress": {
-    "current_chapter": 31,
-    "total_words": 74528
-  },
-  "protagonist_state": {
-    "name": "主角名",
-    "power": { "realm": "境界", "layer": 1 },
-    "location": { "current": "位置" },
-    "golden_finger": { "name": "金手指名", "level": 1 }
-  },
-  "relationships": {
-    "角色名": { "type": "类型", "role": "角色/地点/物品" }
-  },
-  "chapter_meta": {
-    "1": { "title": "第1章 标题", "countdown": "D-60", "time_anchor": "时间锚点" }
-  },
-  "review_checkpoints": [
-    {
-      "chapters": "1-2",
-      "overall_score": 82,
-      "dimension_scores": {
-        "爽点密度": 8.0,
-        "设定一致性": 9.0,
-        "节奏控制": 7.5,
-        "人物塑造": 8.5,
-        "连贯性": 8.0,
-        "追读力": 8.0
-      },
-      "severity_counts": {
-        "critical": 0,
-        "high": 1,
-        "medium": 3,
-        "low": 2
-      },
-      "critical_issues": [],
-      "reviewed_at": "2026-03-20"
-    }
-  ]
-}
+```bash
+python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" dashboard
 ```
 
-## 故障排除
+或直接使用 dashboard 模块：
 
-### 数据无法加载
-- 确保在正确的项目目录下运行
-- 检查 `.webnovel/state.json` 文件是否存在
+```bash
+# 确保 .opencode 目录在 PYTHONPATH 中
+if [ -n "${PYTHONPATH:-}" ]; then
+  export PYTHONPATH="${OPENCODE_DIR}:${PYTHONPATH}"
+else
+  export PYTHONPATH="${OPENCODE_DIR}"
+fi
 
-### 端口被占用
-- **自动处理**: 启动时会自动检测并尝试释放被占用的端口
-- **手动处理**: 如果自动释放失败，请手动关闭占用端口的程序（8085 或 8086）
-- **查看占用**: 使用以下命令查看端口占用：
-  - Windows: `netstat -ano | findstr ":8085"` 或 `netstat -ano | findstr ":8086"`
-  - Linux/Mac: `lsof -i :8085` 或 `lsof -i :8086`
-- **修改端口**: 如需使用其他端口，可修改 `dashboard_server.py` 和 `api_server.py` 中的 `PORT` 变量
+python -m dashboard.server --project-root "${PROJECT_ROOT}"
+```
 
-### 需要安装 psutil（可选但推荐）
-- 自动释放端口功能需要 psutil 库
-- 安装命令: `pip install psutil`
-- 如果未安装，脚本会提示手动关闭占用端口的程序
+启动后会自动打开浏览器访问 `http://127.0.0.1:8765`。
+
+如不需要自动打开浏览器，使用：
+
+```bash
+python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" dashboard --no-browser
+```
+
+## 注意事项
+
+- Dashboard 为纯只读面板，所有 API 仅 GET，不提供任何修改接口。
+- 文件读取严格限制在 `PROJECT_ROOT` 范围内，防止路径穿越。
+- 如需自定义端口，添加 `--port 9000` 参数。

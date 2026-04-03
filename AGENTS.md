@@ -156,6 +156,7 @@ def load_state(self) -> bool:
 │   ├── skills/           # 10个 Skills
 │   │   ├── webnovel-publish/  # 番茄小说发布
 │   │   └── webnovel-dashboard/ # 看板
+│   ├── dashboard/        # 可视化面板（FastAPI + React）
 │   ├── scripts/          # Python 核心脚本
 │   │   ├── publisher/  # 番茄发布模块
 │   │   └── data_modules/ # 核心模块
@@ -260,6 +261,9 @@ python .opencode/scripts/webnovel.py rag index-chapter --chapter 1
 # 番茄小说发布
 python .opencode/scripts/webnovel.py publish setup-browser
 python .opencode/scripts/webnovel.py publish upload --book-id <id> --range "1-10" --project-root <path>
+
+# 可视化看板
+python .opencode/scripts/webnovel.py --project-root <项目路径> dashboard
 
 # 插件管理
 python .opencode/scripts/webnovel.py plugin list

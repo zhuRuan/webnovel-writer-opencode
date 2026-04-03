@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "plugins": [
+    {
+      "id": "com.example.demo-checker",
+      "name": "敏感词检查器",
+      "description": "演示插件：检查章节中的敏感词",
+      "author": "Webnovel Writer Team",
+      "license": "GPL-3.0",
+      "repo": "https://github.com/webnovel-writer/demo-checker.git",
+      "tags": [
+        "checker",
+        "demo"
+      ]
+    }
+  ]
+}

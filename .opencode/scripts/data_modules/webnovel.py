@@ -268,6 +268,12 @@ def main() -> None:
     p_plugin = sub.add_parser("plugin", help="插件管理工具")
     p_plugin.add_argument("args", nargs=argparse.REMAINDER)
 
+    # dashboard 命令（可视化面板）
+    p_dashboard = sub.add_parser("dashboard", help="启动可视化小说管理面板（只读 Web Dashboard）")
+    p_dashboard.add_argument("--host", default="127.0.0.1", help="监听地址")
+    p_dashboard.add_argument("--port", type=int, default=8765, help="监听端口")
+    p_dashboard.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
+
     # 兼容：允许 `--project-root` 出现在任意位置（减少 agents/skills 拼命令的出错率）
     from .cli_args import normalize_global_project_root
 
@@ -347,6 +353,55 @@ def main() -> None:
 
     if tool == "publish":
         raise SystemExit(_run_script("publish_manager.py", [*forward_args, *rest]))
+
+    # dashboard 是交互式长驻服务，作为后台子进程启动，避免 agent 超时
+    if tool == "dashboard":
+        import subprocess
+        import time
+        import webbrowser
+
+        # 确保 .opencode 在 PYTHONPATH 中，使 import dashboard 生效
+        opencode_dir = str(Path(__file__).resolve().parent.parent)
+        env = os.environ.copy()
+        env["PYTHONPATH"] = f"{opencode_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
+
+        # 启动后台进程
+        cmd = [
+            sys.executable, "-m", "dashboard.server",
+            "--project-root", str(project_root),
+            "--host", args.host,
+            "--port", str(args.port),
+        ]
+        if args.no_browser:
+            cmd.append("--no-browser")
+
+        proc = subprocess.Popen(
+            cmd,
+            env=env,
+            cwd=opencode_dir,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        # 等待服务就绪
+        url = f"http://{args.host}:{args.port}"
+        for _ in range(30):
+            time.sleep(0.3)
+            try:
+                import urllib.request
+                urllib.request.urlopen(f"{url}/docs", timeout=1)
+                break
+            except Exception:
+                continue
+
+        print(f"Dashboard 启动: {url}")
+        print(f"API 文档: {url}/docs")
+        print(f"进程 PID: {proc.pid}")
+
+        if not args.no_browser:
+            webbrowser.open(url)
+
+        return 0
 
     raise SystemExit(2)
 

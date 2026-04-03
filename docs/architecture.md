@@ -66,7 +66,8 @@
 ```
 项目目录/
 ├── .opencode/              # OpenCode 配置
-│   ├── skills/            # 9个 Skills
+│   ├── skills/            # 10个 Skills
+│   ├── dashboard/         # 可视化面板（FastAPI + React）
 │   ├── agents/           # 8个 Agents（context-agent, data-agent, 6个 Checker）
 │   ├── checkers/         # 审查器配置驱动
 │   ├── scripts/          # Python 核心脚本
