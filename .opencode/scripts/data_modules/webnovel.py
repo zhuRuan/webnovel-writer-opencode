@@ -356,12 +356,16 @@ def main() -> None:
 
     # dashboard 是交互式长驻服务，作为后台子进程启动，避免 agent 超时
     if tool == "dashboard":
+        import os
         import subprocess
         import time
         import webbrowser
+        import socket
 
         # 确保 .opencode 在 PYTHONPATH 中，使 import dashboard 生效
-        opencode_dir = str(Path(__file__).resolve().parent.parent)
+        # __file__ 在 data_modules/webnovel.py，所以 parent.parent.parent 才是 .opencode 目录
+        opencode_dir = str(Path(__file__).resolve().parent.parent.parent)
+        scripts_dir = str(Path(__file__).resolve().parent.parent)
         env = os.environ.copy()
         env["PYTHONPATH"] = f"{opencode_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
 
@@ -375,28 +379,58 @@ def main() -> None:
         if args.no_browser:
             cmd.append("--no-browser")
 
-        proc = subprocess.Popen(
-            cmd,
-            env=env,
-            cwd=opencode_dir,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        # 日志文件路径（放在 .opencode 目录下）
+        log_file = Path(opencode_dir) / "dashboard.log"
 
-        # 等待服务就绪
+        # Windows 下使用 CREATE_NEW_PROCESS_GROUP + DETACHED_PROCESS 确保子进程独立运行
+        creation_flags = 0
+        if sys.platform == "win32":
+            creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+
+        with open(log_file, "w", encoding="utf-8") as log_f:
+            proc = subprocess.Popen(
+                cmd,
+                env=env,
+                cwd=opencode_dir,
+                stdout=log_f,
+                stderr=subprocess.STDOUT,
+                creationflags=creation_flags,
+            )
+
+        # 等待服务就绪（通过检测端口监听状态）
         url = f"http://{args.host}:{args.port}"
-        for _ in range(30):
+        ready = False
+        for i in range(40):
             time.sleep(0.3)
+            # 先检查进程是否还活着
+            if proc.poll() is not None:
+                # 进程已退出，打印日志内容
+                print(f"Dashboard 启动失败（进程已退出，退出码: {proc.returncode}）", file=sys.stderr)
+                print(f"日志文件: {log_file}", file=sys.stderr)
+                try:
+                    with open(log_file, "r", encoding="utf-8") as f:
+                        print(f.read(), file=sys.stderr)
+                except Exception:
+                    pass
+                return 1
+            # 再检查端口是否监听
             try:
-                import urllib.request
-                urllib.request.urlopen(f"{url}/docs", timeout=1)
-                break
-            except Exception:
+                with socket.create_connection((args.host, args.port), timeout=0.5):
+                    ready = True
+                    break
+            except (ConnectionRefusedError, OSError):
                 continue
+
+        if not ready:
+            print(f"Dashboard 启动超时（等待 {40*0.3:.0f} 秒后仍未就绪）", file=sys.stderr)
+            print(f"日志文件: {log_file}", file=sys.stderr)
+            proc.terminate()
+            return 1
 
         print(f"Dashboard 启动: {url}")
         print(f"API 文档: {url}/docs")
         print(f"进程 PID: {proc.pid}")
+        print(f"日志文件: {log_file}")
 
         if not args.no_browser:
             webbrowser.open(url)

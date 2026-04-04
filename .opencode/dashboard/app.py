@@ -148,6 +148,83 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         return {"success": True}
 
     # ===========================================================
+    # API：小说发布
+    # ===========================================================
+
+    from .publish_bridge import (
+        check_playwright,
+        check_login_status,
+        get_books,
+        create_book,
+        publish_chapters,
+        get_task_status,
+        get_remote_chapters,
+    )
+
+    @app.get("/api/publish/status")
+    def api_publish_status():
+        """检查发布环境状态（Playwright 可用性 + 登录状态）。"""
+        pw = check_playwright()
+        login = check_login_status()
+        return {
+            "playwright": pw,
+            "login": login,
+            "ready": pw["available"] and login["logged_in"],
+        }
+
+    @app.get("/api/publish/books")
+    def api_publish_books():
+        """获取已创建书籍列表。"""
+        try:
+            return get_books(_get_project_root())
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/publish/books")
+    def api_publish_create_book(
+        title: str,
+        genre: str,
+        synopsis: str,
+        protagonist1: str = "",
+        protagonist2: str = "",
+    ):
+        """创建新书。"""
+        result = create_book(
+            _get_project_root(), title, genre, synopsis, protagonist1, protagonist2
+        )
+        if result.get("success"):
+            return result
+        raise HTTPException(status_code=400, detail=result.get("error", "创建失败"))
+
+    @app.get("/api/publish/books/{book_id}/remote-chapters")
+    def api_remote_chapters(book_id: str):
+        """获取番茄平台上的章节列表（已发布+草稿）。"""
+        result = get_remote_chapters(_get_project_root(), book_id)
+        if isinstance(result, dict) and "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
+
+    @app.post("/api/publish/chapters")
+    def api_publish_chapters(
+        book_id: str,
+        range_spec: str = "all",
+        publish_mode: str = "draft",
+    ):
+        """发布章节（创建后台任务）。"""
+        task_id = publish_chapters(
+            _get_project_root(), book_id, range_spec, publish_mode
+        )
+        return {"task_id": task_id, "status": "pending"}
+
+    @app.get("/api/publish/task/{task_id}")
+    def api_publish_task_status(task_id: str):
+        """查询发布任务进度。"""
+        status = get_task_status(task_id)
+        if status is None:
+            raise HTTPException(404, f"任务 {task_id} 不存在")
+        return status
+
+    # ===========================================================
     # API：实体数据库（index.db 只读查询）
     # ===========================================================
 
