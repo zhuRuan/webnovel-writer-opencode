@@ -264,10 +264,6 @@ def main() -> None:
     p_publish = sub.add_parser("publish", help="番茄小说发布工具")
     p_publish.add_argument("args", nargs=argparse.REMAINDER)
 
-    # plugin 命令（插件管理）
-    p_plugin = sub.add_parser("plugin", help="插件管理工具")
-    p_plugin.add_argument("args", nargs=argparse.REMAINDER)
-
     # dashboard 命令（可视化面板）
     p_dashboard = sub.add_parser("dashboard", help="启动可视化小说管理面板（只读 Web Dashboard）")
     p_dashboard.add_argument("--host", default="127.0.0.1", help="监听地址")
@@ -299,10 +295,6 @@ def main() -> None:
     # checkers 是审查器配置管理，不需要 project_root
     if tool == "checkers":
         raise SystemExit(_run_data_module("checkers_manager", rest))
-
-    # plugin 是插件管理，不需要 project_root
-    if tool == "plugin":
-        raise SystemExit(_run_data_module("plugin_manager", rest))
 
     # publish 命令中，setup-browser 不需要 project_root，其他命令需要
     if tool == "publish":
@@ -347,9 +339,6 @@ def main() -> None:
 
     if tool == "export":
         raise SystemExit(_run_script("export_manager.py", [*forward_args, *rest]))
-
-    if tool == "plugin":
-        raise SystemExit(_run_data_module("plugin_manager", rest))
 
     if tool == "publish":
         raise SystemExit(_run_script("publish_manager.py", [*forward_args, *rest]))

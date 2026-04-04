@@ -48,7 +48,6 @@
 │  ├── app.py          # 应用入口                              │
 │  ├── server.py       # 服务器                                │
 │  ├── watcher.py      # 文件监听                              │
-│  ├── plugin_bridge.py  # 插件数据桥接                        │
 │  ├── publish_bridge.py # 发布数据桥接                        │
 │  └── frontend/       # React SPA                            │
 └─────────────────────────────────────────────────────────────┘
@@ -85,12 +84,8 @@
 │   │   ├── app.py         # FastAPI 应用
 │   │   ├── server.py      # 服务器配置
 │   │   ├── watcher.py     # 文件监听
-│   │   ├── plugin_bridge.py  # 插件数据桥接
 │   │   ├── publish_bridge.py # 发布数据桥接
 │   │   └── frontend/      # React 前端
-│   ├── plugins/           # 插件目录
-│   │   ├── demo_checker/  # 示例插件
-│   │   └── auto_fix_hook/ # 自动修复钩子
 │   ├── agents/           # 8个 Agents（context-agent, data-agent, 6个 Checker）
 │   ├── checkers/         # 审查器配置驱动
 │   ├── scripts/          # Python 核心脚本

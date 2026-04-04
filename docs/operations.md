@@ -34,12 +34,8 @@ WORKSPACE_ROOT/
 │   ├── app.py          # FastAPI 应用入口
 │   ├── server.py       # 服务器配置
 │   ├── watcher.py      # 文件监听
-│   ├── plugin_bridge.py  # 插件数据桥接
 │   ├── publish_bridge.py # 发布数据桥接
 │   └── frontend/       # React 前端
-├── plugins/             # 插件目录
-│   ├── demo_checker/   # 示例插件
-│   └── auto_fix_hook/  # 自动修复钩子
 ├── scripts/             # Python 核心脚本
 │   ├── data_modules/    # 核心模块
 │   ├── publisher/       # 番茄小说发布模块
@@ -107,11 +103,6 @@ python .opencode/scripts/sync_missing_chapters.py --project-root <项目路径>
 
 # 章节验证
 python .opencode/scripts/verify_chapters.py --project-root <项目路径>
-
-# 插件管理
-python .opencode/scripts/webnovel.py plugin list
-python .opencode/scripts/webnovel.py plugin install <source>
-python .opencode/scripts/webnovel.py plugin reload
 ```
 
 ## 测试

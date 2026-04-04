@@ -177,59 +177,6 @@ def load_state(self) -> bool:
 4. **文件编码**: 所有文件使用 UTF-8
 5. **中文文档**: 所有用户面向的字符串和文档使用中文
 6. **审查器**: 通过 registry.yaml 配置，由 agents/*.md 实现
-7. **插件系统**: 通过 manifest.json 注册扩展点，支持 Agent/Skill/Checker/Publisher
-
-## 插件系统
-
-### 目录结构
-```
-.opencode/plugins/<plugin-id>/
-├── manifest.json    # 必需：插件元数据
-├── __init__.py     # 必需：Python 包入口
-├── checkers/      # 可选：自定义审查器
-├── skills/        # 可选：自定义技能命令
-├── publishers/    # 可选：自定义发布平台
-└── templates/     # 可选：自定义题材模板
-```
-
-### manifest.json 关键字段
-- `id`: 插件唯一标识（使用下划线，如 `com_example_my_plugin`）
-- `name`: 插件名称（中文）
-- `version`: 语义化版本（如 `1.0.0`）
-- `core_api_version`: 兼容的核心版本（如 `>=2.0.0,<3.0.0`）
-- `entry_points`: 扩展点定义
-- `permissions`: 权限声明
-
-### 扩展点类型
-- **agents**: 自定义 Agent（继承 `BaseAgent`）
-- **skills**: 自定义 Skill（继承 `BaseSkill`）
-- **checkers**: 自定义 Checker（继承 `BaseChecker`）
-- **publishers**: 自定义 Publisher（继承 `BasePublisher`）
-
-### 插件管理命令
-```bash
-# 列出已安装插件
-python .opencode/scripts/webnovel.py plugin list
-
-# 安装插件（Git URL 或本地路径）
-python .opencode/scripts/webnovel.py plugin install https://github.com/user/plugin.git
-
-# 查看插件详情
-python .opencode/scripts/webnovel.py plugin info <plugin-id>
-
-# 卸载插件
-python .opencode/scripts/webnovel.py plugin remove <plugin-id>
-
-# 重新加载所有插件
-python .opencode/scripts/webnovel.py plugin reload
-
-# 重新加载指定插件
-python .opencode/scripts/webnovel.py plugin reload <plugin-id>
-
-# 在 OpenCode 中使用
-/webnovel-plugin list
-/webnovel-plugin install <source>
-```
 
 ## 测试最佳实践
 
@@ -264,11 +211,6 @@ python .opencode/scripts/webnovel.py publish upload --book-id <id> --range "1-10
 
 # 可视化看板
 python .opencode/scripts/webnovel.py --project-root <项目路径> dashboard
-
-# 插件管理
-python .opencode/scripts/webnovel.py plugin list
-python .opencode/scripts/webnovel.py plugin install <source>
-python .opencode/scripts/webnovel.py plugin remove <plugin-id>
 ```
 
 ## Git 工作流

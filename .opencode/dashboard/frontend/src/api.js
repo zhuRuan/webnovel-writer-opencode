@@ -4,13 +4,21 @@
 
 const BASE = '';  // 开发时由 vite proxy 代理到 FastAPI
 
-export async function fetchJSON(path, params = {}) {
+export async function fetchJSON(path, options = {}) {
+    const { method = 'GET', body, headers, ...queryParams } = options;
     const url = new URL(path, window.location.origin);
-    Object.entries(params).forEach(([k, v]) => {
+    Object.entries(queryParams).forEach(([k, v]) => {
         if (v !== undefined && v !== null) url.searchParams.set(k, v);
     });
-    const res = await fetch(url.toString());
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const res = await fetch(url.toString(), {
+        method,
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+    });
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status} ${text}`);
+    }
     return res.json();
 }
 

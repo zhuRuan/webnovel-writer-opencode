@@ -184,8 +184,34 @@ def get_remote_chapters(project_root: Path, book_id: str) -> List[Dict[str, Any]
     loop = asyncio.new_event_loop()
     try:
         client = loop.run_until_complete(pm._ensure_client())
-        chapters = loop.run_until_complete(client.get_chapter_list(book_id))
-        return chapters
+
+        # 1. 获取已发布章节
+        published = loop.run_until_complete(client.get_chapter_list(book_id))
+
+        # 2. 获取草稿章节
+        drafts = []
+        try:
+            volumes = loop.run_until_complete(client.get_volume_list(book_id))
+            for vol in volumes:
+                vol_id = vol.get("volume_id", "")
+                vol_drafts = loop.run_until_complete(client.get_draft_list(book_id, vol_id))
+                if vol_drafts:
+                    drafts.extend(vol_drafts)
+        except Exception:
+            pass
+
+        # 3. 合并：已发布 + 草稿（去重，以 item_id 为准）
+        seen_ids = set()
+        merged = []
+        for ch in published + drafts:
+            item_id = ch.get("item_id", "")
+            if item_id and item_id not in seen_ids:
+                seen_ids.add(item_id)
+                merged.append(ch)
+            elif not item_id:
+                merged.append(ch)
+
+        return merged
     except Exception as e:
         return {"error": str(e)}
     finally:

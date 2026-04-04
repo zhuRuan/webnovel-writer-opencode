@@ -147,19 +147,6 @@ python -m opencode.dashboard --project-root <项目路径> --port 9000 --no-brow
 | `--port` | 监听端口（默认 8765） |
 | `--no-browser` | 不自动打开浏览器 |
 
-## `/webnovel-plugin`
-
-用途：管理插件（安装、卸载、重载）。
-
-示例：
-
-```
-/webnovel-plugin list
-/webnovel-plugin install demo-checker
-/webnovel-plugin remove com.example.demo-checker
-/webnovel-plugin reload
-```
-
 ## `/webnovel-export`
 
 用途：将正文导出为 Markdown/TXT/EPUB 格式。
