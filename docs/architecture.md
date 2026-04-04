@@ -36,7 +36,21 @@
 │  Agents (8个): context-agent / data-agent /                 │
 │                 6 维 Checker                                 │
 ├─────────────────────────────────────────────────────────────┤
+│  Plugin System: Agent / Skill / Checker / Publisher / Hook │
+├─────────────────────────────────────────────────────────────┤
 │  Data Layer: state.json / index.db / vectors.db            │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  Dashboard (独立模块)                                        │
+├─────────────────────────────────────────────────────────────┤
+│  FastAPI Backend + React Frontend                           │
+│  ├── app.py          # 应用入口                              │
+│  ├── server.py       # 服务器                                │
+│  ├── watcher.py      # 文件监听                              │
+│  ├── plugin_bridge.py  # 插件数据桥接                        │
+│  ├── publish_bridge.py # 发布数据桥接                        │
+│  └── frontend/       # React SPA                            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -67,10 +81,24 @@
 项目目录/
 ├── .opencode/              # OpenCode 配置
 │   ├── skills/            # 10个 Skills
-│   ├── dashboard/         # 可视化面板（FastAPI + React）
+│   ├── dashboard/         # 可视化面板（独立模块）
+│   │   ├── app.py         # FastAPI 应用
+│   │   ├── server.py      # 服务器配置
+│   │   ├── watcher.py     # 文件监听
+│   │   ├── plugin_bridge.py  # 插件数据桥接
+│   │   ├── publish_bridge.py # 发布数据桥接
+│   │   └── frontend/      # React 前端
+│   ├── plugins/           # 插件目录
+│   │   ├── demo_checker/  # 示例插件
+│   │   └── auto_fix_hook/ # 自动修复钩子
 │   ├── agents/           # 8个 Agents（context-agent, data-agent, 6个 Checker）
 │   ├── checkers/         # 审查器配置驱动
 │   ├── scripts/          # Python 核心脚本
+│   │   ├── data_modules/ # 核心数据模块
+│   │   ├── publisher/    # 番茄发布模块
+│   │   ├── sync_chapters_to_db.py   # 章节同步
+│   │   ├── sync_missing_chapters.py # 缺失章节同步
+│   │   └── verify_chapters.py       # 章节验证
 │   ├── references/      # 参考文档
 │   ├── genres/          # 题材参考（38+）
 │   └── templates/       # 输出模板

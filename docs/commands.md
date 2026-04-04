@@ -86,33 +86,6 @@
 
 - `.webnovel/project_memory.json`
 
-## `/webnovel-export`
-
-用途：将正文导出为 Markdown/TXT/EPUB 格式。
-
-示例：
-
-```
-/webnovel-export
-/webnovel-export --format markdown
-/webnovel-export --range 1-10 --format epub
-/webnovel-export --volume 1 --format txt
-/webnovel-export --format epub --cover cover.jpg --style style.css --author "作者名"
-```
-
-参数：
-
-| 参数 | 说明 |
-|------|------|
-| `--format` | 输出格式：markdown（默认）、txt、epub |
-| `--range` | 章节范围，如 `1-10`、`1,3,5` |
-| `--volume` | 导出指定卷 |
-| `--output` | 输出文件路径 |
-| `--author` | 作者名（仅 EPUB 需要） |
-| `--cover` | 封面图路径（仅 EPUB，默认检测项目根目录/cover.jpg） |
-| `--style` | 自定义 CSS 路径（仅 EPUB，默认检测项目根目录/style.css） |
-| `--cover-size` | 封面裁剪尺寸（仅 EPUB，格式如 1200x1600） |
-
 ## `/webnovel-publish`
 
 用途：通过交互式问答引导，将章节发布到番茄小说平台。
@@ -154,15 +127,16 @@
 - 角色活跃度追踪
 - 伏笔状态管理
 - 审查分数展示
-- 时间线和势力版图
+- 势力版图
 - 关系图谱（3D 力导向图）
 - 正文/大纲/设定集文件浏览
+- 插件数据展示
 
 底层命令：
 
 ```bash
-python .opencode/scripts/webnovel.py --project-root <项目路径> dashboard
-python .opencode/scripts/webnovel.py --project-root <项目路径> dashboard --port 9000 --no-browser
+python -m opencode.dashboard --project-root <项目路径>
+python -m opencode.dashboard --project-root <项目路径> --port 9000 --no-browser
 ```
 
 参数：
@@ -172,3 +146,43 @@ python .opencode/scripts/webnovel.py --project-root <项目路径> dashboard --p
 | `--host` | 监听地址（默认 127.0.0.1） |
 | `--port` | 监听端口（默认 8765） |
 | `--no-browser` | 不自动打开浏览器 |
+
+## `/webnovel-plugin`
+
+用途：管理插件（安装、卸载、重载）。
+
+示例：
+
+```
+/webnovel-plugin list
+/webnovel-plugin install demo-checker
+/webnovel-plugin remove com.example.demo-checker
+/webnovel-plugin reload
+```
+
+## `/webnovel-export`
+
+用途：将正文导出为 Markdown/TXT/EPUB 格式。
+
+示例：
+
+```
+/webnovel-export
+/webnovel-export --format markdown
+/webnovel-export --range 1-10 --format epub
+/webnovel-export --volume 1 --format txt
+/webnovel-export --format epub --cover cover.jpg --style style.css --author "作者名"
+```
+
+参数：
+
+| 参数 | 说明 |
+|------|------|
+| `--format` | 输出格式：markdown（默认）、txt、epub |
+| `--range` | 章节范围，如 `1-10`、`1,3,5` |
+| `--volume` | 导出指定卷 |
+| `--output` | 输出文件路径 |
+| `--author` | 作者名（仅 EPUB 需要） |
+| `--cover` | 封面图路径（仅 EPUB，默认检测项目根目录/cover.jpg） |
+| `--style` | 自定义 CSS 路径（仅 EPUB，默认检测项目根目录/style.css） |
+| `--cover-size` | 封面裁剪尺寸（仅 EPUB，格式如 1200x1600） |
