@@ -225,6 +225,90 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 ).fetchall()
             return [dict(r) for r in rows]
 
+    @app.get("/api/relationships/graph")
+    def relationships_graph():
+        """返回聚合去重后的图谱数据（节点+边）。"""
+        import json as _json
+        with closing(_get_db()) as conn:
+            # 获取所有关系
+            rels = conn.execute(
+                "SELECT * FROM relationships ORDER BY chapter ASC"
+            ).fetchall()
+            rels = [dict(r) for r in rels]
+
+            # 获取所有实体
+            ents = conn.execute(
+                "SELECT * FROM entities WHERE is_archived = 0"
+            ).fetchall()
+            entity_map = {e["id"]: dict(e) for e in ents}
+
+            type_colors = {
+                "角色": "#4f8ff7", "地点": "#34d399", "星球": "#22d3ee",
+                "神仙": "#f59e0b", "势力": "#8b5cf6", "招式": "#ef4444",
+                "法宝": "#ec4899",
+            }
+
+            # 收集所有涉及的实体 ID
+            related_ids = set()
+            for r in rels:
+                related_ids.add(r["from_entity"])
+                related_ids.add(r["to_entity"])
+
+            # 构建节点
+            tier_sizes = {"S": 10, "A": 7, "B": 5, "C": 3}
+            nodes = []
+            for eid in related_ids:
+                ent = entity_map.get(eid, {})
+                tier = ent.get("tier", "D") or "D"
+                nodes.append({
+                    "id": eid,
+                    "name": ent.get("canonical_name") or eid,
+                    "type": ent.get("type") or "未知",
+                    "tier": tier,
+                    "val": tier_sizes.get(tier, 2),
+                    "color": type_colors.get(ent.get("type"), "#5c6078"),
+                    "desc": ent.get("desc") or "",
+                    "first_appearance": ent.get("first_appearance", 0),
+                    "last_appearance": ent.get("last_appearance", 0),
+                    "is_protagonist": bool(ent.get("is_protagonist", False)),
+                })
+
+            # 构建聚合边（去重）
+            link_map = {}
+            for r in rels:
+                key = f"{r['from_entity']}→{r['to_entity']}"
+                if key not in link_map:
+                    link_map[key] = {
+                        "source": r["from_entity"],
+                        "target": r["to_entity"],
+                        "types": [],
+                        "chapters": [],
+                        "descriptions": [],
+                    }
+                if r["type"] not in link_map[key]["types"]:
+                    link_map[key]["types"].append(r["type"])
+                link_map[key]["chapters"].append(r["chapter"])
+                if r.get("description"):
+                    link_map[key]["descriptions"].append(r["description"])
+
+            links = []
+            for l in link_map.values():
+                chapter_count = len(l["chapters"])
+                links.append({
+                    "source": l["source"],
+                    "target": l["target"],
+                    "types": l["types"],
+                    "chapters": l["chapters"],
+                    "descriptions": l["descriptions"],
+                    "name": "、".join(l["types"]),
+                    "strength": min(1.0, chapter_count / 5.0),
+                    "width": 1 + len(l["types"]) * 0.5,
+                    "first_chapter": min(l["chapters"]),
+                    "last_chapter": max(l["chapters"]),
+                })
+
+            return {"nodes": nodes, "links": links}
+
     @app.get("/api/relationship-events")
     def list_relationship_events(
         entity: Optional[str] = None,

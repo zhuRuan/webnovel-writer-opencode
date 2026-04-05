@@ -191,12 +191,7 @@ def get_remote_chapters(project_root: Path, book_id: str) -> List[Dict[str, Any]
         # 2. 获取草稿章节
         drafts = []
         try:
-            volumes = loop.run_until_complete(client.get_volume_list(book_id))
-            for vol in volumes:
-                vol_id = vol.get("volume_id", "")
-                vol_drafts = loop.run_until_complete(client.get_draft_list(book_id, vol_id))
-                if vol_drafts:
-                    drafts.extend(vol_drafts)
+            drafts = loop.run_until_complete(client.get_draft_list(book_id))
         except Exception:
             pass
 

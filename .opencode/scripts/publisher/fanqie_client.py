@@ -315,10 +315,14 @@ class FanqieClient:
 
     async def get_draft_list(self, book_id: str) -> List[Dict[str, Any]]:
         """获取草稿章节列表"""
-        data = await self._get("/api/author/chapter/draft_list/v1/", {"book_id": book_id})
+        data = await self._get("/api/author/chapter/draft_list/v1/", {
+            "book_id": book_id,
+            "page_index": "0",
+            "page_count": "200",
+        })
         if isinstance(data, list):
             return data
-        return data.get("draft_list", [])
+        return data.get("draft_list") or data.get("item_list", [])
 
     async def save_draft(
         self,
@@ -421,7 +425,7 @@ class FanqieClient:
 
         data = await self._get("/api/author/chapter/chapter_list/v1", params)
         if isinstance(data, dict):
-            return data.get("chapter_list", [])
+            return data.get("item_list") or data.get("chapter_list", [])
         if isinstance(data, list):
             return data
         return []

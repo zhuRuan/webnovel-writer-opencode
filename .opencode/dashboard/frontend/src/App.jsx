@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { fetchJSON, subscribeSSE } from './api.js'
 import ForceGraph3D from 'react-force-graph-3d'
 
@@ -349,59 +349,235 @@ function EntitiesPage() {
 // ====================================================================
 
 function GraphPage() {
-    const [relationships, setRelationships] = useState([])
     const [graphData, setGraphData] = useState({ nodes: [], links: [] })
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
+    const [searchQuery, setSearchQuery] = useState('')
+    const [typeFilter, setTypeFilter] = useState('')
+    const [chapterFilter, setChapterFilter] = useState('')
+    const [selectedNode, setSelectedNode] = useState(null)
 
     useEffect(() => {
-        Promise.all([
-            fetchJSON('/api/relationships', { limit: 1000 }),
-            fetchJSON('/api/entities'),
-        ]).then(([rels, ents]) => {
-            setRelationships(rels)
-            const typeColors = {
-                '角色': '#4f8ff7', '地点': '#34d399', '星球': '#22d3ee', '神仙': '#f59e0b',
-                '势力': '#8b5cf6', '招式': '#ef4444', '法宝': '#ec4899'
-            }
-            const relatedIds = new Set()
-            rels.forEach(r => { relatedIds.add(r.from_entity); relatedIds.add(r.to_entity) })
-            const entityMap = {}
-            ents.forEach(e => { entityMap[e.id] = e })
-
-            const nodes = [...relatedIds].map(id => ({
-                id,
-                name: entityMap[id]?.canonical_name || id,
-                val: (entityMap[id]?.tier === 'S' ? 8 : entityMap[id]?.tier === 'A' ? 5 : 2),
-                color: typeColors[entityMap[id]?.type] || '#5c6078'
-            }))
-            const links = rels.map(r => ({
-                source: r.from_entity,
-                target: r.to_entity,
-                name: r.type
-            }))
-            setGraphData({ nodes, links })
-        }).catch(() => { })
+        setLoading(true)
+        fetchJSON('/api/relationships/graph')
+            .then(data => {
+                setGraphData(data)
+                setError(null)
+            })
+            .catch(e => setError(e.message))
+            .finally(() => setLoading(false))
     }, [])
+
+    // 过滤后的数据
+    const filteredNodes = useMemo(() => {
+        return graphData.nodes.filter(n => {
+            if (searchQuery && !n.name.includes(searchQuery) && !n.id.includes(searchQuery)) return false
+            if (typeFilter && n.type !== typeFilter) return false
+            if (chapterFilter) {
+                const ch = parseInt(chapterFilter)
+                if (ch && (n.last_appearance < ch || n.first_appearance > ch)) return false
+            }
+            return true
+        })
+    }, [graphData.nodes, searchQuery, typeFilter, chapterFilter])
+
+    const filteredNodeIds = new Set(filteredNodes.map(n => n.id))
+    const filteredLinks = useMemo(() => {
+        return graphData.links.filter(l =>
+            filteredNodeIds.has(l.source) && filteredNodeIds.has(l.target)
+        )
+    }, [graphData.links, filteredNodeIds])
+
+    // 高亮逻辑 — 仅基于 selectedNode，避免 hover 触发重渲染导致场景闪烁
+    const connectedNodeIds = useMemo(() => {
+        if (!selectedNode) return null
+        const ids = new Set([selectedNode.id])
+        filteredLinks.forEach(l => {
+            if (l.source === selectedNode.id) ids.add(l.target)
+            if (l.target === selectedNode.id) ids.add(l.source)
+        })
+        return ids
+    }, [selectedNode, filteredLinks])
+
+    const highlightOpacity = !!selectedNode
+    const highlightLinks = highlightOpacity ? new Set(
+        filteredLinks
+            .filter(l => l.source === selectedNode.id || l.target === selectedNode.id)
+            .map(l => `${l.source}→${l.target}`)
+    ) : null
+
+    const entityTypes = useMemo(() => {
+        const types = new Set(graphData.nodes.map(n => n.type))
+        return [...types].sort()
+    }, [graphData.nodes])
+
+    const typeColors = {
+        '角色': '#4f8ff7', '地点': '#34d399', '星球': '#22d3ee', '神仙': '#f59e0b',
+        '势力': '#8b5cf6', '招式': '#ef4444', '法宝': '#ec4899'
+    }
+
+    function strengthColor(s) {
+        if (s >= 0.8) return '#ef4444'
+        if (s >= 0.5) return '#f59e0b'
+        return 'rgba(127, 90, 240, 0.35)'
+    }
+
+    function resetFilters() {
+        setSearchQuery('')
+        setTypeFilter('')
+        setChapterFilter('')
+        setSelectedNode(null)
+    }
+
+    if (loading) return (
+        <>
+            <div className="page-header"><h2>🕸️ 关系图谱</h2></div>
+            <div className="card" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+                <div className="loading">加载中…</div>
+            </div>
+        </>
+    )
+
+    if (error) return (
+        <>
+            <div className="page-header"><h2>🕸️ 关系图谱</h2></div>
+            <div className="card" style={{ textAlign: 'center', padding: '3rem', color: '#f87171' }}>
+                <p>加载失败: {error}</p>
+                <button className="btn btn-primary" onClick={() => window.location.reload()}>重试</button>
+            </div>
+        </>
+    )
 
     return (
         <>
             <div className="page-header">
                 <h2>🕸️ 关系图谱</h2>
-                <span className="card-badge badge-blue">{relationships.length} 条引力链接</span>
+                <span className="card-badge badge-blue">{filteredNodes.length} 节点 · {filteredLinks.length} 链接</span>
             </div>
-            <div className="card graph-shell">
+
+            {/* 工具栏 */}
+            <div className="card" style={{ padding: '0.75rem 1rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <input className="filter-input" placeholder="搜索实体名称…" value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)', width: 180 }} />
+                    <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+                        style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)' }}>
+                        <option value="">全部类型</option>
+                        {entityTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <input type="number" min="1" placeholder="章节号过滤" value={chapterFilter}
+                        onChange={e => setChapterFilter(e.target.value)}
+                        style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)', width: 120 }} />
+                    <button className="btn btn-sm" style={{ background: '#64748b', color: '#fff' }} onClick={resetFilters}>重置</button>
+                    {selectedNode && (
+                        <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: '0.85rem' }}>
+                            已选中: <strong style={{ color: '#e2e8f0' }}>{selectedNode.name}</strong>
+                            <button className="btn btn-sm" style={{ marginLeft: '0.5rem', background: '#334155', color: '#94a3b8' }} onClick={() => setSelectedNode(null)}>取消</button>
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            <div className="card graph-shell" style={{ position: 'relative' }}>
                 <ForceGraph3D
-                    graphData={graphData}
+                    graphData={{ nodes: filteredNodes, links: filteredLinks }}
                     nodeLabel="name"
                     nodeColor="color"
                     nodeRelSize={6}
-                    linkColor={() => 'rgba(127, 90, 240, 0.35)'}
-                    linkWidth={1}
-                    linkDirectionalParticles={2}
+                    nodeOpacity={highlightOpacity ? n => (connectedNodeIds?.has(n.id) ? 1 : 0.15) : 1}
+                    linkColor={d => {
+                        const key = `${d.source}→${d.target}`
+                        if (highlightLinks?.has(key)) return strengthColor(d.strength)
+                        if (highlightOpacity) return 'rgba(127, 90, 240, 0.08)'
+                        return strengthColor(d.strength)
+                    }}
+                    linkWidth={d => (highlightLinks?.has(`${d.source}→${d.target}`) ? d.width * 1.5 : d.width)}
+                    linkDirectionalParticles={d => (highlightLinks?.has(`${d.source}→${d.target}`) ? 3 : 1)}
                     linkDirectionalParticleWidth={1.5}
-                    linkDirectionalParticleSpeed={d => 0.005 + Math.random() * 0.005}
+                    linkDirectionalParticleSpeed={d => 0.005 + d.strength * 0.005}
+                    linkLabel={d => `${d.name}\n第${d.first_chapter}-${d.last_chapter}章 · 强度${(d.strength * 100).toFixed(0)}%`}
                     backgroundColor="#fffaf0"
                     showNavInfo={false}
+                    onNodeHover={node => {
+                        document.body.style.cursor = node ? 'pointer' : 'default'
+                    }}
+                    onNodeClick={node => {
+                        setSelectedNode(node === selectedNode ? null : node)
+                    }}
+                    onBackgroundClick={() => setSelectedNode(null)}
                 />
+
+                {/* 图例 */}
+                <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'rgba(15,23,42,0.85)', borderRadius: 8, padding: '0.5rem 0.75rem', fontSize: '0.75rem', color: '#cbd5e1', zIndex: 10, pointerEvents: 'none' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>节点类型</div>
+                    {Object.entries(typeColors).map(([type, color]) => (
+                        <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
+                            {type}
+                        </div>
+                    ))}
+                    <div style={{ marginTop: '0.4rem', fontWeight: 600 }}>链接强度</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
+                        <span style={{ width: 16, height: 3, borderRadius: 2, background: '#ef4444', display: 'inline-block' }} /> 强 (≥80%)
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
+                        <span style={{ width: 16, height: 3, borderRadius: 2, background: '#f59e0b', display: 'inline-block' }} /> 中 (50-79%)
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <span style={{ width: 16, height: 3, borderRadius: 2, background: 'rgba(127,90,240,0.35)', display: 'inline-block' }} /> 弱 (&lt;50%)
+                    </div>
+                </div>
+
+                {/* 详情面板 */}
+                {selectedNode && (() => {
+                    const connectedLinks = filteredLinks.filter(l => l.source === selectedNode.id || l.target === selectedNode.id)
+                    const connectedEntities = connectedLinks.map(l => {
+                        const otherId = l.source === selectedNode.id ? l.target : l.source
+                        const other = filteredNodes.find(n => n.id === otherId)
+                        return { ...l, other: other || { name: otherId, type: '未知', color: '#5c6078' } }
+                    })
+                    return (
+                        <div style={{
+                            position: 'absolute', top: 0, right: 0, width: 320, height: '100%',
+                            background: 'rgba(15,23,42,0.95)', borderLeft: '1px solid #334155',
+                            padding: '1rem', overflowY: 'auto', zIndex: 20,
+                            backdropFilter: 'blur(8px)',
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '1rem' }}>{selectedNode.name}</h3>
+                                <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '1rem' }}>
+                                <div>类型: <span style={{ color: selectedNode.color }}>{selectedNode.type}</span></div>
+                                <div>等级: {selectedNode.tier}</div>
+                                <div>首次出现: 第 {selectedNode.first_appearance} 章</div>
+                                <div>最后出现: 第 {selectedNode.last_appearance} 章</div>
+                                {selectedNode.is_protagonist && <div style={{ color: '#f59e0b' }}>⭐ 主角</div>}
+                                {selectedNode.desc && <div style={{ marginTop: '0.5rem', color: '#cbd5e1' }}>{selectedNode.desc}</div>}
+                            </div>
+                            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#e2e8f0', marginBottom: '0.5rem' }}>
+                                关联 ({connectedEntities.length})
+                            </div>
+                            {connectedEntities.map((ce, i) => (
+                                <div key={i} style={{
+                                    padding: '0.5rem', marginBottom: '0.4rem', borderRadius: 6,
+                                    background: 'rgba(51,65,85,0.5)', border: '1px solid #334155',
+                                    cursor: 'pointer',
+                                }} onClick={() => setSelectedNode(ce.other)}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: ce.other.color, display: 'inline-block' }} />
+                                        <span style={{ color: '#e2e8f0', fontSize: '0.85rem' }}>{ce.other.name}</span>
+                                    </div>
+                                    <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.2rem' }}>{ce.name}</div>
+                                    <div style={{ color: '#64748b', fontSize: '0.7rem' }}>
+                                        第 {ce.first_chapter}-{ce.last_chapter} 章 · 强度 {(ce.strength * 100).toFixed(0)}%
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                })()}
             </div>
         </>
     )
@@ -552,6 +728,224 @@ function ReadingPowerPage() {
                 </div>
                 {data.length === 0 ? <div className="empty-state"><div className="empty-icon">🔥</div><p>暂无追读力数据</p></div> : null}
             </div>
+        </>
+    )
+}
+
+
+// ====================================================================
+// 页面 7：小说发布
+// ====================================================================
+
+const PUB_PAGE_SIZE = 20
+
+function PublishPage() {
+    const [status, setStatus] = useState(null)
+    const [books, setBooks] = useState([])
+    const [selectedBook, setSelectedBook] = useState('')
+    const [publishMode, setPublishMode] = useState('draft')
+    const [publishing, setPublishing] = useState(false)
+    const [task, setTask] = useState(null)
+    const [showCreateForm, setShowCreateForm] = useState(false)
+    const [newBook, setNewBook] = useState({ title: '', genre: '', synopsis: '', protagonist1: '', protagonist2: '' })
+    const [toast, setToast] = useState(null)
+    const [localChapters, setLocalChapters] = useState([])
+    const [remoteChapters, setRemoteChapters] = useState([])
+    const [remoteLoading, setRemoteLoading] = useState(false)
+    const [selectedChapters, setSelectedChapters] = useState(new Set())
+    const [chPage, setChPage] = useState(1)
+    const [chFilter, setChFilter] = useState('all')
+
+    useEffect(() => {
+        fetchJSON('/api/publish/status').then(setStatus).catch(() => setStatus(null))
+        fetchJSON('/api/publish/books').then(setBooks).catch(() => setBooks([]))
+        fetchJSON('/api/chapters').then(setLocalChapters).catch(() => setLocalChapters([]))
+    }, [])
+
+    useEffect(() => {
+        if (!selectedBook) {
+            setRemoteChapters([])
+            setSelectedChapters(new Set())
+            return
+        }
+        setRemoteLoading(true)
+        setRemoteChapters([])
+        setSelectedChapters(new Set())
+        setChPage(1)
+        setChFilter('all')
+        fetchJSON(`/api/publish/books/${encodeURIComponent(selectedBook)}/remote-chapters`)
+            .then(data => {
+                if (Array.isArray(data)) setRemoteChapters(data)
+                else setRemoteChapters([])
+            })
+            .catch(() => setRemoteChapters([]))
+            .finally(() => setRemoteLoading(false))
+    }, [selectedBook])
+
+    useEffect(() => {
+        if (!task) return
+        if (task.status === 'pending' || task.status === 'running') {
+            const timer = setInterval(() => {
+                fetchJSON(`/api/publish/task/${task.task_id}`)
+                    .then(t => {
+                        setTask(t)
+                        if (t.status === 'success' || t.status === 'failed') {
+                            clearInterval(timer)
+                            setPublishing(false)
+                        }
+                    })
+                    .catch(() => clearInterval(timer))
+            }, 1500)
+            return () => clearInterval(timer)
+        }
+    }, [task?.task_id, task?.status])
+
+    function showToast(msg, type = 'success') {
+        setToast({ msg, type })
+        setTimeout(() => setToast(null), 3000)
+    }
+
+    const remoteChapterNos = new Set(remoteChapters.map(r => {
+        const m = r.title && r.title.match(/第\s*(\d+)\s*章/)
+        return m ? parseInt(m[1]) : 0
+    }).filter(n => n > 0))
+
+    const filteredChapters = localChapters.filter(c => {
+        const isPublished = remoteChapterNos.has(c.chapter)
+        if (chFilter === 'unpublished') return !isPublished
+        if (chFilter === 'published') return isPublished
+        return true
+    })
+
+    const unpublishedCount = localChapters.filter(c => !remoteChapterNos.has(c.chapter)).length
+    const publishedCount = localChapters.filter(c => remoteChapterNos.has(c.chapter)).length
+    const chTotalPages = Math.max(1, Math.ceil(filteredChapters.length / PUB_PAGE_SIZE))
+    const safeChPage = Math.min(chPage, chTotalPages)
+    const chPageStart = (safeChPage - 1) * PUB_PAGE_SIZE
+    const chPageItems = filteredChapters.slice(chPageStart, chPageStart + PUB_PAGE_SIZE)
+
+    function selectAll() { setSelectedChapters(new Set(filteredChapters.map(c => c.chapter))) }
+    function selectUnpublished() {
+        const unp = filteredChapters.filter(c => !remoteChapterNos.has(c.chapter)).map(c => c.chapter)
+        setSelectedChapters(new Set(unp))
+    }
+    function clearAll() { setSelectedChapters(new Set()) }
+    function toggleChapter(ch) {
+        setSelectedChapters(prev => {
+            const next = new Set(prev)
+            if (next.has(ch)) next.delete(ch)
+            else next.add(ch)
+            return next
+        })
+    }
+
+    async function handlePublish() {
+        if (!selectedBook) { showToast('请先选择书籍', 'error'); return }
+        if (selectedChapters.size === 0) { showToast('请至少选择一章', 'error'); return }
+        setPublishing(true)
+        setTask(null)
+        const rangeSpec = [...selectedChapters].sort((a, b) => a - b).join(',')
+        try {
+            const params = new URLSearchParams({ book_id: selectedBook, range_spec: rangeSpec, publish_mode: publishMode })
+            const res = await fetchJSON('/api/publish/chapters?' + params.toString(), { method: 'POST' })
+            setTask({ task_id: res.task_id, status: 'pending', progress: 0, total: 0, message: '任务已创建', logs: [] })
+            showToast('发布任务已创建')
+        } catch (e) {
+            showToast('发布失败: ' + e.message, 'error')
+            setPublishing(false)
+        }
+    }
+
+    async function handleCreateBook() {
+        if (!newBook.title || !newBook.genre || !newBook.synopsis) { showToast('请填写必填项', 'error'); return }
+        try {
+            const params = new URLSearchParams({
+                title: newBook.title, genre: newBook.genre, synopsis: newBook.synopsis,
+                protagonist1: newBook.protagonist1, protagonist2: newBook.protagonist2,
+            })
+            const res = await fetchJSON('/api/publish/books?' + params.toString(), { method: 'POST' })
+            showToast(`书籍创建成功！ID: ${res.book_id}`)
+            setNewBook({ title: '', genre: '', synopsis: '', protagonist1: '', protagonist2: '' })
+            setShowCreateForm(false)
+            setBooks(await fetchJSON('/api/publish/books'))
+        } catch (e) {
+            showToast('创建失败: ' + e.message, 'error')
+        }
+    }
+
+    const isReady = status?.ready
+    const cliCmd = status?.login?.cli_command || ''
+
+    return (
+        <>
+            <div className="page-header">
+                <h2>📖 小说发布</h2>
+                <span className={`card-badge ${isReady ? 'badge-green' : 'badge-red'}`}>{isReady ? '环境就绪' : '需要配置'}</span>
+            </div>
+
+            <div className="card">
+                <div className="card-header"><span className="card-title">发布环境</span></div>
+                {status ? (
+                    <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div><span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Playwright</span><div style={{ color: status.playwright.available ? '#4ade80' : '#f87171' }}>{status.playwright.available ? `✅ 可用 (v${status.playwright.version})` : '❌ 未安装'}</div></div>
+                        <div><span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>番茄登录</span><div style={{ color: status.login.logged_in ? '#4ade80' : '#f87171' }}>{status.login.logged_in ? '✅ 已登录' : '❌ 未登录'}</div></div>
+                        {!isReady && (<div style={{ background: '#1e293b', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #334155', maxWidth: 500 }}><div style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '0.5rem' }}>首次配置步骤：</div><code style={{ color: '#38bdf8', fontSize: '0.85rem' }}>{cliCmd}</code><div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.5rem' }}>运行此命令后，会弹出浏览器窗口，扫码登录即可。</div></div>)}
+                    </div>
+                ) : (<div className="loading">检查中…</div>)}
+            </div>
+
+            <div className="card">
+                <div className="card-header"><span className="card-title">书籍管理</span><button className="btn btn-sm btn-primary" onClick={() => setShowCreateForm(!showCreateForm)}>{showCreateForm ? '取消' : '+ 创建新书'}</button></div>
+                {showCreateForm && (
+                    <div style={{ marginBottom: '1rem', padding: '1rem', background: '#0f172a', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                            <input placeholder="小说标题 *" value={newBook.title} onChange={e => setNewBook(p => ({ ...p, title: e.target.value }))} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #334155', background: '#1e293b', color: '#e2e8f0' }} />
+                            <input placeholder="题材（如玄幻、都市）*" value={newBook.genre} onChange={e => setNewBook(p => ({ ...p, genre: e.target.value }))} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #334155', background: '#1e293b', color: '#e2e8f0' }} />
+                            <textarea placeholder="小说简介 *（至少50字）" value={newBook.synopsis} onChange={e => setNewBook(p => ({ ...p, synopsis: e.target.value }))} rows={3} style={{ gridColumn: '1 / -1', padding: '0.5rem', borderRadius: '6px', border: '1px solid #334155', background: '#1e293b', color: '#e2e8f0', resize: 'vertical' }} />
+                            <input placeholder="主角1（可选）" value={newBook.protagonist1} onChange={e => setNewBook(p => ({ ...p, protagonist1: e.target.value }))} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #334155', background: '#1e293b', color: '#e2e8f0' }} />
+                            <input placeholder="主角2（可选）" value={newBook.protagonist2} onChange={e => setNewBook(p => ({ ...p, protagonist2: e.target.value }))} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #334155', background: '#1e293b', color: '#e2e8f0' }} />
+                        </div>
+                        <button className="btn btn-sm btn-primary" style={{ marginTop: '0.75rem' }} onClick={handleCreateBook}>创建</button>
+                    </div>
+                )}
+                {books.length === 0 ? (<div className="empty-state"><div className="empty-icon">📚</div><p>暂无书籍，请先在番茄作家后台创建</p></div>) : (
+                    <div className="table-wrap">
+                        <table className="data-table"><thead><tr><th>书名</th><th>ID</th><th>状态</th></tr></thead><tbody>{books.map(b => (<tr key={b.book_id} role="button" tabIndex={0} className={selectedBook === b.book_id ? 'selected' : ''} onClick={() => setSelectedBook(b.book_id)} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setSelectedBook(b.book_id))}><td>{b.book_name || '未命名'}</td><td><code style={{ fontSize: '0.8rem' }}>{b.book_id}</code></td><td>{b.status || '—'}</td></tr>))}</tbody></table>
+                    </div>
+                )}
+            </div>
+
+            <div className="card">
+                <div className="card-header"><span className="card-title">章节选择</span><div style={{ display: 'flex', gap: '0.5rem' }}><button className="btn btn-sm btn-primary" onClick={selectAll}>全选</button><button className="btn btn-sm btn-primary" onClick={selectUnpublished}>仅未发布 ({unpublishedCount})</button><button className="btn btn-sm" style={{ background: '#64748b', color: '#fff' }} onClick={clearAll}>清空</button></div></div>
+                {selectedBook ? (<>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        {[{ key: 'all', label: `全部 (${localChapters.length})` }, { key: 'unpublished', label: `🆕 可发布 (${unpublishedCount})` }, { key: 'published', label: `✅ 已发布 (${publishedCount})` }].map(f => (<button key={f.key} className={`btn btn-sm ${chFilter === f.key ? 'btn-primary' : ''}`} style={chFilter === f.key ? {} : { background: '#334155', color: '#94a3b8' }} onClick={() => { setChFilter(f.key); setChPage(1) }}>{f.label}</button>))}
+                    </div>
+                    <div className="table-wrap" style={{ maxHeight: 480, overflowY: 'auto' }}>
+                        <table className="data-table"><thead><tr><th style={{ width: 40 }}>☑</th><th>章节</th><th>标题</th><th>字数</th><th>状态</th></tr></thead><tbody>{chPageItems.map(c => { const isPublished = remoteChapterNos.has(c.chapter); const checked = selectedChapters.has(c.chapter); return (<tr key={c.chapter}><td><input type="checkbox" checked={checked} onChange={() => toggleChapter(c.chapter)} style={{ width: 16, height: 16, cursor: 'pointer' }} /></td><td className="chapter-no">第 {c.chapter} 章</td><td>{c.title || '—'}</td><td>{c.word_count ? c.word_count.toLocaleString() + ' 字' : '—'}</td><td>{isPublished ? <span className="card-badge badge-green">✅ 已发布</span> : <span className="card-badge badge-blue">🆕 可发布</span>}</td></tr>) })}</tbody></table>
+                    </div>
+                    {chTotalPages > 1 && (<div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '0.75rem', alignItems: 'center' }}><button className="btn btn-sm" disabled={safeChPage <= 1} onClick={() => setChPage(p => Math.max(1, p - 1))} style={safeChPage <= 1 ? { opacity: 0.4 } : {}}>上一页</button><span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>第 {safeChPage} / {chTotalPages} 页</span><button className="btn btn-sm" disabled={safeChPage >= chTotalPages} onClick={() => setChPage(p => Math.min(chTotalPages, p + 1))} style={safeChPage >= chTotalPages ? { opacity: 0.4 } : {}}>下一页</button></div>)}
+                    {remoteLoading && <div className="loading">加载平台章节中…</div>}
+                </>) : (<div className="empty-state"><div className="empty-icon">📝</div><p>请先选择书籍以加载章节列表</p></div>)}
+            </div>
+
+            <div className="card">
+                <div className="card-header"><span className="card-title">发布操作</span></div>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <div style={{ flex: 1, minWidth: 150 }}><label style={{ color: '#94a3b8', fontSize: '0.8rem', display: 'block', marginBottom: '0.25rem' }}>发布模式</label><select value={publishMode} onChange={e => setPublishMode(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #334155', background: '#1e293b', color: '#e2e8f0' }}><option value="draft">草稿</option><option value="publish">直接发布</option></select></div>
+                    <button className="btn btn-primary" disabled={publishing || !selectedBook || selectedChapters.size === 0} onClick={handlePublish} style={{ padding: '0.5rem 1.5rem' }}>{publishing ? '发布中…' : `发布选中章节 (${selectedChapters.size})`}</button>
+                </div>
+                {task && (
+                    <div style={{ background: '#0f172a', borderRadius: '8px', border: '1px solid #334155', padding: '1rem', marginTop: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>任务 {task.task_id}</span><span className={`card-badge ${task.status === 'success' ? 'badge-green' : task.status === 'failed' ? 'badge-red' : task.status === 'running' ? 'badge-blue' : 'badge-amber'}`}>{task.status === 'success' ? '✅ 完成' : task.status === 'failed' ? '❌ 失败' : task.status === 'running' ? '⏳ 进行中' : '等待中'}</span></div>
+                        {task.total > 0 && (<div style={{ marginBottom: '0.5rem' }}><div style={{ background: '#1e293b', borderRadius: '4px', height: '8px', overflow: 'hidden' }}><div style={{ width: `${(task.progress / task.total * 100).toFixed(0)}%`, height: '100%', background: task.status === 'failed' ? '#ef4444' : '#3b82f6', transition: 'width 0.3s' }} /></div><span style={{ color: '#64748b', fontSize: '0.75rem' }}>{task.progress} / {task.total}</span></div>)}
+                        {task.message && <div style={{ color: '#cbd5e1', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{task.message}</div>}
+                        {task.logs.length > 0 && (<div style={{ background: '#1e293b', borderRadius: '6px', padding: '0.75rem', maxHeight: 200, overflowY: 'auto', fontFamily: 'monospace', fontSize: '0.8rem', color: '#94a3b8', whiteSpace: 'pre-wrap' }}>{task.logs.map((l, i) => <div key={i}>{l}</div>)}</div>)}
+                    </div>
+                )}
+            </div>
+
+            {toast && (<div style={{ position: 'fixed', bottom: '2rem', right: '2rem', padding: '0.75rem 1.25rem', borderRadius: '8px', fontSize: '0.9rem', zIndex: 200, background: toast.type === 'error' ? '#7f1d1d' : '#166534', color: toast.type === 'error' ? '#f87171' : '#4ade80', border: `1px solid ${toast.type === 'error' ? '#ef4444' : '#22c55e'}` }}>{toast.msg}</div>)}
         </>
     )
 }
