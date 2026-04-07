@@ -244,8 +244,46 @@ class ContextManager:
                 "disambiguation_pending": (
                     state.get("disambiguation_pending", [])[-alert_slice:] if alert_slice else []
                 ),
+                "foreshadowing_overdue": self._load_foreshadowing_overdue(state, chapter),
             },
         }
+
+    def _load_foreshadowing_overdue(self, state: Dict[str, Any], current_chapter: int) -> List[Dict[str, Any]]:
+        """加载超期伏笔警报（v5.5 引入）"""
+        threshold = getattr(self.config, "foreshadowing_stale_threshold", 10)
+        plot_threads = state.get("plot_threads", {}) or {}
+        foreshadowing_list = plot_threads.get("foreshadowing", [])
+        if not foreshadowing_list:
+            return []
+
+        tier_weights = {"核心": 3.0, "重要": 2.5, "支线": 2.0, "装饰": 1.0}
+        result = []
+
+        for item in foreshadowing_list:
+            if not isinstance(item, dict):
+                continue
+            if item.get("status") != "未回收":
+                continue
+
+            last_ch = item.get("last_mentioned_chapter") or item.get("planted_chapter", 0)
+            elapsed = current_chapter - last_ch
+            if elapsed > threshold:
+                tier = item.get("tier", "支线")
+                tier_weight = tier_weights.get(tier, 1.0)
+                urgency = (elapsed / max(threshold, 1)) * tier_weight
+
+                result.append({
+                    "content": item.get("content"),
+                    "tier": tier,
+                    "planted_chapter": item.get("planted_chapter"),
+                    "last_mentioned_chapter": last_ch,
+                    "elapsed_chapters": elapsed,
+                    "urgency": round(urgency, 2),
+                })
+
+        result.sort(key=lambda x: x["urgency"], reverse=True)
+        max_urgent = getattr(self.config, "context_max_urgent_foreshadowing", 5)
+        return result[:max_urgent]
 
     def _load_reader_signal(self, chapter: int) -> Dict[str, Any]:
         if not getattr(self.config, "context_reader_signal_enabled", True):

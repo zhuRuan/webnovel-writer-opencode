@@ -202,6 +202,10 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers validate
 
 #### 3.2 调用审查器（关键）
 
+**⚠️ 必须并行执行，禁止串行**
+
+所有审查器必须在**同一消息中**并行调用，**禁止逐个串行执行**。
+
 **加载审查器配置**：
 ```bash
 # 加载 registry.yaml 获取完整配置（包括 invoke_template）
@@ -211,29 +215,46 @@ cat "${SKILL_ROOT}/../../checkers/registry.yaml"
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode {standard|minimal|full} --format json
 ```
 
-**动态构建 Task 调用**：
+**并行调用模板**（必须按此格式执行）：
+
+```markdown
+# 错误示例（串行，禁止）
+Task 1: 调用 consistency-checker，等待完成
+Task 2: 调用 continuity-checker，等待完成  ← 错误！
+
+# 正确示例（并行，同一消息中全部发出）
+Task 1:
+  subagent: consistency-checker
+  prompt: |
+    {invoke_template}
+    - 章节文件：{chapter_file}
+    - 项目根：{PROJECT_ROOT}
+
+Task 2:
+  subagent: continuity-checker
+  prompt: |
+    {invoke_template}
+    - 章节文件：{chapter_file}
+    - 项目根：{PROJECT_ROOT}
+
+Task 3:
+  subagent: ooc-checker
+  prompt: |
+    {invoke_template}
+    - 章节文件：{chapter_file}
+    - 项目根：{PROJECT_ROOT}
+```
+
+**动态构建步骤**：
 1. 从 registry.yaml 的 `checkers` 节点获取每个审查器的 `invoke_template`
 2. 替换模板中的占位符：`{chapter}`、`{chapter_file}`、`{PROJECT_ROOT}`
-3. 使用 Task 工具并行调用各审查器
+3. 在**同一条消息中**使用多个 Task 工具调用所有审查器（非串行等待）
 
 **⚠️ 重要约束**：
 - 必须让 OpenCode 加载 agent 文件的完整定义（registry.yaml 的 `file` 字段指向 .opencode/agents/*.md）
 - **不要**在 prompt 中包含具体检查项、JSON 模板、评分标准
 - prompt 中只传递必要参数（章节号、文件路径、项目根）
 - 如需传递额外上下文（如上章钩子、大纲标签），只放在 prompt 最后作为"背景信息"
-
-**Task 调用示例**（动态替换 invoke_template）：
-```
-并行调用审查器（使用 Task 工具）：
-
-Task 1:
-  - agent/subagent: {checker_id}
-  - prompt: |
-      {invoke_template}
-      - 章节文件：{chapter_file}
-      - 项目根：{PROJECT_ROOT}
-      - 审查器定义见：.opencode/agents/{checker_id}.md
-```
 
 #### 3.3 审查器输出格式约束
 

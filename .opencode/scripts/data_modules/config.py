@@ -188,6 +188,9 @@ class DataModulesConfig:
     max_disambiguation_pending: int = 1000
     max_state_changes: int = 2000
 
+    # ================= 伏笔管理配置 (v5.5 引入) =================
+    foreshadowing_stale_threshold: int = 10
+
     context_recent_summaries_window: int = 3
     context_recent_meta_window: int = 3
     context_alerts_slice: int = 10

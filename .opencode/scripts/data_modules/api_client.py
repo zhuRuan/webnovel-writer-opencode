@@ -425,6 +425,12 @@ class ModalAPIClient:
         await self._embed_client.close()
         await self._rerank_client.close()
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+
     # ==================== 预热 ====================
 
     async def warmup(self):
@@ -487,10 +493,32 @@ class ModalAPIClient:
 
 # 全局客户端
 _client: Optional[ModalAPIClient] = None
+_cleanup_registered: bool = False
+
+
+def _async_run(coro):
+    """在同步上下文运行异步协程"""
+    try:
+        import asyncio
+        loop = asyncio.get_running_loop()
+        loop.create_task(coro)
+    except RuntimeError:
+        asyncio.run(coro)
+
+
+def _cleanup_client():
+    global _client
+    if _client is not None:
+        _async_run(_client.close())
+        _client = None
 
 
 def get_client(config=None) -> ModalAPIClient:
-    global _client
+    global _client, _cleanup_registered
     if _client is None or config is not None:
         _client = ModalAPIClient(config)
+        if not _cleanup_registered:
+            import atexit
+            atexit.register(_cleanup_client)
+            _cleanup_registered = True
     return _client

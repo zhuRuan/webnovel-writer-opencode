@@ -76,6 +76,31 @@ class StateChange:
 
 
 @dataclass
+class _ForeshadowingAdd:
+    """待添加的伏笔记录"""
+    content: str
+    tier: str = "支线"
+    target_offset: int = 50
+    planted_chapter: int = 0
+    added_at: str = ""
+
+
+@dataclass
+class _ForeshadowingResolve:
+    """待解决的伏笔记录"""
+    content: str
+    resolved_chapter: int
+    resolved_at: str = ""
+
+
+@dataclass
+class _ForeshadowingMention:
+    """待更新的伏笔提及记录"""
+    content: str
+    mentioned_chapter: int
+
+
+@dataclass
 class _EntityPatch:
     """待写入的实体增量补丁（用于锁内合并）"""
     entity_type: str
@@ -123,6 +148,9 @@ class StateManager:
         self._pending_structured_relationships: List[Dict[str, Any]] = []
         self._pending_disambiguation_warnings: List[Dict[str, Any]] = []
         self._pending_disambiguation_pending: List[Dict[str, Any]] = []
+        self._pending_foreshadowing_adds: List[_ForeshadowingAdd] = []
+        self._pending_foreshadowing_resolves: List[_ForeshadowingResolve] = []
+        self._pending_foreshadowing_mentions: List[_ForeshadowingMention] = []
         self._pending_progress_chapter: Optional[int] = None
         self._pending_progress_words_delta: int = 0
         self._pending_chapter_meta: Dict[str, Any] = {}
@@ -224,6 +252,9 @@ class StateManager:
                 self._pending_structured_relationships,
                 self._pending_disambiguation_warnings,
                 self._pending_disambiguation_pending,
+                self._pending_foreshadowing_adds,
+                self._pending_foreshadowing_resolves,
+                self._pending_foreshadowing_mentions,
                 self._pending_chapter_meta,
                 self._pending_progress_chapter is not None,
                 self._pending_progress_words_delta != 0,
@@ -338,6 +369,47 @@ class StateManager:
                         disk_state["chapter_meta"] = chapter_meta
                     chapter_meta.update(self._pending_chapter_meta)
 
+                # 伏笔合并（v5.5 引入）
+                plot_threads = disk_state.setdefault("plot_threads", {"active_threads": [], "foreshadowing": []})
+                if not isinstance(plot_threads, dict):
+                    plot_threads = {"active_threads": [], "foreshadowing": []}
+                    disk_state["plot_threads"] = plot_threads
+                foreshadowing_list = plot_threads.setdefault("foreshadowing", [])
+                if not isinstance(foreshadowing_list, list):
+                    foreshadowing_list = []
+                    plot_threads["foreshadowing"] = foreshadowing_list
+
+                # 1) 添加新伏笔
+                for add in self._pending_foreshadowing_adds:
+                    foreshadowing_list.append({
+                        "content": add.content,
+                        "status": "未回收",
+                        "tier": add.tier,
+                        "planted_chapter": add.planted_chapter,
+                        "target_chapter": add.planted_chapter + add.target_offset,
+                        "resolved_chapter": None,
+                        "last_mentioned_chapter": add.planted_chapter,
+                        "added_at": add.added_at or self._now_progress_timestamp(),
+                        "resolved_at": None,
+                    })
+
+                # 2) 解决伏笔
+                for resolve in self._pending_foreshadowing_resolves:
+                    for item in foreshadowing_list:
+                        if isinstance(item, dict) and item.get("content") == resolve.content:
+                            item["status"] = "已回收"
+                            item["resolved_chapter"] = resolve.resolved_chapter
+                            item["resolved_at"] = resolve.resolved_at or self._now_progress_timestamp()
+                            break
+
+                # 3) 更新提及章节
+                for mention in self._pending_foreshadowing_mentions:
+                    for item in foreshadowing_list:
+                        if isinstance(item, dict) and item.get("content") == mention.content:
+                            current_last = item.get("last_mentioned_chapter") or 0
+                            item["last_mentioned_chapter"] = max(current_last, mention.mentioned_chapter)
+                            break
+
                 # 原子写入（锁已持有，不再二次加锁）
                 atomic_write_json(self.config.state_file, disk_state, use_lock=False, backup=True)
 
@@ -351,6 +423,9 @@ class StateManager:
                 # state.json 侧 pending 已写盘，直接清空
                 self._pending_disambiguation_warnings.clear()
                 self._pending_disambiguation_pending.clear()
+                self._pending_foreshadowing_adds.clear()
+                self._pending_foreshadowing_resolves.clear()
+                self._pending_foreshadowing_mentions.clear()
                 self._pending_chapter_meta.clear()
                 self._pending_progress_chapter = None
                 self._pending_progress_words_delta = 0
@@ -916,6 +991,187 @@ class StateManager:
             ]
         return rels
 
+    # ==================== 伏笔管理 (v5.5 引入) ====================
+
+    def _ensure_foreshadowing_schema(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """确保伏笔记录包含 last_mentioned_chapter 字段（历史兼容）"""
+        if "last_mentioned_chapter" not in item or item.get("last_mentioned_chapter") is None:
+            item["last_mentioned_chapter"] = item.get("planted_chapter", 0)
+        return item
+
+    def add_foreshadowing(
+        self,
+        content: str,
+        tier: str = "支线",
+        target_offset: int = 50,
+    ) -> Dict[str, Any]:
+        """
+        添加新伏笔。
+
+        参数:
+        - content: 伏笔内容描述
+        - tier: 优先级层级（核心/支线/装饰）
+        - target_offset: 目标回收偏移（默认 50 章）
+
+        返回:
+            完整的伏笔记录字典
+        """
+        current_chapter = self.get_current_chapter()
+        now = self._now_progress_timestamp()
+
+        record = {
+            "content": content,
+            "status": "未回收",
+            "tier": tier,
+            "planted_chapter": current_chapter,
+            "target_chapter": current_chapter + target_offset,
+            "resolved_chapter": None,
+            "last_mentioned_chapter": current_chapter,
+            "added_at": now,
+            "resolved_at": None,
+        }
+
+        # 同步写入内存
+        foreshadowing = self._state.setdefault("plot_threads", {}).setdefault("foreshadowing", [])
+        foreshadowing.append(record)
+
+        # 记录 pending 用于 save_state() 持久化
+        self._pending_foreshadowing_adds.append(_ForeshadowingAdd(
+            content=content,
+            tier=tier,
+            target_offset=target_offset,
+            planted_chapter=current_chapter,
+            added_at=now,
+        ))
+
+        return record
+
+    def resolve_foreshadowing(self, content: str, chapter: Optional[int] = None) -> bool:
+        """
+        标记伏笔已回收。
+
+        参数:
+        - content: 伏笔内容描述
+        - chapter: 回收章节号（默认取当前进度）
+
+        返回:
+            True 表示找到并标记，False 表示未找到
+        """
+        if chapter is None:
+            chapter = self.get_current_chapter()
+        now = self._now_progress_timestamp()
+
+        foreshadowing = self._state.get("plot_threads", {}).get("foreshadowing", [])
+        found = False
+        for item in foreshadowing:
+            if isinstance(item, dict) and item.get("content") == content:
+                item["status"] = "已回收"
+                item["resolved_chapter"] = chapter
+                item["resolved_at"] = now
+                found = True
+                break
+
+        if found:
+            self._pending_foreshadowing_resolves.append(_ForeshadowingResolve(
+                content=content,
+                resolved_chapter=chapter,
+                resolved_at=now,
+            ))
+
+        return found
+
+    def update_foreshadowing_mention(self, content: str, chapter: int) -> bool:
+        """
+        更新伏笔最后被提及的章节。
+
+        参数:
+        - content: 伏笔内容描述
+        - chapter: 提及章节号
+
+        返回:
+            True 表示找到并更新，False 表示未找到
+        """
+        foreshadowing = self._state.get("plot_threads", {}).get("foreshadowing", [])
+        found = False
+        for item in foreshadowing:
+            if isinstance(item, dict) and item.get("content") == content:
+                self._ensure_foreshadowing_schema(item)
+                current_last = item.get("last_mentioned_chapter", 0) or 0
+                item["last_mentioned_chapter"] = max(current_last, chapter)
+                found = True
+                break
+
+        if found:
+            self._pending_foreshadowing_mentions.append(_ForeshadowingMention(
+                content=content,
+                mentioned_chapter=chapter,
+            ))
+
+        return found
+
+    def get_foreshadowing(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        获取伏笔列表。
+
+        参数:
+        - status: 过滤状态（"未回收"/"已回收"），None 返回全部
+        """
+        foreshadowing = self._state.get("plot_threads", {}).get("foreshadowing", [])
+        result = []
+        for item in foreshadowing:
+            if not isinstance(item, dict):
+                continue
+            self._ensure_foreshadowing_schema(item)
+            if status is None or item.get("status") == status:
+                result.append(item)
+        return result
+
+    def get_overdue_foreshadowing(
+        self,
+        current_chapter: Optional[int] = None,
+        threshold: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        获取超期未回收的伏笔。
+
+        超期判定：current_chapter - last_mentioned_chapter > threshold
+
+        参数:
+        - current_chapter: 当前章节号（默认取进度）
+        - threshold: 超期阈值（默认使用 config.foreshadowing_stale_threshold）
+
+        返回:
+            超期伏笔列表，按 urgency 降序排列
+        """
+        if current_chapter is None:
+            current_chapter = self.get_current_chapter()
+        if threshold is None:
+            threshold = getattr(self.config, "foreshadowing_stale_threshold", 10)
+
+        tier_weights = {"核心": 3.0, "重要": 2.5, "支线": 2.0, "装饰": 1.0}
+
+        result = []
+        for item in self.get_foreshadowing(status="未回收"):
+            last_ch = item.get("last_mentioned_chapter") or item.get("planted_chapter", 0)
+            elapsed = current_chapter - last_ch
+            if elapsed > threshold:
+                target_ch = item.get("target_chapter", 0) or 0
+                remaining = target_ch - current_chapter
+                tier = item.get("tier", "支线")
+                tier_weight = tier_weights.get(tier, 1.0)
+                urgency = (elapsed / max(threshold, 1)) * tier_weight
+
+                result.append({
+                    **item,
+                    "elapsed_chapters": elapsed,
+                    "remaining_chapters": remaining,
+                    "urgency": round(urgency, 2),
+                    "is_overdue": remaining < 0,
+                })
+
+        result.sort(key=lambda x: x["urgency"], reverse=True)
+        return result
+
     # ==================== 批量操作 ====================
 
     def _record_disambiguation(self, chapter: int, uncertain_items: Any) -> List[str]:
@@ -1249,6 +1505,23 @@ def main():
     process_parser.add_argument("--chapter", type=int, required=True, help="章节号")
     process_parser.add_argument("--data", required=True, help="JSON 格式的处理结果")
 
+    # 伏笔管理 (v5.5 引入)
+    foreshadowing_add_parser = subparsers.add_parser("foreshadowing-add")
+    foreshadowing_add_parser.add_argument("--content", required=True, help="伏笔内容描述")
+    foreshadowing_add_parser.add_argument("--tier", default="支线", help="优先级层级（核心/支线/装饰）")
+    foreshadowing_add_parser.add_argument("--target-offset", type=int, default=50, help="目标回收偏移章数（默认 50）")
+
+    foreshadowing_resolve_parser = subparsers.add_parser("foreshadowing-resolve")
+    foreshadowing_resolve_parser.add_argument("--content", required=True, help="伏笔内容描述")
+    foreshadowing_resolve_parser.add_argument("--chapter", type=int, help="回收章节号（默认当前进度）")
+
+    foreshadowing_list_parser = subparsers.add_parser("foreshadowing-list")
+    foreshadowing_list_parser.add_argument("--status", help="过滤状态（未回收/已回收）")
+
+    foreshadowing_overdue_parser = subparsers.add_parser("foreshadowing-overdue")
+    foreshadowing_overdue_parser.add_argument("--threshold", type=int, help="超期阈值（默认 10 章）")
+    foreshadowing_overdue_parser.add_argument("--chapter", type=int, help="当前章节号（默认取进度）")
+
     argv = normalize_global_project_root(sys.argv[1:])
     args = parser.parse_args(argv)
     command_started_at = time.perf_counter()
@@ -1340,6 +1613,47 @@ def main():
         warnings = manager.process_chapter_result(args.chapter, validated.model_dump(by_alias=True))
         manager.save_state()
         emit_success({"chapter": args.chapter, "warnings": warnings}, message="chapter_processed", chapter=args.chapter)
+
+    elif args.command == "foreshadowing-add":
+        content = getattr(args, "content", None)
+        if not content:
+            emit_error("MISSING_ARG", "缺少 --content 参数")
+            return
+        tier = getattr(args, "tier", "支线") or "支线"
+        target_offset = getattr(args, "target_offset", 50) or 50
+        record = manager.add_foreshadowing(content=content, tier=tier, target_offset=int(target_offset))
+        manager.save_state()
+        emit_success(record, message="foreshadowing_added")
+
+    elif args.command == "foreshadowing-resolve":
+        content = getattr(args, "content", None)
+        if not content:
+            emit_error("MISSING_ARG", "缺少 --content 参数")
+            return
+        chapter = getattr(args, "chapter", None)
+        if chapter:
+            chapter = int(chapter)
+        found = manager.resolve_foreshadowing(content=content, chapter=chapter)
+        manager.save_state()
+        if found:
+            emit_success({"content": content}, message="foreshadowing_resolved")
+        else:
+            emit_error("NOT_FOUND", f"未找到伏笔: {content}")
+
+    elif args.command == "foreshadowing-list":
+        status = getattr(args, "status", None)
+        result = manager.get_foreshadowing(status=status)
+        emit_success(result, message="foreshadowing_list")
+
+    elif args.command == "foreshadowing-overdue":
+        threshold = getattr(args, "threshold", None)
+        if threshold:
+            threshold = int(threshold)
+        current_chapter = getattr(args, "chapter", None)
+        if current_chapter:
+            current_chapter = int(current_chapter)
+        result = manager.get_overdue_foreshadowing(current_chapter=current_chapter, threshold=threshold)
+        emit_success(result, message="foreshadowing_overdue")
 
     else:
         emit_error("UNKNOWN_COMMAND", "未指定有效命令", suggestion="请查看 --help")
