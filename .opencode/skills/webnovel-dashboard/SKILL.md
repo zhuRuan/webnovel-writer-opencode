@@ -43,18 +43,40 @@ export SCRIPTS_DIR="${OPENCODE_DIR}/scripts"
 python -m pip install -r "${DASHBOARD_DIR}/requirements.txt" --quiet
 ```
 
+### Step 1.5：自动安装前端依赖（首次）
+
+```bash
+FRONTEND_DIR="${DASHBOARD_DIR}/frontend"
+
+# 检查前端 package.json 是否存在（pip 安装时可能缺失）
+if [ ! -f "${FRONTEND_DIR}/package.json" ]; then
+  echo "ERROR: 缺少前端 package.json" >&2
+  echo "请从源码复制 .opencode/dashboard/frontend/package.json 到此处。" >&2
+  exit 1
+fi
+
+# 检查 node_modules 是否存在
+if [ ! -d "${FRONTEND_DIR}/node_modules" ]; then
+  echo "首次使用，正在安装前端依赖..."
+  cd "${FRONTEND_DIR}"
+  npm install
+fi
+
+# 检查 dist 目录是否存在（前端构建产物）
+if [ ! -f "${FRONTEND_DIR}/dist/index.html" ]; then
+  echo "正在构建前端..."
+  cd "${FRONTEND_DIR}"
+  npm run build
+fi
+
+echo "前端依赖就绪。"
+```
+
 ### Step 2：解析项目根目录
 
 ```bash
 export PROJECT_ROOT="$(python "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
 echo "项目路径: ${PROJECT_ROOT}"
-
-# 前端 dist 已随插件发布；若缺失说明安装包异常
-if [ ! -f "${DASHBOARD_DIR}/frontend/dist/index.html" ]; then
-  echo "ERROR: 缺少前端构建产物 ${DASHBOARD_DIR}/frontend/dist/index.html" >&2
-  echo "请重新安装插件或联系维护者修复发布包。" >&2
-  exit 1
-fi
 ```
 
 ### Step 3：启动 Dashboard
