@@ -28,11 +28,16 @@ EMBED_API_KEY=your_embed_api_key
 RERANK_BASE_URL=https://api.jina.ai/v1
 RERANK_MODEL=jina-reranker-v3
 RERANK_API_KEY=your_rerank_api_key
+
+LLM_API_KEY=your_llm_api_key
+LLM_BASE_URL=https://api-inference.modelscope.cn/v1
+LLM_MODEL=Qwen/Qwen2.5-72B-Instruct
 ```
 
 说明：
 
 - 未配置 Embedding Key 时，语义检索会回退到 BM25。
+- 未配置 LLM Key 时，`plot extract` 等 LLM 相关命令无法使用。
 - 推荐每本书单独配置 `${PROJECT_ROOT}/.env`，避免多项目串配置。
 
 ## API 获取地址

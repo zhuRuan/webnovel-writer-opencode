@@ -147,6 +147,80 @@ python -m opencode.dashboard --project-root <项目路径> --port 9000 --no-brow
 | `--port` | 监听端口（默认 8765） |
 | `--no-browser` | 不自动打开浏览器 |
 
+## `rule` 命令
+
+用途：世界规则管理。
+
+示例：
+
+```bash
+webnovel rule list                      # 列出所有世界规则
+webnovel rule set magic_system "规则值" # 设置规则
+webnovel rule usage-report              # 生成规则使用报告
+webnovel rule check --chapter 5         # 规则一致性检查
+```
+
+子命令：
+
+| 子命令 | 说明 |
+|--------|------|
+| `list` | 列出所有世界规则 |
+| `get <key>` | 获取指定规则值 |
+| `set <key> <value>` | 设置规则（支持 dot  notation） |
+| `usage-report` | 生成规则使用报告，扫描最近 N 章中规则的使用情况 |
+| `check --chapter <N>` | 检查章节是否违反世界规则 |
+| `foreshadowing-warn` | 手动触发伏笔超期警告 |
+
+参数：
+
+| 参数 | 说明 |
+|------|------|
+| `--chapters` / `-n` | usage-report 扫描的章数（默认 10） |
+| `--threshold` / `-t` | usage-report 使用次数阈值（默认 0） |
+
+## `character` 命令
+
+用途：角色动态状态管理。
+
+示例：
+
+```bash
+webnovel character list                  # 列出有动态状态的角色
+webnovel character get-state 林风        # 获取角色状态
+webnovel character set-state 林风 realm 元婴期  # 更新角色状态
+```
+
+子命令：
+
+| 子命令 | 说明 |
+|--------|------|
+| `list` | 列出所有有动态状态的角色 |
+| `get-state <角色ID>` | 获取角色当前动态状态 |
+| `set-state <角色ID> <属性> <值>` | 更新角色动态状态 |
+
+## `plot` 命令
+
+用途：情节图谱与因果链管理。
+
+示例：
+
+```bash
+webnovel plot list                       # 列出事件
+webnovel plot add --name 获得钥匙 --chapter 5  # 添加事件
+webnovel plot extract --chapter 5        # LLM 自动提取关键事件
+webnovel plot check --chapter 5          # 因果一致性检查
+```
+
+子命令：
+
+| 子命令 | 说明 |
+|--------|------|
+| `list` | 列出事件（支持 `--chapter` / `--actor` 过滤） |
+| `add --name <名称> --chapter <N>` | 添加事件 |
+| `extract --chapter <N>` | 调用 LLM 自动提取章节中的关键事件 |
+| `delete <事件ID>` | 删除事件 |
+| `check --chapter <N>` | 检查因果一致性问题 |
+
 ## `/webnovel-export`
 
 用途：将正文导出为 Markdown/TXT/EPUB 格式。

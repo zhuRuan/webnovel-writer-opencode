@@ -1267,6 +1267,143 @@ class StateManager:
                 })
         return result
 
+    # ==================== 情节图谱（事件管理） ====================
+
+    def _ensure_plot_events_schema(self, state: Dict[str, Any]) -> None:
+        """确保 plot_events 字段存在"""
+        if "plot_events" not in state:
+            state["plot_events"] = []
+
+    def _get_plot_events_raw(self) -> List[Dict[str, Any]]:
+        """从 state.json 获取事件列表"""
+        state = self._load_state()
+        self._ensure_plot_events_schema(state)
+        return state.get("plot_events", [])
+
+    def _save_plot_events_raw(self, events: List[Dict[str, Any]]) -> None:
+        """保存事件列表到 state.json"""
+        state = self._load_state()
+        self._ensure_plot_events_schema(state)
+        state["plot_events"] = events
+        self.save_state()
+
+    def add_plot_event(self, event_data: Dict[str, Any]) -> str:
+        """添加新事件，返回事件ID"""
+        events = self._get_plot_events_raw()
+        event_id = f"evt_{len(events)+1:03d}"
+        event_data["id"] = event_id
+        event_data["created_at"] = self._now_progress_timestamp()
+        events.append(event_data)
+        self._save_plot_events_raw(events)
+        return event_id
+
+    def get_plot_events(self, chapter: int = None, actor: str = None) -> List[Dict[str, Any]]:
+        """获取事件，可按章节或参与者过滤"""
+        events = self._get_plot_events_raw()
+        if chapter is not None:
+            events = [e for e in events if e.get("chapter") == chapter]
+        if actor:
+            events = [e for e in events if actor in e.get("actors", [])]
+        return events
+
+    def update_plot_event(self, event_id: str, updates: Dict[str, Any]) -> bool:
+        """更新事件信息"""
+        events = self._get_plot_events_raw()
+        for i, e in enumerate(events):
+            if e.get("id") == event_id:
+                events[i].update(updates)
+                self._save_plot_events_raw(events)
+                return True
+        return False
+
+    def delete_plot_event(self, event_id: str) -> bool:
+        """删除事件"""
+        events = self._get_plot_events_raw()
+        new_events = [e for e in events if e.get("id") != event_id]
+        if len(new_events) == len(events):
+            return False
+        self._save_plot_events_raw(new_events)
+        return True
+
+    def check_event_prerequisites(self, event_name: str, current_chapter: int) -> tuple:
+        """
+        检查某个事件的所有前置条件是否在 current_chapter 之前已满足。
+        返回 (是否满足, 缺失条件列表)
+        """
+        events = self._get_plot_events_raw()
+        target = None
+        for e in events:
+            if e.get("name") == event_name:
+                target = e
+                break
+        if not target:
+            return True, []
+
+        missing = []
+        for prereq in target.get("preconditions", []):
+            prereq_event = next((e for e in events if e.get("name") == prereq), None)
+            if prereq_event and prereq_event.get("chapter", 999) > current_chapter:
+                missing.append(prereq)
+            elif not prereq_event:
+                missing.append(prereq)
+        return len(missing) == 0, missing
+
+    # ==================== 世界规则使用扫描 ====================
+
+    DEFAULT_RULE_KEYWORDS: Dict[str, List[str]] = {
+        "magic_system": ["施法", "魔法", "法术", "魔力", "元婴", "金丹", "筑基"],
+        "currency": ["金币", "铜币", "银币", "交易", "灵石"],
+        "power_realm": ["境界", "修为", "炼气", "筑基", "金丹", "元婴", "化神"],
+        "faction": ["宗门", "门派", "势力", "家族"],
+        "location": ["城池", "坊市", "秘境", "遗迹"],
+    }
+
+    def get_world_rule_keywords(self, rule_key: str) -> List[str]:
+        """获取指定规则的关键词列表，若无则返回空列表"""
+        rule = self.get_world_rule(rule_key)
+        if rule and isinstance(rule, dict):
+            keywords = rule.get("keywords", [])
+            if keywords:
+                return keywords
+        base_key = rule_key.split(".")[0]
+        return self.DEFAULT_RULE_KEYWORDS.get(base_key, [])
+
+    def scan_rule_usage(self, start_chapter: int, end_chapter: int) -> Dict[str, Any]:
+        """
+        扫描章节范围，统计每条规则的使用次数。
+        返回 { rule_key: {"count": int, "chapters": [int], "keywords": [str]} }
+        """
+        rules = self.get_world_rules()
+        result: Dict[str, Any] = {}
+
+        for key, value in rules.items():
+            keywords = self.get_world_rule_keywords(key)
+            result[key] = {"count": 0, "chapters": set(), "keywords": keywords}
+
+        if not result:
+            return {}
+
+        from .chapter_paths import find_chapter_file
+
+        for chap in range(start_chapter, end_chapter + 1):
+            chapter_file = find_chapter_file(self.config.project_root, chap)
+            if not chapter_file or not chapter_file.exists():
+                continue
+            try:
+                text = chapter_file.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            for key, data in result.items():
+                for kw in data["keywords"]:
+                    if kw in text:
+                        data["count"] += 1
+                        data["chapters"].add(chap)
+                        break
+
+        for key in result:
+            result[key]["chapters"] = sorted(result[key]["chapters"])
+        return result
+
     # ==================== 批量操作 ====================
 
     def _record_disambiguation(self, chapter: int, uncertain_items: Any) -> List[str]:
