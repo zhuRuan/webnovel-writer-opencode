@@ -270,6 +270,14 @@ def main() -> None:
     p_dashboard.add_argument("--port", type=int, default=8765, help="监听端口")
     p_dashboard.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
 
+    # rule 命令（世界规则管理）
+    p_rule = sub.add_parser("rule", help="世界规则管理")
+    p_rule.add_argument("args", nargs=argparse.REMAINDER)
+
+    # character 命令（角色状态管理）
+    p_character = sub.add_parser("character", help="角色状态管理")
+    p_character.add_argument("args", nargs=argparse.REMAINDER)
+
     # 兼容：允许 `--project-root` 出现在任意位置（减少 agents/skills 拼命令的出错率）
     from .cli_args import normalize_global_project_root
 
@@ -342,6 +350,132 @@ def main() -> None:
 
     if tool == "publish":
         raise SystemExit(_run_script("publish_manager.py", [*forward_args, *rest]))
+
+    # rule 命令（世界规则管理）
+    if tool == "rule":
+        from .cli_output import print_foreshadowing_warning
+        from .state_manager import StateManager
+        from .config import get_config
+
+        config = get_config(project_root=str(project_root))
+        state_manager = StateManager(config)
+
+        # 解析 rule 子命令
+        if not rest:
+            print("用法: webnovel rule list|get <key>|set <key> <value>")
+            raise SystemExit(0)
+
+        subcmd = rest[0]
+        if subcmd == "list":
+            world_rules = state_manager.get_world_rules()
+            if not world_rules:
+                print("世界规则为空")
+                raise SystemExit(0)
+            import json
+            print(json.dumps(world_rules, ensure_ascii=False, indent=2))
+            raise SystemExit(0)
+        elif subcmd == "get":
+            if len(rest) < 2:
+                print("用法: webnovel rule get <key>")
+                raise SystemExit(1)
+            key = rest[1]
+            value = state_manager.get_world_rule(key)
+            print(value or f"未找到规则: {key}")
+            raise SystemExit(0)
+        elif subcmd == "set":
+            if len(rest) < 3:
+                print("用法: webnovel rule set <key> <value>")
+                raise SystemExit(1)
+            key = rest[1]
+            value = " ".join(rest[2:])
+            state_manager.set_world_rule(key, value)
+            print(f"已设置: {key} = {value}")
+            raise SystemExit(0)
+        elif subcmd == "foreshadowing-warn":
+            # 手动触发伏笔警告（供调试）
+            current_chapter = state_manager.get_current_chapter()
+            threshold = config.foreshadowing_stale_threshold
+            overdue = state_manager.get_overdue_foreshadowing(current_chapter, threshold)
+            mode = config.foreshadowing_warning_mode
+            print_foreshadowing_warning(overdue, mode)
+            raise SystemExit(0)
+        elif subcmd == "check":
+            if len(rest) < 2:
+                print("用法: webnovel rule check --chapter <章节号>")
+                raise SystemExit(1)
+            if rest[1] != "--chapter" or len(rest) < 3:
+                print("用法: webnovel rule check --chapter <章节号>")
+                raise SystemExit(1)
+            chapter = int(rest[2])
+            from .chapter_paths import find_chapter_file
+            chapter_file = find_chapter_file(project_root, chapter)
+            if not chapter_file or not chapter_file.exists():
+                print(f"章节文件不存在: 第{chapter}章")
+                raise SystemExit(1)
+            chapter_text = chapter_file.read_text(encoding="utf-8")
+            from .rule_checker_utils import check_chapter_rules
+            result = check_chapter_rules(chapter_text, str(project_root))
+            import json
+            if result["overall_pass"]:
+                print("✅ 规则检查通过，未发现问题。")
+            else:
+                print("❌ 发现以下问题：")
+                for issue in result["issues"]:
+                    print(f"  - [{issue['severity']}] {issue['detail']}")
+                if result["warnings"]:
+                    print("\n⚠️ 以下为警告：")
+                    for warn in result["warnings"]:
+                        print(f"  - {warn['detail']}")
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            raise SystemExit(0)
+        else:
+            print(f"未知子命令: {subcmd}")
+            print("可用: list, get <key>, set <key> <value>, foreshadowing-warn, check --chapter <N>")
+            raise SystemExit(1)
+
+    # character 命令（角色状态管理）
+    if tool == "character":
+        from .state_manager import StateManager
+        from .config import get_config
+
+        config = get_config(project_root=str(project_root))
+        sm = StateManager(config)
+
+        if not rest:
+            chars = sm.list_characters_with_dynamic_state()
+            import json
+            print(json.dumps(chars, ensure_ascii=False, indent=2))
+            raise SystemExit(0)
+
+        subcmd = rest[0]
+        if subcmd == "set-state":
+            if len(rest) < 4:
+                print("用法: webnovel character set-state <角色ID> <属性名> <值>")
+                raise SystemExit(1)
+            entity_id = rest[1]
+            key = rest[2]
+            value = " ".join(rest[3:])
+            sm.update_character_dynamic_state(entity_id, {key: value})
+            print(f"已更新 {entity_id}.{key} = {value}")
+            raise SystemExit(0)
+        elif subcmd == "get-state":
+            if len(rest) < 2:
+                print("用法: webnovel character get-state <角色ID>")
+                raise SystemExit(1)
+            entity_id = rest[1]
+            state = sm.get_character_dynamic_state(entity_id)
+            import json
+            print(json.dumps(state, ensure_ascii=False, indent=2))
+            raise SystemExit(0)
+        elif subcmd == "list":
+            chars = sm.list_characters_with_dynamic_state()
+            import json
+            print(json.dumps(chars, ensure_ascii=False, indent=2))
+            raise SystemExit(0)
+        else:
+            print(f"未知子命令: {subcmd}")
+            print("可用: set-state, get-state, list")
+            raise SystemExit(1)
 
     # dashboard 是交互式长驻服务，作为后台子进程启动，避免 agent 超时
     if tool == "dashboard":

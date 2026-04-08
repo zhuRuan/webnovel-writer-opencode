@@ -189,6 +189,7 @@ class StateManager:
             state["relationships"] = {}
 
         state.setdefault("world_settings", {"power_system": [], "factions": [], "locations": []})
+        state.setdefault("world_rules", {})
         state.setdefault("plot_threads", {"active_threads": [], "foreshadowing": []})
         state.setdefault("review_checkpoints", [])
         state.setdefault("chapter_meta", {})
@@ -1170,6 +1171,100 @@ class StateManager:
                 })
 
         result.sort(key=lambda x: x["urgency"], reverse=True)
+        return result
+
+    # ==================== 世界规则管理 ====================
+
+    def get_world_rules(self) -> Dict[str, Any]:
+        """获取所有世界规则"""
+        return self._state.get("world_rules", {})
+
+    def get_world_rule(self, key: str) -> Optional[Any]:
+        """获取指定规则（支持 dot  notation，如 magic_system.daily_limit）"""
+        rules = self._state.get("world_rules", {})
+        keys = key.split(".")
+        value = rules
+        for k in keys:
+            if isinstance(value, dict):
+                value = value.get(k)
+            else:
+                return None
+        return value
+
+    def set_world_rule(self, key: str, value: Any) -> None:
+        """设置规则（支持 dot notation）"""
+        rules = self._state.setdefault("world_rules", {})
+        keys = key.split(".")
+        current = rules
+        for i, k in enumerate(keys[:-1]):
+            if k not in current or not isinstance(current[k], dict):
+                current[k] = {}
+            current = current[k]
+        current[keys[-1]] = value
+        self.save_state()
+
+        if getattr(self.config, "world_rule_rag_enabled", True):
+            try:
+                import asyncio
+                from .rag_adapter import RAGAdapter
+                rag = RAGAdapter(self.config)
+                asyncio.run(rag.index_world_rule(key, value))
+            except Exception:
+                logger.warning("自动索引世界规则失败: %s", key)
+
+    # ==================== 角色动态状态管理 ====================
+
+    def get_character_dynamic_state(self, entity_id: str) -> Dict[str, Any]:
+        """获取角色动态状态"""
+        entity = self.get_entity(entity_id, "角色")
+        if not entity:
+            return {}
+        return entity.get("attributes", {}).get("dynamic_state", {})
+
+    def update_character_dynamic_state(
+        self,
+        entity_id: str,
+        updates: Dict[str, Any],
+        merge: bool = True,
+    ) -> bool:
+        """更新角色动态状态
+
+        Args:
+            entity_id: 角色 ID
+            updates: 要更新的状态字典
+            merge: True=合并现有状态, False=完全替换
+
+        Returns:
+            是否更新成功
+        """
+        entity = self.get_entity(entity_id, "角色")
+        if not entity:
+            logger.warning(f"角色不存在: {entity_id}")
+            return False
+
+        attrs = entity.get("attributes", {})
+        if merge:
+            dynamic = attrs.get("dynamic_state", {})
+            dynamic.update(updates)
+        else:
+            dynamic = updates
+        attrs["dynamic_state"] = dynamic
+        entity["attributes"] = attrs
+
+        self.save_state()
+        return True
+
+    def list_characters_with_dynamic_state(self) -> List[Dict[str, Any]]:
+        """列出所有有动态状态的角色"""
+        result = []
+        for entity_id, entity in self.get_entities_by_type("角色").items():
+            dynamic = entity.get("attributes", {}).get("dynamic_state", {})
+            if dynamic:
+                result.append({
+                    "id": entity_id,
+                    "name": entity.get("name"),
+                    "dynamic_state": dynamic,
+                })
         return result
 
     # ==================== 批量操作 ====================

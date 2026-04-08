@@ -1625,6 +1625,54 @@ def main():
     else:
         emit_error("UNKNOWN_COMMAND", "未指定有效命令", suggestion="请查看 --help")
 
+    # ==================== 世界规则 RAG 方法 ====================
+
+    async def index_world_rule(self, key: str, value: Any) -> bool:
+        """将世界规则索引到向量库
+
+        Args:
+            key: 规则键名（如 "magic_system.daily_limit"）
+            value: 规则值
+
+        Returns:
+            是否成功索引
+        """
+        content = f"{key}: {value}"
+        chunk = {
+            "chapter": 0,
+            "scene_index": 0,
+            "content": content,
+            "chunk_type": "world_rule",
+            "source_file": f".webnovel/world_rules#{key}",
+        }
+        try:
+            await self.store_chunks([chunk], incremental=False)
+            return True
+        except Exception:
+            logger.exception("索引世界规则失败: %s", key)
+            return False
+
+    async def search_world_rules(
+        self,
+        query: str,
+        top_k: int = 5,
+    ) -> List[SearchResult]:
+        """检索与当前场景相关的世界规则
+
+        Args:
+            query: 查询语句（章节大纲/场景描述）
+            top_k: 返回数量
+
+        Returns:
+            匹配的规则列表
+        """
+        return await self.search(
+            query=query,
+            top_k=top_k,
+            strategy="hybrid",
+            filters={"chunk_type": "world_rule"},
+        )
+
 
 if __name__ == "__main__":
     import sys

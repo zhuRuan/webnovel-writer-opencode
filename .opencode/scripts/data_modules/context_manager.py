@@ -74,11 +74,13 @@ class ContextManager:
     ]
     SUMMARY_SECTION_RE = re.compile(r"##\s*剧情摘要\s*\r?\n(.*?)(?=\r?\n##|\Z)", re.DOTALL)
 
-    def __init__(self, config=None, snapshot_manager: Optional[SnapshotManager] = None):
+    def __init__(self, config=None, snapshot_manager: Optional[SnapshotManager] = None, rag_adapter=None, state_manager=None):
         self.config = config or get_config()
         self.snapshot_manager = snapshot_manager or SnapshotManager(self.config)
         self.index_manager = IndexManager(self.config)
         self.context_ranker = ContextRanker(self.config)
+        self.rag_adapter = rag_adapter
+        self.state_manager = state_manager
 
     def _is_snapshot_compatible(self, cached: Dict[str, Any], template: str) -> bool:
         """判断快照是否可用于当前模板。"""
@@ -207,6 +209,7 @@ class ContextManager:
             "appearing_characters": self._load_recent_appearances(
                 limit=self.config.context_max_appearing_characters,
             ),
+            "character_states": self._load_character_states(chapter),
         }
         scene["appearing_characters"] = self.filter_invalid_items(
             scene["appearing_characters"], source_type="entity", id_key="entity_id"
@@ -216,6 +219,7 @@ class ContextManager:
             "worldview_skeleton": self._load_setting("世界观"),
             "power_system_skeleton": self._load_setting("力量体系"),
             "style_contract_ref": self._load_setting("风格契约"),
+            "world_rules_summary": self._load_world_rules_simple(),
         }
 
         preferences = self._load_json_optional(self.config.webnovel_dir / "preferences.json")
@@ -713,6 +717,103 @@ class ContextManager:
         if matches:
             return matches[0].read_text(encoding="utf-8")
         return f"[{keyword}设定未找到]"
+
+    async def _load_relevant_world_rules(self, chapter: int, outline: str = "") -> str:
+        """从向量库检索与当前章节相关的世界规则"""
+        if not getattr(self.config, "world_rule_rag_enabled", True):
+            return ""
+        if not self.rag_adapter:
+            return ""
+        
+        query = f"第{chapter}章 {outline}"
+        top_k = getattr(self.config, "world_rule_rag_top_k", 5)
+        
+        try:
+            results = await self.rag_adapter.search_world_rules(query, top_k=top_k)
+            if not results:
+                return ""
+            lines = ["【相关世界规则】"]
+            for r in results:
+                lines.append(f"- {r.content}")
+            return "\n".join(lines)
+        except Exception:
+            logger.exception("检索世界规则失败")
+            return ""
+
+    def _load_world_rules_simple(self) -> str:
+        """简单模式：从 state.json 直接读取规则（不使用 RAG）"""
+        if not getattr(self.config, "world_rule_rag_enabled", True):
+            return ""
+        
+        try:
+            state_path = self.config.webnovel_dir / "state.json"
+            if not state_path.exists():
+                return ""
+            import json
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            rules = state.get("world_rules", {})
+            if not rules:
+                return ""
+            
+            max_rules = getattr(self.config, "world_rule_rag_top_k", 5)
+            lines = ["【世界规则】"]
+            count = 0
+            for key, value in rules.items():
+                if isinstance(value, dict):
+                    for subk, subv in value.items():
+                        lines.append(f"- {key}.{subk}: {subv}")
+                        count += 1
+                        if count >= max_rules:
+                            break
+                else:
+                    lines.append(f"- {key}: {value}")
+                    count += 1
+                if count >= max_rules:
+                    break
+            return "\n".join(lines)
+        except Exception:
+            logger.exception("加载世界规则失败")
+            return ""
+
+    def _load_character_states(self, chapter: int, outline: str = "") -> str:
+        """加载当前章节相关角色的动态状态"""
+        if not getattr(self.config, "character_state_in_context_enabled", True):
+            return ""
+        if not self.state_manager:
+            return ""
+
+        try:
+            appearing = self.index_manager.get_recent_appearances(limit=10)
+            char_ids = [c.get("entity_id") for c in appearing if c.get("entity_id")]
+
+            if not char_ids:
+                return ""
+
+            max_chars = getattr(self.config, "context_max_appearing_characters", 5)
+            char_ids = char_ids[:max_chars]
+
+            lines = ["【角色动态状态】"]
+            for char_id in char_ids:
+                state = self.state_manager.get_character_dynamic_state(char_id)
+                if not state:
+                    continue
+                entity = self.state_manager.get_entity(char_id, "角色")
+                name = entity.get("canonical_name", char_id) if entity else char_id
+
+                key_fields = ["location", "health_status", "emotion_state", "inventory", "relationships"]
+                state_parts = []
+                for k in key_fields:
+                    v = state.get(k)
+                    if v:
+                        state_parts.append(f"{k}={v}")
+
+                if state_parts:
+                    lines.append(f"• {name}: {', '.join(state_parts)}")
+
+            return "\n".join(lines) if len(lines) > 1 else ""
+        except Exception:
+            logger.exception("加载角色状态失败")
+            return ""
 
     def _extract_summary_excerpt(self, text: str, max_chars: int) -> str:
         if not text:
