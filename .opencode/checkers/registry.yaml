@@ -53,14 +53,11 @@ checkers:
     enabled: true
     description: 评估钩子/微兑现/约束分层
     triggers:
-      - 非过渡章
-      - 有明确未闭合问题/期待锚点
-      - 用户显式要求"追读力审查"
-    signal_keywords:
-      - 悬念
-      - 危机
-      - 承诺
-      - 期待
+      - type: condition
+        expression: "chapter_type != 'transitional'"
+      - type: keyword
+        keywords: ["悬念", "危机", "承诺", "期待"]
+        min_count: 1
     invoke_template: |
       对第 {chapter} 章执行追读力审查。
       - 章节文件：{chapter_file}
@@ -75,15 +72,9 @@ checkers:
     enabled: true
     description: 爽点密度与质量，支持迪化误解/身份掉马模式
     triggers:
-      - 关键章/高潮章/卷末章
-      - 正文出现战斗/反杀/打脸/身份揭露/大反转
-    signal_keywords:
-      - 战斗
-      - 反杀
-      - 打脸
-      - 身份揭露
-      - 大反转
-      - 突破
+      - type: keyword
+        keywords: ["战斗", "反杀", "打脸", "身份揭露", "大反转", "突破"]
+        min_count: 1
     invoke_template: |
       对第 {chapter} 章执行爽点密度审查。
       - 章节文件：{chapter_file}
@@ -98,9 +89,10 @@ checkers:
     enabled: true
     description: Strand Weave 节奏检查，防止读者疲劳
     triggers:
-      - 章号 >= 10
-      - 最近章节存在明显节奏失衡风险
-      - 用户显式要求"节奏审查"
+      - type: condition
+        expression: "chapter_number >= 10"
+      - type: condition
+        expression: "has_pacing_risk == True"
     invoke_template: |
       对第 {chapter} 章执行节奏审查。
       - 章节文件：{chapter_file}

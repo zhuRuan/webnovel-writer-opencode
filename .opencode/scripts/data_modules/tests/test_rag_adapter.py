@@ -511,3 +511,96 @@ def test_rag_adapter_cli_search_shows_degraded_warning(temp_project, monkeypatch
     assert warnings
     assert warnings[0].get("code") == "DEGRADED_MODE"
     assert warnings[0].get("reason") == "embedding_auth_failed"
+
+
+# ==================== 分词增强测试 ====================
+
+class TestTokenizer:
+    """分词器测试"""
+
+    def test_tokenize_basic_chinese(self, temp_project):
+        """测试基本中文分词"""
+        RAGAdapter._jieba_initialized = False
+        RAGAdapter._jieba_loaded = False
+        adapter = RAGAdapter(temp_project)
+        tokens = adapter._tokenize("萧炎在天云宗修炼斗气")
+        assert len(tokens) > 0
+        assert "萧炎" in tokens or ("萧" in tokens and "炎" in tokens)
+
+    def test_tokenize_english(self, temp_project):
+        """测试英文分词"""
+        RAGAdapter._jieba_initialized = False
+        RAGAdapter._jieba_loaded = False
+        adapter = RAGAdapter(temp_project)
+        tokens = adapter._tokenize("Xiao Yan is training")
+        assert "xiao" in tokens or "yan" in tokens
+        assert "training" in tokens
+
+    def test_tokenize_number_normalization(self, temp_project):
+        """测试数字归一化"""
+        RAGAdapter._jieba_initialized = False
+        RAGAdapter._jieba_loaded = False
+        adapter = RAGAdapter(temp_project)
+
+        tokens = adapter._tokenize("3年之约")
+        assert "三" in tokens and "年" in tokens
+        tokens = adapter._tokenize("第10章突破")
+        assert "第" in tokens and "十" in tokens and "章" in tokens
+        tokens = adapter._tokenize("斗气三段")
+        assert "三" in tokens and "段" in tokens
+
+    def test_tokenize_fallback_without_jieba(self, temp_project, monkeypatch):
+        """测试 jieba 不可用时的降级"""
+        RAGAdapter._jieba_initialized = False
+        RAGAdapter._jieba_loaded = False
+        import data_modules.rag_adapter as rag_mod
+        monkeypatch.setitem(sys.modules, 'jieba', None)
+        adapter = RAGAdapter(temp_project)
+        tokens = adapter._tokenize("萧炎修炼")
+        assert len(tokens) > 0
+
+    def test_tokenize_custom_dict_loaded(self, temp_project):
+        """测试自定义词典加载"""
+        RAGAdapter._jieba_initialized = False
+        RAGAdapter._jieba_loaded = False
+        adapter = RAGAdapter(temp_project)
+        if adapter._jieba_available:
+            tokens = adapter._tokenize("迦南学院")
+            assert "迦南学院" in tokens or "迦" in tokens
+
+    def test_normalize_numbers_year(self, temp_project):
+        """测试年份归一化"""
+        RAGAdapter._jieba_initialized = False
+        RAGAdapter._jieba_loaded = False
+        adapter = RAGAdapter(temp_project)
+        result = adapter._normalize_numbers("3年之约，5年后再战")
+        assert "三年之约" in result
+        assert "五年后" in result
+
+    def test_normalize_numbers_chapter(self, temp_project):
+        """测试章节归一化"""
+        RAGAdapter._jieba_initialized = False
+        RAGAdapter._jieba_loaded = False
+        adapter = RAGAdapter(temp_project)
+        result = adapter._normalize_numbers("第100章大战")
+        assert "第一百章大战" in result or ("第一百" in result and "章" in result)
+
+    @pytest.mark.asyncio
+    async def test_bm25_search_with_tokenization(self, temp_project):
+        """测试 BM25 搜索使用分词"""
+        RAGAdapter._jieba_initialized = False
+        RAGAdapter._jieba_loaded = False
+        adapter = RAGAdapter(temp_project)
+
+        await adapter.store_chunks([
+            {"chapter": 1, "scene_index": 1, "content": "萧炎在迦南学院修炼斗气"},
+        ])
+
+        results = adapter.bm25_search("萧炎", top_k=5)
+        assert len(results) >= 1
+
+        await adapter.store_chunks([
+            {"chapter": 2, "scene_index": 1, "content": "三年之约即将到来"},
+        ])
+        results = adapter.bm25_search("3年之约", top_k=5)
+        assert len(results) >= 1

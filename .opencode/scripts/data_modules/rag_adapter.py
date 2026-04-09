@@ -34,6 +34,7 @@ from .api_client import get_client
 from .index_manager import IndexManager
 from .query_router import QueryRouter
 from .observability import safe_append_perf_timing, safe_log_tool_call
+from .temporal_graph import TemporalGraphIndex
 
 
 logger = getLogger(__name__)
@@ -71,13 +72,119 @@ class SearchResult:
 class RAGAdapter:
     """RAG 检索适配器"""
 
+    _jieba_loaded: bool = False
+    _jieba_initialized: bool = False
+
     def __init__(self, config=None):
         self.config = config or get_config()
         self.api_client = get_client(config)
         self.index_manager = IndexManager(self.config)
         self.query_router = QueryRouter()
         self._degraded_mode_reason: Optional[str] = None
+        self._temporal_graph: Optional[TemporalGraphIndex] = None
         self._init_db()
+        self._init_jieba()
+        self._init_temporal_graph()
+
+    def _init_jieba(self):
+        """初始化 jieba 分词器（懒加载单例）"""
+        if RAGAdapter._jieba_initialized:
+            return
+        try:
+            import jieba
+            dict_path = self.config.custom_dict_path
+            if dict_path.exists():
+                jieba.load_userdict(str(dict_path))
+                logger.info("jieba 词典加载完成: %s", dict_path)
+            else:
+                logger.warning("jieba 自定义词典不存在: %s，跳过", dict_path)
+            RAGAdapter._jieba_loaded = True
+        except ImportError:
+            logger.warning("jieba 未安装，使用单字符分词降级")
+        except Exception as e:
+            logger.warning("jieba 初始化失败，使用单字符分词降级: %s", e)
+        finally:
+            RAGAdapter._jieba_initialized = True
+
+    def _init_temporal_graph(self):
+        """初始化时序图索引"""
+        self._temporal_graph = TemporalGraphIndex(decay_base=0.9)
+        self._load_relationships_to_graph()
+    
+    def _load_relationships_to_graph(self):
+        """从关系数据加载到时序图"""
+        if not self._temporal_graph:
+            return
+        
+        try:
+            relationships = self.index_manager.get_all_relationships()
+            for rel in relationships:
+                self._temporal_graph.add_edge(
+                    src=rel.get("from_entity", ""),
+                    rel=rel.get("type", "相关"),
+                    tgt=rel.get("to_entity", ""),
+                    chapter=rel.get("chapter", 0),
+                    weight=1.0
+                )
+            logger.info("时序图加载完成: %s", self._temporal_graph.get_stats())
+        except Exception as e:
+            logger.warning("时序图加载失败: %s", e)
+    
+    def get_temporal_graph(self) -> Optional[TemporalGraphIndex]:
+        """获取时序图索引"""
+        return self._temporal_graph
+
+    @property
+    def _jieba_available(self) -> bool:
+        """检查 jieba 是否可用"""
+        return RAGAdapter._jieba_loaded
+
+    def _normalize_numbers(self, text: str) -> str:
+        """数字归一化：阿拉伯数字转中文"""
+        def _number_to_chinese(num_str: str) -> str:
+            if not num_str:
+                return num_str
+            digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+            
+            try:
+                num = int(num_str)
+                if num == 0:
+                    return '零'
+                
+                if num < 10:
+                    return digits[num]
+                
+                if num < 20:
+                    return '十' if num == 10 else '十' + digits[num % 10]
+                
+                if num < 100:
+                    tens = num // 10
+                    ones = num % 10
+                    result = digits[tens] + '十'
+                    if ones > 0:
+                        result += digits[ones]
+                    return result
+                
+                if num < 1000:
+                    hundreds = num // 100
+                    remainder = num % 100
+                    result = digits[hundreds] + '百'
+                    if remainder > 0:
+                        if remainder < 10:
+                            result += '零' + digits[remainder]
+                        else:
+                            result += _number_to_chinese(str(remainder))
+                    return result
+                
+                return num_str
+            except ValueError:
+                return num_str
+
+        text = re.sub(r'(\d+)年', lambda m: _number_to_chinese(m.group(1)) + '年', text)
+        text = re.sub(r'第(\d+)章', lambda m: '第' + _number_to_chinese(m.group(1)) + '章', text)
+        text = re.sub(r'(\d+)段', lambda m: _number_to_chinese(m.group(1)) + '段', text)
+        text = re.sub(r'第(\d+)次', lambda m: '第' + _number_to_chinese(m.group(1)) + '次', text)
+        return text
 
     @property
     def degraded_mode_reason(self) -> Optional[str]:
@@ -556,15 +663,20 @@ class RAGAdapter:
     # ==================== BM25 索引 ====================
 
     def _tokenize(self, text: str) -> List[str]:
-        """简单分词（中文按字符，英文按单词）"""
-        # 中文字符
-        chinese = re.findall(r'[\u4e00-\u9fff]+', text)
-        chinese_chars = list("".join(chinese))
+        """智能分词（中文 jieba + 数字归一化 + 英文单词）"""
+        text = self._normalize_numbers(text)
 
-        # 英文单词
+        if self._jieba_available:
+            try:
+                import jieba
+                chinese = list(jieba.cut(text))
+            except Exception:
+                chinese = list(text)
+        else:
+            chinese = list(text)
+
         english = re.findall(r'[a-zA-Z]+', text.lower())
-
-        return chinese_chars + english
+        return [w for w in chinese + english if w.strip() and not w.isspace()]
 
     def _update_bm25_index(self, cursor, chunk_id: str, content: str):
         """更新 BM25 索引"""
@@ -886,6 +998,60 @@ class RAGAdapter:
                 break
         return expanded[:max_entities]
 
+    def _expand_related_entities_temporal(
+        self,
+        seed_entities: List[str],
+        current_chapter: int | None = None,
+        hops: int | None = None,
+    ) -> List[str]:
+        """
+        使用时序图扩展相关实体（增强版）
+        
+        Args:
+            seed_entities: 种子实体列表
+            current_chapter: 当前章节
+            hops: 跳数
+        
+        Returns:
+            扩展后的实体列表（按时序权重排序）
+        """
+        if not self._temporal_graph:
+            return self._expand_related_entities(seed_entities, hops)
+        
+        max_entities = int(self.config.graph_rag_max_expanded_entities)
+        hops = max(1, int(hops or self.config.graph_rag_expand_hops))
+        
+        if current_chapter is None:
+            try:
+                current_chapter = int(self.get_stats().get("max_chapter") or 1)
+            except Exception:
+                current_chapter = 1
+        
+        expanded: List[str] = []
+        for seed in seed_entities:
+            if seed not in expanded:
+                expanded.append(seed)
+            if len(expanded) >= max_entities:
+                break
+            
+            results = self._temporal_graph.query_expand(
+                entity=seed,
+                current_chapter=current_chapter,
+                max_hops=hops,
+                max_entities=max_entities
+            )
+            
+            for r in results:
+                if r.entity and r.entity not in expanded:
+                    expanded.append(r.entity)
+                if len(expanded) >= max_entities:
+                    break
+            
+            if len(expanded) >= max_entities:
+                break
+        
+        return expanded[:max_entities]
+
     def _collect_graph_candidate_chunk_ids(
         self,
         entity_ids: List[str],
@@ -1047,7 +1213,14 @@ class RAGAdapter:
                 self._log_query(query, "graph_hybrid_no_seed", final, latency_ms, chapter=chapter)
             return final
 
-        expanded_entities = self._expand_related_entities(seeds)
+        if self._temporal_graph:
+            expanded_entities = self._expand_related_entities_temporal(
+                seed_entities=seeds,
+                current_chapter=chapter,
+            )
+        else:
+            expanded_entities = self._expand_related_entities(seeds)
+        
         candidate_chunk_ids = self._collect_graph_candidate_chunk_ids(
             expanded_entities,
             chapter=chapter,

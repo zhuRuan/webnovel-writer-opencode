@@ -124,6 +124,14 @@ class DataModulesConfig:
     def outline_dir(self) -> Path:
         return self.project_root / "大纲"
 
+    @property
+    def dict_dir(self) -> Path:
+        return self.project_root / ".opencode" / "dicts"
+
+    @property
+    def custom_dict_path(self) -> Path:
+        return self.dict_dir / "webnovel_dict.txt"
+
 
     # ================= Embedding API 配置 =================
     embed_api_type: str = "openai"
@@ -169,13 +177,28 @@ class DataModulesConfig:
     vector_prefilter_recent_candidates: int = 200
 
     # ================= Graph-RAG 配置 =================
-    graph_rag_enabled: bool = False
-    graph_rag_expand_hops: int = 1
-    graph_rag_max_expanded_entities: int = 30
+    # 环境变量覆盖：GRAPH_RAG_ENABLED, GRAPH_RAG_HOPS, GRAPH_RAG_MAX_ENTITIES
+    graph_rag_enabled: bool = field(
+        default_factory=lambda: os.getenv("GRAPH_RAG_ENABLED", "false").lower() == "true"
+    )
+    graph_rag_expand_hops: int = field(
+        default_factory=lambda: int(os.getenv("GRAPH_RAG_HOPS", "1"))
+    )
+    graph_rag_max_expanded_entities: int = field(
+        default_factory=lambda: int(os.getenv("GRAPH_RAG_MAX_ENTITIES", "30"))
+    )
     graph_rag_candidate_limit: int = 150
     graph_rag_boost_same_entity: float = 0.2
     graph_rag_boost_related_entity: float = 0.1
     graph_rag_boost_recency: float = 0.05
+    
+    # ================= 分词配置 =================
+    tokenizer_chinese_jieba: bool = field(
+        default_factory=lambda: os.getenv("TOKENIZER_JIEBA_ENABLED", "true").lower() == "true"
+    )
+    tokenizer_number_normalization: bool = field(
+        default_factory=lambda: os.getenv("TOKENIZER_NUMBER_NORM", "true").lower() == "true"
+    )
 
     relationship_graph_from_index_enabled: bool = True
 

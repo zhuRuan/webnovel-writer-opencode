@@ -20,6 +20,8 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from .condition_evaluator import ConditionEvaluator, TriggerCondition
+
 
 class CheckersManager:
     """审查器配置管理器"""
@@ -206,6 +208,57 @@ class CheckersManager:
             "checker_count": len(checkers),
             "mode_count": len(modes),
         }
+
+    def should_trigger_checker(
+        self,
+        checker_id: str,
+        chapter_context: Dict[str, Any]
+    ) -> bool:
+        """
+        判断 conditional 审查器是否应该触发
+        
+        Args:
+            checker_id: 审查器 ID
+            chapter_context: 章节上下文
+        
+        Returns:
+            是否应该触发
+        """
+        registry = self.load_registry()
+        checkers = registry.get("checkers", {})
+        
+        if checker_id not in checkers:
+            return False
+        
+        checker_config = checkers[checker_id]
+        if checker_config.get("category") != "conditional":
+            return True
+        
+        triggers = checker_config.get("triggers", [])
+        if not triggers:
+            return True
+        
+        evaluator = ConditionEvaluator(chapter_context)
+        
+        conditions = []
+        for trigger in triggers:
+            if isinstance(trigger, str):
+                conditions.append(TriggerCondition(type="condition", expression=trigger))
+            elif isinstance(trigger, dict):
+                trigger_type = trigger.get("type", "condition")
+                if trigger_type == "condition":
+                    conditions.append(TriggerCondition(
+                        type="condition",
+                        expression=trigger.get("expression", "")
+                    ))
+                elif trigger_type == "keyword":
+                    conditions.append(TriggerCondition(
+                        type="keyword",
+                        keywords=trigger.get("keywords", []),
+                        min_count=trigger.get("min_count", 1)
+                    ))
+        
+        return evaluator.evaluate(conditions)
 
     def get_schema_for_checker(self, checker_id: str) -> Optional[Dict[str, Any]]:
         """获取指定审查器的 metrics Schema"""
