@@ -4,7 +4,7 @@
 Playwright 浏览器生命周期管理
 """
 
-import logging
+from logging import getLogger
 from pathlib import Path
 from typing import Optional
 
@@ -12,7 +12,7 @@ from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
 from .exceptions import BrowserError
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 _STEALTH_ARGS = [
     "--disable-blink-features=AutomationControlled",

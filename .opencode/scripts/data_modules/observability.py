@@ -7,13 +7,13 @@ Shared observability helpers for data modules.
 from __future__ import annotations
 
 import json
-import logging
+from logging import getLogger
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 def safe_log_tool_call(

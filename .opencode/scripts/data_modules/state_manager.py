@@ -14,10 +14,10 @@ v5.1 变更（v5.4 沿用）:
 """
 
 import json
-import logging
 import sys
 import time
 from copy import deepcopy
+from logging import getLogger
 from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
@@ -30,7 +30,7 @@ from .config import get_config
 from .observability import safe_append_perf_timing, safe_log_tool_call
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 try:
     # 当 scripts 目录在 sys.path 中（常见：从 scripts/ 运行）

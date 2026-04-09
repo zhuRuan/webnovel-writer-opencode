@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import re
 import sys
-import logging
+from logging import getLogger
 from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
@@ -44,7 +44,7 @@ from .writing_guidance_builder import (
 )
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 class ContextManager:

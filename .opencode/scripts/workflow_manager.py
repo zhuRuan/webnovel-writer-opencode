@@ -10,12 +10,12 @@ Workflow state manager
 from __future__ import annotations
 
 import json
-import logging
 import os
 import shutil
 import subprocess
 import sys
 from datetime import datetime
+from logging import getLogger
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -25,7 +25,7 @@ from runtime_compat import enable_windows_utf8_stdio, normalize_windows_path
 from security_utils import atomic_write_json, create_secure_directory
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 # UTF-8 output for Windows console (CLI run only, avoid pytest capture issues)

@@ -7,12 +7,12 @@ IndexObservabilityMixin extracted from IndexManager.
 from __future__ import annotations
 
 import json
-import logging
+from logging import getLogger
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 class IndexObservabilityMixin:

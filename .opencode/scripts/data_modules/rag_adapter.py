@@ -14,7 +14,7 @@ import asyncio
 import sqlite3
 import json
 import math
-import logging
+from logging import getLogger
 import shutil
 import hashlib
 from pathlib import Path
@@ -36,7 +36,7 @@ from .query_router import QueryRouter
 from .observability import safe_append_perf_timing, safe_log_tool_call
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 RAG_SCHEMA_VERSION = "3"
 VECTOR_REQUIRED_COLUMNS = (

@@ -7,14 +7,14 @@ IndexEntityMixin extracted from IndexManager.
 from __future__ import annotations
 
 import json
-import logging
 import re
 import sqlite3
+from logging import getLogger
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 class IndexEntityMixin:

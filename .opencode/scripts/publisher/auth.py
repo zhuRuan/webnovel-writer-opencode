@@ -5,7 +5,7 @@
 """
 
 import asyncio
-import logging
+from logging import getLogger
 from pathlib import Path
 from typing import Optional
 
@@ -13,7 +13,7 @@ from playwright.async_api import Page
 
 from .exceptions import AuthenticationError
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 WRITER_URL = "https://fanqienovel.com/main/writer/?enter_from=author_zone"
 
