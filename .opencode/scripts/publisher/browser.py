@@ -115,7 +115,7 @@ class BrowserManager:
                 self._playwright = None
             logger.info("浏览器已关闭")
         except Exception as e:
-            logger.warning("关闭浏览器时出现警告: %s", e)
+            logger.exception("关闭浏览器时出现错误")
 
     async def __aenter__(self) -> "BrowserManager":
         """异步上下文管理器入口"""

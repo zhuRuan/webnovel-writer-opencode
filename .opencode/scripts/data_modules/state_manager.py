@@ -629,8 +629,7 @@ class StateManager:
             return True
 
         except Exception as e:
-            # SQLite 同步失败时记录警告（不中断主流程）
-            logger.warning("SQLite sync failed: %s", e)
+            logger.exception("SQLite sync failed")
             return False
 
     def _snapshot_sqlite_pending(self) -> Dict[str, Any]:

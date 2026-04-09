@@ -105,12 +105,12 @@ class RAGAdapter:
                     "vectors 表结构已迁移（备份: %s）",
                     str(backup_path),
                 )
-            except Exception:
+            except Exception as migrate_err:
                 try:
                     self._restore_vector_db_from_backup(backup_path)
-                    logger.error("vectors 表迁移失败，已从备份恢复: %s", str(backup_path))
+                    logger.exception("vectors 表迁移失败，已从备份恢复")
                 except Exception as restore_exc:
-                    logger.exception("vectors 表迁移失败，且恢复备份失败: %s", restore_exc)
+                    logger.exception("vectors 表迁移失败，且恢复备份失败")
                 raise
 
         with self._get_conn() as conn:

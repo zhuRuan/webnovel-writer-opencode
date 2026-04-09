@@ -37,7 +37,7 @@ async def _save_auth_state(page: Page, save_path: Path) -> None:
         await page.context.storage_state(path=str(save_path))
         logger.info("登录状态已保存到: %s", save_path)
     except Exception as e:
-        logger.warning("保存登录状态失败: %s", e)
+        logger.exception("保存登录状态失败")
         raise AuthenticationError(f"保存登录状态失败: {e}") from e
 
 
@@ -64,7 +64,7 @@ async def ensure_logged_in(
     try:
         await page.goto(WRITER_URL, wait_until="commit", timeout=60_000)
     except Exception as e:
-        logger.warning("导航时出现错误: %s", e)
+        logger.exception("导航到作家后台失败")
 
     try:
         await page.wait_for_load_state("networkidle", timeout=15_000)
