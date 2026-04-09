@@ -192,10 +192,6 @@ class DataModulesConfig:
     foreshadowing_stale_threshold: int = 10
     foreshadowing_warning_mode: str = "log"  # log | pause | ask
 
-    # ================= 世界规则 RAG 配置 =================
-    world_rule_rag_enabled: bool = True
-    world_rule_rag_top_k: int = 5
-
     context_recent_summaries_window: int = 3
     context_recent_meta_window: int = 3
     context_alerts_slice: int = 10

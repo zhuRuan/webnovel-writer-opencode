@@ -107,20 +107,6 @@ checkers:
       - 项目根：{PROJECT_ROOT}
       - 审查器定义见：.opencode/agents/pacing-checker.md
 
-  world-rule-checker:
-    name: 世界规则与角色状态检查
-    name_en: World Rule & Character State Checker
-    file: ../agents/world-rule-checker.md
-    category: core
-    enabled: true
-    description: 使用轻量级规则引擎检测章节内容是否违反世界规则和角色动态状态
-    triggers: []
-    invoke_template: |
-      对第 {chapter} 章执行规则检查。
-      - 章节文件：{chapter_file}
-      - 项目根：{PROJECT_ROOT}
-      - 审查器定义见：.opencode/agents/world-rule-checker.md
-
 # 审查模式配置
 modes:
   standard:
@@ -142,7 +128,6 @@ dimension_mapping:
   人物塑造: [ooc-checker]
   连贯性: [continuity-checker]
   追读力: [reader-pull-checker]
-  规则一致性: [world-rule-checker]
 
 # 时间线闸门配置
 timeline_gate:
