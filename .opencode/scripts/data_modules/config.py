@@ -190,7 +190,6 @@ class DataModulesConfig:
 
     # ================= 伏笔管理配置 (v5.5 引入) =================
     foreshadowing_stale_threshold: int = 10
-    foreshadowing_warning_mode: str = "log"  # log | pause | ask
 
     context_recent_summaries_window: int = 3
     context_recent_meta_window: int = 3
