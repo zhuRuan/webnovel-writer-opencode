@@ -262,6 +262,45 @@ async def test_embedding_empty_and_error_paths(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_embedding_empty_string_replaced_with_space(tmp_path, monkeypatch):
+    config = DataModulesConfig.from_project_root(tmp_path)
+    config.embed_api_type = "openai"
+    config.api_max_retries = 1
+    client = EmbeddingAPIClient(config)
+
+    captured_payloads = []
+
+    class CaptureSession:
+        def __init__(self):
+            self.closed = False
+
+        def post(self, url, **kwargs):
+            captured_payloads.append(kwargs.get("json"))
+            input_len = len(captured_payloads[-1]["input"])
+            return FakeResponse(200, json_data={
+                "data": [{"embedding": [0.1] * 768, "index": i} for i in range(input_len)]
+            })
+
+        async def close(self):
+            self.closed = True
+
+    async def fake_get_session():
+        return CaptureSession()
+
+    monkeypatch.setattr(client, "_get_session", fake_get_session)
+
+    result = await client.embed(["", "text", ""])
+    assert result is not None
+    assert len(result) == 3
+    assert captured_payloads[0]["input"] == [" ", "text", " "]
+
+    result_empty_only = await client.embed([""])
+    assert result_empty_only is not None
+    assert len(result_empty_only) == 1
+    assert captured_payloads[1]["input"] == [" "]
+
+
+@pytest.mark.asyncio
 async def test_embedding_exception_and_close(tmp_path, monkeypatch):
     config = DataModulesConfig.from_project_root(tmp_path)
     config.api_max_retries = 1

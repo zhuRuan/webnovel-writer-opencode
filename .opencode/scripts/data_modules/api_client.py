@@ -123,6 +123,8 @@ class EmbeddingAPIClient:
         if not texts:
             return []
 
+        texts = [t if t else " " for t in texts]
+
         timeout = self.config.cold_start_timeout if not self._warmed_up else self.config.normal_timeout
         max_retries = getattr(self.config, 'api_max_retries', 3)
         base_delay = getattr(self.config, 'api_retry_delay', 1.0)
