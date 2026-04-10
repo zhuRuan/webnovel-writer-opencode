@@ -77,16 +77,16 @@ def retry(func, max_attempts=3, delay=5):
 
 
 # ---------- 远程下载 ----------
-def download_file(url: str, dest: Path) -> bool:
+def download_file(url: str, dest: Path, timeout: int = 30) -> bool:
     try:
         log_info(f"下载 {url} ...")
-        urllib.request.urlretrieve(url, dest)
+        urllib.request.urlretrieve(url, dest, timeout=timeout)
         return True
     except Exception as e:
         log_warn(f"下载失败: {e}")
         return False
 
-def download_template():
+def download_template(timeout: int = 30):
     script_dir = Path(__file__).parent
     env_file = Path(".env")
     
@@ -104,13 +104,13 @@ def download_template():
     # 下载 .env 模板
     env_url = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/.env"
     env_template = script_dir / ".env.tmp"
-    if not download_file(env_url, env_template):
+    if not download_file(env_url, env_template, timeout):
         log_error("无法下载 .env 模板")
 
     # 下载 requirements.txt
     req_url = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/requirements.txt"
     req_file = script_dir / "requirements.txt"
-    if not download_file(req_url, req_file):
+    if not download_file(req_url, req_file, timeout):
         log_warn("无法下载 requirements.txt")
 
     # 合并用户配置（增量更新 .env）
@@ -135,14 +135,14 @@ def download_template():
 
 
 # ---------- 文件操作 ----------
-def download_opencode():
+def download_opencode(timeout: int = 30):
     script_dir = Path(__file__).parent
     
     # 下载源码包
     zip_url = f"https://github.com/{REPO}/archive/refs/heads/{BRANCH}.zip"
     zip_file = script_dir / "repo.zip"
     
-    if not download_file(zip_url, zip_file):
+    if not download_file(zip_url, zip_file, timeout):
         log_error("无法下载源码包")
 
     # 解压
@@ -191,6 +191,9 @@ def install_requirements():
 
 
 def maybe_install_playwright():
+    if not sys.stdin.isatty():
+        log_info("非交互模式，跳过 playwright 安装")
+        return
     try:
         answer = input("是否安装 playwright 浏览器（用于发布功能）？[y/N] ").strip().lower()
     except EOFError:
@@ -212,6 +215,13 @@ def maybe_install_playwright():
 
 # ---------- 主流程 ----------
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='Webnovel Writer for OpenCode 安装脚本')
+    parser.add_argument('--yes', '-y', action='store_true', help='自动确认所有交互')
+    parser.add_argument('--skip-playwright', action='store_true', help='跳过 playwright 安装')
+    parser.add_argument('--timeout', '-t', type=int, default=30, help='网络下载超时秒数（默认30）')
+    args = parser.parse_args()
+
     print("=" * 50)
     print("  Webnovel Writer for OpenCode 安装脚本")
     print("=" * 50)
@@ -219,10 +229,14 @@ def main():
 
     check_dependencies()
 
-    download_template()
-    download_opencode()
+    download_template(args.timeout)
+    download_opencode(args.timeout)
     install_requirements()
-    maybe_install_playwright()
+
+    if args.skip_playwright or args.yes:
+        log_info("跳过 playwright 安装（--skip-playwright 或 --yes 模式）")
+    else:
+        maybe_install_playwright()
 
     print()
     print("=" * 50)
