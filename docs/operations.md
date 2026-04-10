@@ -36,8 +36,16 @@ WORKSPACE_ROOT/
 │   ├── watcher.py      # 文件监听
 │   ├── publish_bridge.py # 发布数据桥接
 │   └── frontend/       # React 前端
+├── dicts/               # 自定义词典（中文分词优化）
+│   └── webnovel_dict.txt
 ├── scripts/             # Python 核心脚本
 │   ├── data_modules/    # 核心模块
+│   │   ├── condition_evaluator.py  # 条件评估器
+│   │   ├── temporal_graph.py      # 时间图谱
+│   │   └── tests/               # 测试文件
+│   │       ├── test_condition_evaluator.py
+│   │       ├── test_temporal_graph.py
+│   │       └── test_tokenizer_improvement.py
 │   ├── publisher/       # 番茄小说发布模块
 │   ├── webnovel.py     # CLI 入口
 │   ├── sync_chapters_to_db.py   # 章节同步到数据库
@@ -113,6 +121,15 @@ pytest
 
 # 运行单个测试
 pytest .opencode/scripts/data_modules/tests/test_config.py::test_config_paths_and_defaults
+
+# 运行条件评估器测试
+pytest .opencode/scripts/data_modules/tests/test_condition_evaluator.py
+
+# 运行时间图谱测试
+pytest .opencode/scripts/data_modules/tests/test_temporal_graph.py
+
+# 运行分词器改进测试
+pytest .opencode/scripts/data_modules/tests/test_tokenizer_improvement.py
 
 # 覆盖率报告
 pytest --cov .opencode/scripts/data_modules/tests/

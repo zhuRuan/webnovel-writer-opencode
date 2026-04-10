@@ -36,8 +36,6 @@
 │  Agents (8个): context-agent / data-agent /                 │
 │                 6 维 Checker                                 │
 ├─────────────────────────────────────────────────────────────┤
-│  Plugin System: Agent / Skill / Checker / Publisher / Hook │
-├─────────────────────────────────────────────────────────────┤
 │  Data Layer: state.json / index.db / vectors.db            │
 └─────────────────────────────────────────────────────────────┘
 
@@ -74,6 +72,20 @@
 | Continuity Checker | 场景与叙事连贯性 |
 | Reader-pull Checker | 钩子强度、期待管理、追读力 |
 
+## 核心模块
+
+### 条件评估器 (condition_evaluator)
+
+负责评估章节中触发的世界规则条件，判断是否符合预设规则。
+
+### 时间图谱 (temporal_graph)
+
+管理故事内时间线，支持时间锚点解析和时间线一致性检查。
+
+### 自定义词典 (dicts/webnovel_dict.txt)
+
+用于改进中文分词质量，支持网文领域专有名词（人名、功法、势力等）。
+
 ## 项目结构
 
 ```
@@ -88,8 +100,11 @@
 │   │   └── frontend/      # React 前端
 │   ├── agents/           # 8个 Agents（context-agent, data-agent, 6个 Checker）
 │   ├── checkers/         # 审查器配置驱动
+│   ├── dicts/            # 自定义词典（中文分词优化）
 │   ├── scripts/          # Python 核心脚本
 │   │   ├── data_modules/ # 核心数据模块
+│   │   │   ├── condition_evaluator.py # 条件评估器
+│   │   │   └── temporal_graph.py      # 时间图谱
 │   │   ├── publisher/    # 番茄发布模块
 │   │   ├── sync_chapters_to_db.py   # 章节同步
 │   │   ├── sync_missing_chapters.py # 缺失章节同步
