@@ -152,7 +152,7 @@ def setup_logging(
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    console_handler = logging.StreamHandler(sys.stderr)
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(getattr(logging, console_lvl.upper(), logging.INFO))
     console_formatter = logging.Formatter(LOG_FORMAT, DATE_FORMAT)
     console_handler.setFormatter(console_formatter)
