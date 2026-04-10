@@ -39,6 +39,34 @@
 | `--fast` | 跳过风格转译（Step 2B） |
 | `--minimal` | 仅执行基础审查 |
 
+## `/webnovel-write-batch`
+
+用途：连续撰写多章节，在单次回复中完成批量写作流程。
+
+示例：
+
+```
+/webnovel-write-batch --range 53-60
+/webnovel-write-batch --range 53-60 --review-level minimal
+/webnovel-write-batch --resume
+```
+
+参数：
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--range` | 章节范围，如 53-60 | 自动解析 |
+| `--review-level` | 审查级别（minimal/standard/full） | standard |
+| `--resume` | 从断点恢复 | - |
+| `--force` | 绕过 20 章上限 | - |
+
+特点：
+
+- 在单次回复中完成所有章节（无需多次调用）
+- 每章独立审查和 Git 提交
+- 断点自动保存，支持随时中断恢复
+- 完成后输出汇总报告
+
 ## `/webnovel-review [范围]`
 
 用途：对历史章节做多维质量审查。

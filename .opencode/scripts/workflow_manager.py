@@ -731,6 +731,203 @@ def extract_stable_state(task):
     }
 
 
+TASK_TYPE_BATCH = "batch"
+TASK_TYPE_SINGLE = "single"
+
+
+def start_batch_task(task_id: str, range_start: int, range_end: int, mode: str, metadata: Optional[Dict[str, Any]] = None):
+    """Start a new batch writing task."""
+    state = load_state()
+    state.setdefault("batch_tasks", {})
+    
+    started_at = now_iso()
+    state["batch_tasks"][task_id] = {
+        "task_id": task_id,
+        "range": {"start": range_start, "end": range_end},
+        "mode": mode,
+        "status": "running",
+        "type": TASK_TYPE_BATCH,
+        "started_at": started_at,
+        "updated_at": started_at,
+        "current_chapter": range_start,
+        "completed_chapters": [],
+        "failed_chapters": [],
+        "chapter_results": {},
+        "stop_reason": None,
+        "metadata": metadata or {},
+    }
+    save_state(state)
+    
+    safe_append_call_trace(
+        "batch_task_started",
+        {
+            "task_id": task_id,
+            "range_start": range_start,
+            "range_end": range_end,
+            "mode": mode,
+        },
+    )
+    print(f"✅ 批量任务已启动: {task_id} (第 {range_start}-{range_end} 章)")
+
+
+def get_batch_task(task_id: str) -> Optional[Dict[str, Any]]:
+    """Get batch task by ID."""
+    state = load_state()
+    batch_tasks = state.get("batch_tasks", {})
+    return batch_tasks.get(task_id)
+
+
+def list_batch_tasks(status: Optional[str] = None) -> list[Dict[str, Any]]:
+    """List all batch tasks, optionally filtered by status."""
+    state = load_state()
+    batch_tasks = state.get("batch_tasks", {})
+    tasks = list(batch_tasks.values())
+    if status:
+        tasks = [t for t in tasks if t.get("status") == status]
+    return sorted(tasks, key=lambda x: x.get("started_at", ""), reverse=True)
+
+
+def update_batch_progress(task_id: str, chapter: int, result: Dict[str, Any]):
+    """Update batch task progress after a chapter completes."""
+    state = load_state()
+    batch_tasks = state.get("batch_tasks", {})
+    
+    if task_id not in batch_tasks:
+        logger.warning(f"Batch task {task_id} not found")
+        return
+    
+    task = batch_tasks[task_id]
+    task["updated_at"] = now_iso()
+    
+    if result.get("status") == "success":
+        task["completed_chapters"] = task.get("completed_chapters", [])
+        if chapter not in task["completed_chapters"]:
+            task["completed_chapters"].append(chapter)
+        task["current_chapter"] = chapter + 1
+    else:
+        task["failed_chapters"] = task.get("failed_chapters", [])
+        if chapter not in task["failed_chapters"]:
+            task["failed_chapters"].append(chapter)
+        task["chapter_results"][str(chapter)] = {
+            "status": "failed",
+            "error": result.get("error", "unknown"),
+        }
+        
+        if result.get("stop_on_fail"):
+            task["status"] = "stopped"
+            task["stop_reason"] = f"chapter_{chapter}_failed"
+    
+    task["chapter_results"][str(chapter)] = task["chapter_results"].get(str(chapter), {})
+    task["chapter_results"][str(chapter)].update({
+        "status": result.get("status", "success"),
+        "score": result.get("score"),
+        "words": result.get("words", 0),
+        "duration_seconds": result.get("duration_seconds", 0),
+        "completed_at": now_iso(),
+    })
+    
+    save_state(state)
+    
+    safe_append_call_trace(
+        "batch_chapter_completed",
+        {
+            "task_id": task_id,
+            "chapter": chapter,
+            "status": result.get("status"),
+            "score": result.get("score"),
+        },
+    )
+
+
+def complete_batch_task(task_id: str, summary: Optional[Dict[str, Any]] = None):
+    """Mark batch task as completed."""
+    state = load_state()
+    batch_tasks = state.get("batch_tasks", {})
+    
+    if task_id not in batch_tasks:
+        logger.warning(f"Batch task {task_id} not found")
+        return
+    
+    task = batch_tasks[task_id]
+    task["status"] = "completed"
+    task["updated_at"] = now_iso()
+    
+    if summary:
+        task["summary"] = summary
+    
+    save_state(state)
+    
+    safe_append_call_trace(
+        "batch_task_completed",
+        {
+            "task_id": task_id,
+            "completed_chapters": task.get("completed_chapters", []),
+            "failed_chapters": task.get("failed_chapters", []),
+        },
+    )
+    print(f"✅ 批量任务已完成: {task_id}")
+
+
+def fail_batch_task(task_id: str, reason: str):
+    """Mark batch task as failed."""
+    state = load_state()
+    batch_tasks = state.get("batch_tasks", {})
+    
+    if task_id not in batch_tasks:
+        logger.warning(f"Batch task {task_id} not found")
+        return
+    
+    task = batch_tasks[task_id]
+    task["status"] = "failed"
+    task["stop_reason"] = reason
+    task["updated_at"] = now_iso()
+    
+    save_state(state)
+    
+    safe_append_call_trace(
+        "batch_task_failed",
+        {
+            "task_id": task_id,
+            "reason": reason,
+        },
+    )
+    print(f"⚠️ 批量任务已标记失败: {task_id} - {reason}")
+
+
+def get_batch_progress(task_id: str) -> Optional[Dict[str, Any]]:
+    """Get batch task progress summary."""
+    task = get_batch_task(task_id)
+    if not task:
+        return None
+    
+    range_start = task.get("range", {}).get("start", 0)
+    range_end = task.get("range", {}).get("end", 0)
+    total = range_end - range_start + 1
+    completed = len(task.get("completed_chapters", []))
+    failed = len(task.get("failed_chapters", []))
+    
+    scores = [
+        task["chapter_results"].get(str(ch), {}).get("score")
+        for ch in task.get("completed_chapters", [])
+        if task["chapter_results"].get(str(ch), {}).get("score") is not None
+    ]
+    avg_score = sum(scores) / len(scores) if scores else 0
+    
+    return {
+        "task_id": task_id,
+        "range": task.get("range"),
+        "total_chapters": total,
+        "completed": completed,
+        "failed": failed,
+        "remaining": total - completed - failed,
+        "progress_percent": (completed / total * 100) if total > 0 else 0,
+        "current_chapter": task.get("current_chapter"),
+        "avg_score": avg_score,
+        "status": task.get("status"),
+        "stop_reason": task.get("stop_reason"),
+    }
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -781,6 +978,45 @@ if __name__ == "__main__":
     p_clear = subparsers.add_parser("clear", help="清除中断任务")
     add_project_root_arg(p_clear)
 
+    # Batch task subcommands
+    p_start_batch = subparsers.add_parser("start-batch", help="开始批量任务")
+    add_project_root_arg(p_start_batch)
+    p_start_batch.add_argument("--task-id", required=True, help="批量任务ID")
+    p_start_batch.add_argument("--range-start", type=int, required=True, help="起始章节")
+    p_start_batch.add_argument("--range-end", type=int, required=True, help="结束章节")
+    p_start_batch.add_argument("--mode", default="standard", help="审查级别")
+    p_start_batch.add_argument("--review-level", default=None, help="审查级别（别名）")
+    p_start_batch.add_argument("--stop-on-fail", action="store_true", help="失败时停止")
+    p_start_batch.add_argument("--force", action="store_true", help="强制执行")
+
+    p_update_batch = subparsers.add_parser("update-batch", help="更新批量任务进度")
+    add_project_root_arg(p_update_batch)
+    p_update_batch.add_argument("--task-id", required=True, help="批量任务ID")
+    p_update_batch.add_argument("--chapter", type=int, required=True, help="章节号")
+    p_update_batch.add_argument("--status", required=True, help="状态: success/failed")
+    p_update_batch.add_argument("--score", type=float, help="审查分数")
+    p_update_batch.add_argument("--words", type=int, default=0, help="字数")
+    p_update_batch.add_argument("--duration-seconds", type=int, default=0, help="耗时（秒）")
+    p_update_batch.add_argument("--error", help="错误信息")
+    p_update_batch.add_argument("--stop-on-fail", action="store_true", help="是否停止")
+
+    p_complete_batch = subparsers.add_parser("complete-batch", help="完成批量任务")
+    add_project_root_arg(p_complete_batch)
+    p_complete_batch.add_argument("--task-id", required=True, help="批量任务ID")
+
+    p_fail_batch = subparsers.add_parser("fail-batch", help="标记批量任务失败")
+    add_project_root_arg(p_fail_batch)
+    p_fail_batch.add_argument("--task-id", required=True, help="批量任务ID")
+    p_fail_batch.add_argument("--reason", required=True, help="失败原因")
+
+    p_list_batch = subparsers.add_parser("list-batch", help="列出批量任务")
+    add_project_root_arg(p_list_batch)
+    p_list_batch.add_argument("--status", help="按状态筛选")
+
+    p_progress_batch = subparsers.add_parser("progress-batch", help="查看批量任务进度")
+    add_project_root_arg(p_progress_batch)
+    p_progress_batch.add_argument("--task-id", required=True, help="批量任务ID")
+
     args = parser.parse_args()
 
     # Set global project root if provided (support both before/after subcommand).
@@ -818,5 +1054,40 @@ if __name__ == "__main__":
             print("⚠️ 以上为预览，未执行实际清理。")
     elif args.action == "clear":
         clear_current_task()
+    elif args.action == "start-batch":
+        mode = args.review_level or args.mode
+        metadata = {
+            "stop_on_fail": args.stop_on_fail,
+            "force": args.force,
+        }
+        start_batch_task(args.task_id, args.range_start, args.range_end, mode, metadata)
+    elif args.action == "update-batch":
+        result = {
+            "status": args.status,
+            "score": args.score,
+            "words": args.words,
+            "duration_seconds": args.duration_seconds,
+            "error": args.error,
+            "stop_on_fail": args.stop_on_fail,
+        }
+        update_batch_progress(args.task_id, args.chapter, result)
+    elif args.action == "complete-batch":
+        complete_batch_task(args.task_id)
+    elif args.action == "fail-batch":
+        fail_batch_task(args.task_id, args.reason)
+    elif args.action == "list-batch":
+        tasks = list_batch_tasks(args.status)
+        if tasks:
+            for task in tasks:
+                print(json.dumps(task, ensure_ascii=False, indent=2))
+                print("---")
+        else:
+            print("未找到批量任务")
+    elif args.action == "progress-batch":
+        progress = get_batch_progress(args.task_id)
+        if progress:
+            print(json.dumps(progress, ensure_ascii=False, indent=2))
+        else:
+            print(f"未找到批量任务: {args.task_id}")
     else:
         parser.print_help()

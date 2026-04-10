@@ -269,6 +269,11 @@ def main() -> None:
     p_dashboard.add_argument("--host", default="127.0.0.1", help="监听地址")
     p_dashboard.add_argument("--port", type=int, default=8765, help="监听端口")
     p_dashboard.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
+    p_dashboard.add_argument("--force", action="store_true", help="强制重启（清理旧进程）")
+
+    # write-batch 命令（批量写作）
+    p_write_batch = sub.add_parser("write-batch", help="批量写作工具")
+    p_write_batch.add_argument("args", nargs=argparse.REMAINDER)
 
     # 兼容：允许 `--project-root` 出现在任意位置（减少 agents/skills 拼命令的出错率）
     from .cli_args import normalize_global_project_root
@@ -337,6 +342,17 @@ def main() -> None:
         return_args = [*forward_args, "--chapter", str(args.chapter), "--format", str(args.format)]
         raise SystemExit(_run_script("extract_chapter_context.py", return_args))
 
+    # write-batch 命令（批量写作）- 通过 Skill 执行
+    if tool == "write-batch":
+        import os
+        skill_root = Path(__file__).resolve().parent.parent / "skills" / "webnovel-write-batch"
+        skill_script = skill_root / "SKILL.md"
+        if not skill_script.exists():
+            logger.error(f"批量写作 skill 不存在: {skill_script}")
+            raise SystemExit(1)
+        logger.info(f"批量写作 skill 路径: {skill_script}")
+        raise SystemExit(0)
+
     if tool == "export":
         raise SystemExit(_run_script("export_manager.py", [*forward_args, *rest]))
 
@@ -351,12 +367,43 @@ def main() -> None:
         import webbrowser
         import socket
 
+        def _kill_port(port: int) -> None:
+            """清理占用指定端口的进程（Windows）"""
+            try:
+                result = subprocess.run(
+                    f'netstat -ano | findstr ":{port}"',
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                )
+                for line in result.stdout.strip().split("\n"):
+                    if not line:
+                        continue
+                    parts = line.split()
+                    if len(parts) >= 5 and parts[3] == "LISTENING":
+                        pid = parts[-1].strip()
+                        if pid and pid != "0":
+                            try:
+                                subprocess.run(
+                                    f"taskkill /PID {pid} /F",
+                                    shell=True,
+                                    capture_output=True,
+                                )
+                                print(f"已终止旧进程 PID: {pid}")
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
         # 确保 .opencode 在 PYTHONPATH 中，使 import dashboard 生效
         # __file__ 在 data_modules/webnovel.py，所以 parent.parent.parent 才是 .opencode 目录
         opencode_dir = str(Path(__file__).resolve().parent.parent.parent)
         scripts_dir = str(Path(__file__).resolve().parent.parent)
         env = os.environ.copy()
         env["PYTHONPATH"] = f"{opencode_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
+
+        # 清理端口占用
+        _kill_port(args.port)
 
         # 启动后台进程
         cmd = [

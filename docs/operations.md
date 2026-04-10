@@ -19,10 +19,11 @@ WORKSPACE_ROOT/
 
 ```
 .opencode/
-├── skills/              # 10个 Skills
+├── skills/              # 11个 Skills
 │   ├── webnovel-init/
 │   ├── webnovel-plan/
 │   ├── webnovel-write/
+│   ├── webnovel-write-batch/
 │   ├── webnovel-review/
 │   ├── webnovel-export/
 │   ├── webnovel-publish/

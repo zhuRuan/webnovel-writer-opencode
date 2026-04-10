@@ -131,6 +131,47 @@ python .opencode/scripts/webnovel.py publish create-book --title "标题" --genr
 python .opencode/scripts/webnovel.py publish upload --book-id <ID> --range "1-10" --mode draft --project-root <path>
 ```
 
+## 批量写作命令
+
+```bash
+# 批量写作（53-60章，标准审查）
+/webnovel-write-batch --range 53-60
+
+# 快速模式（minimal 审查，跳过风格适配）
+/webnovel-write-batch --range 53-60 --review-level minimal
+
+# 完整审查（full 模式）
+/webnovel-write-batch --range 53-60 --review-level full
+
+# 强制执行 30 章（绕过默认 20 章上限）
+/webnovel-write-batch --range 53-82 --force
+
+# 恢复中断的批量任务
+/webnovel-write-batch --resume
+
+# 失败时继续执行（不自动停止）
+/webnovel-write-batch --range 53-60 --no-stop-on-fail
+```
+
+**参数说明**：
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--range` | 章节范围（必填），格式：start-end | - |
+| `--review-level` | 审查级别 | standard |
+| `--stop-on-fail` | 失败时立即停止 | true |
+| `--resume` | 从断点恢复 | - |
+| `--force` | 绕过 20 章上限 | false |
+
+**状态文件**：
+- 批量任务状态：`.opencode/skills/webnovel-write-batch/.batch_state.json`
+- 单章任务状态：`.webnovel/workflow_state.json`
+
+**限制**：
+- 默认单次批量上限 20 章
+- `--stop-on-fail` 失败时立即停止
+- 每章完成后自动保存断点状态
+
 ## 代码约定
 
 - **编码**：所有文件 UTF-8，中文文档
@@ -163,5 +204,8 @@ git commit -m "type: description"
 | `.opencode/scripts/data_modules/state_manager.py` | 小说状态管理 |
 | `.opencode/scripts/data_modules/entity_linker.py` | 实体注册 |
 | `.opencode/scripts/runtime_compat.py` | 跨平台路径/编码兼容 |
+| `.opencode/scripts/workflow_manager.py` | 工作流+批量任务状态管理 |
 | `.opencode/checkers/registry.yaml` | 审查器配置 |
 | `.opencode/agents/*.md` | 审查器实现定义 |
+| `.opencode/skills/webnovel-write-batch/SKILL.md` | 批量写作 Skill |
+| `.opencode/skills/webnovel-write-batch/references/batch-protocol.md` | 批量协议定义 |

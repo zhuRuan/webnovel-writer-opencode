@@ -43,33 +43,12 @@ export SCRIPTS_DIR="${OPENCODE_DIR}/scripts"
 python -m pip install -r "${DASHBOARD_DIR}/requirements.txt" --quiet
 ```
 
-### Step 1.5：自动安装前端依赖（首次）
+### Step 1.5：前端构建由 server 自动处理
 
+前端依赖安装和构建由 `dashboard.server` 自动处理，无需手动操作。
+如果需要手动构建，执行：
 ```bash
-FRONTEND_DIR="${DASHBOARD_DIR}/frontend"
-
-# 检查前端 package.json 是否存在（pip 安装时可能缺失）
-if [ ! -f "${FRONTEND_DIR}/package.json" ]; then
-  echo "ERROR: 缺少前端 package.json" >&2
-  echo "请从源码复制 .opencode/dashboard/frontend/package.json 到此处。" >&2
-  exit 1
-fi
-
-# 检查 node_modules 是否存在
-if [ ! -d "${FRONTEND_DIR}/node_modules" ]; then
-  echo "首次使用，正在安装前端依赖..."
-  cd "${FRONTEND_DIR}"
-  npm install
-fi
-
-# 检查 dist 目录是否存在（前端构建产物）
-if [ ! -f "${FRONTEND_DIR}/dist/index.html" ]; then
-  echo "正在构建前端..."
-  cd "${FRONTEND_DIR}"
-  npm run build
-fi
-
-echo "前端依赖就绪。"
+cd "${DASHBOARD_DIR}/frontend" && npm install && npm run build
 ```
 
 ### Step 2：解析项目根目录

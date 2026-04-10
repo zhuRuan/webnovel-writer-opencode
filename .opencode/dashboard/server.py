@@ -8,6 +8,7 @@ Dashboard 启动脚本
 
 import argparse
 import os
+import subprocess
 import sys
 import webbrowser
 from pathlib import Path
@@ -46,10 +47,27 @@ def main():
     parser.add_argument("--host", default="127.0.0.1", help="监听地址")
     parser.add_argument("--port", type=int, default=8765, help="监听端口")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
+    parser.add_argument("--rebuild", action="store_true", help="强制重建前端")
     args = parser.parse_args()
 
     project_root = _resolve_project_root(args.project_root)
     print(f"项目路径: {project_root}")
+
+    # 检查并自动构建前端
+    frontend_dir = Path(__file__).parent / "frontend"
+    dist_dir = frontend_dir / "dist"
+    index_html = dist_dir / "index.html"
+
+    if not index_html.exists() or args.rebuild:
+        print("前端未构建，正在构建...")
+        npm = "npm.cmd" if sys.platform == "win32" else "npm"
+        try:
+            subprocess.run([npm, "install"], cwd=frontend_dir, check=True, capture_output=True)
+            subprocess.run([npm, "run", "build"], cwd=frontend_dir, check=True, capture_output=True)
+            print("前端构建完成")
+        except subprocess.CalledProcessError as e:
+            print(f"前端构建失败: {e}", file=sys.stderr)
+            sys.exit(1)
 
     # 延迟导入，以便先处理路径
     import uvicorn
