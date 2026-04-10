@@ -80,7 +80,9 @@ def retry(func, max_attempts=3, delay=5):
 def download_file(url: str, dest: Path, timeout: int = 30) -> bool:
     try:
         log_info(f"下载 {url} ...")
-        urllib.request.urlretrieve(url, dest, timeout=timeout)
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            with open(dest, 'wb') as f:
+                shutil.copyfileobj(response, f)
         return True
     except Exception as e:
         log_warn(f"下载失败: {e}")
