@@ -140,6 +140,11 @@ def download_template(timeout: int = 30):
 def download_opencode(timeout: int = 30):
     script_dir = Path(__file__).parent
     
+    # 清理可能残留的临时目录
+    temp_dest = Path(".opencode_new")
+    if temp_dest.exists():
+        shutil.rmtree(temp_dest)
+    
     # 下载源码包
     zip_url = f"https://github.com/{REPO}/archive/refs/heads/{BRANCH}.zip"
     zip_file = script_dir / "repo.zip"
@@ -153,17 +158,32 @@ def download_opencode(timeout: int = 30):
         z.extractall(script_dir)
     zip_file.unlink()
 
-    # 找到解压目录并覆盖安装 .opencode
+    # 找到解压目录并复制到 .opencode_new
     dest = Path(".opencode")
     for item in script_dir.iterdir():
         if item.is_dir() and item.name.startswith("webnovel-writer"):
             opencode_src = item / ".opencode"
             if opencode_src.exists():
-                log_info("覆盖安装 .opencode 配置...")
-                if dest.exists():
-                    shutil.rmtree(dest)
-                shutil.copytree(opencode_src, dest)
-                shutil.rmtree(item)
+                log_info("下载完成，正在安装...")
+                try:
+                    if dest.exists():
+                        shutil.rmtree(dest)
+                    shutil.copytree(opencode_src, dest)
+                    shutil.rmtree(item)
+                except PermissionError:
+                    # 目录被占用，保留到 .opencode_new
+                    shutil.copytree(opencode_src, temp_dest)
+                    shutil.rmtree(item)
+                    print()
+                    print("=" * 50)
+                    print("  需要手动操作")
+                    print("=" * 50)
+                    print()
+                    print("请先关闭 OpenCode，然后：")
+                    print("  1. 删除 .opencode 目录")
+                    print("  2. 将 .opencode_new 重命名为 .opencode")
+                    print()
+                    return
                 return
     
     log_error("解压后找不到 .opencode 目录")
@@ -176,20 +196,28 @@ def install_requirements():
     if not req_file.exists():
         log_warn("未找到 requirements.txt，跳过")
         return
-    log_info("安装 Python 依赖...")
-
-    def install():
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", str(req_file)],
-            check=True,
-            cwd=script_dir
-        )
-
-    retry(install)
-
-    if req_file.exists():
-        req_file.unlink()
-        log_info("已清理临时文件")
+    log_info("后台安装 Python 依赖...")
+    
+    # 后台执行，避免阻塞
+    import threading
+    
+    def install_in_background():
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "-r", str(req_file)],
+                check=True,
+                cwd=script_dir,
+                capture_output=True
+            )
+            # 安装完成后清理临时文件
+            if req_file.exists():
+                req_file.unlink()
+                print(f"{Colors.GREEN}[INFO]{Colors.NC} 已清理临时文件")
+        except Exception as e:
+            print(f"{Colors.YELLOW}[WARN]{Colors.NC} 依赖安装后台任务: {e}")
+    
+    thread = threading.Thread(target=install_in_background, daemon=True)
+    thread.start()
 
 
 def maybe_install_playwright():
@@ -253,12 +281,9 @@ def main():
     print("  3. 运行 /webnovel-init 开始新项目")
     print()
 
-    # 自删除安装脚本
-    script_path = Path(__file__).resolve()
-    try:
-        script_path.unlink()
-    except Exception:
-        pass
+    # 提示用户可手动删除安装脚本
+    print("提示: 安装脚本已运行完成，您可以手动删除 install.py")
+    print()
 
 if __name__ == "__main__":
     main()
