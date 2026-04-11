@@ -124,11 +124,19 @@ fi
 
 > **重要**：以下循环体在**同一个回复**中连续执行。每完成一章输出进度并更新状态文件。
 
-#### 循环变量
+#### 循环控制
 
 ```
 for chapter in [S, S+1, ..., E]:
+    # 循环开始前检查：上一章是否通过充分性闸门
+    if chapter > S:
+        PREV = chapter - 1
+        if PREV not in batch_state.completed_chapters:
+            # 回退：完成上一章的 Data Agent 步骤后再继续
+            执行 Step 2.6 - 2.8（针对 PREV）
 ```
+
+> **⚠️ 循环安全检查**：每次循环开始前，必须确认上一章已通过充分性闸门（尤其是 Data Agent 回写）。
 
 ---
 
@@ -236,29 +244,60 @@ Task 5:
 
 ---
 
-#### 2.6 数据落盘与备份
+#### 2.6 Data Agent - 状态与索引回写
+
+> **⚠️ 强制要求**：本步骤**必须执行**，不得跳过。跳过此步骤将导致状态不一致。
+
+**执行前检查**：
+- [ ] 章节文件已生成且非空
+- [ ] 审查分数已计算（OVERALL_SCORE）
+- [ ] review_metrics.json 已保存
+
+**Task 调用（必须执行）**：
 
 ```markdown
-# Data Agent - 状态回写
 Task:
   subagent: data-agent
   prompt: |
     处理第 {chapter} 章的数据回写。
+
+    ## 参数
     - 章节文件：{PROJECT_ROOT}/{CHAPTER_PATH}
     - 审查分数：{OVERALL_SCORE}
     - 项目根：{PROJECT_ROOT}
-```
+    - 存储路径：.webnovel/
+    - 状态文件：.webnovel/state.json
 
-```bash
-# Git 备份
-cd "${PROJECT_ROOT}"
-git add "${CHAPTER_PATH}" ".webnovel/state.json" ".webnovel/index.db"
-git -c i18n.commitEncoding=UTF-8 commit -m "第{chapter}章: 写作完成"
+    ## 必须完成的子步骤
+    1. 加载上下文
+    2. AI 实体提取
+    3. 实体消歧
+    4. 写入 state.json（更新 progress.current_chapter、entity、relations）
+    5. 写入 index.db（RAG 向量索引）
+    6. 写入章节摘要 .webnovel/summaries/ch{chapter_padded}.md
+
+    ## 执行后验证
+    确认以下文件已更新：
+    - .webnovel/state.json
+    - .webnovel/index.db
+    - .webnovel/summaries/ch{chapter_padded}.md
 ```
 
 ---
 
-#### 2.7 更新批量状态
+#### 2.7 Git 备份
+
+```bash
+cd "${PROJECT_ROOT}"
+git add "${CHAPTER_PATH}" ".webnovel/state.json" ".webnovel/index.db" ".webnovel/summaries/"
+git -c i18n.commitEncoding=UTF-8 commit -m "第{chapter}章: 写作完成 [review={OVERALL_SCORE}]"
+```
+
+> **⚠️ Git 提交失败处理**：如果提交失败（非空仓库无变更可忽略），记录警告但**不得阻断**。已完成的 Data Agent 回写是持久化的。
+
+---
+
+#### 2.8 更新批量状态
 
 ```bash
 python -c "
@@ -272,6 +311,7 @@ state['chapter_results']['{chapter}'] = {{
     'status': 'success',
     'score': {OVERALL_SCORE},
     'words': {WORD_COUNT},
+    'data_agent_completed': True,
     'completed_at': '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
 }}
 
@@ -280,10 +320,35 @@ with open('${BATCH_STATE_FILE}', 'w', encoding='utf-8') as f:
 "
 ```
 
-#### 2.8 进度反馈
+> **⚠️ 状态更新失败处理**：如果 batch_state.json 更新失败，重试 3 次。仍失败则记录到 failed_chapters 并停止批量任务。
+
+---
+
+#### 2.9 进度反馈
 
 ```
-[chapter/E] ✅ 第{chapter}章已完成 | 得分: {OVERALL_SCORE} | 字数: ~{WORD_COUNT}
+✅ 第{chapter}章已完成
+   - 审查得分: {OVERALL_SCORE}
+   - 字数: ~{WORD_COUNT}
+   - Data Agent: ✓ 已回写
+   - Git: ✓ 已提交
+   - 进度: [{chapter}/{E}]
+```
+
+---
+
+#### 章内验证点（每章必须通过）
+
+**在进入下一章之前，必须验证本章以下项目全部完成**：
+
+```
+章内完成检查（第{chapter}章）：
+├── [✓] 章节文件存在且非空
+├── [✓] Data Agent 已执行（state.json/index.db/summaries 已更新）
+├── [✓] Git 已提交（或记录警告）
+└── [✓] batch_state.json 已更新
+
+若任何一项未完成，**必须回退完成后再继续**。
 ```
 
 ---
@@ -375,14 +440,22 @@ git -c i18n.commitEncoding=UTF-8 commit -m "批量写作完成: 第{S}-{E}章"
 
 ---
 
-## 充分性闸门
+## 充分性闸门（每章必须满足）
 
-未满足以下条件不得结束流程：
+**未满足以下条件，不得进入下一章或结束批量任务**：
 
-1. ✅ 所有章节文件已生成且非空
-2. ✅ 审查指标已落库
-3. ✅ `.batch_state.json` 状态为 `completed`
-4. ✅ Git 提交已完成
+| # | 检查项 | 验证方法 |
+|---|--------|---------|
+| 1 | 章节文件已生成且非空 | `test -s "${CHAPTER_PATH}"` |
+| 2 | 审查分数已计算 | review_metrics.json 存在 |
+| 3 | **Data Agent 已回写** | state.json/index.db/summaries 至少一个存在且更新时间 > 章节创建时间 |
+| 4 | **batch_state.json 已更新** | 当前章节在 completed_chapters 中 |
+| 5 | Git 提交已完成（或记录警告） | 检查上一章 commit 时间 |
+
+**⚠️ 关键约束**：
+- Data Agent 回写（Step 2.6）是**硬性要求**，不得跳过
+- 若 Data Agent 失败，重试 3 次后仍失败，记录到 failed_chapters 并停止批量任务
+- 只有通过全部 5 项检查，才能进入下一章
 
 ---
 
