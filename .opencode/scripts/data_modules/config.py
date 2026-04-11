@@ -132,6 +132,11 @@ class DataModulesConfig:
     def custom_dict_path(self) -> Path:
         return self.dict_dir / "webnovel_dict.txt"
 
+    @property
+    def framework_dict_path(self) -> Path:
+        """框架级词典路径（不依赖项目）"""
+        return Path(__file__).parent.parent.parent / "dicts" / "webnovel_dict.txt"
+
 
     # ================= Embedding API 配置 =================
     embed_api_type: str = "openai"

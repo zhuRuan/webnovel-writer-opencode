@@ -87,17 +87,24 @@ class RAGAdapter:
         self._init_temporal_graph()
 
     def _init_jieba(self):
-        """初始化 jieba 分词器（懒加载单例）"""
+        """初始化 jieba 分词器（懒加载单例 + 动态词典）"""
         if RAGAdapter._jieba_initialized:
             return
         try:
             import jieba
+            
             dict_path = self.config.custom_dict_path
             if dict_path.exists():
                 jieba.load_userdict(str(dict_path))
-                logger.info("jieba 词典加载完成: %s", dict_path)
+                logger.info("jieba 项目词典加载完成: %s", dict_path)
             else:
-                logger.warning("jieba 自定义词典不存在: %s，跳过", dict_path)
+                framework_dict = self.config.framework_dict_path
+                if framework_dict.exists():
+                    jieba.load_userdict(str(framework_dict))
+                    logger.info("jieba 框架词典加载完成: %s", framework_dict)
+                else:
+                    logger.warning("jieba 静态词典不存在，尝试动态生成")
+            
             RAGAdapter._jieba_loaded = True
         except ImportError:
             logger.warning("jieba 未安装，使用单字符分词降级")
@@ -105,6 +112,121 @@ class RAGAdapter:
             logger.warning("jieba 初始化失败，使用单字符分词降级: %s", e)
         finally:
             RAGAdapter._jieba_initialized = True
+
+    def rebuild_custom_dict(self) -> int:
+        """
+        从项目设定集和实体自动生成自定义词典
+        
+        Returns:
+            生成的词条数量
+        """
+        try:
+            import jieba
+            
+            words: set = set()
+            
+            words.update(self._extract_keywords_from_settings())
+            words.update(self._extract_keywords_from_entities())
+            words.update(self._extract_keywords_from_outline())
+            
+            if not words:
+                logger.info("未提取到任何关键词，跳过词典生成")
+                return 0
+            
+            dict_path = self.config.custom_dict_path
+            dict_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(dict_path, "w", encoding="utf-8") as f:
+                f.write("# 动态生成的 jieba 词典\n")
+                f.write("# 由 RAGAdapter.rebuild_custom_dict() 自动生成\n")
+                for word in sorted(words):
+                    if word and len(word) >= 2:
+                        f.write(f"{word} 10 n\n")
+            
+            if RAGAdapter._jieba_loaded:
+                jieba.load_userdict(str(dict_path))
+                logger.info("jieba 动态词典加载完成: %s, 词条数=%d", dict_path, len(words))
+            
+            return len(words)
+        except ImportError:
+            logger.warning("jieba 未安装，无法生成词典")
+            return 0
+        except Exception as e:
+            logger.warning("词典生成失败: %s", e)
+            return 0
+
+    def _extract_keywords_from_settings(self) -> set:
+        """从设定集目录提取关键词"""
+        words: set = set()
+        settings_dir = self.config.settings_dir
+        
+        if not settings_dir.exists():
+            return words
+        
+        for file in settings_dir.glob("*.md"):
+            try:
+                content = file.read_text(encoding="utf-8")
+                words.update(self._extract_chinese_words(content))
+            except Exception as e:
+                logger.debug("读取设定集失败 %s: %s", file.name, e)
+        
+        return words
+
+    def _extract_keywords_from_entities(self) -> set:
+        """从索引实体提取关键词"""
+        words: set = set()
+        
+        try:
+            for entity in self.index_manager.get_core_entities():
+                name = entity.get("canonical_name", "")
+                if name:
+                    words.add(name)
+                
+                for alias in self.index_manager.get_entity_aliases(entity.get("id", "")):
+                    if alias:
+                        words.add(alias)
+        except Exception as e:
+            logger.debug("提取实体关键词失败: %s", e)
+        
+        return words
+
+    def _extract_keywords_from_outline(self) -> set:
+        """从大纲目录提取关键词"""
+        words: set = set()
+        outline_dir = self.config.outline_dir
+        
+        if not outline_dir.exists():
+            return words
+        
+        for file in outline_dir.glob("*.md"):
+            try:
+                content = file.read_text(encoding="utf-8")
+                words.update(self._extract_chinese_words(content))
+            except Exception as e:
+                logger.debug("读取大纲失败 %s: %s", file.name, e)
+        
+        return words
+
+    def _extract_chinese_words(self, text: str) -> set:
+        """从文本中提取可能的中文专有名词"""
+        import re
+        words: set = set()
+        
+        chinese_patterns = [
+            r'[\u4e00-\u9fff]{2,6}',  # 2-6个连续汉字
+        ]
+        
+        for pattern in chinese_patterns:
+            matches = re.findall(pattern, text)
+            words.update(matches)
+        
+        filter_words = {
+            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人",
+            "都", "一", "一个", "上", "也", "很", "到", "说", "要", "去",
+            "你", "会", "着", "没有", "看", "好", "自己", "这", "那",
+        }
+        
+        return {w for w in words if w not in filter_words and len(w) >= 2}
 
     def _init_temporal_graph(self):
         """初始化时序图索引"""
@@ -117,7 +239,7 @@ class RAGAdapter:
             return
         
         try:
-            relationships = self.index_manager.get_all_relationships()
+            relationships = self.index_manager.get_recent_relationships(limit=1000)
             for rel in relationships:
                 self._temporal_graph.add_edge(
                     src=rel.get("from_entity", ""),
@@ -1648,6 +1770,9 @@ def main():
         help="中心实体列表（JSON 数组或逗号分隔）",
     )
 
+    # 重建词典
+    subparsers.add_parser("rebuild-dict")
+
     argv = normalize_global_project_root(sys.argv[1:])
     args = parser.parse_args(argv)
     command_started_at = time.perf_counter()
@@ -1794,6 +1919,10 @@ def main():
             _append_timing(True)
         else:
             emit_success(payload, message="search_results")
+
+    elif args.command == "rebuild-dict":
+        count = adapter.rebuild_custom_dict()
+        emit_success({"words_count": count}, message="dict_rebuilt")
 
     else:
         emit_error("UNKNOWN_COMMAND", "未指定有效命令", suggestion="请查看 --help")
