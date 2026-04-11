@@ -82,18 +82,28 @@ class RAGAdapter:
         self.query_router = QueryRouter()
         self._degraded_mode_reason: Optional[str] = None
         self._temporal_graph: Optional[TemporalGraphIndex] = None
+        self._last_dict_word_count: int = 0
+        self._rebuild_timer: Optional[Any] = None
         self._init_db()
         self._init_jieba()
         self._init_temporal_graph()
 
     def _init_jieba(self):
-        """初始化 jieba 分词器（懒加载单例 + 动态词典）"""
+        """初始化 jieba 分词器（懒加载单例 + 自动重建）"""
         if RAGAdapter._jieba_initialized:
             return
         try:
             import jieba
             
             dict_path = self.config.custom_dict_path
+            
+            # 自动重建（初始化时）
+            if self.config.tokenizer_auto_rebuild_on_init and not dict_path.exists():
+                word_count = self.rebuild_custom_dict()
+                if word_count > 0 and self.config.tokenizer_log_rebuild_summary:
+                    logger.info("[分词词典] 初始化重建完成: %d 词条", word_count)
+            
+            # 加载词典
             if dict_path.exists():
                 jieba.load_userdict(str(dict_path))
                 logger.info("jieba 项目词典加载完成: %s", dict_path)
@@ -103,7 +113,7 @@ class RAGAdapter:
                     jieba.load_userdict(str(framework_dict))
                     logger.info("jieba 框架词典加载完成: %s", framework_dict)
                 else:
-                    logger.warning("jieba 静态词典不存在，尝试动态生成")
+                    logger.warning("jieba 词典不存在，跳过")
             
             RAGAdapter._jieba_loaded = True
         except ImportError:
@@ -113,9 +123,12 @@ class RAGAdapter:
         finally:
             RAGAdapter._jieba_initialized = True
 
-    def rebuild_custom_dict(self) -> int:
+    def rebuild_custom_dict(self, reason: str = "manual") -> int:
         """
         从项目设定集和实体自动生成自定义词典
+        
+        Args:
+            reason: 触发原因 (init/entity_change/manual)
         
         Returns:
             生成的词条数量
@@ -137,15 +150,21 @@ class RAGAdapter:
             dict_path.parent.mkdir(parents=True, exist_ok=True)
             
             with open(dict_path, "w", encoding="utf-8") as f:
-                f.write("# 动态生成的 jieba 词典\n")
-                f.write("# 由 RAGAdapter.rebuild_custom_dict() 自动生成\n")
+                f.write(f"# 动态生成的 jieba 词典\n")
+                f.write(f"# 由 RAGAdapter.rebuild_custom_dict() 自动生成\n")
+                f.write(f"# 触发原因: {reason}\n")
                 for word in sorted(words):
                     if word and len(word) >= 2:
                         f.write(f"{word} 10 n\n")
             
             if RAGAdapter._jieba_loaded:
                 jieba.load_userdict(str(dict_path))
-                logger.info("jieba 动态词典加载完成: %s, 词条数=%d", dict_path, len(words))
+            
+            # 记录词条数量，用于日志抑制
+            self._last_dict_word_count = len(words)
+            
+            if self.config.tokenizer_log_rebuild_summary:
+                logger.info("[分词词典] 重建完成: %d 词条, 原因: %s", len(words), reason)
             
             return len(words)
         except ImportError:

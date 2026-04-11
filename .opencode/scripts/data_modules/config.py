@@ -204,6 +204,14 @@ class DataModulesConfig:
     tokenizer_number_normalization: bool = field(
         default_factory=lambda: os.getenv("TOKENIZER_NUMBER_NORM", "true").lower() == "true"
     )
+    tokenizer_auto_rebuild_on_init: bool = field(
+        default_factory=lambda: os.getenv("TOKENIZER_AUTO_REBUILD", "true").lower() == "true"
+    )
+    tokenizer_auto_rebuild_on_entity: bool = field(
+        default_factory=lambda: os.getenv("TOKENIZER_REBUILD_ON_ENTITY", "true").lower() == "true"
+    )
+    tokenizer_rebuild_debounce_seconds: int = 30
+    tokenizer_log_rebuild_summary: bool = True
 
     relationship_graph_from_index_enabled: bool = True
 
