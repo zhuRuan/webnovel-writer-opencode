@@ -212,6 +212,13 @@ class DataModulesConfig:
     )
     tokenizer_rebuild_debounce_seconds: int = 30
     tokenizer_log_rebuild_summary: bool = True
+    
+    # ================= 世界观一致性配置 =================
+    world_consistency_check_enabled: bool = True
+    world_consistency_check_interval: int = 10
+    power_jump_threshold: int = 3
+    relationship_jump_threshold: float = 0.5
+    faction_change_threshold: float = 0.2
 
     relationship_graph_from_index_enabled: bool = True
 

@@ -99,6 +99,24 @@ checkers:
       - 项目根：{PROJECT_ROOT}
       - 审查器定义见：.opencode/agents/pacing-checker.md
 
+  world-consistency-checker:
+    name: 世界观一致性检查
+    name_en: World Consistency Checker
+    file: ../agents/world-consistency-checker.md
+    category: conditional
+    enabled: true
+    description: 检测战力崩坏、道具复用、势力平衡、时间线矛盾
+    triggers:
+      - type: condition
+        expression: "chapter_number >= 5 and chapter_number % 10 == 0"
+      - type: condition
+        expression: "chapter_type == 'climax'"
+    invoke_template: |
+      对第 {chapter} 章执行世界观一致性检查。
+      - 章节文件：{chapter_file}
+      - 项目根：{PROJECT_ROOT}
+      - 审查器定义见：.opencode/agents/world-consistency-checker.md
+
 # 审查模式配置
 modes:
   standard:
