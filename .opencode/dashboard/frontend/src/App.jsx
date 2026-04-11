@@ -756,6 +756,10 @@ function PublishPage() {
     const [chPage, setChPage] = useState(1)
     const [chFilter, setChFilter] = useState('all')
 
+    function refreshLocalChapters() {
+        fetchJSON('/api/chapters').then(setLocalChapters).catch(() => setLocalChapters([]))
+    }
+
     useEffect(() => {
         fetchJSON('/api/publish/status').then(setStatus).catch(() => setStatus(null))
         fetchJSON('/api/publish/books').then(setBooks).catch(() => setBooks([]))
@@ -916,7 +920,7 @@ function PublishPage() {
             </div>
 
             <div className="card">
-                <div className="card-header"><span className="card-title">章节选择</span><div style={{ display: 'flex', gap: '0.5rem' }}><button className="btn btn-sm btn-primary" onClick={selectAll}>全选</button><button className="btn btn-sm btn-primary" onClick={selectUnpublished}>仅未发布 ({unpublishedCount})</button><button className="btn btn-sm" style={{ background: '#64748b', color: '#fff' }} onClick={clearAll}>清空</button></div></div>
+                <div className="card-header"><span className="card-title">章节选择</span><div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}><button className="btn btn-sm" style={{ background: '#475569', color: '#fff' }} onClick={refreshLocalChapters}>🔄 刷新</button><button className="btn btn-sm btn-primary" onClick={selectAll}>全选</button><button className="btn btn-sm btn-primary" onClick={selectUnpublished}>仅未发布 ({unpublishedCount})</button><button className="btn btn-sm" style={{ background: '#64748b', color: '#fff' }} onClick={clearAll}>清空</button></div></div>
                 {selectedBook ? (<>
                     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
                         {[{ key: 'all', label: `全部 (${localChapters.length})` }, { key: 'unpublished', label: `🆕 可发布 (${unpublishedCount})` }, { key: 'published', label: `✅ 已发布 (${publishedCount})` }].map(f => (<button key={f.key} className={`btn btn-sm ${chFilter === f.key ? 'btn-primary' : ''}`} style={chFilter === f.key ? {} : { background: '#334155', color: '#94a3b8' }} onClick={() => { setChFilter(f.key); setChPage(1) }}>{f.label}</button>))}

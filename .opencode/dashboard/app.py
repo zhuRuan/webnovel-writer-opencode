@@ -159,6 +159,11 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             raise HTTPException(404, f"任务 {task_id} 不存在")
         return status
 
+    @app.post("/api/publish/close")
+    def api_close_publish_manager():
+        """显式关闭浏览器，释放资源。"""
+        return close_publish_manager()
+
     # ===========================================================
     # API：实体数据库（index.db 只读查询）
     # ===========================================================

@@ -11,14 +11,57 @@ FastAPI 可调用的同步接口，并提供后台任务管理与进度跟踪。
 """
 
 import asyncio
+import atexit
 import json
 import sys
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+_pm_lock = threading.Lock()
+_pm_loop: Optional[asyncio.AbstractEventLoop] = None
+_pm_instance: Optional["PublisherManager"] = None
+_pm_project_root: Optional[Path] = None
+_pm_last_used: float = 0
+_IDLE_TIMEOUT = 15 * 60  # 15分钟
+
+
+def _run_async(coro):
+    """线程安全的异步执行器，复用单个事件循环"""
+    global _pm_loop
+    with _pm_lock:
+        if _pm_loop is None or _pm_loop.is_closed():
+            _pm_loop = asyncio.new_event_loop()
+    return _pm_loop.run_until_complete(coro)
+
+
+def _close_pm_instance():
+    """关闭并清理缓存的 PublisherManager 实例"""
+    global _pm_instance, _pm_project_root
+    if _pm_instance:
+        try:
+            _run_async(_pm_instance.close())
+        except Exception:
+            pass
+        _pm_instance = None
+        _pm_project_root = None
+
+
+def _check_idle():
+    """后台线程检查闲置并关闭浏览器"""
+    while True:
+        time.sleep(60)
+        with _pm_lock:
+            if _pm_instance and (time.time() - _pm_last_used) > _IDLE_TIMEOUT:
+                _close_pm_instance()
+
+
+threading.Thread(target=_check_idle, daemon=True).start()
+atexit.register(_close_pm_instance)
 
 # 确保 publisher 和 publish_manager 可被导入
 _opencode_root = Path(__file__).resolve().parent.parent
@@ -98,9 +141,27 @@ def get_task_store() -> TaskStore:
 
 
 def _get_publish_manager(project_root: Path):
-    """动态导入并返回 PublisherManager 实例。"""
+    """获取 PublisherManager 实例（单例模式）"""
+    global _pm_instance, _pm_project_root, _pm_last_used
+    
     from publish_manager import PublisherManager
-    return PublisherManager(project_root)
+    
+    _pm_last_used = time.time()
+    
+    if _pm_instance is not None and _pm_project_root != project_root:
+        _close_pm_instance()
+    
+    if _pm_instance is None:
+        _pm_instance = PublisherManager(project_root)
+        _pm_project_root = project_root
+    
+    return _pm_instance
+
+
+def close_publish_manager() -> Dict[str, Any]:
+    """显式关闭浏览器（供 API 调用）"""
+    _close_pm_instance()
+    return {"success": True}
 
 
 def check_playwright() -> Dict[str, Any]:
@@ -136,18 +197,8 @@ def check_login_status() -> Dict[str, Any]:
 def get_books(project_root: Path) -> List[Dict[str, Any]]:
     """获取已创建书籍列表。"""
     pm = _get_publish_manager(project_root)
-    try:
-        loop = asyncio.new_event_loop()
-        books = loop.run_until_complete(pm.list_books())
-        loop.close()
-        return books
-    finally:
-        try:
-            loop = asyncio.new_event_loop()
-            loop.run_until_complete(pm.close())
-            loop.close()
-        except Exception:
-            pass
+    books = _run_async(pm.list_books())
+    return books
 
 
 def create_book(
@@ -161,41 +212,26 @@ def create_book(
     """创建新书。"""
     pm = _get_publish_manager(project_root)
     try:
-        loop = asyncio.new_event_loop()
-        book_id = loop.run_until_complete(
+        book_id = _run_async(
             pm.create_book(title, genre, synopsis, protagonist1, protagonist2)
         )
-        loop.close()
         return {"success": True, "book_id": book_id, "title": title}
     except Exception as e:
         return {"success": False, "error": str(e)}
-    finally:
-        try:
-            loop = asyncio.new_event_loop()
-            loop.run_until_complete(pm.close())
-            loop.close()
-        except Exception:
-            pass
 
 
 def get_remote_chapters(project_root: Path, book_id: str) -> List[Dict[str, Any]]:
     """获取番茄平台上的章节列表（已发布+草稿）。"""
     pm = _get_publish_manager(project_root)
-    loop = asyncio.new_event_loop()
-    try:
-        client = loop.run_until_complete(pm._ensure_client())
-
-        # 1. 获取已发布章节
-        published = loop.run_until_complete(client.get_chapter_list(book_id))
-
-        # 2. 获取草稿章节
-        drafts = []
+    
+    async def _fetch():
+        client = await pm._ensure_client()
+        published = await client.get_chapter_list(book_id)
         try:
-            drafts = loop.run_until_complete(client.get_draft_list(book_id))
+            drafts = await client.get_draft_list(book_id)
         except Exception:
-            pass
-
-        # 3. 合并：已发布 + 草稿（去重，以 item_id 为准）
+            drafts = []
+        
         seen_ids = set()
         merged = []
         for ch in published + drafts:
@@ -205,16 +241,12 @@ def get_remote_chapters(project_root: Path, book_id: str) -> List[Dict[str, Any]
                 merged.append(ch)
             elif not item_id:
                 merged.append(ch)
-
         return merged
+    
+    try:
+        return _run_async(_fetch())
     except Exception as e:
         return {"error": str(e)}
-    finally:
-        try:
-            loop.run_until_complete(pm.close())
-        except Exception:
-            pass
-        loop.close()
 
 
 def publish_chapters(
@@ -273,15 +305,9 @@ def publish_chapters(
             _task_store.update(task_id, status=TaskStatus.FAILED, message=f"发布失败: {e}")
             _task_store.add_log(task_id, f"ERROR: {e}")
         finally:
-            try:
-                loop.run_until_complete(pm.close())
-            except Exception:
-                pass
             loop.close()
 
-    import threading
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
+    threading.Thread(target=_run, daemon=True).start()
 
     return task_id
 
