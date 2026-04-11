@@ -1,31 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-分词增强效果测试脚本
-
-用于验证 jieba 分词 + 数字归一化 相比单字符分词的效果提升。
-运行方式: python test_tokenizer_improvement.py
+分词增强效果测试脚本 - 带 jieba 验证
 """
 
 import asyncio
 import sys
+import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+os.environ["PYTHONPATH"] = str(Path(__file__).parent.parent.parent)
 
-from data_modules.rag_adapter import RAGAdapter, SearchResult
+from data_modules.rag_adapter import RAGAdapter
 from data_modules.config import DataModulesConfig
 
 
-class ABComparisonResult:
-    """A/B 测试结果"""
-    def __init__(self, query: str, old_results: list, new_results: list):
-        self.query = query
-        self.old_results = old_results
-        self.new_results = new_results
-
-
 def create_test_adapter(temp_path: Path) -> RAGAdapter:
-    """创建测试用的 RAGAdapter"""
     import data_modules.rag_adapter as rag_module
     
     class StubClient:
@@ -48,7 +38,6 @@ def create_test_adapter(temp_path: Path) -> RAGAdapter:
 
 
 async def prepare_test_data(adapter: RAGAdapter):
-    """准备测试数据"""
     chunks = [
         {"chapter": 1, "scene_index": 1, "content": "萧炎是天云宗弟子，在迦南学院修炼斗气"},
         {"chapter": 2, "scene_index": 1, "content": "药老苏醒后，传授萧炎三年之约的秘密"},
@@ -62,14 +51,10 @@ async def prepare_test_data(adapter: RAGAdapter):
 
 
 async def run_ab_test(adapter: RAGAdapter, queries: list) -> list:
-    """运行 A/B 测试"""
     results = []
     for query in queries:
         bm25_results = adapter.bm25_search(query, top_k=5)
-        results.append({
-            'query': query,
-            'results': bm25_results
-        })
+        results.append({'query': query, 'results': bm25_results})
     return results
 
 
@@ -77,12 +62,14 @@ def main():
     import tempfile
     
     print("=" * 60)
-    print("Tokenization Enhancement Test - A/B Comparison")
+    print("Tokenization Enhancement Test - With jieba")
     print("=" * 60)
     
     with tempfile.TemporaryDirectory() as tmp:
         temp_path = Path(tmp)
         adapter = create_test_adapter(temp_path)
+        
+        print(f"\n[jieba status] Available: {adapter._jieba_available}")
         
         asyncio.run(prepare_test_data(adapter))
         
@@ -112,7 +99,7 @@ def main():
         
         print("\n" + "=" * 60)
         print("Test Complete")
-        print("\nNote: Install jieba for full effect: pip install jieba>=0.42.1")
+        print(f"jieba loaded: {adapter._jieba_available}")
         print("Dictionary: .opencode/dicts/webnovel_dict.txt")
 
 

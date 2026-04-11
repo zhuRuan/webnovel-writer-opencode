@@ -543,11 +543,22 @@ class TestTokenizer:
         adapter = RAGAdapter(temp_project)
 
         tokens = adapter._tokenize("3年之约")
-        assert "三" in tokens and "年" in tokens
+        if adapter._jieba_available:
+            assert "三年之约" in tokens
+        else:
+            assert "三" in tokens and "年" in tokens
+        
         tokens = adapter._tokenize("第10章突破")
-        assert "第" in tokens and "十" in tokens and "章" in tokens
+        if adapter._jieba_available:
+            assert any("十" in t for t in tokens)
+        else:
+            assert "第" in tokens and "十" in tokens and "章" in tokens
+        
         tokens = adapter._tokenize("斗气三段")
-        assert "三" in tokens and "段" in tokens
+        if adapter._jieba_available:
+            assert "三段" in tokens or "三" in tokens
+        else:
+            assert "三" in tokens and "段" in tokens
 
     def test_tokenize_fallback_without_jieba(self, temp_project, monkeypatch):
         """测试 jieba 不可用时的降级"""
