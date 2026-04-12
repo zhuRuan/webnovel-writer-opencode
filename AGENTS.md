@@ -209,3 +209,22 @@ git commit -m "type: description"
 | `.opencode/agents/*.md` | 审查器实现定义 |
 | `.opencode/skills/webnovel-write-batch/SKILL.md` | 批量写作 Skill |
 | `.opencode/skills/webnovel-write-batch/references/batch-protocol.md` | 批量协议定义 |
+
+---
+
+## 功能完成状态
+
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| **Phase 1: 基础架构** | ✅ 完成 | |
+| └─ jieba 分词 + 动态词典 | ✅ | 自动重建 |
+| └─ Graph-RAG | ✅ | 三层子图 + 持久化 |
+| └─ 触发条件 | ✅ | ConditionEvaluator |
+| **Phase 2: 一致性保障** | ✅ 完成 | |
+| └─ WorldConsistencyChecker | ✅ | 通用化配置 |
+| └─ DebtTracker | ✅ | 债务追踪 + 硬约束 |
+| └─ 分层审查 | ✅ | Code → LLM |
+| └─ 自适应上下文预算 | ✅ | 债务感知增强 |
+| **Phase 1.5: 通用化** | ✅ 完成 | |
+| └─ 题材预设 | ✅ | xianxia/urban/scifi |
+| └─ 自定义战力体系 | ✅ | config 驱动 |

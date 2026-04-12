@@ -204,6 +204,37 @@ python .opencode/scripts/webnovel.py checkers schema new-checker
 
 ## 审查器分类
 
+### Code Checkers（代码层）
+
+运行在 LLM 之前，用于快速阻断严重问题。确定性检查，执行速度快（~ms）：
+
+| 检查器 | 说明 | 阻塞级别 |
+|--------|------|----------|
+| `world-consistency` | 战力/道具/时间线一致性 | critical 阻断 |
+| `DebtTracker` | 债务追踪（伏笔/承诺/偿还） | high 阻断 |
+
+**特点**：
+- 无需 LLM 调用，纯 Python 逻辑
+- 优先于 LLM Agents 执行
+- critical/high 问题可硬阻塞后续流程
+
+**使用方式**：
+
+```python
+from data_modules.checkers_manager import CheckersManager
+
+# 注册 code checker
+CheckersManager.register_code_checker(
+    "my-checker",
+    lambda chapter, content, ctx: [{"severity": "high", "message": "test"}],
+    {"block_on_critical": True}
+)
+
+# 运行分层审查
+result = CheckersManager.run_layered_checkers(chapter, content, context)
+# blocked=True → 立即终止，不调用 LLM
+```
+
 ### 核心审查器（Core）
 
 始终执行：
@@ -214,7 +245,7 @@ python .opencode/scripts/webnovel.py checkers schema new-checker
 | `continuity-checker` | 连贯性 |
 | `ooc-checker` | 人物 OOC |
 
-### 条件审查器（Conditional）
+### LLM Agents（语言模型层）
 
 满足触发条件时执行：
 
@@ -223,6 +254,47 @@ python .opencode/scripts/webnovel.py checkers schema new-checker
 | `reader-pull-checker` | 非过渡章、有未闭合问题 |
 | `high-point-checker` | 关键章/高潮章、有战斗/打脸 |
 | `pacing-checker` | 章号 >= 10、节奏失衡风险 |
+
+---
+
+## 债务追踪（DebtTracker）
+
+债务追踪用于管理网文中的"债务"（伏笔、承诺、断章钩子）：
+
+### 创建债务
+
+在正文中使用显式标签：
+
+```
+[伏笔:神秘玉佩]  # 自动创建 Debt，priority=HIGH
+```
+
+### 偿还债务
+
+```
+[回收:神秘玉佩]  # 自动标记 repaid=True
+```
+
+### 硬约束
+
+```python
+from data_modules.debt_tracker import DebtTracker
+
+tracker = DebtTracker()
+
+# 检查是否可以写高潮章节
+can_write, reason = tracker.can_write_climax(chapter_num)
+# - 高优先级债务未偿还 → False
+# - >3 活跃债务 → False
+```
+
+### 配置项
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `context_debt_aware_budget_enabled` | True | 启用债务感知预算 |
+| `context_debt_aware_threshold` | 2 | 触发阈值 |
+| `context_debt_aware_foreshadow_weight` | 0.15 | 15% Token 重分配 |
 
 ---
 

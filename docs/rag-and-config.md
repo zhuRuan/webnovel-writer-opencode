@@ -54,3 +54,41 @@ python .opencode/scripts/webnovel.py status --focus all
 # RAG 统计
 python .opencode/scripts/webnovel.py rag stats
 ```
+
+## Graph-RAG 持久化
+
+TemporalGraphIndex 支持 SQLite 持久化，避免每次启动时全量重建：
+
+### 数据流
+
+```
+首次启动:
+  _init_temporal_graph()
+    → _load_relationships_to_graph() (全量重建)
+    → save_to_db(index.db)
+
+后续启动:
+  _init_temporal_graph()
+    → load_from_db(index.db) ✓ (毫秒级加载)
+```
+
+### 数据库表
+
+| 表名 | 说明 |
+|------|------|
+| `graph_nodes` | 图节点（角色/地点/势力） |
+| `graph_edges` | 图边（关系及权重） |
+
+### 触发时机
+
+- **触发位置**: `RAGAdapter.__init__() → _init_temporal_graph()`
+- **自动保存**: 启动时全量重建后 + 5分钟延迟保存
+- **验收标准**: 第二次启动时初始化耗时 < 100ms
+
+### 配置项
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `graph_rag_enabled` | True | 启用 Graph-RAG |
+| `graph_rag_expand_hops` | 2 | 最大跳数 |
+| `graph_rag_max_expanded_entities` | 50 | 最大扩展实体数 |
