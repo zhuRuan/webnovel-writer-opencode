@@ -15,16 +15,40 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import dataclass
+from logging import getLogger
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import yaml
 
 from .condition_evaluator import ConditionEvaluator, TriggerCondition
 
+logger = getLogger(__name__)
+
+
+class CodeCheckerProtocol:
+    """Code Checker 协议接口"""
+    
+    def check_chapter(self, chapter: int, content: str, chapter_context: Dict = None) -> List[Dict]:
+        """检查章节并返回问题列表"""
+        raise NotImplementedError
+
+
+@dataclass
+class CodeCheckerResult:
+    """Code Checker 执行结果"""
+    checker_id: str
+    passed: bool
+    issues: List[Dict]
+    blocked: bool = False  # 是否硬阻塞（critical 问题）
+
 
 class CheckersManager:
     """审查器配置管理器"""
+    
+    # 预注册的 code checkers
+    _code_checkers: Dict[str, Tuple[Callable, Dict]] = {}
 
     def __init__(self, checkers_dir: Optional[Path] = None):
         if checkers_dir is None:
@@ -34,6 +58,181 @@ class CheckersManager:
         self.schema_path = checkers_dir / "schema.yaml"
         self.agents_dir = checkers_dir / "agents"
         self.templates_dir = checkers_dir / "templates"
+
+    @classmethod
+    def register_code_checker(
+        cls,
+        checker_id: str,
+        checker_func: Callable,
+        config: Optional[Dict] = None
+    ) -> None:
+        """
+        注册 code checker（运行在 LLM agent 之前的确定性检查层）
+        
+        Args:
+            checker_id: 唯一标识符
+            checker_func: 检查函数 (chapter, content, chapter_context) -> List[Dict]
+            config: 配置参数 {severity_threshold, block_on_critical, ...}
+        """
+        if config is None:
+            config = {}
+        cls._code_checkers[checker_id] = (checker_func, config)
+        logger.info(f"注册 code checker: {checker_id}")
+
+    @classmethod
+    def register_world_consistency_checker(
+        cls,
+        config: Optional[Dict] = None
+    ) -> None:
+        """
+        注册 WorldConsistencyChecker 作为 code checker
+        
+        Args:
+            config: 配置参数
+        """
+        from .world_consistency_checker import WorldConsistencyChecker
+        
+        def world_checker_wrapper(
+            chapter: int,
+            content: str,
+            chapter_context: Optional[Dict] = None
+        ) -> List[Dict]:
+            from .world_state_tracker import WorldStateTracker
+            tracker = WorldStateTracker()
+            checker = WorldConsistencyChecker(config, tracker)
+            issues = checker.check_chapter(chapter, content, chapter_context)
+            return [
+                {
+                    "issue_id": issue.issue_id,
+                    "severity": issue.severity,
+                    "message": issue.message,
+                    "location": issue.location,
+                    "suggestion": issue.suggestion,
+                }
+                for issue in issues
+            ]
+        
+        default_config = {
+            "severity_threshold": "high",
+            "block_on_critical": True,
+        }
+        if config:
+            default_config.update(config)
+        
+        cls.register_code_checker(
+            "world-consistency",
+            world_checker_wrapper,
+            default_config
+        )
+
+    @classmethod
+    def run_code_checkers(
+        cls,
+        chapter: int,
+        content: str,
+        chapter_context: Optional[Dict] = None
+    ) -> List[CodeCheckerResult]:
+        """
+        运行所有已注册的 code checkers
+        
+        Args:
+            chapter: 章节号
+            content: 章节内容
+            chapter_context: 章节上下文
+        
+        Returns:
+            执行结果列表
+        """
+        results = []
+        for checker_id, (checker_func, config) in cls._code_checkers.items():
+            try:
+                issues = checker_func(chapter, content, chapter_context)
+                severity_threshold = config.get("severity_threshold", "critical")
+                block_on_critical = config.get("block_on_critical", True)
+                
+                has_blocking = False
+                if block_on_critical:
+                    for issue in issues:
+                        if issue.get("severity") in ["critical", "high"]:
+                            has_blocking = True
+                            break
+                
+                results.append(CodeCheckerResult(
+                    checker_id=checker_id,
+                    passed=len(issues) == 0,
+                    issues=issues,
+                    blocked=has_blocking
+                ))
+            except Exception as e:
+                logger.error(f"Code checker {checker_id} 执行失败: {e}")
+                results.append(CodeCheckerResult(
+                    checker_id=checker_id,
+                    passed=False,
+                    issues=[{"error": str(e)}],
+                    blocked=False
+                ))
+        
+        return results
+
+    @classmethod
+    def get_code_checkers(cls) -> Dict[str, Tuple[Callable, Dict]]:
+        """获取已注册的 code checkers"""
+        return cls._code_checkers.copy()
+
+    @classmethod
+    def run_layered_checkers(
+        cls,
+        chapter: int,
+        content: str,
+        chapter_context: Optional[Dict] = None,
+        mode: str = "standard"
+    ) -> Dict[str, Any]:
+        """
+        分层运行审查器：Code Layer → LLM Agents
+        
+        1. 先运行 code checkers（确定性检查，快速）
+        2. 若有 blocked=True → 立即返回阻塞结果
+        3. 否则运行 LLM agents（可选）
+        
+        Args:
+            chapter: 章节号
+            content: 章节内容
+            chapter_context: 章节上下文
+            mode: 审查模式 (standard/minimal/full)
+        
+        Returns:
+            {
+                "layer": "code" | "llm",
+                "blocked": bool,
+                "code_results": [...],
+                "llm_results": [...],
+                "issues": [...],
+            }
+        """
+        code_results = cls.run_code_checkers(chapter, content, chapter_context)
+        
+        blocked_results = [r for r in code_results if r.blocked]
+        if blocked_results:
+            logger.warning(f"Code layer blocking: %d issues found", len(blocked_results))
+            return {
+                "layer": "code",
+                "blocked": True,
+                "code_results": code_results,
+                "llm_results": [],
+                "issues": [
+                    issue
+                    for r in blocked_results
+                    for issue in r.issues
+                ],
+            }
+        
+        return {
+            "layer": "llm",
+            "blocked": False,
+            "code_results": code_results,
+            "llm_results": [],
+            "issues": [],
+        }
 
     def load_registry(self) -> Dict[str, Any]:
         """加载审查器注册表"""

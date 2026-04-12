@@ -43,6 +43,11 @@ from .writing_guidance_builder import (
     is_checklist_item_completed,
 )
 
+try:
+    from .debt_tracker import DebtTracker
+except ImportError:
+    DebtTracker = None
+
 
 logger = getLogger(__name__)
 
@@ -162,6 +167,26 @@ class ContextManager:
         assembled["weights"] = weights
         if chapter > 0:
             assembled.setdefault("meta", {})["context_weight_stage"] = self._resolve_context_stage(chapter)
+        
+        if DebtTracker and getattr(self.config, "context_debt_aware_budget_enabled", True):
+            debt_threshold = getattr(self.config, "context_debt_aware_threshold", 2)
+            foreshadow_weight = getattr(self.config, "context_debt_aware_foreshadow_weight", 0.15)
+            
+            tracker = DebtTracker()
+            active_debts = tracker.check_active_debts()
+            
+            if len(active_debts) > debt_threshold:
+                adjusted_weights = dict(weights)
+                adjusted_weights["global"] = adjusted_weights.get("global", 0) + foreshadow_weight
+                adjusted_weights["scene"] = max(0, adjusted_weights.get("scene", 0) - foreshadow_weight)
+                assembled["weights"] = adjusted_weights
+                assembled["meta"]["debt_aware"] = {
+                    "active_debts": len(active_debts),
+                    "threshold": debt_threshold,
+                    "foreshadow_weight": foreshadow_weight,
+                }
+                logger.info(f"债务感知预算启用: %d 活跃债务 → foreshadow %.0f%%", len(active_debts), foreshadow_weight * 100)
+        
         return assembled
 
     def filter_invalid_items(self, items: List[Dict[str, Any]], source_type: str, id_key: str) -> List[Dict[str, Any]]:

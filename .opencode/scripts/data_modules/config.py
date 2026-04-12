@@ -293,6 +293,9 @@ class DataModulesConfig:
     context_dynamic_budget_early_scene_bonus: float = 0.04
     context_dynamic_budget_late_global_bonus: float = 0.08
     context_dynamic_budget_late_scene_penalty: float = 0.06
+    context_debt_aware_budget_enabled: bool = True
+    context_debt_aware_threshold: int = 2
+    context_debt_aware_foreshadow_weight: float = 0.15
     context_template_weights_dynamic: dict[str, dict[str, dict[str, float]]] = field(
         default_factory=_default_context_template_weights_dynamic
     )
