@@ -36,20 +36,20 @@ class ConsistencyIssue:
 class WorldConsistencyChecker:
     """世界观一致性检查器"""
     
-    # 配置参数
-    POWER_JUMP_THRESHOLD = 3      # 战力跨越阈值
-    ITEM_DESTROYED_SEVERITY = "high"  # 已销毁道具使用严重级别
-    FACTION_CHANGE_THRESHOLD = 0.2     # 势力变化阈值（20%）
-    RELATIONSHIP_JUMP_THRESHOLD = 0.5  # 关系突变阈值
+    # 默认配置参数（当 config 为 None 时使用）
+    DEFAULT_POWER_JUMP_THRESHOLD = 3
+    DEFAULT_ITEM_DESTROYED_SEVERITY = "high"
+    DEFAULT_FACTION_CHANGE_THRESHOLD = 0.2
+    DEFAULT_RELATIONSHIP_JUMP_THRESHOLD = 0.5
     
-    # 战力等级关键词
-    POWER_KEYWORDS = [
+    # 默认战力等级关键词
+    DEFAULT_POWER_KEYWORDS = [
         "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫",
         "斗者", "斗师", "大斗师", "斗灵", "斗王", "斗皇", "斗宗", "斗尊", "斗帝",
     ]
     
-    # 已销毁/已损坏关键词
-    ITEM_DESTROYED_KEYWORDS = [
+    # 默认已销毁/已损坏关键词
+    DEFAULT_ITEM_DESTROYED_KEYWORDS = [
         "碎裂", "报废", "毁灭", "消散", "化为灰烬", "彻底损毁",
         "失去光泽", "暗淡无光", "裂纹", "破碎",
     ]
@@ -59,7 +59,32 @@ class WorldConsistencyChecker:
         self.world_tracker = world_tracker or WorldStateTracker(config)
         
         if config:
-            self.POWER_JUMP_THRESHOLD = getattr(config, "power_jump_threshold", 3)
+            self.POWER_JUMP_THRESHOLD = getattr(config, "power_jump_threshold", self.DEFAULT_POWER_JUMP_THRESHOLD)
+            self.ITEM_DESTROYED_SEVERITY = "high"
+            self.FACTION_CHANGE_THRESHOLD = getattr(config, "faction_change_threshold", self.DEFAULT_FACTION_CHANGE_THRESHOLD)
+            self.RELATIONSHIP_JUMP_THRESHOLD = getattr(config, "relationship_jump_threshold", self.DEFAULT_RELATIONSHIP_JUMP_THRESHOLD)
+            
+            power_levels_cfg = getattr(config, "world_power_levels", None)
+            if power_levels_cfg:
+                self.world_tracker.DEFAULT_POWER_LEVELS = dict(power_levels_cfg)
+            
+            self.POWER_KEYWORDS = getattr(config, "world_power_keywords", self.DEFAULT_POWER_KEYWORDS)
+            self.ITEM_DESTROYED_KEYWORDS = getattr(config, "world_item_destroy_keywords", self.DEFAULT_ITEM_DESTROYED_KEYWORDS)
+            
+            resolver = getattr(config, "resolve_world_preset", None)
+            if resolver:
+                preset = resolver()
+                if preset.get("power_levels"):
+                    self.world_tracker.DEFAULT_POWER_LEVELS = dict(preset["power_levels"])
+                if preset.get("power_keywords"):
+                    self.POWER_KEYWORDS = list(preset["power_keywords"])
+        else:
+            self.POWER_JUMP_THRESHOLD = self.DEFAULT_POWER_JUMP_THRESHOLD
+            self.ITEM_DESTROYED_SEVERITY = self.DEFAULT_ITEM_DESTROYED_SEVERITY
+            self.FACTION_CHANGE_THRESHOLD = self.DEFAULT_FACTION_CHANGE_THRESHOLD
+            self.RELATIONSHIP_JUMP_THRESHOLD = self.DEFAULT_RELATIONSHIP_JUMP_THRESHOLD
+            self.POWER_KEYWORDS = self.DEFAULT_POWER_KEYWORDS
+            self.ITEM_DESTROYED_KEYWORDS = self.DEFAULT_ITEM_DESTROYED_KEYWORDS
     
     def check_chapter(self, chapter: int, content: str, chapter_context: Dict = None) -> List[ConsistencyIssue]:
         """

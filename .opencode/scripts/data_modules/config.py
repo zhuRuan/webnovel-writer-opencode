@@ -17,6 +17,12 @@ from runtime_compat import normalize_windows_path
 
 from .context_weights import TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT
 
+
+def _load_dotenv() -> None:
+    """加载 .env 文件"""
+    pass
+
+
 def _get_user_claude_root() -> Path:
     raw = (
         os.environ.get("WEBNOVEL_CLAUDE_HOME")
@@ -78,17 +84,45 @@ def _load_project_dotenv(project_root: Path) -> None:
     except Exception:
         return
 
-_load_dotenv()
+
+def _default_context_template_weights_dynamic() -> dict:
+    import copy
+    return copy.deepcopy(TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT)
 
 
-def _default_context_template_weights_dynamic() -> dict[str, dict[str, dict[str, float]]]:
+def _load_world_presets() -> dict:
+    """加载世界观预设配置"""
     return {
-        stage: {
-            template: dict(weights)
-            for template, weights in templates.items()
-        }
-        for stage, templates in TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT.items()
+        "xianxia": {
+            "power_levels": {
+                "筑基": 1, "金丹": 2, "元婴": 3, "化神": 4, "炼虚": 5,
+                "合体": 6, "大乘": 7, "渡劫": 8,
+                "斗者": 1, "斗师": 2, "大斗师": 3, "斗灵": 4, "斗王": 5,
+                "斗皇": 6, "斗宗": 7, "斗尊": 8, "斗帝": 9,
+            },
+            "power_keywords": [
+                "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫",
+                "斗者", "斗师", "大斗师", "斗灵", "斗王", "斗皇", "斗宗", "斗尊", "斗帝",
+            ],
+        },
+        "urban": {
+            "power_levels": {
+                "普通人": 1, "上班族": 2, "小主管": 3, "部门经理": 4, "总监": 5,
+                "vp": 6, "ceo": 7, "富豪榜": 8,
+            },
+            "power_keywords": ["普通人", "上班族", "小主管", "部门经理", "总监", "vp", "ceo"],
+        },
+        "scifi": {
+            "power_levels": {
+                "列兵": 1, "士官": 2, "尉官": 3, "校官": 4, "将军": 5,
+                "星系": 1, "行星": 2, "恒星": 3, "宇宙": 4,
+            },
+            "power_keywords": ["列兵", "士官", "尉官", "校官", "将军", "星系", "行星"],
+        },
     }
+
+
+WORLD_PRESETS = _load_world_presets()
 
 
 @dataclass
@@ -137,6 +171,12 @@ class DataModulesConfig:
         """框架级词典路径（不依赖项目）"""
         return Path(__file__).parent.parent.parent / "dicts" / "webnovel_dict.txt"
 
+    def resolve_world_preset(self) -> dict:
+        """解析世界观预设配置"""
+        preset_name = getattr(self, "world_preset", "xianxia")
+        if preset_name in WORLD_PRESETS:
+            return WORLD_PRESETS[preset_name]
+        return WORLD_PRESETS.get("xianxia", {})
 
     # ================= Embedding API 配置 =================
     embed_api_type: str = "openai"
@@ -219,6 +259,25 @@ class DataModulesConfig:
     power_jump_threshold: int = 3
     relationship_jump_threshold: float = 0.5
     faction_change_threshold: float = 0.2
+    
+    # 战力等级配置（可配置化，支持不同题材）
+    world_power_levels: dict[str, int] = field(default_factory=lambda: {
+        # 仙侠体系
+        "筑基": 1, "金丹": 2, "元婴": 3, "化神": 4, "炼虚": 5,
+        "合体": 6, "大乘": 7, "渡劫": 8,
+        # 玄幻体系
+        "斗者": 1, "斗师": 2, "大斗师": 3, "斗灵": 4, "斗王": 5,
+        "斗皇": 6, "斗宗": 7, "斗尊": 8, "斗帝": 9,
+    })
+    world_power_keywords: list[str] = field(default_factory=lambda: [
+        "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫",
+        "斗者", "斗师", "大斗师", "斗灵", "斗王", "斗皇", "斗宗", "斗尊", "斗帝",
+    ])
+    world_item_destroy_keywords: list[str] = field(default_factory=lambda: [
+        "碎裂", "报废", "毁灭", "消散", "化为灰烬", "彻底损毁",
+        "失去光泽", "暗淡无光", "裂纹", "破碎",
+    ])
+    world_preset: str = "xianxia"  # xianxia / fantasy / urban / scifi / wuxia
 
     relationship_graph_from_index_enabled: bool = True
 
