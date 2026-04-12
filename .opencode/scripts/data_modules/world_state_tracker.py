@@ -84,6 +84,17 @@ class WorldStateTracker:
         self._faction_power: Dict[str, FactionPower] = {}      # faction_name -> FactionPower(...)
         self._timeline: List[TimelineEvent] = []
         self._relationship_arcs: Dict[Tuple[str, str], RelationshipArc] = {}
+        
+        if config:
+            power_levels_cfg = getattr(config, "world_power_levels", None)
+            if power_levels_cfg:
+                self.DEFAULT_POWER_LEVELS = dict(power_levels_cfg)
+            
+            resolver = getattr(config, "resolve_world_preset", None)
+            if resolver:
+                preset = resolver()
+                if preset.get("power_levels"):
+                    self.DEFAULT_POWER_LEVELS = dict(preset["power_levels"])
     
     def load_from_state(self, state_data: Dict) -> None:
         """从 state.json 加载历史状态"""
