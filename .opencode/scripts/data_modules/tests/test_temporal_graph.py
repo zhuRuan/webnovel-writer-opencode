@@ -148,3 +148,28 @@ class TestTemporalGraphIndex:
         
         assert graph2.get_stats()["nodes"] == 1
         assert graph2.get_stats()["edges"] == 1
+
+    def test_save_load_db(self, tmp_path):
+        """测试数据库持久化"""
+        import sqlite3
+        
+        db_path = str(tmp_path / "test_graph.db")
+        
+        graph = TemporalGraphIndex()
+        node = GraphNode(id="角色1", type="角色", name="萧炎")
+        graph.add_node(node)
+        graph.add_edge("角色1", "结识", "角色2", chapter=5)
+        
+        edge_count = graph.save_to_db(db_path)
+        assert edge_count == 1
+        assert graph.node_count == 1
+        assert graph.edge_count == 1
+        
+        graph2 = TemporalGraphIndex()
+        loaded = graph2.load_from_db(db_path)
+        assert loaded is True
+        assert graph2.node_count == 1
+        assert graph2.edge_count == 1
+        
+        node_retrieved = graph2.get_node("角色1")
+        assert node_retrieved.name == "萧炎"

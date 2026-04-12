@@ -248,9 +248,37 @@ class RAGAdapter:
         return {w for w in words if w not in filter_words and len(w) >= 2}
 
     def _init_temporal_graph(self):
-        """初始化时序图索引"""
+        """初始化时序图索引（优先从 DB 加载，若无则重建）"""
         self._temporal_graph = TemporalGraphIndex(decay_base=0.9)
-        self._load_relationships_to_graph()
+        
+        db_path = str(self.config.index_db)
+        loaded = self._temporal_graph.load_from_db(db_path)
+        
+        if loaded:
+            logger.info("时序图从 DB 加载: %s", self._temporal_graph.get_stats())
+        else:
+            logger.info("时序图 DB 无数据，执行全量重建...")
+            self._load_relationships_to_graph()
+            self._temporal_graph.save_to_db(db_path)
+            logger.info("时序图已保存到 DB")
+        
+        self._save_temporal_graph_timer()
+
+    def _save_temporal_graph_timer(self):
+        """定时保存时序图（避免频繁写入）"""
+        import threading
+        if self._temporal_graph and self._temporal_graph.edge_count > 0:
+            def delayed_save():
+                try:
+                    db_path = str(self.config.index_db)
+                    self._temporal_graph.save_to_db(db_path)
+                    logger.info("时序图定时保存完成")
+                except Exception as e:
+                    logger.warning("时序图定时保存失败: %s", e)
+            
+            timer = threading.Timer(300, delayed_save)  # 5分钟后保存
+            timer.daemon = True
+            timer.start()
     
     def _load_relationships_to_graph(self):
         """从关系数据加载到时序图"""

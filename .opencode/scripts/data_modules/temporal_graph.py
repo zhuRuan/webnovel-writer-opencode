@@ -234,3 +234,135 @@ class TemporalGraphIndex:
                 } for k, v in self._edges.items()
             }
         }
+
+    def save_to_db(self, db_path: str) -> int:
+        """
+        持久化到 SQLite 数据库
+        
+        Args:
+            db_path: index.db 路径
+        
+        Returns:
+            保存的边数量
+        """
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS graph_nodes (
+                id TEXT PRIMARY KEY,
+                type TEXT,
+                name TEXT,
+                tier TEXT,
+                first_appearance INTEGER,
+                last_appearance INTEGER
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS graph_edges (
+                src TEXT,
+                rel TEXT,
+                tgt TEXT,
+                weight REAL,
+                last_seen_chapter INTEGER,
+                count INTEGER,
+                PRIMARY KEY (src, rel, tgt)
+            )
+        """)
+        
+        cursor.execute("DELETE FROM graph_nodes")
+        cursor.execute("DELETE FROM graph_edges")
+        
+        for node in self._nodes.values():
+            cursor.execute(
+                "INSERT INTO graph_nodes VALUES (?, ?, ?, ?, ?, ?)",
+                (node.id, node.type, node.name, node.tier,
+                 node.first_appearance, node.last_appearance)
+            )
+        
+        for edge in self._edges.values():
+            cursor.execute(
+                "INSERT INTO graph_edges VALUES (?, ?, ?, ?, ?, ?)",
+                (edge.src, edge.rel, edge.tgt, edge.weight,
+                 edge.last_seen_chapter, edge.count)
+            )
+        
+        conn.commit()
+        edge_count = len(self._edges)
+        conn.close()
+        
+        logger.info(f"Graph 持久化完成: {len(self._nodes)} 节点, {edge_count} 边")
+        return edge_count
+
+    def load_from_db(self, db_path: str) -> bool:
+        """
+        从 SQLite 数据库加载
+        
+        Args:
+            db_path: index.db 路径
+        
+        Returns:
+            是否成功加载
+        """
+        import sqlite3
+        if not db_path:
+            return False
+        
+        import os
+        if not os.path.exists(db_path):
+            logger.warning(f"Graph DB 不存在: {db_path}")
+            return False
+        
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name='graph_edges'
+            """)
+            if not cursor.fetchone():
+                conn.close()
+                return False
+            
+            cursor.execute("SELECT * FROM graph_nodes")
+            for row in cursor.fetchall():
+                node = GraphNode(
+                    id=row[0], type=row[1], name=row[2],
+                    tier=row[3], first_appearance=row[4],
+                    last_appearance=row[5]
+                )
+                self._nodes[node.id] = node
+            
+            cursor.execute("SELECT * FROM graph_edges")
+            for row in cursor.fetchall():
+                edge = GraphEdge(
+                    src=row[0], rel=row[1], tgt=row[2],
+                    weight=row[3], last_seen_chapter=row[4],
+                    count=row[5]
+                )
+                key = (edge.src, edge.rel, edge.tgt)
+                self._edges[key] = edge
+                
+                if edge.src not in self._adjacency:
+                    self._adjacency[edge.src] = []
+                self._adjacency[edge.src].append(key)
+            
+            conn.close()
+            
+            logger.info(f"Graph 加载完成: {len(self._nodes)} 节点, {len(self._edges)} 边")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Graph 加载失败: {e}")
+            return False
+
+    @property
+    def node_count(self) -> int:
+        return len(self._nodes)
+
+    @property
+    def edge_count(self) -> int:
+        return len(self._edges)

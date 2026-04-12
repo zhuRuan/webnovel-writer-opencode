@@ -263,7 +263,6 @@ def publish_chapters(
 
     def _run():
         pm = _get_publish_manager(project_root)
-        loop = asyncio.new_event_loop()
         try:
             _task_store.add_log(task_id, "正在加载章节…")
             chapters = pm.load_chapters(range_spec)
@@ -286,7 +285,7 @@ def publish_chapters(
                 )
                 return results
 
-            results = loop.run_until_complete(_upload())
+            results = _run_async(_upload())
 
             success_count = sum(1 for r in results if r.get("success"))
             fail_count = len(results) - success_count
@@ -304,8 +303,6 @@ def publish_chapters(
         except Exception as e:
             _task_store.update(task_id, status=TaskStatus.FAILED, message=f"发布失败: {e}")
             _task_store.add_log(task_id, f"ERROR: {e}")
-        finally:
-            loop.close()
 
     threading.Thread(target=_run, daemon=True).start()
 
