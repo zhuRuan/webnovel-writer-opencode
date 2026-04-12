@@ -129,8 +129,8 @@ class TestLayeredCheckers:
             {"block_on_critical": True}
         )
         
-        result = CheckersManager.run_layered_checkers(1, "test", {})
+        result = CheckersManager.run_layered_checkers(1, "test", {}, run_llm=False)
         
         assert result["blocked"] is False
-        assert result["layer"] == "llm"
+        assert result["layer"] == "code"
         assert result["code_results"]

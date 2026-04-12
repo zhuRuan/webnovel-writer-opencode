@@ -185,7 +185,8 @@ class CheckersManager:
         chapter: int,
         content: str,
         chapter_context: Optional[Dict] = None,
-        mode: str = "standard"
+        mode: str = "standard",
+        run_llm: bool = True,
     ) -> Dict[str, Any]:
         """
         分层运行审查器：Code Layer → LLM Agents
@@ -199,10 +200,11 @@ class CheckersManager:
             content: 章节内容
             chapter_context: 章节上下文
             mode: 审查模式 (standard/minimal/full)
+            run_llm: 是否运行 LLM agents
         
         Returns:
             {
-                "layer": "code" | "llm",
+                "layer": "code" | "llm" | "fallback",
                 "blocked": bool,
                 "code_results": [...],
                 "llm_results": [...],
@@ -226,13 +228,101 @@ class CheckersManager:
                 ],
             }
         
+        if not run_llm:
+            return {
+                "layer": "code",
+                "blocked": False,
+                "code_results": code_results,
+                "llm_results": [],
+                "issues": [],
+            }
+        
+        llm_results = cls.run_llm_agents(chapter, content, chapter_context, mode)
+        
+        has_blocking_llm = any(
+            r.get("passed") is False and r.get("overall_score", 100) < 60
+            for r in llm_results
+        ) if llm_results else False
+        
         return {
             "layer": "llm",
-            "blocked": False,
+            "blocked": has_blocking_llm,
             "code_results": code_results,
-            "llm_results": [],
-            "issues": [],
+            "llm_results": llm_results,
+            "issues": [
+                issue
+                for r in llm_results
+                for issue in r.get("issues", [])
+            ],
         }
+
+    @classmethod
+    def run_llm_agents(
+        cls,
+        chapter: int,
+        content: str,
+        chapter_context: Optional[Dict] = None,
+        mode: str = "standard",
+    ) -> List[Dict]:
+        """
+        运行 LLM agents
+        
+        Args:
+            chapter: 章节号
+            content: 章节内容
+            chapter_context: 章节上下文
+            mode: 审查模式
+        
+        Returns:
+            LLM agents 执行结果列表
+        """
+        try:
+            from .llm_invoker import LLMInvoker, AgentInput
+        except ImportError:
+            logger.warning("LLMInvoker 不可用")
+            return []
+        
+        invoker = LLMInvoker()
+        if not invoker.is_enabled():
+            logger.info("LLM 不可用，跳过 LLM agents")
+            return []
+        
+        registry = cls().load_registry()
+        checkers = registry.get("checkers", {})
+        
+        llm_agents = []
+        for checker_id, config in checkers.items():
+            if not config.get("enabled", True):
+                continue
+            if config.get("category") == "llm":
+                llm_agents.append(checker_id)
+        
+        results = []
+        for agent_id in llm_agents:
+            agent_file = cls().agents_dir / f"{agent_id}.md"
+            if not agent_file.exists():
+                continue
+            
+            prompt = agent_file.read_text(encoding="utf-8")
+            input_data = AgentInput(
+                chapter=chapter,
+                chapter_title=chapter_context.get("title", "") if chapter_context else "",
+                content=content,
+                project_root=chapter_context.get("project_root", "") if chapter_context else "",
+                context=chapter_context or {},
+            )
+            
+            output = invoker.invoke(agent_id, prompt, input_data)
+            results.append({
+                "agent_id": output.agent_id,
+                "chapter": output.chapter,
+                "overall_score": output.overall_score,
+                "passed": output.passed,
+                "issues": output.issues,
+                "summary": output.summary,
+            })
+        
+        return results
 
     def load_registry(self) -> Dict[str, Any]:
         """加载审查器注册表"""
