@@ -101,7 +101,7 @@ class DebtTracker:
         )
         
         self._debts[debt_id] = debt
-        logger.info(f"创建债务 {debt_id}: {content} (章节 {chapter})")
+        logger.info(f"[DebtTracker] 创建债务 {debt_id}: {content} (chapter={chapter}, priority={priority.name})")
         
         return debt
 
@@ -132,6 +132,7 @@ class DebtTracker:
             if debt and not debt.repaid:
                 debt.repaid = True
                 debt.repaid_chapter = chapter
+                logger.info(f"[DebtTracker] 已偿还 {debt.debt_id}: {debt.content} (chapter={chapter})")
                 repaid_debts.append(debt)
                 logger.info(f"债务已偿还 {debt.debt_id}: {debt.content}")
         
@@ -145,12 +146,16 @@ class DebtTracker:
         """获取高优先级债务（priority >= HIGH）"""
         return [
             d for d in self._debts.values()
-            if not d.repaid and d.priority.value >= DebtPriority.HIGH.value
+            if not d.repaid and (d.priority.value if hasattr(d.priority, 'value') else d.priority) >= DebtPriority.HIGH.value
         ]
 
-    def can_write_climax(self, chapter: int) -> tuple[bool, str]:
+    def can_write_climax(self, chapter: int, is_climax: bool = False) -> tuple[bool, str]:
         """
-        检查是否可以写高潮章节
+        检查是否可以写章节
+        
+        Args:
+            chapter: 章节号
+            is_climax: 是否为高潮章节
         
         Returns:
             (can_write, reason)
@@ -158,14 +163,26 @@ class DebtTracker:
         active_debts = self.check_active_debts()
         high_priority_debts = self.get_high_priority_debts()
         
-        if len(active_debts) > self.DEBT_WARNING_THRESHOLD:
-            return False, f"活跃债务过多: {len(active_debts)} 个（阈值 {self.DEBT_WARNING_THRESHOLD}）"
+        logger.debug(f"[DebtTracker] can_write_climax chapter={chapter}, is_climax={is_climax}, active={len(active_debts)}, high_prio={len(high_priority_debts)}")
+        
+        if active_debts:
+            logger.debug(f"[DebtTracker] 活跃债务: {[d.content for d in active_debts[:5]]}")
         
         if high_priority_debts:
             debt_list = ", ".join([d.content[:20] for d in high_priority_debts[:3]])
+            logger.warning(f"[DebtTracker] HIGH PRIORITY BLOCK: {debt_list}")
             return False, f"存在未偿还高优先级债务: {debt_list}"
         
-        return True, "可以写高潮章节"
+        if is_climax and len(active_debts) > self.DEBT_WARNING_THRESHOLD:
+            logger.warning(f"[DebtTracker] CLIMAX THRESHOLD BLOCK: {len(active_debts)} debts > {self.DEBT_WARNING_THRESHOLD}")
+            return False, f"高潮章节活跃债务过多: {len(active_debts)} 个（阈值 {self.DEBT_WARNING_THRESHOLD}）"
+        
+        if len(active_debts) > self.DEBT_WARNING_THRESHOLD:
+            logger.info(f"[DebtTracker] WARNING: {len(active_debts)} debts (non-climax allowed)")
+            return True, f"警告: 活跃债务数 {len(active_debts)}，建议偿还"
+        
+        logger.debug(f"[DebtTracker] can_write=True")
+        return True, "可以写章节"
 
     def get_debt_summary(self) -> Dict:
         """获取债务摘要"""

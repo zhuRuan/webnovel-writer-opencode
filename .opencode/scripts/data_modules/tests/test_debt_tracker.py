@@ -83,7 +83,7 @@ class TestDebtTracker:
         for i in range(5):
             tracker.create_debt(DebtType.EXPLICIT_FORESADOW, f"债{i}", chapter=i+1)
         
-        can_write, reason = tracker.can_write_climax(10)
+        can_write, reason = tracker.can_write_climax(10, is_climax=True)  #高潮章节才阻断
         assert can_write is False
         assert "活跃债务过多" in reason
 

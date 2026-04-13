@@ -215,7 +215,7 @@ class CheckersManager:
         
         blocked_results = [r for r in code_results if r.blocked]
         if blocked_results:
-            logger.warning(f"Code layer blocking: %d issues found", len(blocked_results))
+            logger.warning(f"[CheckersManager] CODE LAYER BLOCKING: {len(blocked_results)} issues")
             return {
                 "layer": "code",
                 "blocked": True,
@@ -229,6 +229,7 @@ class CheckersManager:
             }
         
         if not run_llm:
+            logger.debug(f"[CheckersManager] Code layer passed, LLM skipped")
             return {
                 "layer": "code",
                 "blocked": False,
@@ -237,12 +238,15 @@ class CheckersManager:
                 "issues": [],
             }
         
+        logger.info(f"[CheckersManager] === LLM Layer Start: chapter={chapter}, mode={mode} ===")
         llm_results = cls.run_llm_agents(chapter, content, chapter_context, mode)
         
         has_blocking_llm = any(
             r.get("passed") is False and r.get("overall_score", 100) < 60
             for r in llm_results
         ) if llm_results else False
+        
+        logger.info(f"[CheckersManager] === LLM Layer End: blocked={has_blocking_llm}, agents={len(llm_results)} ===")
         
         return {
             "layer": "llm",
@@ -303,6 +307,8 @@ class CheckersManager:
             if not agent_file.exists():
                 continue
             
+            logger.debug(f"[LLM Agent] 调用: {agent_id}")
+            
             prompt = agent_file.read_text(encoding="utf-8")
             input_data = AgentInput(
                 chapter=chapter,
@@ -313,6 +319,9 @@ class CheckersManager:
             )
             
             output = invoker.invoke(agent_id, prompt, input_data)
+            
+            logger.debug(f"[LLM Agent] 完成: {agent_id}, score={output.overall_score}, passed={output.passed}")
+            
             results.append({
                 "agent_id": output.agent_id,
                 "chapter": output.chapter,

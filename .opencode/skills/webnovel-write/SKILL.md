@@ -15,9 +15,13 @@ allowed-tools: Read Write Edit Grep Bash Task
 
 | 模式 | 流程 |
 |------|------|
-| 标准 | Step 0 → 0.5 → 1 → 2A → 2B → 3 → 4 → 5 → 6 → **Step 7** |
-| --fast | Step 0 → 0.5 → 1 → 2A → 3 → 4 → 5 → 6 → **Step 7** |
+| 标准 | Step 0 → 0.5 → **1.5** → 1 → 2A → 2B → 3 → **3.6** → 4 → 5 → 6 → **Step 7** |
+| --fast | Step 0 → 0.5 → **1.5** → 1 → 2A → 3 → **3.6** → 4 → 5 → 6 → **Step 7** |
 | --minimal | Step 0 → 0.5 → 1 → 2A → 3 → 4 → 5 → 6 → **Step 7** |
+
+**新增步骤**：
+- **Step 1.5**：创作前置检查（债务硬约束阻断）
+- **Step 3.6**：分层审查增强（Code Layer → LLM）
 
 **产出**：`正文/第N卷/第NNNN章-{title}.md`（自动适配卷目录）、`review_metrics`、`.webnovel/summaries/chNNNN.md`
 
@@ -55,6 +59,7 @@ echo "章节文件将写入: ${CHAPTER_PATH}"
 | `../../checkers/registry.yaml` | 审查器列表 | Step 3 |
 | `../../checkers/schema.yaml` | 审查器输出格式 | Step 3 |
 | `../../references/shared/core-constraints.md` | 写作硬约束 | Step 2A |
+| `../../data_modules/debt_tracker.py` | 债务追踪模块 | Step 1.5 (新增) |
 | `references/polish-guide.md` | 问题修复、Anti-AI | Step 4 |
 | `references/writing/typesetting.md` | 排版规则 | Step 4 |
 | `references/style-adapter.md` | 风格转译 | Step 2B |
@@ -109,6 +114,66 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" wor
 - `--step-id` 仅允许：`Step 1` / `Step 2A` / `Step 2B` / `Step 3` / `Step 4` / `Step 5` / `Step 6`。
 - 任何记录失败只记警告，不阻断写作。
 - 每个 Step 执行结束后，同样需要 `complete-step`（失败不阻断）。
+
+### Step 1.5：创作前置检查（债务硬约束）
+
+```bash
+# 债务检查（确保可以写高潮章节）
+DEBT_CHECK=$(python -X utf8 -c "
+import sys
+sys.path.insert(0, '${SCRIPTS_DIR}')
+from data_modules.debt_tracker import DebtTracker
+tracker = DebtTracker()
+try:
+    from data_modules.config import DataModulesConfig
+    config = DataModulesConfig.from_project_root('${PROJECT_ROOT}')
+    tracker = DebtTracker()
+    state_file = config.state_file
+    if state_file.exists():
+        import json
+        state = json.loads(state_file.read_text(encoding='utf-8'))
+        debts = state.get('debts', [])
+        for d in debts:
+            if not d.get('repaid'):
+                tracker.create_debt(
+                    d.get('debt_type', 'explicit'),
+                    d.get('content', ''),
+                    d.get('created_chapter', 1),
+                    d.get('priority', 'medium')
+                )
+except: pass
+
+can_write, reason = tracker.can_write_climax(int('${CHAPTER_NUM}'))
+print(f'{can_write}|{reason}')
+" 2>/dev/null || echo "True|")
+
+BLOCKED=$(echo "$DEBT_CHECK" | cut -d'|' -f1)
+REASON=$(echo "$DEBT_CHECK" | cut -d'|' -f2-)
+
+if [ "$BLOCKED" = "False" ]; then
+    echo "⚠️ 创作阻断: $REASON"
+    echo "建议：先偿还高优先级债务，或切换到非高潮章节类型"
+    exit 1
+fi
+
+# 低于阈值时警告
+ACTIVE_DEBTS=$(python -X utf8 -c "
+import sys; sys.path.insert(0, '${SCRIPTS_DIR}')
+from data_modules.debt_tracker import DebtTracker
+t = DebtTracker()
+print(len(t.check_active_debts()))
+" 2>/dev/null || echo "0")
+
+if [ "$ACTIVE_DEBTS" -gt 3 ]; then
+    echo "⚠️ 活跃债务数: $ACTIVE_DEBTS (建议 > 3 时偿还部分)"
+fi
+```
+
+**阻断条件**：
+- 高优先级未偿还债务存在 + 当前为高潮章节 → **强制阻断**
+- 活跃债务数 > 3 → **强警告**（不阻断）
+
+**修复建议**：返回债务列表，指导先填坑。
 
 ### Step 1：Context Agent
 
@@ -332,6 +397,38 @@ review_metrics 字段约束：
 **硬要求**：
 - `--minimal` 也必须产出 `overall_score`
 - 未落库 `review_metrics` 不得进入 Step 5
+
+#### 3.6 分层审查增强（Code → LLM）
+
+执行 Code 层检查（战力/道具一致性 + 债务）：
+```bash
+# 分层审查（Code Layer 快速）
+LAYERED_RESULT=$(python -X utf8 -c "
+import sys
+sys.path.insert(0, '${SCRIPTS_DIR}')
+from data_modules.checkers_manager import CheckersManager
+result = CheckersManager.run_layered_checkers(
+    ${CHAPTER_NUM},
+    '''${CHAPTER_CONTENT}''',  # 需要读取章节文件
+    {'project_root': '${PROJECT_ROOT}'},
+    run_llm=False  # 先只运行 Code checkers
+)
+import json
+print(json.dumps(result, ensure_ascii=False))
+" 2>/dev/null || echo '{}')
+
+echo "Code Layer 结果: $LAYERED_RESULT"
+
+# 检查阻断
+if echo "$LAYERED_RESULT" | grep -q '"blocked": true'; then
+    echo "⚠️ Code 层阻断: 检测到严重问题"
+    echo "请修复后重新提交审查"
+fi
+```
+
+**阻断规则**：
+- Code layer (world-consistency) 发现 critical 问题 → 阻断
+- 债务硬约束违反 → 阻断
 
 ### Step 4：润色（问题修复优先）
 
