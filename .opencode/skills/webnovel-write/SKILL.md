@@ -207,7 +207,12 @@ echo "章节文件将写入: ${CHAPTER_PATH}"
 
 硬要求：
 - 只输出纯正文到 `${CHAPTER_PATH}` 指定的文件。
+- **字数下限（按章节类型，硬性约束）**：
+  - 常规推进章：≥1500字
+  - 过渡章：≥1000字
+  - 高潮章/战斗章：≥2000字
 - 默认按 2000-2500 字执行；若大纲为关键战斗章/高潮章/卷末章或用户明确指定，则按大纲/用户优先。
+- **字数低于下限必须补充至达标，方可进入审查流程**
 - 禁止占位符正文（如 `[TODO]`、`[待补充]`）。
 - 保留承接关系：若上章有明确钩子，本章必须回应（可部分兑现）。
 
@@ -429,6 +434,64 @@ fi
 **阻断规则**：
 - Code layer (world-consistency) 发现 critical 问题 → 阻断
 - 债务硬约束违反 → 阻断
+- **字数不足 → 阻断（必须补充达标）**
+
+#### 3.7 字数硬性检查（必须执行）
+
+**⚠️ 此检查在所有审查之前执行，字数不足将阻断流程**
+
+```bash
+# 字数检查（硬性，阻断流程）
+CHAPTER_TYPE=$(python -X utf8 -c "
+import sys, json
+sys.path.insert(0, '${SCRIPTS_DIR}')
+from data_modules.config import DataModulesConfig
+config = DataModulesConfig.from_project_root('${PROJECT_ROOT}')
+state_file = config.state_file
+if state_file.exists():
+    state = json.loads(state_file.read_text(encoding='utf-8'))
+    # 尝试从大纲获取章节类型
+    plot_outline = state.get('plot_outline', {})
+    # 默认为常规推进章
+    print('常规推进章')
+else:
+    print('常规推进章')
+" 2>/dev/null || echo "常规推进章")
+
+# 确定字数下限
+MIN_WORDS=1500
+if [ "$CHAPTER_TYPE" = "过渡章" ]; then
+    MIN_WORDS=1000
+elif [ "$CHAPTER_TYPE" = "高潮章" ] || [ "$CHAPTER_TYPE" = "战斗章" ]; then
+    MIN_WORDS=2000
+fi
+
+# 计算实际字数
+ACTUAL_WORDS=$(python -X utf8 -c "
+import re
+text = open('${PROJECT_ROOT}/${CHAPTER_PATH}', encoding='utf-8').read()
+# 统计中文字符数
+words = sum(len(re.findall(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', line)) for line in text.split('\n'))
+print(words)
+" 2>/dev/null || echo "0")
+
+echo "章节类型: $CHAPTER_TYPE"
+echo "字数下限: $MIN_WORDS"
+echo "实际字数: $ACTUAL_WORDS"
+
+if [ "$ACTUAL_WORDS" -lt "$MIN_WORDS" ]; then
+    echo "⚠️ 字数不足: $ACTUAL_WORDS < $MIN_WORDS"
+    echo "必须补充至 $MIN_WORDS 字以上才能进入审查"
+    # 字数不足时，跳过审查直接进入Step 4补充
+    echo "SKIP_REVIEW=true" > /tmp/word_check_${CHAPTER_NUM}.txt
+fi
+```
+
+**字数不足处理流程**：
+1. 字数不足 → 记录 `SKIP_REVIEW=true` → 直接进入 Step 4
+2. Step 4 优先在"未闭合问题"和"期待锚点"处补充内容
+3. 补充后重新计算字数，达标后退出 Step 4
+4. 若多次补充仍不足，标记为 deviation 但允许继续
 
 ### Step 4：润色（问题修复优先）
 
@@ -438,15 +501,59 @@ cat "${SKILL_ROOT}/references/polish-guide.md"
 cat "${SKILL_ROOT}/references/writing/typesetting.md"
 ```
 
+**字数补充逻辑（字数不足时优先执行）**：
+```bash
+# 检查是否需要补充字数
+if [ -f "/tmp/word_check_${CHAPTER_NUM}.txt" ]; then
+    source "/tmp/word_check_${CHAPTER_NUM}.txt"
+    if [ "$SKIP_REVIEW" = "true" ]; then
+        echo "字数不足，优先补充内容..."
+        # 读取当前正文
+        CURRENT_CONTENT=$(cat "${PROJECT_ROOT}/${CHAPTER_PATH}")
+        # 计算当前字数
+        CURRENT_WORDS=$(python -X utf8 -c "
+import re
+text = '''$CURRENT_CONTENT'''
+words = len(re.findall(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', text))
+print(words)
+")
+        # 补充目标字数（按章节类型）
+        TARGET_WORDS=$((MIN_WORDS - CURRENT_WORDS + 500))  # 多补500字缓冲
+        echo "需要补充: 约 $TARGET_WORDS 字"
+        echo "补充策略："
+        echo "1. 在章末添加'未闭合问题'扩展"
+        echo "2. 在章节中部补充'期待锚点'场景"
+        echo "3. 增加对话/动作细节描写"
+        echo "4. 补充角色内心活动"
+        # 补充完成后重新计算字数
+        NEW_WORDS=$(python -X utf8 -c "
+import re
+text = open('${PROJECT_ROOT}/${CHAPTER_PATH}', encoding='utf-8').read()
+words = len(re.findall(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', text))
+print(words)
+")
+        if [ "$NEW_WORDS" -ge "$MIN_WORDS" ]; then
+            echo "字数补充完成: $NEW_WORDS 字 ≥ $MIN_WORDS 字"
+            rm -f "/tmp/word_check_${CHAPTER_NUM}.txt"
+        else
+            echo "⚠️ 字数仍不足: $NEW_WORDS < $MIN_WORDS"
+            echo "标记为 deviation，继续流程"
+        fi
+    fi
+fi
+```
+
 执行顺序：
-1. 修复 `critical`（必须）
-2. 修复 `high`（不能修复则记录 deviation）
-3. 处理 `medium/low`（按收益择优）
-4. 执行 Anti-AI 与 No-Poison 全文终检（必须输出 `anti_ai_force_check: pass/fail`）
+1. **字数补充（若不足）**：优先在"未闭合问题"和"期待锚点"处补充
+2. 修复 `critical`（必须）
+3. 修复 `high`（不能修复则记录 deviation）
+4. 处理 `medium/low`（按收益择优）
+5. 执行 Anti-AI 与 No-Poison 全文终检（必须输出 `anti_ai_force_check: pass/fail`）
+6. **字数终检**：润色后再次检查字数，达标后才能输出
 
 输出：
 - 润色后正文（覆盖章节文件）
-- 变更摘要（至少含：修复项、保留项、deviation、`anti_ai_force_check`）
+- 变更摘要（至少含：修复项、保留项、deviation、`anti_ai_force_check`、`word_count`）
 
 ### Step 5：Data Agent（状态与索引回写）
 
