@@ -886,8 +886,7 @@ class StatusReporter:
         Returns:
             包含各项分析结果的字典
         """
-        import logging
-        logger = logging.getLogger(__name__)
+        logger = get_logger(__name__)
 
         logger.info("Generating JSON dict with focus=%s", focus)
 
