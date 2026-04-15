@@ -69,6 +69,7 @@ export default function App() {
                 {page === 'files' && <FilesPage />}
                 {page === 'reading' && <ReadingPowerPage key={refreshKey} />}
                 {page === 'publish' && <PublishPage key={refreshKey} />}
+                {page === 'export' && <ExportPage key={refreshKey} />}
             </main>
         </div>
     )
@@ -82,6 +83,7 @@ const NAV_ITEMS = [
     { id: 'files', icon: '📁', label: '文档浏览' },
     { id: 'reading', icon: '🔥', label: '追读力' },
     { id: 'publish', icon: '📖', label: '小说发布' },
+    { id: 'export', icon: '📦', label: '导出小说' },
 ]
 
 const FULL_DATA_GROUPS = [
@@ -1288,3 +1290,315 @@ function formatCell(v) {
     const s = String(v)
     return s.length > 180 ? `${s.slice(0, 180)}...` : s
 }
+
+
+// ====================================================================
+// 页面 8：导出小说
+// ====================================================================
+
+const FORMAT_OPTIONS = [
+    { key: 'txt', label: 'TXT', icon: '📝', desc: '纯文本，最通用', color: '#5d8a66' },
+    { key: 'markdown', label: 'Markdown', icon: '📋', desc: '保留格式，易编辑', color: '#4a7ab5' },
+    { key: 'epub', label: 'EPUB', icon: '📱', desc: '电子书格式', color: '#9b6b9e' },
+]
+
+function ExportPage() {
+    const [format, setFormat] = useState('markdown')
+    const [range, setRange] = useState('all')
+    const [author, setAuthor] = useState('')
+    const [exporting, setExporting] = useState(false)
+    const [info, setInfo] = useState(null)
+    const [result, setResult] = useState(null)
+    const [history, setHistory] = useState([])
+    const [activeTab, setActiveTab] = useState('export')
+
+    useEffect(() => {
+        fetchJSON('/api/export/info').then(setInfo).catch(() => setInfo(null))
+        fetchJSON('/api/export/files').then(setHistory).catch(() => setHistory([]))
+    }, [])
+
+    async function handleExport() {
+        setExporting(true)
+        setResult(null)
+        try {
+            const res = await fetchJSON('/api/export/do', {
+                method: 'POST',
+                body: JSON.stringify({
+                    format,
+                    range_spec: range || 'all',
+                    author: author,
+                }),
+            })
+            setResult(res)
+            if (res.success) {
+                fetchJSON('/api/export/files').then(setHistory).catch(() => {})
+            }
+        } catch (e) {
+            setResult({ success: false, error: e.message })
+        }
+        setExporting(false)
+    }
+
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B'
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+        return (bytes / 1024 / 1024).toFixed(2) + ' MB'
+    }
+
+    function formatDate(timestamp) {
+        return new Date(timestamp * 1000).toLocaleString('zh-CN', {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        })
+    }
+
+    return (
+        <div className="export-page">
+            <div className="page-header">
+                <h2>📦 导出小说</h2>
+            </div>
+
+            <div className="export-tabs">
+                <button
+                    className={`export-tab ${activeTab === 'export' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('export')}
+                >
+                    <span className="tab-icon">✨</span>
+                    <span>新建导出</span>
+                </button>
+                <button
+                    className={`export-tab ${activeTab === 'history' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('history')}
+                >
+                    <span className="tab-icon">📁</span>
+                    <span>导出历史</span>
+                    {history.length > 0 && <span className="tab-badge">{history.length}</span>}
+                </button>
+            </div>
+
+            {activeTab === 'export' ? (
+                <div className="export-content">
+                    {info && (
+                        <div className="export-summary">
+                            <div className="summary-item">
+                                <span className="summary-icon">📚</span>
+                                <span className="summary-value">{info.chapter_count}</span>
+                                <span className="summary-label">章节</span>
+                            </div>
+                            <div className="summary-divider" />
+                            <div className="summary-item">
+                                <span className="summary-icon">📖</span>
+                                <span className="summary-value">{info.chapter_range}</span>
+                                <span className="summary-label">章节范围</span>
+                            </div>
+                            {info.cover_exists || info.cover_png_exists ? (
+                                <>
+                                    <div className="summary-divider" />
+                                    <div className="summary-item">
+                                        <span className="summary-icon">🖼️</span>
+                                        <span className="summary-value" style={{ color: 'var(--accent-green)' }}>已检测</span>
+                                        <span className="summary-label">封面</span>
+                                    </div>
+                                </>
+                            ) : null}
+                            {info.style_exists ? (
+                                <>
+                                    <div className="summary-divider" />
+                                    <div className="summary-item">
+                                        <span className="summary-icon">🎨</span>
+                                        <span className="summary-value" style={{ color: 'var(--accent-green)' }}>已检测</span>
+                                        <span className="summary-label">样式</span>
+                                    </div>
+                                </>
+                            ) : null}
+                        </div>
+                    )}
+
+                    <div className="export-card">
+                        <div className="export-card-header">
+                            <h3>输出格式</h3>
+                        </div>
+                        <div className="format-grid">
+                            {FORMAT_OPTIONS.map(opt => (
+                                <button
+                                    key={opt.key}
+                                    className={`format-option ${format === opt.key ? 'selected' : ''}`}
+                                    onClick={() => setFormat(opt.key)}
+                                    style={{ '--format-color': opt.color }}
+                                >
+                                    <span className="format-icon">{opt.icon}</span>
+                                    <span className="format-label">{opt.label}</span>
+                                    <span className="format-desc">{opt.desc}</span>
+                                    {format === opt.key && <span className="format-check">✓</span>}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="export-card">
+                        <div className="export-card-header">
+                            <h3>导出范围</h3>
+                        </div>
+                        <div className="range-section">
+                            <div className="range-presets">
+                                <button
+                                    className={`range-preset ${range === 'all' ? 'active' : ''}`}
+                                    onClick={() => setRange('all')}
+                                >
+                                    全部章节
+                                </button>
+                                <button
+                                    className={`range-preset ${range === `${info?.chapter_min || 1}-${info?.chapter_max || 10}` ? 'active' : ''}`}
+                                    onClick={() => setRange(`${info?.chapter_min || 1}-${info?.chapter_max || 10}`)}
+                                >
+                                    当前进度
+                                </button>
+                            </div>
+                            <div className="range-input-group">
+                                <label>自定义范围</label>
+                                <input
+                                    type="text"
+                                    value={range}
+                                    onChange={e => setRange(e.target.value)}
+                                    placeholder="all / 1-10 / 1,3,5"
+                                    className="range-input"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {format === 'epub' && (
+                        <div className="export-card">
+                            <div className="export-card-header">
+                                <h3>EPUB 设置</h3>
+                            </div>
+                            <div className="epub-settings">
+                                <div className="setting-row">
+                                    <label>作者名</label>
+                                    <input
+                                        type="text"
+                                        value={author}
+                                        onChange={e => setAuthor(e.target.value)}
+                                        placeholder="输入作者名（EPUB 元数据）"
+                                        className="setting-input"
+                                    />
+                                </div>
+                                {info && (info.cover_exists || info.cover_png_exists) && (
+                                    <div className="setting-hint">
+                                        🖼️ 已自动检测封面文件，导出时将自动应用
+                                    </div>
+                                )}
+                                {info?.style_exists && (
+                                    <div className="setting-hint">
+                                        🎨 已自动检测样式文件，导出时将自动应用
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <button
+                        className="export-button"
+                        onClick={handleExport}
+                        disabled={exporting || !info?.chapter_count}
+                    >
+                        {exporting ? (
+                            <>
+                                <span className="export-spinner" />
+                                <span>导出中...</span>
+                            </>
+                        ) : (
+                            <>
+                                <span className="export-icon">🚀</span>
+                                <span>开始导出</span>
+                            </>
+                        )}
+                    </button>
+
+                    {result && (
+                        <div className={`export-result ${result.success ? 'success' : 'error'}`}>
+                            {result.success ? (
+                                <>
+                                    <div className="result-header">
+                                        <span className="result-icon">✅</span>
+                                        <span>导出成功</span>
+                                    </div>
+                                    <div className="result-details">
+                                        <div className="result-row">
+                                            <span>格式</span>
+                                            <span className="result-value">{result.format.toUpperCase()}</span>
+                                        </div>
+                                        <div className="result-row">
+                                            <span>章节</span>
+                                            <span className="result-value">{result.chapter_count} 章</span>
+                                        </div>
+                                        <div className="result-row">
+                                            <span>文件</span>
+                                            <span className="result-value">{result.filename}</span>
+                                        </div>
+                                        <div className="result-row">
+                                            <span>大小</span>
+                                            <span className="result-value">{formatSize(result.file_size)}</span>
+                                        </div>
+                                    </div>
+                                    <a
+                                        href={`/api/export/download/${encodeURIComponent(result.filename)}`}
+                                        className="download-link"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        <span>📥</span> 下载文件
+                                    </a>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="result-header">
+                                        <span className="result-icon">❌</span>
+                                        <span>导出失败</span>
+                                    </div>
+                                    <div className="result-error">{result.error}</div>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="history-content">
+                    {history.length === 0 ? (
+                        <div className="empty-state">
+                            <div className="empty-icon">📦</div>
+                            <p>暂无导出历史</p>
+                            <p className="empty-hint">完成导出后，文件将显示在这里</p>
+                        </div>
+                    ) : (
+                        <div className="history-list">
+                            {history.map(item => (
+                                <div key={item.filename} className="history-item">
+                                    <div className="history-icon">
+                                        {item.format === 'epub' ? '📱' : item.format === 'markdown' ? '📋' : '📝'}
+                                    </div>
+                                    <div className="history-info">
+                                        <div className="history-name">{item.filename}</div>
+                                        <div className="history-meta">
+                                            <span className="history-format">{item.format.toUpperCase()}</span>
+                                            <span className="history-size">{formatSize(item.size)}</span>
+                                            <span className="history-date">{formatDate(item.modified)}</span>
+                                        </div>
+                                    </div>
+                                    <a
+                                        href={`/api/export/download/${encodeURIComponent(item.filename)}`}
+                                        className="history-download"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        📥
+                                    </a>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+

@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager, closing
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Body, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -163,6 +163,57 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     def api_close_publish_manager():
         """显式关闭浏览器，释放资源。"""
         return close_publish_manager()
+
+    # ===========================================================
+    # API：小说导出
+    # ===========================================================
+    from .export_bridge import (
+        get_export_info,
+        get_chapter_list,
+        do_export,
+        list_exports,
+        _output_dir,
+    )
+
+    @app.get("/api/export/info")
+    def api_export_info():
+        """获取导出配置信息"""
+        return get_export_info(_get_project_root())
+
+    @app.get("/api/export/chapters")
+    def api_export_chapters():
+        """获取可用章节列表"""
+        return get_chapter_list(_get_project_root())
+
+    @app.post("/api/export/do")
+    def api_do_export(
+        format: str = Body(...),
+        range_spec: str = Body("all"),
+        author: str = Body(""),
+        cover_path: Optional[str] = Body(None),
+        style_path: Optional[str] = Body(None),
+    ):
+        """执行导出"""
+        result = do_export(
+            _get_project_root(), format, range_spec, author, cover_path, style_path
+        )
+        if not result.get("success"):
+            raise HTTPException(400, detail=result.get("error"))
+        return result
+
+    @app.get("/api/export/files")
+    def api_list_exports():
+        """列出已导出的文件"""
+        return list_exports(_get_project_root())
+
+    @app.get("/api/export/download/{filename}")
+    def api_download_export(filename: str):
+        """下载导出的文件"""
+        file_path = (_output_dir / filename).resolve()
+        safe_resolve(file_path, _get_project_root())
+        if not file_path.is_file():
+            raise HTTPException(404, "文件不存在")
+        return FileResponse(file_path)
 
     # ===========================================================
     # API：实体数据库（index.db 只读查询）
