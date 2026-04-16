@@ -16,6 +16,7 @@ API 调用流程:
 
 import asyncio
 import aiohttp
+import json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
@@ -114,9 +115,11 @@ class ImageGenerator:
         return self.config.image_size
 
     async def _submit_task(self, session: aiohttp.ClientSession, prompt: str, size: str) -> Optional[str]:
-        """提交生成任务，返回 task_id"""
+        """提交生成任务，返回 task_id 或图片URL（同步模式）"""
         url = self._build_url()
         headers = self._build_headers()
+        
+        # 官方API: 使用 data=json.dumps().encode() 而不是 json=
         payload = {
             "model": self.config.image_model,
             "prompt": prompt,
@@ -127,17 +130,27 @@ class ImageGenerator:
             try:
                 async with session.post(
                     url,
-                    json=payload,
+                    data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=self.config.normal_timeout)
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        # 官方API返回 task_id
+                        
+                        # 同步模式返回: {"images": [{"url": "..."}]}
+                        images = data.get("images", [])
+                        if images and images[0].get("url"):
+                            logger.info(f"Sync image generated: {images[0]['url']}")
+                            return images[0]["url"]
+                        
+                        # 异步模式返回: {"task_id": "..."}
                         task_id = data.get("task_id") or data.get("request_id")
                         if task_id:
-                            logger.info(f"Task submitted: {task_id}")
+                            logger.info(f"Async task submitted: {task_id}")
                             return task_id
+                        
+                        logger.error(f"Unexpected response format: {data}")
+                        return None
                     
                     # 打印错误信息帮助调试
                     err_text = await resp.text()
@@ -149,8 +162,6 @@ class ImageGenerator:
                         await asyncio.sleep(delay)
                         continue
                     
-                    err_text = await resp.text()
-                    logger.error("Submit task failed %s: %s", resp.status, err_text[:200])
                     return None
 
             except Exception as e:
@@ -260,15 +271,23 @@ class ImageGenerator:
         
         session = await self._get_session()
         
-        # 1. 提交任务
-        task_id = await self._submit_task(session, prompt, size)
-        if not task_id:
+        # 1. 提交任务（可能直接返回图片URL或task_id）
+        result = await self._submit_task(session, prompt, size)
+        if not result:
             self.stats.errors += 1
             self.stats.total += 1
             return None
-
-        # 2. 轮询状态
-        image_url = await self._poll_task(session, task_id)
+        
+        # 2. 判断返回类型：直接图片URL 或 task_id
+        # task_id 是字符串且包含字母数字，图片URL通常以 http 开头
+        image_url = None
+        if result.startswith("http"):
+            # 同步模式：直接返回图片URL
+            image_url = result
+        else:
+            # 异步模式：需要轮询
+            image_url = await self._poll_task(session, result)
+        
         if not image_url:
             self.stats.errors += 1
             self.stats.total += 1
