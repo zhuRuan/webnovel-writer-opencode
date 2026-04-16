@@ -1,0 +1,910 @@
+{
+  "project": {
+    "title": "末世降临：我在地摊买了本成神指南",
+    "genre": "末世+异能",
+    "target_words": 1000000,
+    "target_chapters": 0,
+    "one_liner": "一个普通的大一学生，在暑假工第一天花十块钱买了本会发光的破书，不仅被告知两个月后世界将进入冰河末世，更从此踏上了一条与大众觉醒者完全不同的古法修行之路——当别人在零下六十度里挣扎求生时，他正在默默筑基。",
+    "core_conflict": "一个提前两个月知道末世降临的普通学生，靠着古法修行在觉醒者横行的世界里艰难求生——他不仅要活下去，更要在“独善其身”与“拯救他人”之间做出选择。",
+    "target_reader": "番茄小说读者",
+    "platform": "番茄小说"
+  },
+  "protagonist": {
+    "name": "陈默",
+    "desire": "表层欲望：活下去；深层欲望：我想看看，这条路的尽头是什么。",
+    "flaw": "过度谨慎导致的“冷眼旁观”——因为他总想“再观察一下”，有时候会错过救人的最佳时机；因为他习惯隐藏实力，有时候会让身边的人误会他“见死不救”；因为他太习惯一个人扛，有时候会拒绝别人的帮助——直到事情失控。",
+    "archetype": "成长型",
+    "structure": "单主角"
+  },
+  "relationship": {
+    "heroine_config": "单女主向（淡化处理）",
+    "heroine_names": [
+      "苏雨"
+    ],
+    "heroine_role": "医学生，温柔而坚韧，是唯一能让陈默卸下防备的人",
+    "co_protagonists": [],
+    "co_protagonist_roles": [],
+    "antagonist_tiers": {
+      "小反派": "环境与人性之恶（强盗、人贩子、趁火打劫者）",
+      "中反派": "猎食者·鬼影（猎杀觉醒者吸收晶核的独行强者）",
+      "大反派": "野心家与旧秩序（想掌控末世的势力、想独占古书秘密的人）",
+      "终极反派": "万灵归墟本身（天劫，命运的终局）"
+    },
+    "antagonist_level": "小/中/大/终极",
+    "antagonist_mirror": "陈默想“有底线地活着”，而反派证明了“没有底线才能活得更好”；陈默走“修炼之路”，反派走“掠夺之路”；陈默想“找到渡劫之法”，反派想“自己渡劫，别人死活与我何干”"
+  },
+  "golden_finger": {
+    "type": "古书系统 + 古法修炼体系",
+    "name": "《洞天要术》",
+    "style": "硬核克制",
+    "visibility": "只有主角知道",
+    "irreversible_cost": "每一次预知未来，都会磨损一丝人性——让他变得越来越冷漠、疏离、难以动情",
+    "growth_rhythm": "慢热型，但爽点密度不低（末世前2个月：感气 → 引气入门；末世第1年：筑基成功；末世第3年：开光；末世第5年：融合；末世第8年：辟谷；末世第12年：金丹；末世第20年：元婴；末世第29年：化神）"
+  },
+  "world": {
+    "scale": "全球末世，聚焦单域（原中国某省范围内）",
+    "factions": "四分天下，外加隐世存在（幸存者联盟、武装势力、掠夺者、科技残党 + 遗迹守望者、古书其他传承者）",
+    "power_system_type": "三足鼎立（古法修炼、异能觉醒、科技残存）",
+    "social_class": "金字塔结构（顶层1%觉醒者强者/势力首领，中层9%普通觉醒者/技术人才，底层60%普通幸存者，最底层30%老弱病残/无技能者）",
+    "resource_distribution": "以物易物 → 晶核本位制 → 混合制",
+    "currency_system": "晶核本位制",
+    "currency_exchange": "1斤粮食≈1-2枚F级晶核；1瓶抗生素≈20-30枚F级晶核；1件保暖衣物≈5-10枚F级晶核",
+    "sect_hierarchy": "古法修炼无组织，陈默是当世唯一的古法修炼者",
+    "cultivation_chain": "感气 → 引气 → 筑基 → 开光 → 融合 → 辟谷 → 金丹 → 元婴 → 化神",
+    "cultivation_subtiers": "每个境界可拆3-4个小阶段（如筑基前期/中期/后期/大圆满）"
+  },
+  "constraints": {
+    "anti_trope": "GM-008（强大能力有副作用）+ AT-001（金手指有代价且不可逆）",
+    "hard_constraints": [
+      "主角不能向他人透露金手指的真实性质",
+      "每次使用预知能力，都会永久失去一部分人性",
+      "主角的修炼速度必须比觉醒者慢，不能依赖金手指快速变强"
+    ],
+    "core_selling_points": [
+      "代价型古法修行：一个普通学生靠着会磨损人性的古法修行，在觉醒者横行的末世中艰难求生",
+      "道德困境：独善其身 vs 拯救他人",
+      "时间紧迫：只有两个月准备时间"
+    ],
+    "opening_hook": "暑假工第一天，花十块钱买了本会发光的破书，书页浮现“末世”二字，距离冰河末世还有59天23小时59分钟"
+  },
+  "project_info": {
+    "title": "末世降临：我在地摊买了本成神指南",
+    "genre": "末世+异能",
+    "created_at": "2026-03-18",
+    "target_words": 1000000,
+    "target_chapters": 0,
+    "golden_finger_name": "《洞天要术》",
+    "golden_finger_type": "古书系统 + 古法修炼体系",
+    "golden_finger_style": "硬核克制",
+    "core_selling_points": "代价型古法修行：一个普通学生靠着会磨损人性的古法修行，在觉醒者横行的末世中艰难求生",
+    "protagonist_structure": "单主角",
+    "heroine_config": "单女主向（淡化处理）",
+    "heroine_names": "苏雨",
+    "heroine_role": "医学生，温柔而坚韧",
+    "co_protagonists": "",
+    "co_protagonist_roles": "",
+    "antagonist_tiers": "小反派：环境与人性之恶；中反派：猎食者·鬼影；大反派：野心家与旧秩序；终极反派：万灵归墟本身",
+    "world_scale": "全球末世，聚焦单域（原中国某省范围内）",
+    "factions": "四分天下，外加隐世存在",
+    "power_system_type": "三足鼎立（古法修炼、异能觉醒、科技残存）",
+    "social_class": "金字塔结构",
+    "resource_distribution": "以物易物 → 晶核本位制 → 混合制",
+    "gf_visibility": "只有主角知道",
+    "gf_irreversible_cost": "每一次预知未来，都会磨损一丝人性",
+    "target_reader": "番茄小说读者",
+    "platform": "番茄小说",
+    "currency_system": "晶核本位制",
+    "currency_exchange": "1斤粮食≈1-2枚F级晶核",
+    "sect_hierarchy": "古法修炼无组织",
+    "cultivation_chain": "感气 → 引气 → 筑基 → 开光 → 融合 → 辟谷 → 金丹 → 元婴 → 化神",
+    "cultivation_subtiers": "每个境界可拆3-4个小阶段"
+  },
+  "progress": {
+    "current_chapter": 42,
+    "total_words": 74528,
+    "last_updated": "2026-03-26",
+    "volumes_completed": [],
+    "current_volume": 1,
+    "volumes_planned": [
+      {
+        "volume": 1,
+        "chapters_range": "1-50",
+        "planned_at": "2026-03-18",
+        "updated_at": "2026-03-26"
+      }
+    ]
+  },
+  "protagonist_state": {
+    "name": "陈默",
+    "power": {
+      "realm": "筑基",
+      "layer": 1,
+      "bottleneck": "巩固筑基境界"
+    },
+    "location": {
+      "current": "临渊市",
+      "last_chapter": 41
+    },
+    "golden_finger": {
+      "name": "《洞天要术》",
+      "level": 1,
+      "cooldown": 0,
+      "skills": []
+    },
+    "attributes": {}
+  },
+  "relationships": {
+    "苏雨": {
+      "role": "医学生，温柔而坚韧",
+      "first_appearance": "第11章",
+      "affection": 30
+    },
+    "陈默": {
+      "location": "临渊市"
+    },
+    "临渊市": {
+      "type": "城市",
+      "description": "主角起始城市，地热带核心区",
+      "first_appearance": "第1章",
+      "importance": "高",
+      "status": "主要场景",
+      "volume": 1,
+      "chapters": "1-50",
+      "region": "虚构省份",
+      "latitude": "北纬32度",
+      "longitude": "东经118度",
+      "population": "500万",
+      "climate": "亚热带季风气候",
+      "terrain": "平原为主，有少量丘陵",
+      "resources": "地热带、地下设施、晶核矿脉",
+      "landmarks": "临渊塔、地热中心、旧时代博物馆",
+      "history": "古文明遗迹，末世前繁华都市",
+      "significance": "主角起始城市，第1卷核心场景"
+    },
+    "临渊塔": {
+      "type": "地标建筑",
+      "description": "临渊市最高建筑，传说与上古文明有关",
+      "first_appearance": "第1章",
+      "importance": "高",
+      "volume": 1,
+      "chapters": "1-50",
+      "status": "主要场景",
+      "height": "300米",
+      "function": "观景、通讯、防御",
+      "owner": "市政府",
+      "history": "建于2020年，末世前是城市地标",
+      "significance": "末世后成为幸存者聚集地",
+      "secret": "塔顶有通往地下设施的密道",
+      "role": "第1卷关键场景",
+      "related_entities": "临渊市、地下设施、旧时代博物馆",
+      "foreshadowing": "临渊塔的传说",
+      "chapter_1_detail": "陈默在地摊买书时，临渊塔在远处若隐若现",
+      "chapter_50_detail": "末世降临后，临渊塔成为幸存者聚集地"
+    },
+    "庇护所": {
+      "type": "地点",
+      "description": "陈默建立的第一个庇护所，位于临渊市地热带核心区",
+      "first_appearance": "第50章",
+      "importance": "高",
+      "volume": 1,
+      "chapters": 50,
+      "status": "主要场景",
+      "capacity": "50人",
+      "resources": "食物、水、药品、武器",
+      "rules": "扁平化管理，按需分配，不抛弃老弱",
+      "leader": "陈默",
+      "location": "临渊市地热带核心区"
+    }
+  },
+  "disambiguation_warnings": [],
+  "disambiguation_pending": [],
+  "world_settings": {
+    "power_system": [],
+    "factions": [],
+    "locations": []
+  },
+  "plot_threads": {
+    "active_threads": [],
+    "foreshadowing": [
+      {
+        "content": "古书《洞天要术》的来历",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "预知能力的代价（人性磨损）",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "陈默的过度谨慎性格",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "女主苏雨的特殊体质",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "上一个文明覆灭的真相",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "临渊市地热带的秘密",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "临渊市地热带的来源",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "临渊市地下设施的秘密",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "临渊市幸存者联盟的建立",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "临渊市地热中心的异常",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "临渊市旧时代博物馆的秘密",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "临渊塔的传说",
+        "status": "未回收",
+        "added_at": "2026-03-18",
+        "planted_chapter": 1,
+        "target_chapter": 101,
+        "tier": "支线"
+      },
+      {
+        "content": "临渊市地下埋藏的上古遗迹",
+        "status": "未回收",
+        "added_at": "2026-03-20",
+        "planted_chapter": 3,
+        "target_chapter": 20,
+        "tier": "核心"
+      },
+      {
+        "content": "临渊塔与遗迹的关联",
+        "status": "未回收",
+        "added_at": "2026-03-20",
+        "planted_chapter": 3,
+        "target_chapter": 30,
+        "tier": "支线"
+      },
+      {
+        "content": "《洞天要术》书灵的身份与过往",
+        "status": "未回收",
+        "added_at": "2026-03-20",
+        "planted_chapter": 3,
+        "target_chapter": 50,
+        "tier": "支线"
+      }
+    ]
+  },
+  "review_checkpoints": [
+    {
+      "chapters": "3",
+      "report_file": "审查报告/第3章审查报告.md",
+      "overall_score": 80,
+      "dimension_scores": {
+        "爽点密度": 7.5,
+        "设定一致性": 9.2,
+        "节奏控制": 6.5,
+        "人物塑造": 9.0,
+        "连贯性": 7.0,
+        "追读力": 8.8
+      },
+      "severity_counts": {
+        "critical": 1,
+        "high": 1,
+        "medium": 6,
+        "low": 3
+      },
+      "critical_issues": [
+        "时间线矛盾：第2章D-58 vs 第3章D-60"
+      ],
+      "reviewed_at": "2026-03-20"
+    },
+    {
+      "chapters": "4",
+      "report_file": "审查报告/第4章审查报告.md",
+      "overall_score": 58,
+      "dimension_scores": {
+        "爽点密度": 5.0,
+        "设定一致性": 4.0,
+        "节奏控制": 6.5,
+        "人物塑造": 7.5,
+        "连贯性": 7.0,
+        "追读力": 5.0
+      },
+      "severity_counts": {
+        "critical": 2,
+        "high": 4,
+        "medium": 4,
+        "low": 4
+      },
+      "critical_issues": [
+        "时间线错误：章节标注D-57应为D-59，偏差2天",
+        "倒计时矛盾：'五十八天后'与D-57不符"
+      ],
+      "reviewed_at": "2026-03-20"
+    },
+    {
+      "chapters": "31-31",
+      "report": "审查报告/第31-31章审查报告.md",
+      "reviewed_at": "2026-03-24 00:04:45"
+    },
+    {
+      "chapters": "1-2",
+      "report": "审查报告/第1-2章审查报告.md",
+      "reviewed_at": "2026-03-24 19:29:34"
+    },
+    {
+      "chapters": "29-30",
+      "report": "审查报告/第29-30章审查报告.md",
+      "reviewed_at": "2026-03-24 19:29:34"
+    }
+  ],
+  "chapter_meta": {
+    "1": {
+      "title": "第1章 地摊买书",
+      "strand": "Quest",
+      "time_anchor": "末世前第60天 清晨 → D-59",
+      "countdown": "D-60 → D-59",
+      "satisfaction": "信息爽点 - 发现古书，得知末世真相，修炼入门",
+      "word_count": 2400,
+      "review_score": 82,
+      "summary_file": ".webnovel/summaries/ch0001.md",
+      "key_events": [
+        "花十块钱买下《洞天要术》",
+        "书中浮现\"末世\"二字",
+        "得知冰河末世将于59天后降临",
+        "开始感知灵气，修炼入门"
+      ],
+      "new_entities": [
+        "《洞天要术》",
+        "临渊塔",
+        "感气"
+      ]
+    },
+    "2": {
+      "title": "第2章 修炼与准备",
+      "strand": "Quest",
+      "time_anchor": "D-59 → D-58",
+      "countdown": "58天",
+      "satisfaction": "信息爽点 - 发现玉片秘密；成就爽点 - 修炼小成",
+      "word_count": 2400,
+      "review_score": 82,
+      "summary_file": ".webnovel/summaries/ch0002.md",
+      "key_events": [
+        "发现古书文字消失",
+        "在书页夹层发现玉片",
+        "成功引导灵气入体一次",
+        "购买生存物资800+元"
+      ],
+      "new_entities": [
+        "玉片",
+        "压缩饼干",
+        "军用水壶",
+        "暖宝宝",
+        "便携净水器"
+      ]
+    },
+    "3": {
+      "title": "第3章 滴血认主",
+      "strand": "Quest",
+      "time_anchor": "D-58 傍晚",
+      "countdown": "57天",
+      "satisfaction": "成就爽点 - 滴血认主成功，感气成功踏入感气境",
+      "word_count": 2200,
+      "review_score": 80,
+      "summary_file": ".webnovel/summaries/ch0003.md",
+      "key_events": [
+        "发现需要滴血认主才能真正修炼",
+        "滴血认主成功，进入识海",
+        "与古书意志对话",
+        "感气成功，踏入感气境第一层",
+        "得知临渊市地下有上古遗迹"
+      ],
+      "new_entities": [
+        "识海",
+        "传承者",
+        "上古遗迹"
+      ]
+    },
+    "4": {
+      "title": "第4章 囤积物资",
+      "strand": "Quest",
+      "time_anchor": "D-57 清晨 → 傍晚",
+      "countdown": "D-57",
+      "satisfaction": "成就爽点 - 成功囤积物资，获得遗迹入口线索",
+      "word_count": 2800,
+      "review_score": 58,
+      "summary_file": ".webnovel/summaries/ch0004.md",
+      "key_events": [
+        "花光积蓄囤积生存物资",
+        "去夜市找地摊老人",
+        "得知自己是传承者",
+        "获得临渊塔地下入口纸条"
+      ],
+      "new_entities": [
+        "临渊塔地下入口",
+        "纸条"
+      ]
+    },
+    "5": {
+      "title": "第5章",
+      "strand": "Quest",
+      "time_anchor": "末世前第59天 中午",
+      "countdown": "D-59",
+      "satisfaction": "信息爽点/成就爽点"
+    },
+    "6": {
+      "title": "第6章（修炼进展）",
+      "strand": "Quest",
+      "time_anchor": "末世前第58-55天",
+      "countdown": "D-58 → D-55",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "7": {
+      "title": "第7章（修炼进展）",
+      "strand": "Quest",
+      "time_anchor": "末世前第53天",
+      "countdown": "D-53",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "8": {
+      "title": "第8章（修炼进展）",
+      "strand": "Quest",
+      "time_anchor": "末世前第52天",
+      "countdown": "D-52",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "9": {
+      "title": "第9章（修炼进展）",
+      "strand": "Quest",
+      "time_anchor": "末世前第51天",
+      "countdown": "D-51",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "10": {
+      "title": "第10章（修炼进展）",
+      "strand": "Quest",
+      "time_anchor": "末世前第50天",
+      "countdown": "D-50",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "11": {
+      "title": "第11章（与苏雨相遇）",
+      "strand": "Fire",
+      "time_anchor": "末世前第54-40天",
+      "countdown": "D-54 → D-40",
+      "satisfaction": "情感爽点 - 与苏雨初次相遇"
+    },
+    "12": {
+      "title": "第12章（与苏雨相遇）",
+      "strand": "Quest",
+      "time_anchor": "末世前第48天",
+      "countdown": "D-48",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "13": {
+      "title": "第13章（与苏雨相遇）",
+      "strand": "Quest",
+      "time_anchor": "末世前第47天",
+      "countdown": "D-47",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "14": {
+      "title": "第14章（与苏雨相遇）",
+      "strand": "Quest",
+      "time_anchor": "末世前第46天",
+      "countdown": "D-46",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "15": {
+      "title": "第15章（与苏雨相遇）",
+      "strand": "Quest",
+      "time_anchor": "末世前第45天",
+      "countdown": "D-45",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "16": {
+      "title": "第16章（与苏雨相遇）",
+      "strand": "Quest",
+      "time_anchor": "末世前第44天",
+      "countdown": "D-44",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "17": {
+      "title": "第17章（与苏雨相遇）",
+      "strand": "Quest",
+      "time_anchor": "末世前第43天",
+      "countdown": "D-43",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "18": {
+      "title": "第18章（与苏雨相遇）",
+      "strand": "Quest",
+      "time_anchor": "末世前第42天",
+      "countdown": "D-42",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "19": {
+      "title": "第19章（与苏雨相遇）",
+      "strand": "Quest",
+      "time_anchor": "末世前第41天",
+      "countdown": "D-41",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "20": {
+      "title": "第20章（与苏雨相遇）",
+      "strand": "Quest",
+      "time_anchor": "末世前第40天",
+      "countdown": "D-40",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "21": {
+      "title": "第21章（修炼突破）",
+      "strand": "Quest",
+      "time_anchor": "末世前第39-20天",
+      "countdown": "D-39 → D-20",
+      "satisfaction": "成就爽点 - 修炼突破"
+    },
+    "22": {
+      "title": "第22章（修炼突破）",
+      "strand": "Quest",
+      "time_anchor": "末世前第38天",
+      "countdown": "D-38",
+      "satisfaction": "成就爽点 - 修炼突破"
+    },
+    "23": {
+      "title": "第23章（修炼突破）",
+      "strand": "Quest",
+      "time_anchor": "末世前第37天",
+      "countdown": "D-37",
+      "satisfaction": "成就爽点 - 修炼突破"
+    },
+    "24": {
+      "title": "第24章（修炼突破）",
+      "strand": "Quest",
+      "time_anchor": "末世前第36天",
+      "countdown": "D-36",
+      "satisfaction": "成就爽点 - 修炼突破"
+    },
+    "25": {
+      "title": "第25章（修炼突破）",
+      "strand": "Quest",
+      "time_anchor": "末世前第35天",
+      "countdown": "D-35",
+      "satisfaction": "成就爽点 - 修炼突破"
+    },
+    "26": {
+      "title": "第26章（修炼突破）",
+      "strand": "Quest",
+      "time_anchor": "末世前第34天",
+      "countdown": "D-34",
+      "satisfaction": "成就爽点 - 修炼突破"
+    },
+    "27": {
+      "title": "第27章（修炼突破）",
+      "strand": "Quest",
+      "time_anchor": "末世前第33天",
+      "countdown": "D-33",
+      "satisfaction": "成就爽点 - 修炼突破"
+    },
+    "28": {
+      "title": "第28章（修炼突破）",
+      "strand": "Quest",
+      "time_anchor": "末世前第32天",
+      "countdown": "D-32",
+      "satisfaction": "成就爽点 - 修炼突破"
+    },
+    "29": {
+      "title": "第29章 感气中期",
+      "strand": "Quest",
+      "time_anchor": "末世第5天",
+      "countdown": "无",
+      "satisfaction": "成就爽点 - 修炼突破感气中期",
+      "word_count": 2100,
+      "review_score": 78,
+      "summary_file": ".webnovel/summaries/ch0029.md",
+      "key_events": [
+        "陈默在防空洞修炼三天",
+        "第四次尝试成功突破感气中期",
+        "耐寒能力提升至零下20度",
+        "决定明天出发前往临渊塔"
+      ],
+      "new_entities": []
+    },
+    "30": {
+      "title": "第30章 遗迹入口",
+      "strand": "Constellation",
+      "time_anchor": "末世第6天",
+      "countdown": "无",
+      "satisfaction": "探索爽点 - 进入临渊塔遗迹",
+      "word_count": 2036,
+      "review_score": 76,
+      "summary_file": ".webnovel/summaries/ch0030.md",
+      "key_events": [
+        "陈默离开防空洞，前往临渊塔",
+        "进入地下遗迹通道",
+        "发现上古修炼者遗迹",
+        "感知到遗迹深处有某种存在正在醒来",
+        "紧急撤离，留下悬念"
+      ],
+      "new_entities": [
+        "临渊塔地下遗迹",
+        "上古修炼者遗迹",
+        "玉盒"
+      ]
+    },
+    "31": {
+      "title": "第31章 探索古书",
+      "strand": "Constellation",
+      "time_anchor": "末世第6天傍晚至第7天早上",
+      "countdown": "无",
+      "satisfaction": "认知爽点 - 揭示古书来历",
+      "word_count": 2028,
+      "review_score": 83.3,
+      "summary_file": ".webnovel/summaries/ch0031.md",
+      "key_events": [
+        "陈默从临渊塔遗迹回到防空洞",
+        "与苏雨简短交流后进入识海",
+        "书灵揭示'渊'是上古文明的核心",
+        "'洞天'是上古文明修炼体系最高境界",
+        "'守渊者'是守护渊的古老存在",
+        "守渊者已被惊动，可能随时出现",
+        "陈默需要达到引气境才能解锁更多信息"
+      ],
+      "new_entities": [
+        "书灵",
+        "渊",
+        "洞天",
+        "守渊者",
+        "上古文明"
+      ]
+    },
+    "32": {
+      "title": "第32章 突破感气后期",
+      "strand": "Quest",
+      "time_anchor": "末世第8天",
+      "countdown": "无",
+      "satisfaction": "成就爽点 - 尝试突破感气后期"
+    },
+    "33": {
+      "title": "第33章 灵气失控",
+      "strand": "Quest",
+      "time_anchor": "末世第9天",
+      "countdown": "无",
+      "satisfaction": "紧张爽点 - 灵气失控，书灵出手相助"
+    },
+    "34": {
+      "title": "第34章 古书残页",
+      "strand": "Constellation",
+      "time_anchor": "末世第10天",
+      "countdown": "无",
+      "satisfaction": "认知爽点 - 发现古书残页的秘密"
+    },
+    "35": {
+      "title": "第35章 修炼瓶颈",
+      "strand": "Quest",
+      "time_anchor": "末世第11天",
+      "countdown": "无",
+      "satisfaction": "紧张爽点 - 修炼遇到瓶颈"
+    },
+    "36": {
+      "title": "第36章 灵气的本质",
+      "strand": "Constellation",
+      "time_anchor": "末世第12天",
+      "countdown": "无",
+      "satisfaction": "认知爽点 - 理解灵气的本质"
+    },
+    "37": {
+      "title": "第37章 书灵苏醒",
+      "strand": "Constellation",
+      "time_anchor": "末世第13天",
+      "countdown": "无",
+      "satisfaction": "认知爽点 - 书灵苏醒，揭示更多信息"
+    },
+    "38": {
+      "title": "第38章 突破的方法",
+      "strand": "Quest",
+      "time_anchor": "末世第14天",
+      "countdown": "无",
+      "satisfaction": "信息爽点 - 找到突破的方法"
+    },
+    "39": {
+      "title": "第39章 青锋山之行",
+      "strand": "Quest",
+      "time_anchor": "末世第15天",
+      "countdown": "无",
+      "satisfaction": "探索爽点 - 青锋山探险，获得灵石"
+    },
+    "40": {
+      "title": "第40章 筑基",
+      "strand": "Quest",
+      "time_anchor": "末世第18天",
+      "countdown": "无",
+      "satisfaction": "高潮爽点 - 成功筑基，卷末高潮"
+    },
+    "41": {
+      "title": "第41章 战",
+      "strand": "Quest",
+      "time_anchor": "末世第19天",
+      "countdown": "无",
+      "satisfaction": "战斗爽点 - 以筑基实力对抗敌人"
+    },
+    "42": {
+      "title": "第42章 巩固",
+      "strand": "Quest",
+      "time_anchor": "末世第20天",
+      "countdown": "无",
+      "satisfaction": "成就爽点 - 巩固筑基境界"
+    },
+    "43": {
+      "title": "第43章（末世降临与筑基）",
+      "strand": "Quest",
+      "time_anchor": "末世前第17天",
+      "countdown": "D-17",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "44": {
+      "title": "第44章（末世降临与筑基）",
+      "strand": "Quest",
+      "time_anchor": "末世前第16天",
+      "countdown": "D-16",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "45": {
+      "title": "第45章（末世降临与筑基）",
+      "strand": "Quest",
+      "time_anchor": "末世前第15天",
+      "countdown": "D-15",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "46": {
+      "title": "第46章（末世降临与筑基）",
+      "strand": "Quest",
+      "time_anchor": "末世前第14天",
+      "countdown": "D-14",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "47": {
+      "title": "第47章（末世降临与筑基）",
+      "strand": "Quest",
+      "time_anchor": "末世前第13天",
+      "countdown": "D-13",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "48": {
+      "title": "第48章（末世降临与筑基）",
+      "strand": "Quest",
+      "time_anchor": "末世前第12天",
+      "countdown": "D-12",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "49": {
+      "title": "第49章（末世降临与筑基）",
+      "strand": "Quest",
+      "time_anchor": "末世前第11天",
+      "countdown": "D-11",
+      "satisfaction": "成就爽点 - 修炼进展"
+    },
+    "50": {
+      "title": "第50章（末世降临与筑基）",
+      "strand": "Quest",
+      "time_anchor": "末世第3个月",
+      "countdown": "无",
+      "satisfaction": "成就爽点 - 成功筑基，建立庇护所"
+    }
+  },
+  "strand_tracker": {
+    "last_quest_chapter": 50,
+    "last_fire_chapter": 11,
+    "last_constellation_chapter": 31,
+    "current_dominant": "constellation",
+    "chapters_since_switch": 1,
+    "history": [
+      {
+        "chapter": 1,
+        "dominant": "quest"
+      },
+      {
+        "chapter": 1,
+        "dominant": "quest"
+      },
+      {
+        "chapter": 2,
+        "dominant": "quest"
+      },
+      {
+        "chapter": 3,
+        "dominant": "quest"
+      },
+      {
+        "chapter": 4,
+        "dominant": "quest"
+      },
+      {
+        "chapter": 5,
+        "dominant": "quest"
+      },
+      {
+        "chapter": 10,
+        "dominant": "fire"
+      },
+      {
+        "chapter": 11,
+        "dominant": "fire"
+      },
+      {
+        "chapter": 20,
+        "dominant": "quest"
+      },
+      {
+        "chapter": 30,
+        "dominant": "constellation"
+      },
+      {
+        "chapter": 31,
+        "dominant": "constellation"
+      },
+      {
+        "chapter": 40,
+        "dominant": "quest"
+      },
+      {
+        "chapter": 50,
+        "dominant": "quest"
+      }
+    ]
+  }
+}

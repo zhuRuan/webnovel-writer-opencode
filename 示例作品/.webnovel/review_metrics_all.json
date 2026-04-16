@@ -1,0 +1,24 @@
+{
+  "start_chapter": 1,
+  "end_chapter": 42,
+  "overall_score": 81.5,
+  "dimension_scores": {
+    "爽点密度": 7.8,
+    "设定一致性": 8.5,
+    "节奏控制": 7.6,
+    "人物塑造": 8.7,
+    "连贯性": 8.3,
+    "追读力": 8.1
+  },
+  "severity_counts": {
+    "critical": 1,
+    "high": 0,
+    "medium": 8,
+    "low": 9
+  },
+  "critical_issues": [
+    "第4章时间线错误：D-57应为D-59"
+  ],
+  "report_file": "审查报告/第1-42章综合审查报告.md",
+  "notes": "Full模式审查，含全部42章。核心问题：Fire线31章干旱、时间线精度问题。"
+}
