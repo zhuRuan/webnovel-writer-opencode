@@ -19,7 +19,7 @@ WORKSPACE_ROOT/
 
 ```
 .opencode/
-├── skills/              # 11个 Skills
+├── skills/              # 12个 Skills
 │   ├── webnovel-init/
 │   ├── webnovel-plan/
 │   ├── webnovel-write/
@@ -30,7 +30,8 @@ WORKSPACE_ROOT/
 │   ├── webnovel-dashboard/
 │   ├── webnovel-query/
 │   ├── webnovel-resume/
-│   └── webnovel-learn/
+│   ├── webnovel-learn/
+│   └── webnovel-image-gen/    # 图片生成
 ├── dashboard/           # 可视化面板（FastAPI + React 独立模块）
 │   ├── app.py          # FastAPI 应用入口
 │   ├── server.py       # 服务器配置
@@ -43,6 +44,7 @@ WORKSPACE_ROOT/
 │   ├── data_modules/    # 核心模块
 │   │   ├── condition_evaluator.py  # 条件评估器
 │   │   ├── temporal_graph.py      # 时间图谱
+│   │   ├── image_generator.py     # ModelScope 图片生成
 │   │   └── tests/               # 测试文件
 │   │       ├── test_condition_evaluator.py
 │   │       ├── test_temporal_graph.py

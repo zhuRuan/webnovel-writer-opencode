@@ -201,3 +201,54 @@ python -m opencode.dashboard --project-root <项目路径> --port 9000 --no-brow
 | `--cover` | 封面图路径（仅 EPUB，默认检测项目根目录/cover.jpg） |
 | `--style` | 自定义 CSS 路径（仅 EPUB，默认检测项目根目录/style.css） |
 | `--cover-size` | 封面裁剪尺寸（仅 EPUB，格式如 1200x1600） |
+
+## `/webnovel-image-gen` (genimg)
+
+用途：使用 ModelScope API 生成小说封面和角色图片。
+
+### 生成小说封面
+
+自动从项目文件读取信息（大纲/总纲.md、设定集/世界观.md、设定集/主角卡.md）：
+
+```
+/webnovel-image-gen gencover
+```
+
+手动指定：
+
+```
+/webnovel-image-gen gencover --novel "末世修仙" --desc "普通大学生末世修仙"
+```
+
+### 生成单个角色图片
+
+```
+/webnovel-image-gen genchar --name "陈默" --desc "19岁大学生，谨慎、孤独"
+```
+
+### 批量生成角色图（从设定集）
+
+扫描设定集目录，自动识别角色文件并生成图片：
+
+```
+/webnovel-image-gen genchars --dir 设定集 --max 20
+```
+
+参数：
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--novel` | 小说标题（可选） | 自动读取 |
+| `--desc` | 小说描述（可选） | 自动读取 |
+| `--name` | 角色名（genchar 必需） | - |
+| `--desc` | 角色描述（genchar 必需） | - |
+| `--dir` | 设定集目录（genchars） | - |
+| `--file` | 单个角色文件（genchars） | - |
+| `--max` | 最大生成数量 | 20 |
+| `--size` | 图片尺寸 | 16:9（封面）, 1:1（角色） |
+
+支持尺寸：1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3
+
+输出位置：
+- 封面：`{PROJECT_ROOT}/images/covers/`
+- 角色：`{PROJECT_ROOT}/images/characters/`

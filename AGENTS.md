@@ -77,6 +77,7 @@ config.world_preset = "xianxia"  # xianxia/urban/fantasy/scifi
 | `scripts/data_modules/config.py` | 配置+题材预设 |
 | `scripts/data_modules/debt_tracker.py` | 债务追踪 |
 | `scripts/data_modules/llm_invoker.py` | LLM调用 |
+| `scripts/data_modules/image_generator.py` | ModelScope 图片生成 |
 | `checkers/registry.yaml` | 审查器配置 |
 
 ## 新手引导
@@ -91,3 +92,4 @@ config.world_preset = "xianxia"  # xianxia/urban/fantasy/scifi
 | Phase 2: 一致性保障 | ✅ |
 | Phase 1.5: 通用化 | ✅ |
 | Phase 3: LLM集成 | ✅ |
+| Phase 4: 图片生成 | ✅ |

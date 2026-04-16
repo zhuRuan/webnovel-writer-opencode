@@ -50,6 +50,20 @@ Rerank 模型不需要重建向量库，更换后即时生效。
 
 推荐每本书单独配置 `${项目根}/.env`，避免多项目串配置。
 
+### Q: 如何配置图片生成 API？
+
+修改项目根目录的 `.env` 文件：
+
+```bash
+# Image Generation (ModelScope)
+IMAGE_BASE_URL=https://api-inference.modelscope.cn/v1
+IMAGE_MODEL=Qwen/Qwen-Image-2512
+IMAGE_API_KEY=your_modelscope_token
+IMAGE_SIZE=1:1
+```
+
+获取 API Key：访问 https://modelscope.cn/ → "我的_access_token" → 创建 Token
+
 ---
 
 ## 向量库管理
