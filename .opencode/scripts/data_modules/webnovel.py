@@ -275,6 +275,10 @@ def main() -> None:
     p_write_batch = sub.add_parser("write-batch", help="批量写作工具")
     p_write_batch.add_argument("args", nargs=argparse.REMAINDER)
 
+    # genimg 命令（ModelScope 文生图）
+    p_genimg = sub.add_parser("genimg", help="ModelScope 文生图工具")
+    p_genimg.add_argument("args", nargs=argparse.REMAINDER)
+
     # 兼容：允许 `--project-root` 出现在任意位置（减少 agents/skills 拼命令的出错率）
     from .cli_args import normalize_global_project_root
 
@@ -355,6 +359,9 @@ def main() -> None:
 
     if tool == "export":
         raise SystemExit(_run_script("export_manager.py", [*forward_args, *rest]))
+
+    if tool == "genimg":
+        raise SystemExit(_run_data_module("image_generator", [*forward_args, *rest]))
 
     if tool == "publish":
         raise SystemExit(_run_script("publish_manager.py", [*forward_args, *rest]))

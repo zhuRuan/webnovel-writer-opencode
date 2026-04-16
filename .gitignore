@@ -72,11 +72,16 @@ prompts/
 
 # 项目运行时生成的数据（小说项目目录）
 # 以下是用户在运行 webnovel-init 后会生成的目录，应该忽略
-.webnovel/
-正文/
-大纲/
-设定集/
-导出/
+# 注意：使用 /* 后缀来只匹配当前目录层级
+/.webnovel/
+/正文/
+/大纲/
+/设定集/
+/导出/
+/审查报告/
+
+# 示例作品（模板示例，需要上传）
+!示例作品/
 
 # Playwright 浏览器数据（发布模块）
 .opencode/browser_user_data/
@@ -88,3 +93,4 @@ prompts/
 
 # 推广素材（本地生成）
 webnovel-promo/
+landing-page/

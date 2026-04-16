@@ -198,6 +198,12 @@ class DataModulesConfig:
     def rerank_url(self) -> str:
         return self.rerank_base_url
 
+    # ================= Image Generation API 配置 =================
+    image_base_url: str = field(default_factory=lambda: os.getenv("IMAGE_BASE_URL", "https://api-inference.modelscope.cn/v1"))
+    image_model: str = field(default_factory=lambda: os.getenv("IMAGE_MODEL", "Qwen/Qwen-Image-2512"))
+    image_api_key: str = field(default_factory=lambda: os.getenv("IMAGE_API_KEY", ""))
+    image_size: str = field(default_factory=lambda: os.getenv("IMAGE_SIZE", "1:1"))
+
     # ================= 并发配置 =================
     embed_concurrency: int = 64
     rerank_concurrency: int = 32
