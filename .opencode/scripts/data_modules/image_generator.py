@@ -133,12 +133,11 @@ class ImageGenerator:
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        task_id = data.get("request_id")
+                        # 官方API返回 task_id
+                        task_id = data.get("task_id") or data.get("request_id")
                         if task_id:
                             logger.info(f"Task submitted: {task_id}")
                             return task_id
-                        # 兼容其他字段名
-                        return data.get("task_id") or data.get("task_id") or data.get("output", {}).get("task_id")
                     
                     # 打印错误信息帮助调试
                     err_text = await resp.text()
@@ -183,14 +182,15 @@ class ImageGenerator:
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        status = data.get("status", "").upper()
+                        # 官方API: task_status
+                        status = data.get("task_status", "").upper()
                         
                         if status == "SUCCEEDED":
-                            output = data.get("output", {})
-                            images = output.get("images", [])
-                            if images:
-                                return images[0].get("url")
-                            return output.get("image_url") or output.get("url")
+                            # 官方API: output_images 是一个URL列表
+                            output_images = data.get("output_images", [])
+                            if output_images:
+                                return output_images[0]
+                            return data.get("output_url")
                         
                         elif status == "FAILED":
                             logger.error("Task failed: %s", data.get("message", "Unknown error"))
