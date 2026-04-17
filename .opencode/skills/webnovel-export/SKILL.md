@@ -124,7 +124,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" wor
 ### 自动检测
 
 EPUB 导出时会自动检测以下文件：
-- `{project_root}/cover.jpg` - 封面图片
+- `{project_root}/图片/封面/` - 目录下最新的图片作为封面
 - `{project_root}/style.css` - 自定义样式
 
 ### 自定义 CSS 示例

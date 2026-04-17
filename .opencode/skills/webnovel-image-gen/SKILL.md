@@ -131,8 +131,8 @@ python .opencode/scripts/webnovel.py --project-root "${PROJECT_ROOT}" genimg gen
 ## 输出位置
 
 生成图片保存到：
-- 封面：`{PROJECT_ROOT}/images/covers/`
-- 角色：`{PROJECT_ROOT}/images/characters/`
+- 封面：`{PROJECT_ROOT}/图片/封面/`
+- 角色：`{PROJECT_ROOT}/图片/角色/`
 
 ## 充分性闸门
 
@@ -140,7 +140,7 @@ python .opencode/scripts/webnovel.py --project-root "${PROJECT_ROOT}" genimg gen
 
 - [ ] `.env` 中 `IMAGE_API_KEY` 已配置
 - [ ] 命令返回码为 0
-- [ ] 图片文件已生成在 `images/` 目录
+- [ ] 图片文件已生成在 `图片/` 目录
 
 ## 常见错误
 

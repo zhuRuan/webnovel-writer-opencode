@@ -250,5 +250,5 @@ python -m opencode.dashboard --project-root <项目路径> --port 9000 --no-brow
 支持尺寸：1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3
 
 输出位置：
-- 封面：`{PROJECT_ROOT}/images/covers/`
-- 角色：`{PROJECT_ROOT}/images/characters/`
+- 封面：`{PROJECT_ROOT}/图片/封面/`
+- 角色：`{PROJECT_ROOT}/图片/角色/`

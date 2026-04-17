@@ -303,9 +303,13 @@ class ExportManager:
 
         # 处理封面图
         if cover_path is None:
-            default_cover = self.project_root / "cover.jpg"
-            if default_cover.exists():
-                cover_path = str(default_cover)
+            # 自动检测 图片/封面/ 目录下的最新图片
+            cover_dir = self.project_root / "图片" / "封面"
+            if cover_dir.exists():
+                covers = [f for f in cover_dir.iterdir() if f.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp"]]
+                if covers:
+                    covers.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                    cover_path = str(covers[0])
 
         if cover_path and Path(cover_path).exists():
             cover_data = crop_cover_image(cover_path, cover_size)
@@ -349,24 +353,20 @@ class ExportManager:
         for chapter in chapters:
             chapter_title, content = self.get_chapter_content(chapter)
 
+            # 跳过空章节
+            if not content or not content.strip():
+                print(f"[WARN] 章节 {chapter} 内容为空，跳过")
+                continue
+
             c = epub.EpubHtml(
                 title=chapter_title,
                 file_name=f"chapter_{chapter}.xhtml",
                 lang=language,
             )
 
-            html_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-    <title>{chapter_title}</title>
-    <link rel="stylesheet" type="text/css" href="style/style.css" />
-</head>
-<body>
-<h1>{chapter_title}</h1>
-"""
-
+            # 去除 frontmatter
             lines = content.split("\n")
+            body_lines = []
             in_frontmatter = False
             frontmatter_count = 0
 
@@ -380,7 +380,25 @@ class ExportManager:
                         in_frontmatter = False
                         continue
 
-                if not in_frontmatter and line.strip():
+                if not in_frontmatter:
+                    body_lines.append(line)
+
+            body_content = "\n".join(body_lines).strip()
+            if not body_content:
+                print(f"[WARN] 章节 {chapter} 正文为空，跳过")
+                continue
+
+            # 使用简化HTML格式（避免ebooklib解析XML声明问题）
+            html_content = f"""<html>
+<head>
+    <title>{chapter_title}</title>
+</head>
+<body>
+<h1>{chapter_title}</h1>
+"""
+
+            for line in body_lines:
+                if line.strip():
                     html_content += f"<p>{line}</p>\n"
 
             html_content += "</body>\n</html>"
@@ -439,7 +457,7 @@ def main():
     p_export.add_argument("--author", default="未知作者", help="作者名（仅 EPUB 需要）")
     p_export.add_argument(
         "--cover",
-        help="封面图路径（默认: 项目根目录/cover.jpg）",
+        help="封面图路径（默认: 图片/封面/目录下的最新图片）",
     )
     p_export.add_argument(
         "--style",

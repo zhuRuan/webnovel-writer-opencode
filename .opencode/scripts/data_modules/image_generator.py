@@ -416,7 +416,7 @@ class ImageGenerator:
     ) -> Optional[Path]:
         """生成小说封面"""
         if output_dir is None:
-            output_dir = self.config.project_root / "images" / "covers"
+            output_dir = self.config.project_root / "图片" / "封面"
         
         filename = f"{novel_title.replace(' ', '_')}_cover.png"
         output_path = output_dir / filename
@@ -445,7 +445,7 @@ class ImageGenerator:
     ) -> Optional[Path]:
         """生成角色图片"""
         if output_dir is None:
-            output_dir = self.config.project_root / "images" / "characters"
+            output_dir = self.config.project_root / "图片" / "角色"
         
         filename = f"{name.replace(' ', '_')}.png"
         output_path = output_dir / filename
@@ -467,7 +467,7 @@ class ImageGenerator:
     ) -> List[Dict[str, Any]]:
         """批量生成角色图片"""
         if output_dir is None:
-            output_dir = self.config.project_root / "images" / "characters"
+            output_dir = self.config.project_root / "图片" / "角色"
 
         results = []
         characters = characters[:max_count]
