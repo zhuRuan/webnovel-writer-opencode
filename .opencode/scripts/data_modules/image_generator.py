@@ -100,6 +100,8 @@ class ImageGenerator:
 
     def _build_url(self) -> str:
         base = self.config.image_base_url.rstrip("/")
+        if "/v1" in base:
+            return f"{base}/images/generations"
         return f"{base}/v1/images/generations"
 
     def _validate_size(self, size: str) -> str:
@@ -119,11 +121,10 @@ class ImageGenerator:
         url = self._build_url()
         headers = self._build_headers()
         
-        # 官方API: 使用 data=json.dumps().encode() 而不是 json=
+        # 官方API格式
         payload = {
             "model": self.config.image_model,
-            "prompt": prompt,
-            "size": size
+            "prompt": prompt
         }
 
         for attempt in range(self.config.api_max_retries):
@@ -137,14 +138,8 @@ class ImageGenerator:
                     if resp.status == 200:
                         data = await resp.json()
                         
-                        # 同步模式返回: {"images": [{"url": "..."}]}
-                        images = data.get("images", [])
-                        if images and images[0].get("url"):
-                            logger.info(f"Sync image generated: {images[0]['url']}")
-                            return images[0]["url"]
-                        
-                        # 异步模式返回: {"task_id": "..."}
-                        task_id = data.get("task_id") or data.get("request_id")
+                        # 官方API: task_id 直接在顶层
+                        task_id = data.get("task_id")
                         if task_id:
                             logger.info(f"Async task submitted: {task_id}")
                             return task_id
@@ -179,7 +174,11 @@ class ImageGenerator:
         """轮询任务状态，返回图片 URL"""
         base = self.config.image_base_url.rstrip("/")
         url = f"{base}/v1/tasks/{task_id}"
-        headers = {"X-ModelScope-Task-Type": "image_generation"}
+        headers = {
+            "X-ModelScope-Task-Type": "image_generation"
+        }
+        if self.config.image_api_key:
+            headers["Authorization"] = f"Bearer {self.config.image_api_key}"
         
         max_attempts = 120
         poll_interval = 5
@@ -193,17 +192,19 @@ class ImageGenerator:
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        # 官方API: task_status
+                        # 官方API: task_status 在顶层 (SUCCEED 而非 SUCCEEDED)
                         status = data.get("task_status", "").upper()
                         
-                        if status == "SUCCEEDED":
-                            # 官方API: output_images 是一个URL列表
-                            output_images = data.get("output_images", [])
-                            if output_images:
-                                return output_images[0]
+                        if status == "SUCCEED":
+                            # 官方API: outputs 包含图片URL列表
+                            outputs = data.get("outputs", {})
+                            if isinstance(outputs, dict):
+                                images = outputs.get("images", [])
+                                if images:
+                                    return images[0].get("url")
                             return data.get("output_url")
                         
-                        elif status == "FAILED":
+                        elif status == "FAIL":
                             logger.error("Task failed: %s", data.get("message", "Unknown error"))
                             return None
                         
