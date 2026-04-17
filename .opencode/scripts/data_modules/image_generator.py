@@ -196,12 +196,12 @@ class ImageGenerator:
                         status = data.get("task_status", "").upper()
                         
                         if status == "SUCCEED":
-                            # 官方API: outputs 包含图片URL列表
-                            outputs = data.get("outputs", {})
-                            if isinstance(outputs, dict):
-                                images = outputs.get("images", [])
-                                if images:
-                                    return images[0].get("url")
+                            # 官方API: output_images 是一个URL列表
+                            output_images = data.get("output_images", [])
+                            if output_images and isinstance(output_images[0], str):
+                                return output_images[0]
+                            elif output_images and isinstance(output_images[0], dict):
+                                return output_images[0].get("url")
                             return data.get("output_url")
                         
                         elif status == "FAIL":
