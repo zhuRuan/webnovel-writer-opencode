@@ -202,3 +202,43 @@ def test_cleanup_artifacts_confirm_deletes_with_backup(tmp_path, monkeypatch):
     backup_dir = tmp_path / ".webnovel" / "recovery_backups"
     backups = list(backup_dir.glob("ch0008-*"))
     assert backups
+
+
+def test_load_state_normalizes_legacy_batch_and_task_payloads(tmp_path, monkeypatch):
+    module = _load_module()
+    monkeypatch.setattr(module, "find_project_root", lambda: tmp_path)
+
+    webnovel_dir = tmp_path / ".webnovel"
+    webnovel_dir.mkdir(parents=True, exist_ok=True)
+
+    legacy_state = {
+        "current_task": {
+            "command": "webnovel-write",
+            "args": {"chapter_num": 11},
+            "artifacts": {},
+        },
+        "batch_tasks": {
+            "batch-1": {
+                "task_id": "batch-1",
+                "range": {"start": 1, "end": 3},
+                "mode": "write",
+                "status": "running",
+            }
+        },
+    }
+    (webnovel_dir / "workflow_state.json").write_text(
+        json.dumps(legacy_state, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    state = module.load_state()
+
+    assert state["current_task"]["failed_steps"] == []
+    assert state["current_task"]["retry_count"] == 0
+    assert state["current_task"]["artifacts"]["review_completed"] is False
+
+    batch_task = state["batch_tasks"]["batch-1"]
+    assert batch_task["type"] == module.TASK_TYPE_BATCH
+    assert batch_task["completed_chapters"] == []
+    assert batch_task["failed_chapters"] == []
+    assert batch_task["chapter_results"] == {}

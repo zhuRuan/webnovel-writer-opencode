@@ -136,9 +136,25 @@ class StatusReporter:
         self.state = None
         self.chapters_data = []
         self._reading_power_cache: Dict[int, Optional[Dict[str, Any]]] = {}
+        self._chapter_index_cache: Dict[int, Optional[Dict[str, Any]]] = {}
+        self._entity_name_cache: Dict[str, str] = {}
+        self._analysis_cache: Dict[str, Any] = {}
 
         # v5.1 引入: 使用 IndexManager 读取实体
         self._index_manager = IndexManager(self.config)
+
+    def _reset_runtime_caches(self) -> None:
+        """清理与当前 state / scan 相关的运行时缓存。"""
+        self._reading_power_cache.clear()
+        self._chapter_index_cache.clear()
+        self._analysis_cache.clear()
+
+    def _get_cached_analysis(self, cache_key: str) -> Any:
+        return self._analysis_cache.get(cache_key)
+
+    def _set_cached_analysis(self, cache_key: str, value: Any) -> Any:
+        self._analysis_cache[cache_key] = value
+        return value
 
     def _extract_stats_field(self, content: str, field_name: str) -> str:
         """
@@ -164,6 +180,7 @@ class StatusReporter:
         if isinstance(self.state, dict):
             self.state = normalize_state_runtime_sections(self.state)
 
+        self._reset_runtime_caches()
         return True
 
     def _to_positive_int(self, value: Any) -> Optional[int]:
@@ -186,6 +203,10 @@ class StatusReporter:
 
     def _collect_foreshadowing_records(self) -> List[Dict[str, Any]]:
         """收集未回收伏笔，并基于真实字段构建分析记录。"""
+        cached = self._get_cached_analysis("foreshadowing_records")
+        if cached is not None:
+            return cached
+
         if not self.state:
             return []
 
@@ -279,7 +300,7 @@ class StatusReporter:
                 }
             )
 
-        return records
+        return self._set_cached_analysis("foreshadowing_records", records)
 
     def _get_chapter_meta(self, chapter: int) -> Dict[str, Any]:
         """读取指定章节的 chapter_meta（支持 0001/1 两种键）。"""
@@ -320,6 +341,19 @@ class StatusReporter:
         self._reading_power_cache[chapter] = record
         return record
 
+    def _get_chapter_index_cached(self, chapter: int) -> Optional[Dict[str, Any]]:
+        """读取并缓存章节索引记录。"""
+        if chapter in self._chapter_index_cache:
+            return self._chapter_index_cache[chapter]
+
+        try:
+            record = self._index_manager.get_chapter(chapter)
+        except Exception:
+            record = None
+
+        self._chapter_index_cache[chapter] = record
+        return record
+
     def _get_chapter_cool_points(self, chapter: int, chapter_data: Dict[str, Any]) -> Tuple[Optional[int], str]:
         """获取单章爽点数量（真实元数据优先）。"""
         reading_power = self._get_chapter_reading_power_cached(chapter)
@@ -342,6 +376,9 @@ class StatusReporter:
 
     def scan_chapters(self):
         """扫描所有章节文件"""
+        self.chapters_data = []
+        self._analysis_cache.clear()
+
         if not self.chapters_dir.exists():
             print(f"⚠️  正文目录不存在: {self.chapters_dir}")
             return
@@ -360,11 +397,13 @@ class StatusReporter:
         # 从 SQLite 获取所有角色的 canonical_name
         try:
             characters_from_db = self._index_manager.get_entities_by_type("角色")
-            known_character_names = [
-                c.get("canonical_name", c.get("id", ""))
-                for c in characters_from_db
-                if c.get("canonical_name")
-            ]
+            for character in characters_from_db:
+                entity_id = str(character.get("id") or "").strip()
+                canonical_name = str(character.get("canonical_name") or entity_id).strip()
+                if entity_id and canonical_name:
+                    self._entity_name_cache.setdefault(entity_id, canonical_name)
+                if canonical_name:
+                    known_character_names.append(canonical_name)
         except Exception:
             known_character_names = []
 
@@ -390,19 +429,25 @@ class StatusReporter:
             # v5.1 引入: 角色提取从 SQLite chapters 表读取
             characters: List[str] = []
             try:
-                chapter_info = self._index_manager.get_chapter(chapter_num)
+                chapter_info = self._get_chapter_index_cached(chapter_num)
                 if chapter_info and chapter_info.get("characters"):
                     stored = chapter_info["characters"]
                     if isinstance(stored, str):
-                        stored = json.loads(stored)
+                        try:
+                            stored = json.loads(stored)
+                        except json.JSONDecodeError:
+                            stored = []
                     if isinstance(stored, list):
                         for entity_id in stored:
                             entity_id = str(entity_id).strip()
                             if not entity_id:
                                 continue
-                            # 尝试获取 canonical_name
-                            entity = self._index_manager.get_entity(entity_id)
-                            name = entity.get("canonical_name", entity_id) if entity else entity_id
+                            name = self._entity_name_cache.get(entity_id)
+                            if not name:
+                                entity = self._index_manager.get_entity(entity_id)
+                                name = entity.get("canonical_name", entity_id) if entity else entity_id
+                                if name:
+                                    self._entity_name_cache[entity_id] = name
                             characters.append(name)
             except Exception:
                 characters = []
@@ -433,6 +478,10 @@ class StatusReporter:
 
     def analyze_characters(self) -> Dict:
         """分析角色活跃度（v5.1 引入，v5.4 沿用）"""
+        cached = self._get_cached_analysis("character_activity")
+        if cached is not None:
+            return cached
+
         if not self.state:
             return {}
 
@@ -444,7 +493,18 @@ class StatusReporter:
         except Exception:
             characters_list = []
 
-        # 统计每个角色的最后出场章节
+        # 预先汇总扫描结果，避免对每个角色重复遍历全量章节。
+        chapter_last_appearance: Dict[str, int] = {}
+        for ch_data in self.chapters_data:
+            chapter_num = int(ch_data.get("chapter", 0) or 0)
+            for char_name in ch_data.get("characters", []):
+                if not char_name:
+                    continue
+                chapter_last_appearance[char_name] = max(
+                    chapter_last_appearance.get(char_name, 0),
+                    chapter_num,
+                )
+
         character_activity = {}
 
         for char in characters_list:
@@ -455,10 +515,7 @@ class StatusReporter:
             # 查找最后出场章节
             last_appearance = char.get("last_appearance", 0) or 0
 
-            # 也从 chapters_data 中检查
-            for ch_data in self.chapters_data:
-                if char_name in ch_data.get("characters", []):
-                    last_appearance = max(last_appearance, ch_data["chapter"])
+            last_appearance = max(last_appearance, chapter_last_appearance.get(char_name, 0))
 
             absence = current_chapter - last_appearance
 
@@ -468,7 +525,7 @@ class StatusReporter:
                 "status": self._get_absence_status(absence)
             }
 
-        return character_activity
+        return self._set_cached_analysis("character_activity", character_activity)
 
     def _get_absence_status(self, absence: int) -> str:
         """判断掉线状态"""
@@ -483,8 +540,12 @@ class StatusReporter:
 
     def analyze_foreshadowing(self) -> List[Dict]:
         """分析伏笔深度"""
+        cached = self._get_cached_analysis("foreshadowing_analysis")
+        if cached is not None:
+            return cached
+
         records = self._collect_foreshadowing_records()
-        return [
+        return self._set_cached_analysis("foreshadowing_analysis", [
             {
                 "content": item["content"],
                 "planted_chapter": item["planted_chapter"],
@@ -494,7 +555,7 @@ class StatusReporter:
                 "status": item["status"],
             }
             for item in records
-        ]
+        ])
 
     def _get_foreshadowing_status(self, elapsed: int) -> str:
         """判断伏笔超时状态"""
@@ -517,6 +578,10 @@ class StatusReporter:
         紧急度计算公式：
         urgency = (已过章节 / 目标回收章节) × 层级权重
         """
+        cached = self._get_cached_analysis("foreshadowing_urgency")
+        if cached is not None:
+            return cached
+
         records = self._collect_foreshadowing_records()
         urgency_list = [
             {
@@ -534,10 +599,10 @@ class StatusReporter:
         ]
 
         # 先按“是否可计算”，再按紧急度降序
-        return sorted(
+        return self._set_cached_analysis("foreshadowing_urgency", sorted(
             urgency_list,
             key=lambda x: (x["urgency"] is None, -(x["urgency"] if x["urgency"] is not None else -1)),
-        )
+        ))
 
     def _get_urgency_status(self, urgency: float, remaining: int) -> str:
         """判断紧急度状态"""
@@ -675,6 +740,10 @@ class StatusReporter:
 
     def analyze_pacing(self) -> List[Dict]:
         """分析爽点节奏分布（每 N 章为一段）"""
+        cached = self._get_cached_analysis("pacing")
+        if cached is not None:
+            return cached
+
         segment_size = self.config.pacing_segment_size
         segments = []
 
@@ -723,7 +792,7 @@ class StatusReporter:
                 "dominant_source": dominant_source,
             })
 
-        return segments
+        return self._set_cached_analysis("pacing", segments)
 
     def _get_pacing_rating(self, words_per_point: Optional[float]) -> str:
         """判断节奏评级"""

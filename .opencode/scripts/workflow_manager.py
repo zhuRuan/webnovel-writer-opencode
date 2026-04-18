@@ -81,6 +81,57 @@ def get_call_trace_path() -> Path:
     return project_root / ".webnovel" / "observability" / "call_trace.jsonl"
 
 
+def _normalize_task_runtime(task: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Ensure task payload keeps required runtime keys."""
+    if task is None:
+        return None
+
+    task.setdefault("completed_steps", [])
+    task.setdefault("failed_steps", [])
+    task.setdefault("retry_count", 0)
+    task.setdefault("pending_steps", get_pending_steps(str(task.get("command") or "")))
+    task.setdefault("artifacts", {})
+    task["artifacts"].setdefault("chapter_file", {})
+    task["artifacts"].setdefault("git_status", {})
+    task["artifacts"].setdefault("state_json_modified", False)
+    task["artifacts"].setdefault("entities_appeared", False)
+    task["artifacts"].setdefault("review_completed", False)
+    return task
+
+
+def _normalize_batch_task(task: Dict[str, Any]) -> Dict[str, Any]:
+    """Backfill batch-task fields for older workflow_state snapshots."""
+    task.setdefault("type", TASK_TYPE_BATCH)
+    task.setdefault("current_chapter", task.get("range", {}).get("start"))
+    task.setdefault("completed_chapters", [])
+    task.setdefault("failed_chapters", [])
+    task.setdefault("chapter_results", {})
+    task.setdefault("metadata", {})
+    task.setdefault("stop_reason", None)
+    return task
+
+
+def _normalize_state_payload(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Normalize persisted workflow state shape in one place."""
+    normalized = state if isinstance(state, dict) else {}
+    normalized.setdefault("current_task", None)
+    normalized.setdefault("last_stable_state", None)
+    normalized.setdefault("history", [])
+    normalized.setdefault("batch_tasks", {})
+
+    normalized["current_task"] = _normalize_task_runtime(normalized.get("current_task"))
+
+    batch_tasks = normalized.get("batch_tasks", {})
+    if not isinstance(batch_tasks, dict):
+        batch_tasks = {}
+    normalized["batch_tasks"] = {
+        str(task_id): _normalize_batch_task(task)
+        for task_id, task in batch_tasks.items()
+        if isinstance(task, dict)
+    }
+    return normalized
+
+
 def append_call_trace(event: str, payload: Optional[Dict[str, Any]] = None):
     """Append workflow call trace event (best effort)."""
     payload = payload or {}
@@ -691,24 +742,22 @@ def load_state():
     """Load workflow state."""
     state_file = get_workflow_state_path()
     if not state_file.exists():
-        return {"current_task": None, "last_stable_state": None, "history": []}
+        return _normalize_state_payload(None)
     with open(state_file, "r", encoding="utf-8") as f:
         state = json.load(f)
-
-    state.setdefault("current_task", None)
-    state.setdefault("last_stable_state", None)
-    state.setdefault("history", [])
-    if state.get("current_task"):
-        state["current_task"].setdefault("failed_steps", [])
-        state["current_task"].setdefault("retry_count", 0)
-    return state
+    return _normalize_state_payload(state)
 
 
 def save_state(state):
     """Save workflow state atomically."""
     state_file = get_workflow_state_path()
     create_secure_directory(str(state_file.parent))
-    atomic_write_json(state_file, state, use_lock=True, backup=False)
+    atomic_write_json(
+        state_file,
+        _normalize_state_payload(state),
+        use_lock=True,
+        backup=False,
+    )
 
 
 def get_pending_steps(command):
@@ -738,8 +787,7 @@ TASK_TYPE_SINGLE = "single"
 def start_batch_task(task_id: str, range_start: int, range_end: int, mode: str, metadata: Optional[Dict[str, Any]] = None):
     """Start a new batch writing task."""
     state = load_state()
-    state.setdefault("batch_tasks", {})
-    
+
     started_at = now_iso()
     state["batch_tasks"][task_id] = {
         "task_id": task_id,
@@ -791,43 +839,40 @@ def update_batch_progress(task_id: str, chapter: int, result: Dict[str, Any]):
     """Update batch task progress after a chapter completes."""
     state = load_state()
     batch_tasks = state.get("batch_tasks", {})
-    
+
     if task_id not in batch_tasks:
         logger.warning(f"Batch task {task_id} not found")
         return
-    
+
     task = batch_tasks[task_id]
-    task["updated_at"] = now_iso()
-    
+    completed_at = now_iso()
+    task["updated_at"] = completed_at
+
     if result.get("status") == "success":
-        task["completed_chapters"] = task.get("completed_chapters", [])
         if chapter not in task["completed_chapters"]:
             task["completed_chapters"].append(chapter)
         task["current_chapter"] = chapter + 1
     else:
-        task["failed_chapters"] = task.get("failed_chapters", [])
         if chapter not in task["failed_chapters"]:
             task["failed_chapters"].append(chapter)
-        task["chapter_results"][str(chapter)] = {
-            "status": "failed",
-            "error": result.get("error", "unknown"),
-        }
-        
+
         if result.get("stop_on_fail"):
             task["status"] = "stopped"
             task["stop_reason"] = f"chapter_{chapter}_failed"
-    
-    task["chapter_results"][str(chapter)] = task["chapter_results"].get(str(chapter), {})
-    task["chapter_results"][str(chapter)].update({
+
+    chapter_result = task["chapter_results"].setdefault(str(chapter), {})
+    chapter_result.update({
         "status": result.get("status", "success"),
         "score": result.get("score"),
         "words": result.get("words", 0),
         "duration_seconds": result.get("duration_seconds", 0),
-        "completed_at": now_iso(),
+        "completed_at": completed_at,
     })
-    
+    if result.get("status") != "success":
+        chapter_result["error"] = result.get("error", "unknown")
+
     save_state(state)
-    
+
     safe_append_call_trace(
         "batch_chapter_completed",
         {
@@ -843,20 +888,20 @@ def complete_batch_task(task_id: str, summary: Optional[Dict[str, Any]] = None):
     """Mark batch task as completed."""
     state = load_state()
     batch_tasks = state.get("batch_tasks", {})
-    
+
     if task_id not in batch_tasks:
         logger.warning(f"Batch task {task_id} not found")
         return
-    
+
     task = batch_tasks[task_id]
     task["status"] = "completed"
     task["updated_at"] = now_iso()
-    
+
     if summary:
         task["summary"] = summary
-    
+
     save_state(state)
-    
+
     safe_append_call_trace(
         "batch_task_completed",
         {
@@ -872,18 +917,18 @@ def fail_batch_task(task_id: str, reason: str):
     """Mark batch task as failed."""
     state = load_state()
     batch_tasks = state.get("batch_tasks", {})
-    
+
     if task_id not in batch_tasks:
         logger.warning(f"Batch task {task_id} not found")
         return
-    
+
     task = batch_tasks[task_id]
     task["status"] = "failed"
     task["stop_reason"] = reason
     task["updated_at"] = now_iso()
-    
+
     save_state(state)
-    
+
     safe_append_call_trace(
         "batch_task_failed",
         {

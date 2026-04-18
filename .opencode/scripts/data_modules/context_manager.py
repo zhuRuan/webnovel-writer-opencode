@@ -23,6 +23,7 @@ from .config import get_config
 from .index_manager import IndexManager, WritingChecklistScoreMeta
 from .context_ranker import ContextRanker
 from .snapshot_manager import SnapshotManager, SnapshotVersionMismatch
+from .observability import safe_append_perf_timing
 from .context_weights import (
     DEFAULT_TEMPLATE as CONTEXT_DEFAULT_TEMPLATE,
     TEMPLATE_WEIGHTS as CONTEXT_TEMPLATE_WEIGHTS,
@@ -84,6 +85,8 @@ class ContextManager:
         self.snapshot_manager = snapshot_manager or SnapshotManager(self.config)
         self.index_manager = IndexManager(self.config)
         self.context_ranker = ContextRanker(self.config)
+        self._memory_cache: Dict[int, Dict[str, Any]] = {}
+        self._memory_cache_enabled = getattr(self.config, 'context_memory_cache_enabled', True)
 
     def _is_snapshot_compatible(self, cached: Dict[str, Any], template: str) -> bool:
         """判断快照是否可用于当前模板。"""
@@ -92,7 +95,6 @@ class ContextManager:
 
         meta = cached.get("meta")
         if not isinstance(meta, dict):
-            # 兼容旧快照：未记录 template 时仅允许默认模板复用
             return template == self.DEFAULT_TEMPLATE
 
         cached_template = meta.get("template")
@@ -100,6 +102,20 @@ class ContextManager:
             return template == self.DEFAULT_TEMPLATE
 
         return cached_template == template
+
+    def _get_from_memory_cache(self, chapter: int, template: str) -> Optional[Dict[str, Any]]:
+        """从内存缓存获取"""
+        if not self._memory_cache_enabled:
+            return None
+        key = (chapter, template)
+        return self._memory_cache.get(key)
+
+    def _set_to_memory_cache(self, chapter: int, template: str, context: Dict[str, Any]) -> None:
+        """存入内存缓存"""
+        if not self._memory_cache_enabled:
+            return
+        key = (chapter, template)
+        self._memory_cache[key] = context
 
     def build_context(
         self,
@@ -109,29 +125,92 @@ class ContextManager:
         save_snapshot: bool = True,
         max_chars: Optional[int] = None,
     ) -> Dict[str, Any]:
+        import time
+
+        start_time = time.perf_counter()
+        snapshot_hit = False
+        snapshot_load_time = 0.0
+
         template = template or self.DEFAULT_TEMPLATE
         self._active_template = template
         if template not in self.TEMPLATE_WEIGHTS:
             template = self.DEFAULT_TEMPLATE
             self._active_template = template
 
+        mem_cached = self._get_from_memory_cache(chapter, template)
+        if mem_cached:
+            snapshot_hit = True
+            if hasattr(self.config, 'project_root'):
+                safe_append_perf_timing(
+                    self.config.project_root,
+                    tool_name="context_manager.build_context",
+                    success=True,
+                    elapsed_ms=1,
+                    meta={"memory_cache_hit": True, "chapter": chapter, "template": template},
+                )
+            return mem_cached
+
         if use_snapshot:
             try:
+                snap_start = time.perf_counter()
                 cached = self.snapshot_manager.load_snapshot(chapter)
+                snapshot_load_time = time.perf_counter() - snap_start
                 if cached and self._is_snapshot_compatible(cached, template):
-                    return cached.get("payload", cached)
+                    snapshot_hit = True
+                    payload = cached.get("payload", cached)
+                    self._set_to_memory_cache(chapter, template, payload)
+                    if hasattr(self.config, 'project_root'):
+                        safe_append_perf_timing(
+                            self.config.project_root,
+                            tool_name="context_manager.build_context",
+                            success=True,
+                            elapsed_ms=int(snapshot_load_time * 1000),
+                            meta={"snapshot_hit": True, "chapter": chapter, "template": template},
+                        )
+                    return payload
             except SnapshotVersionMismatch:
-                # Snapshot incompatible; rebuild below.
                 pass
 
         pack = self._build_pack(chapter)
+        pack_time = time.perf_counter() - start_time - snapshot_load_time
+
         if getattr(self.config, "context_ranker_enabled", True):
+            rank_start = time.perf_counter()
             pack = self.context_ranker.rank_pack(pack, chapter)
+            rank_time = time.perf_counter() - rank_start
+        else:
+            rank_time = 0.0
+
+        assemble_start = time.perf_counter()
         assembled = self.assemble_context(pack, template=template, max_chars=max_chars)
+        assemble_time = time.perf_counter() - assemble_start
+
+        total_time = time.perf_counter() - start_time
 
         if save_snapshot:
             meta = {"template": template}
             self.snapshot_manager.save_snapshot(chapter, assembled, meta=meta)
+            self._set_to_memory_cache(chapter, template, assembled)
+
+        context_size = len(json.dumps(assembled, ensure_ascii=False))
+
+        if hasattr(self.config, 'project_root'):
+            safe_append_perf_timing(
+                self.config.project_root,
+                tool_name="context_manager.build_context",
+                success=True,
+                elapsed_ms=int(total_time * 1000),
+                meta={
+                    "snapshot_hit": snapshot_hit,
+                    "snapshot_load_ms": int(snapshot_load_time * 1000),
+                    "pack_ms": int(pack_time * 1000),
+                    "rank_ms": int(rank_time * 1000),
+                    "assemble_ms": int(assemble_time * 1000),
+                    "context_size": context_size,
+                    "chapter": chapter,
+                    "template": template,
+                },
+            )
 
         return assembled
 

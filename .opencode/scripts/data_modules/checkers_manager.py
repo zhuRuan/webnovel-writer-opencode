@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path
@@ -23,6 +24,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import yaml
 
 from .condition_evaluator import ConditionEvaluator, TriggerCondition
+from .observability import safe_append_perf_timing
 
 logger = getLogger(__name__)
 
@@ -46,11 +48,10 @@ class CodeCheckerResult:
 
 class CheckersManager:
     """审查器配置管理器"""
-    
-    # 预注册的 code checkers
+
     _code_checkers: Dict[str, Tuple[Callable, Dict]] = {}
 
-    def __init__(self, checkers_dir: Optional[Path] = None):
+    def __init__(self, checkers_dir: Optional[Path] = None, config=None):
         if checkers_dir is None:
             checkers_dir = Path(__file__).resolve().parent.parent.parent / "checkers"
         self.checkers_dir = checkers_dir
@@ -58,6 +59,7 @@ class CheckersManager:
         self.schema_path = checkers_dir / "schema.yaml"
         self.agents_dir = checkers_dir / "agents"
         self.templates_dir = checkers_dir / "templates"
+        self._config = config
 
     @classmethod
     def register_code_checker(
@@ -66,18 +68,34 @@ class CheckersManager:
         checker_func: Callable,
         config: Optional[Dict] = None
     ) -> None:
-        """
-        注册 code checker（运行在 LLM agent 之前的确定性检查层）
-        
-        Args:
-            checker_id: 唯一标识符
-            checker_func: 检查函数 (chapter, content, chapter_context) -> List[Dict]
-            config: 配置参数 {severity_threshold, block_on_critical, ...}
-        """
+        """注册 code checker"""
         if config is None:
             config = {}
+        cls._validate_checker_config(checker_id, config)
         cls._code_checkers[checker_id] = (checker_func, config)
         logger.info(f"注册 code checker: {checker_id}")
+
+    @classmethod
+    def _validate_checker_config(cls, checker_id: str, config: Dict) -> None:
+        """验证 checker 配置"""
+        required_keys = {"severity_threshold", "block_on_critical"}
+        for key in required_keys:
+            if key not in config:
+                logger.warning(f"checker {checker_id} 缺少配置 {key}，使用默认值")
+                if key == "severity_threshold":
+                    config[key] = "critical"
+                elif key == "block_on_critical":
+                    config[key] = True
+
+    @classmethod
+    def get_code_checkers(cls) -> Dict[str, Tuple[Callable, Dict]]:
+        """获取已注册的 code checkers"""
+        return cls._code_checkers.copy()
+
+    @classmethod
+    def list_code_checkers(cls) -> List[str]:
+        """列出所有已注册的 checker ID"""
+        return list(cls._code_checkers.keys())
 
     @classmethod
     def register_world_consistency_checker(
@@ -175,11 +193,6 @@ class CheckersManager:
         return results
 
     @classmethod
-    def get_code_checkers(cls) -> Dict[str, Tuple[Callable, Dict]]:
-        """获取已注册的 code checkers"""
-        return cls._code_checkers.copy()
-
-    @classmethod
     def run_layered_checkers(
         cls,
         chapter: int,
@@ -190,18 +203,18 @@ class CheckersManager:
     ) -> Dict[str, Any]:
         """
         分层运行审查器：Code Layer → LLM Agents
-        
+
         1. 先运行 code checkers（确定性检查，快速）
         2. 若有 blocked=True → 立即返回阻塞结果
         3. 否则运行 LLM agents（可选）
-        
+
         Args:
             chapter: 章节号
             content: 章节内容
             chapter_context: 章节上下文
             mode: 审查模式 (standard/minimal/full)
             run_llm: 是否运行 LLM agents
-        
+
         Returns:
             {
                 "layer": "code" | "llm" | "fallback",
@@ -211,11 +224,37 @@ class CheckersManager:
                 "issues": [...],
             }
         """
+        start_time = time.perf_counter()
+        code_checker_time = 0.0
+        llm_checker_time = 0.0
+        blocked_count = 0
+
+        code_start = time.perf_counter()
         code_results = cls.run_code_checkers(chapter, content, chapter_context)
-        
+        code_checker_time = time.perf_counter() - code_start
+
         blocked_results = [r for r in code_results if r.blocked]
+        blocked_count = len(blocked_results)
+
         if blocked_results:
             logger.warning(f"[CheckersManager] CODE LAYER BLOCKING: {len(blocked_results)} issues")
+            total_time = time.perf_counter() - start_time
+            if hasattr(cls, '_config') and hasattr(cls._config, 'project_root'):
+                safe_append_perf_timing(
+                    cls._config.project_root,
+                    tool_name="checkers_manager.run_layered_checkers",
+                    success=True,
+                    elapsed_ms=int(total_time * 1000),
+                    meta={
+                        "chapter": chapter,
+                        "mode": mode,
+                        "run_llm": run_llm,
+                        "layer": "code",
+                        "blocked": True,
+                        "code_checker_ms": int(code_checker_time * 1000),
+                        "blocked_count": blocked_count,
+                    },
+                )
             return {
                 "layer": "code",
                 "blocked": True,
@@ -227,9 +266,26 @@ class CheckersManager:
                     for issue in r.issues
                 ],
             }
-        
+
         if not run_llm:
             logger.debug(f"[CheckersManager] Code layer passed, LLM skipped")
+            total_time = time.perf_counter() - start_time
+            if hasattr(cls, '_config') and hasattr(cls._config, 'project_root'):
+                safe_append_perf_timing(
+                    cls._config.project_root,
+                    tool_name="checkers_manager.run_layered_checkers",
+                    success=True,
+                    elapsed_ms=int(total_time * 1000),
+                    meta={
+                        "chapter": chapter,
+                        "mode": mode,
+                        "run_llm": run_llm,
+                        "layer": "code",
+                        "blocked": False,
+                        "code_checker_ms": int(code_checker_time * 1000),
+                        "blocked_count": 0,
+                    },
+                )
             return {
                 "layer": "code",
                 "blocked": False,
@@ -237,17 +293,40 @@ class CheckersManager:
                 "llm_results": [],
                 "issues": [],
             }
-        
+
+        llm_start = time.perf_counter()
         logger.info(f"[CheckersManager] === LLM Layer Start: chapter={chapter}, mode={mode} ===")
         llm_results = cls.run_llm_agents(chapter, content, chapter_context, mode)
-        
+        llm_checker_time = time.perf_counter() - llm_start
+
         has_blocking_llm = any(
             r.get("passed") is False and r.get("overall_score", 100) < 60
             for r in llm_results
         ) if llm_results else False
-        
+
         logger.info(f"[CheckersManager] === LLM Layer End: blocked={has_blocking_llm}, agents={len(llm_results)} ===")
-        
+
+        total_time = time.perf_counter() - start_time
+
+        if hasattr(cls, '_config') and hasattr(cls._config, 'project_root'):
+            safe_append_perf_timing(
+                cls._config.project_root,
+                tool_name="checkers_manager.run_layered_checkers",
+                success=True,
+                elapsed_ms=int(total_time * 1000),
+                meta={
+                    "chapter": chapter,
+                    "mode": mode,
+                    "run_llm": run_llm,
+                    "layer": "llm",
+                    "blocked": has_blocking_llm,
+                    "code_checker_ms": int(code_checker_time * 1000),
+                    "llm_checker_ms": int(llm_checker_time * 1000),
+                    "llm_agent_count": len(llm_results),
+                    "blocked_count": blocked_count,
+                },
+            )
+
         return {
             "layer": "llm",
             "blocked": has_blocking_llm,

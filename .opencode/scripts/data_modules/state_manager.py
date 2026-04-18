@@ -29,6 +29,11 @@ import filelock
 from .config import get_config
 from .observability import safe_append_perf_timing, safe_log_tool_call
 
+try:
+    from .exceptions import StateManagerError
+except ImportError:
+    StateManagerError = None
+
 
 logger = getLogger(__name__)
 
@@ -266,8 +271,18 @@ class StateManager:
         self.config.ensure_dirs()
 
         lock = filelock.FileLock(str(self._lock_path), timeout=10)
+        lock_wait_time = 0.0
+        lock_acquired = False
+        merge_time = 0.0
+        write_time = 0.0
+        sqlite_time = 0.0
+
         try:
+            lock_start = time.perf_counter()
             with lock:
+                lock_wait_time = time.perf_counter() - lock_start
+                lock_acquired = True
+                merge_start = time.perf_counter()
                 disk_state = read_json_safe(self.config.state_file, default={})
                 disk_state = self._ensure_state_schema(disk_state)
 
@@ -410,12 +425,22 @@ class StateManager:
                             item["last_mentioned_chapter"] = max(current_last, mention.mentioned_chapter)
                             break
 
+                merge_time = time.perf_counter() - merge_start
+
+                write_start = time.perf_counter()
                 # 原子写入（锁已持有，不再二次加锁）
                 atomic_write_json(self.config.state_file, disk_state, use_lock=False, backup=True)
+                write_time = time.perf_counter() - write_start
 
+                sqlite_start = time.perf_counter()
                 # v5.1 引入: 同步到 SQLite（失败时保留 pending 以便重试）
                 sqlite_pending_snapshot = self._snapshot_sqlite_pending()
-                sqlite_sync_ok = self._sync_to_sqlite()
+                try:
+                    sqlite_sync_ok = self._sync_to_sqlite()
+                except Exception as e:
+                    logger.warning("SQLite sync exception: %s", e)
+                    sqlite_sync_ok = False
+                sqlite_time = time.perf_counter() - sqlite_start
 
                 # 同步内存为磁盘最新快照
                 self._state = disk_state
@@ -439,6 +464,24 @@ class StateManager:
                     self._clear_pending_sqlite_data()
                 else:
                     self._restore_sqlite_pending(sqlite_pending_snapshot)
+
+                total_time = lock_wait_time + merge_time + write_time + sqlite_time
+                save_failure = 0 if sqlite_sync_ok else 1
+
+                if hasattr(self.config, 'project_root'):
+                    safe_append_perf_timing(
+                        self.config.project_root,
+                        tool_name="state_manager.save_state",
+                        success=sqlite_sync_ok,
+                        elapsed_ms=int(total_time * 1000),
+                        meta={
+                            "lock_wait_ms": int(lock_wait_time * 1000),
+                            "merge_ms": int(merge_time * 1000),
+                            "write_ms": int(write_time * 1000),
+                            "sqlite_ms": int(sqlite_time * 1000),
+                            "save_failure": save_failure,
+                        },
+                    )
 
         except filelock.Timeout:
             raise RuntimeError("无法获取 state.json 文件锁，请稍后重试")

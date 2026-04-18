@@ -74,6 +74,50 @@
 
 ## 核心模块
 
+### data_modules/
+
+```
+data_modules/
+├── config.py              # 配置系统（题材预设）
+├── config_defaults.py     # 配置默认值
+├── config_presets.py    # 世界观预设（xianxia/urban/scifi）
+├── exceptions.py         # 统一异常体系
+├── rag_adapter.py        # RAG + 动态词典
+├── rag_backend.py        # RAG后端抽象（Protocol接口）
+├── temporal_graph.py     # Graph-RAG + 持久化
+├── context_manager.py    # 自适应上下文 + 债务感知 + 内存缓存
+├── checkers_manager.py   # 分层审查管理 + 性能埋点
+├── state_manager.py      # 状态管理 + 性能埋点
+├── index_manager.py      # 索引管理 + 查询埋点
+├── api_client.py         # API客户端 + 埋点
+├── webnovel.py           # CLI入口 + COMMAND_REGISTRY
+├── debt_tracker.py       # 债务追踪
+├── condition_evaluator.py # 条件评估器
+└── image_generator.py    # ModelScope 图片生成
+```
+
+### 性能观测
+
+观测数据写入 `{project_root}/.webnovel/observability/data_agent_timing.jsonl`，覆盖：
+- `state_manager.save_state()` - lock_wait/merge/write/sqlite 耗时
+- `context_manager.build_context()` - snapshot命中率/pack/rank/assemble 耗时
+- `api_client.embed()` / `embed_batch()` - batch_size/失败率/重试次数
+- `checkers_manager.run_layered_checkers()` - code/llm checker 耗时
+
+### RAG 后端抽象
+
+```python
+from data_modules.rag_backend import BackendFactory, VectorSearchBackend, TemporalGraphBackendAdapter
+
+# 获取后端
+adapter = RAGAdapter(config)
+vector_backend = adapter.get_vector_backend()
+graph_backend = adapter.get_temporal_graph_backend()
+
+# 工厂模式
+backend = BackendFactory.create("vector")
+```
+
 ### 条件评估器 (condition_evaluator)
 
 负责评估章节中触发的世界规则条件，判断是否符合预设规则。

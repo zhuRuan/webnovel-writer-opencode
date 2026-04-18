@@ -35,6 +35,30 @@ from project_locator import resolve_project_root, write_current_project_pointer,
 from logger import get_logger, setup_logging
 
 
+COMMAND_REGISTRY = {
+    # 命令: (类型, 目标, 是否需要 project_root)
+    # 类型: "data_module" | "script" | "special"
+    "index": {"type": "data_module", "target": "index_manager", "needs_root": True},
+    "state": {"type": "data_module", "target": "state_manager", "needs_root": True},
+    "rag": {"type": "data_module", "target": "rag_adapter", "needs_root": True},
+    "style": {"type": "data_module", "target": "style_sampler", "needs_root": True},
+    "entity": {"type": "data_module", "target": "entity_linker", "needs_root": True},
+    "context": {"type": "data_module", "target": "context_manager", "needs_root": True},
+    "migrate": {"type": "data_module", "target": "migrate_state_to_sqlite", "needs_root": True},
+    "checkers": {"type": "data_module", "target": "checkers_manager", "needs_root": False},
+    "genimg": {"type": "data_module", "target": "image_generator", "needs_root": True},
+    "workflow": {"type": "script", "target": "workflow_manager.py", "needs_root": True},
+    "status": {"type": "script", "target": "status_reporter.py", "needs_root": True},
+    "update-state": {"type": "script", "target": "update_state.py", "needs_root": True},
+    "backup": {"type": "script", "target": "backup_manager.py", "needs_root": True},
+    "archive": {"type": "script", "target": "archive_manager.py", "needs_root": True},
+    "export": {"type": "script", "target": "export_manager.py", "needs_root": True},
+    "publish": {"type": "script", "target": "publish_manager.py", "needs_root": True},
+    "extract-context": {"type": "special", "target": "_extract_context", "needs_root": True},
+    "init": {"type": "special", "target": "_init_project", "needs_root": False},
+}
+
+
 def _scripts_dir() -> Path:
     # data_modules/webnovel.py -> data_modules -> scripts
     return Path(__file__).resolve().parent.parent
@@ -292,26 +316,20 @@ def main() -> None:
 
     tool = args.tool
     rest = list(getattr(args, "args", []) or [])
-    # argparse.REMAINDER 可能以 `--` 开头占位，这里去掉
     if rest[:1] == ["--"]:
         rest = rest[1:]
     rest = _strip_project_root_args(rest)
 
-    # init 是创建项目，不应该依赖/注入已存在 project_root
+    cmd = COMMAND_REGISTRY.get(tool)
+
     if tool == "init":
         raise SystemExit(_run_script("init_project.py", rest))
-
-    # checkers 是审查器配置管理，不需要 project_root
     if tool == "checkers":
         raise SystemExit(_run_data_module("checkers_manager", rest))
-
-    # publish 命令中，setup-browser 不需要 project_root，其他命令需要
     if tool == "publish":
         if rest and rest[0] == "setup-browser":
             raise SystemExit(_run_script("publish_manager.py", rest))
-        # 其他 publish 子命令需要 project_root
 
-    # 其余工具：统一解析 project_root 后前置给下游
     project_root = _resolve_root(args.project_root)
     forward_args = ["--project-root", str(project_root)]
 

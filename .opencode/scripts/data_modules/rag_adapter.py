@@ -35,6 +35,13 @@ from .index_manager import IndexManager
 from .query_router import QueryRouter
 from .observability import safe_append_perf_timing, safe_log_tool_call
 from .temporal_graph import TemporalGraphIndex
+from .rag_backend import (
+    BackendFactory,
+    VectorSearchBackend,
+    TemporalGraphBackendAdapter,
+    RAGBackend,
+    TemporalGraphBackend,
+)
 
 
 logger = getLogger(__name__)
@@ -84,9 +91,32 @@ class RAGAdapter:
         self._temporal_graph: Optional[TemporalGraphIndex] = None
         self._last_dict_word_count: int = 0
         self._rebuild_timer: Optional[Any] = None
+
+        self._backends: Dict[str, Any] = {}
+
         self._init_db()
         self._init_jieba()
+        self._init_backends()
+
+    def _init_backends(self):
+        """初始化后端（使用 BackendFactory）"""
         self._init_temporal_graph()
+        self._backends["vector"] = VectorSearchBackend(config=self.config, rag_adapter=self)
+        self._backends["temporal_graph"] = TemporalGraphBackendAdapter(
+            config=self.config, temporal_graph=self._temporal_graph
+        )
+
+    def get_backend(self, backend_type: str) -> Optional[Any]:
+        """获取后端实例"""
+        return self._backends.get(backend_type)
+
+    def get_vector_backend(self) -> Optional[VectorSearchBackend]:
+        """获取向量检索后端"""
+        return self._backends.get("vector")
+
+    def get_temporal_graph_backend(self) -> Optional[TemporalGraphBackendAdapter]:
+        """获取时序图后端"""
+        return self._backends.get("temporal_graph")
 
     def _init_jieba(self):
         """初始化 jieba 分词器（懒加载单例 + 自动重建）"""

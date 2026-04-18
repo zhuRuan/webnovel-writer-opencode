@@ -8,6 +8,7 @@ from data_modules.config import DataModulesConfig
 from data_modules.index_manager import (
     IndexManager,
     ChapterReadingPowerMeta,
+    ChapterMeta,
     EntityMeta,
     RelationshipMeta,
     RelationshipEventMeta,
@@ -257,6 +258,58 @@ def test_to_dict_returns_basic_stats():
         assert result["basic_stats"]["total_words"] == 300000
         assert result["basic_stats"]["completion_percent"] == 60.0
         assert result["focus"] == "basic"
+
+
+def test_scan_chapters_reuses_prefetched_entity_names(tmp_path, monkeypatch):
+    config = DataModulesConfig.from_project_root(tmp_path)
+    config.ensure_dirs()
+    project_root = config.project_root
+
+    state = {
+        "progress": {"current_chapter": 1, "total_words": 3200},
+        "protagonist_state": {"name": "萧炎"},
+    }
+    _write_state(project_root, state)
+
+    chapter_file = project_root / "正文" / "第0001章.md"
+    chapter_file.parent.mkdir(parents=True, exist_ok=True)
+    chapter_file.write_text("# 第1章\n萧炎出场。", encoding="utf-8")
+
+    idx = IndexManager(config)
+    idx.upsert_entity(
+        EntityMeta(
+            id="xiaoyan",
+            type="角色",
+            canonical_name="萧炎",
+            tier="核心",
+            current={},
+            first_appearance=1,
+            last_appearance=1,
+            is_protagonist=True,
+        )
+    )
+    idx.add_chapter(
+        ChapterMeta(
+            chapter=1,
+            title="第1章",
+            location="乌坦城",
+            word_count=3200,
+            characters=["xiaoyan"],
+            summary="主角登场",
+        )
+    )
+
+    reporter = StatusReporter(str(project_root))
+    assert reporter.load_state() is True
+
+    def _unexpected_lookup(entity_id):
+        raise AssertionError(f"unexpected entity lookup: {entity_id}")
+
+    monkeypatch.setattr(reporter._index_manager, "get_entity", _unexpected_lookup)
+
+    reporter.scan_chapters()
+
+    assert reporter.chapters_data[0]["characters"] == ["萧炎"]
 
 
 def test_to_dict_returns_foreshadowing():

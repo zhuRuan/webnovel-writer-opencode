@@ -51,6 +51,11 @@ from .index_reading_mixin import IndexReadingMixin
 from .index_observability_mixin import IndexObservabilityMixin
 from .observability import safe_append_perf_timing, safe_log_tool_call
 
+try:
+    from .exceptions import IndexManagerError
+except ImportError:
+    IndexManagerError = None
+
 
 @dataclass
 class ChapterMeta:
@@ -226,11 +231,22 @@ class WritingChecklistScoreMeta:
 
 
 class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexReadingMixin, IndexObservabilityMixin):
-    """索引管理器"""
+    """索引管理器（v5.4 过渡版，内部服务化）"""
 
     def __init__(self, config=None):
         self.config = config or get_config()
         self._init_db()
+        self._services = {
+            "chapter": self,
+            "entity": self,
+            "debt": self,
+            "reading": self,
+            "observability": self,
+        }
+
+    def get_service(self, name: str):
+        """获取内部服务（过渡用，未来替换 mixin）"""
+        return self._services.get(name, self)
 
     def _init_db(self):
         """初始化数据库表"""
@@ -642,12 +658,23 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
     @contextmanager
     def _get_conn(self):
         """获取数据库连接"""
+        query_time = 0.0
         conn = sqlite3.connect(str(self.config.index_db))
         conn.row_factory = sqlite3.Row
         try:
             yield conn
         finally:
+            query_time = conn.total_changes
             conn.close()
+
+        if hasattr(self.config, 'project_root'):
+            from .observability import safe_append_perf_timing
+            safe_append_perf_timing(
+                self.config.project_root,
+                tool_name="index_manager.query",
+                success=True,
+                elapsed_ms=int(query_time * 10),
+            )
 
     # ==================== 章节操作 ====================
 
