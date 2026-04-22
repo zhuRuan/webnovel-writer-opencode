@@ -6,6 +6,7 @@ aiohttp>=3.8.0
 jieba>=0.42.1
 filelock>=3.0.0
 pydantic>=2.0.0
+pypinyin>=0.49.0
 
 # Optional (export feature)
 ebooklib>=0.5.0

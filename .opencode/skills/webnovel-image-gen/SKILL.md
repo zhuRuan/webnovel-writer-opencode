@@ -76,7 +76,7 @@ python .opencode/scripts/webnovel.py --project-root "${PROJECT_ROOT}" genimg gen
 |------|------|------|
 | `--novel` | 小说标题（可选） | "末世修仙" |
 | `--desc` | 小说描述（可选） | "大学生修仙末世求生" |
-| `--size` | 图片尺寸，默认 1:1 | `16:9`, `1:1` |
+| `--size` | 图片尺寸，默认 3:4（番茄标准600x800） | `3:4`, `16:9` |
 
 ### Step 2：生成单个角色图片
 
@@ -91,7 +91,7 @@ python .opencode/scripts/webnovel.py --project-root "${PROJECT_ROOT}" genimg gen
 |------|------|------|
 | `--name` | 角色名 | "陈默" |
 | `--desc` | 角色描述 | "白衣少年，面容坚毅" |
-| `--size` | 图片尺寸，默认 1:1 | `1:1`, `9:16` |
+| `--size` | 图片尺寸，默认 3:4 | `3:4`, `1:1` |
 
 ### Step 3：批量生成角色图（从设定集）
 
@@ -161,18 +161,15 @@ python .opencode/scripts/webnovel.py --project-root "${PROJECT_ROOT}" genimg gen
 
 | 比例 | 尺寸 | 适用场景 |
 |------|------|----------|
-| 1:1 | 1328x1328 | 方形，默认值 |
-| 16:9 | 1664x928 | 横向封面 |
-| 9:16 | 928x1664 | 竖向角色全身像 |
-| 4:3 | 1472x1104 | 横向 |
-| 3:4 | 1104x1472 | 竖向 |
-| 3:2 | 1584x1056 | 横向 |
-| 2:3 | 1056x1584 | 竖向 |
+| 3:4 | 600x800 | 竖向，番茄小说标准尺寸（推荐） |
+| 1:1 | 1328x1328 | 方形，社交媒体 |
+| 16:9 | 1664x928 | 横向，电影感封面 |
+| 9:16 | 928x1664 | 竖向，角色全身像 |
 
 **使用示例**：
 ```bash
 # 使用比例格式
-python .opencode/scripts/webnovel.py genimg gencover --novel "小说" --desc "描述" --size 16:9
+python .opencode/scripts/webnovel.py genimg gencover --novel "小说" --desc "描述" --size 3:4
 
 # 或使用像素格式
 python .opencode/scripts/webnovel.py genimg gencover --novel "小说" --desc "描述" --size 1664x928
