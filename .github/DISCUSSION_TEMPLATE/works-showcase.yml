@@ -1,0 +1,74 @@
+# .github/DISCUSSION_TEMPLATE/works-showcase.yml
+title: "新作品提交"
+labels: ["作品展示"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 欢迎提交您的作品！
+        请填写以下信息，帮助我们更好地展示您的创作。
+
+  - type: input
+    id: work-name
+    attributes:
+      label: "作品名"
+      description: "请输入您的作品名称"
+      placeholder: "例如：三体"
+    validations:
+      required: true
+
+  - type: input
+    id: author
+    attributes:
+      label: "作者"
+      description: "请输入您的署名或笔名"
+      placeholder: "例如：刘慈欣"
+    validations:
+      required: true
+
+  - type: input
+    id: genre
+    attributes:
+      label: "题材"
+      description: "请选择或填写作品题材"
+      placeholder: "例如：科幻、奇幻、悬疑"
+    validations:
+      required: false
+
+  - type: input
+    id: word-count
+    attributes:
+      label: "字数"
+      description: "作品的大致字数"
+      placeholder: "例如：约 20万字"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: status
+    attributes:
+      label: "作品状态"
+      description: "请选择当前连载状态"
+      options:
+        - "连载中"
+        - "已完结"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "作品简介"
+      description: "用一段话介绍您的作品"
+      placeholder: "这是一个关于...的故事"
+    validations:
+      required: true
+
+  - type: input
+    id: link
+    attributes:
+      label: "作品链接"
+      description: "读者可以访问该作品的链接"
+      placeholder: "https://..."
+    validations:
+      required: true
