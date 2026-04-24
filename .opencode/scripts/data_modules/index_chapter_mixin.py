@@ -91,26 +91,17 @@ class IndexChapterMixin:
             ]
 
     def get_chapters_needing_reindex(self, chapters: List[int]) -> List[int]:
-        """获取需要重新索引的章节列表（增量检测）
-
-        Args:
-            chapters: 待检查的章节列表
-
-        Returns:
-            实际需要重新索引的章节列表
-        """
         with self._get_conn() as conn:
             cursor = conn.cursor()
-            result = []
-            for ch in chapters:
-                cursor.execute(
-                    "SELECT content_hash, updated_at FROM chapters WHERE chapter = ?",
-                    (ch,),
-                )
-                row = cursor.fetchone()
-                if row is None:
-                    result.append(ch)
-            return result
+            if not chapters:
+                return []
+            placeholders = ",".join("?" for _ in chapters)
+            cursor.execute(
+                f"SELECT chapter FROM chapters WHERE chapter IN ({placeholders})",
+                chapters,
+            )
+            existing = {row[0] for row in cursor.fetchall()}
+            return [ch for ch in chapters if ch not in existing]
 
     def get_max_chapter(self) -> int:
         """获取最大章节号"""

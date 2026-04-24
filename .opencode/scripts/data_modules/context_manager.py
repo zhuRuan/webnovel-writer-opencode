@@ -86,6 +86,7 @@ class ContextManager:
         self.index_manager = IndexManager(self.config)
         self.context_ranker = ContextRanker(self.config)
         self._memory_cache: Dict[int, Dict[str, Any]] = {}
+        self._memory_cache_max = 128
         self._memory_cache_enabled = getattr(self.config, 'context_memory_cache_enabled', True)
 
     def _is_snapshot_compatible(self, cached: Dict[str, Any], template: str) -> bool:
@@ -115,6 +116,11 @@ class ContextManager:
         if not self._memory_cache_enabled:
             return
         key = (chapter, template)
+        if len(self._memory_cache) >= self._memory_cache_max:
+            try:
+                self._memory_cache.pop(next(iter(self._memory_cache)))
+            except StopIteration:
+                pass
         self._memory_cache[key] = context
 
     def build_context(

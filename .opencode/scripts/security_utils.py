@@ -403,7 +403,12 @@ def atomic_write_json(
 
     try:
         # Step 1: 写入临时文件
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        try:
+            f = os.fdopen(fd, 'w', encoding='utf-8')
+        except Exception:
+            os.close(fd)
+            raise
+        with f:
             f.write(json_content)
             f.flush()
             os.fsync(f.fileno())  # 确保写入磁盘

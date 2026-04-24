@@ -11,11 +11,14 @@ LLM Agent 调用封装
 
 from __future__ import annotations
 
-import asyncio
 import json
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from logging import getLogger
+
+import requests
 
 from .config import get_config
 
@@ -82,8 +85,6 @@ class LLMInvoker:
             logger.warning("LLM 不可用，返回空结果")
             return self._fallback_output(agent_id, input_data.chapter)
         
-        import aiohttp
-        
         prompt = prompt_template.format(
             chapter=input_data.chapter,
             chapter_title=input_data.chapter_title,
@@ -102,23 +103,26 @@ class LLMInvoker:
             "max_tokens": 2000,
         }
         
+        session = requests.Session()
         for attempt in range(self.MAX_RETRIES + 1):
             try:
-                resp = aiohttp.ClientSession().post(
+                resp = session.post(
                     f"{self._base_url}/chat/completions",
                     json=payload,
                     headers={"Authorization": f"Bearer {self._api_key}"},
-                    timeout=aiohttp.ClientTimeout(total=self.DEFAULT_TIMEOUT)
+                    timeout=self.DEFAULT_TIMEOUT
                 )
-                if resp.status == 200:
+                if resp.status_code == 200:
                     result = resp.json()
                     return self._parse_output(agent_id, input_data.chapter, result)
                 else:
-                    logger.warning(f"LLM 调用失败: {resp.status}")
-            except Exception as e:
+                    logger.warning(f"LLM 调用失败: {resp.status_code}")
+            except requests.RequestException as e:
                 logger.warning(f"LLM 调用异常: {e}")
                 if attempt == self.MAX_RETRIES:
                     break
+            if attempt < self.MAX_RETRIES:
+                time.sleep(1 * (2 ** attempt))
         
         return self._fallback_output(agent_id, input_data.chapter)
     
@@ -140,24 +144,20 @@ class LLMInvoker:
         if not self._enabled:
             return [self._fallback_output(cfg["agent_id"], input_data.chapter) for cfg in agent_configs]
         
-        tasks = [
-            self._invoke_async(cfg["agent_id"], cfg["prompt"], input_data)
-            for cfg in agent_configs
-        ]
-        return asyncio.run(self._run_tasks(tasks))
-    
-    async def _invoke_async(
-        self,
-        agent_id: str,
-        prompt: str,
-        input_data: AgentInput,
-    ) -> AgentOutput:
-        """异步调用"""
-        return self.invoke(agent_id, prompt, input_data)
-    
-    async def _run_tasks(self, tasks: List) -> List[AgentOutput]:
-        """并发运行任务"""
-        return await asyncio.gather(*tasks)
+        results: List[AgentOutput] = []
+        with ThreadPoolExecutor(max_workers=min(len(agent_configs), 5)) as executor:
+            fut_to_id = {
+                executor.submit(self.invoke, cfg["agent_id"], cfg["prompt"], input_data): cfg["agent_id"]
+                for cfg in agent_configs
+            }
+            for future in as_completed(fut_to_id):
+                try:
+                    results.append(future.result())
+                except Exception as e:
+                    agent_id = fut_to_id[future]
+                    logger.error(f"批量调用 {agent_id} 失败: {e}")
+                    results.append(self._fallback_output(agent_id, input_data.chapter))
+        return results
     
     def _parse_output(
         self,

@@ -24,7 +24,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import yaml
 
 from .condition_evaluator import ConditionEvaluator, TriggerCondition
-from .observability import safe_append_perf_timing
+
 
 logger = getLogger(__name__)
 
@@ -224,37 +224,12 @@ class CheckersManager:
                 "issues": [...],
             }
         """
-        start_time = time.perf_counter()
-        code_checker_time = 0.0
-        llm_checker_time = 0.0
-        blocked_count = 0
-
-        code_start = time.perf_counter()
         code_results = cls.run_code_checkers(chapter, content, chapter_context)
-        code_checker_time = time.perf_counter() - code_start
 
         blocked_results = [r for r in code_results if r.blocked]
-        blocked_count = len(blocked_results)
 
         if blocked_results:
             logger.warning(f"[CheckersManager] CODE LAYER BLOCKING: {len(blocked_results)} issues")
-            total_time = time.perf_counter() - start_time
-            if hasattr(cls, '_config') and hasattr(cls._config, 'project_root'):
-                safe_append_perf_timing(
-                    cls._config.project_root,
-                    tool_name="checkers_manager.run_layered_checkers",
-                    success=True,
-                    elapsed_ms=int(total_time * 1000),
-                    meta={
-                        "chapter": chapter,
-                        "mode": mode,
-                        "run_llm": run_llm,
-                        "layer": "code",
-                        "blocked": True,
-                        "code_checker_ms": int(code_checker_time * 1000),
-                        "blocked_count": blocked_count,
-                    },
-                )
             return {
                 "layer": "code",
                 "blocked": True,
@@ -269,23 +244,6 @@ class CheckersManager:
 
         if not run_llm:
             logger.debug(f"[CheckersManager] Code layer passed, LLM skipped")
-            total_time = time.perf_counter() - start_time
-            if hasattr(cls, '_config') and hasattr(cls._config, 'project_root'):
-                safe_append_perf_timing(
-                    cls._config.project_root,
-                    tool_name="checkers_manager.run_layered_checkers",
-                    success=True,
-                    elapsed_ms=int(total_time * 1000),
-                    meta={
-                        "chapter": chapter,
-                        "mode": mode,
-                        "run_llm": run_llm,
-                        "layer": "code",
-                        "blocked": False,
-                        "code_checker_ms": int(code_checker_time * 1000),
-                        "blocked_count": 0,
-                    },
-                )
             return {
                 "layer": "code",
                 "blocked": False,
@@ -294,10 +252,8 @@ class CheckersManager:
                 "issues": [],
             }
 
-        llm_start = time.perf_counter()
         logger.info(f"[CheckersManager] === LLM Layer Start: chapter={chapter}, mode={mode} ===")
         llm_results = cls.run_llm_agents(chapter, content, chapter_context, mode)
-        llm_checker_time = time.perf_counter() - llm_start
 
         has_blocking_llm = any(
             r.get("passed") is False and r.get("overall_score", 100) < 60
@@ -305,27 +261,6 @@ class CheckersManager:
         ) if llm_results else False
 
         logger.info(f"[CheckersManager] === LLM Layer End: blocked={has_blocking_llm}, agents={len(llm_results)} ===")
-
-        total_time = time.perf_counter() - start_time
-
-        if hasattr(cls, '_config') and hasattr(cls._config, 'project_root'):
-            safe_append_perf_timing(
-                cls._config.project_root,
-                tool_name="checkers_manager.run_layered_checkers",
-                success=True,
-                elapsed_ms=int(total_time * 1000),
-                meta={
-                    "chapter": chapter,
-                    "mode": mode,
-                    "run_llm": run_llm,
-                    "layer": "llm",
-                    "blocked": has_blocking_llm,
-                    "code_checker_ms": int(code_checker_time * 1000),
-                    "llm_checker_ms": int(llm_checker_time * 1000),
-                    "llm_agent_count": len(llm_results),
-                    "blocked_count": blocked_count,
-                },
-            )
 
         return {
             "layer": "llm",
@@ -763,8 +698,18 @@ def cmd_list(args: argparse.Namespace) -> int:
             category_label = "[核心]" if checker["category"] == "core" else "[条件]"
             enabled_label = "✓" if checker["enabled"] else "✗"
             print(f"{enabled_label} {category_label} {checker['id']}: {checker['name']}")
-            if checker.get("triggers"):
-                print(f"    触发: {', '.join(checker['triggers'][:2])}")
+            triggers = checker.get("triggers", [])
+            if triggers:
+                trigger_desc = []
+                for t in triggers[:2]:
+                    if isinstance(t, dict):
+                        expr = t.get("expression") or t.get("keywords", "(条件)")
+                        if isinstance(expr, list):
+                            expr = ", ".join(expr[:2])
+                        trigger_desc.append(str(expr))
+                    else:
+                        trigger_desc.append(str(t))
+                print(f"    触发: {'; '.join(trigger_desc)}")
             print()
 
     return 0

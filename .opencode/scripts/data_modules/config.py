@@ -155,19 +155,11 @@ class DataModulesConfig:
     embed_model: str = field(default_factory=lambda: os.getenv("EMBED_MODEL", "Qwen/Qwen3-Embedding-8B"))
     embed_api_key: str = field(default_factory=lambda: os.getenv("EMBED_API_KEY", ""))
 
-    @property
-    def embed_url(self) -> str:
-        return self.embed_base_url
-
     # ================= Rerank API 配置 =================
     rerank_api_type: str = "openai"
     rerank_base_url: str = field(default_factory=lambda: os.getenv("RERANK_BASE_URL", "https://api.jina.ai/v1"))
     rerank_model: str = field(default_factory=lambda: os.getenv("RERANK_MODEL", "jina-reranker-v3"))
     rerank_api_key: str = field(default_factory=lambda: os.getenv("RERANK_API_KEY", ""))
-
-    @property
-    def rerank_url(self) -> str:
-        return self.rerank_base_url
 
     # ================= Image Generation API 配置 =================
     image_base_url: str = field(default_factory=lambda: os.getenv("IMAGE_BASE_URL", "https://api-inference.modelscope.cn/"))

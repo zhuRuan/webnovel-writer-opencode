@@ -23,12 +23,13 @@ Data Modules - API 客户端 (v5.4，v5.0 OpenAI 兼容接口沿用)
 
 import asyncio
 import aiohttp
+import random
 import time
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 from .config import get_config
-from logger import get_logger, setup_logging
+from logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -161,7 +162,7 @@ class EmbeddingAPIClient:
 
                         # 可重试的状态码: 429 (限流), 500, 502, 503, 504
                         if resp.status in (429, 500, 502, 503, 504) and attempt < max_retries - 1:
-                            delay = base_delay * (2 ** attempt)  # 指数退避
+                            delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)  # 指数退避
                             logger.warning(f"Embed %s, retrying in %.1fs (%d/%d)", resp.status, delay, attempt + 1, max_retries)
                             await asyncio.sleep(delay)
                             continue
@@ -175,7 +176,7 @@ class EmbeddingAPIClient:
 
                 except asyncio.TimeoutError:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)
+                        delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)
                         logger.warning("Embed timeout, retrying in %.1fs (%d/%d)", delay, attempt + 1, max_retries)
                         await asyncio.sleep(delay)
                         continue
@@ -187,7 +188,7 @@ class EmbeddingAPIClient:
 
                 except Exception as e:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)
+                        delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)
                         logger.warning("Embed error: %s, retrying in %.1fs (%d/%d)", e, delay, attempt + 1, max_retries)
                         await asyncio.sleep(delay)
                         continue
@@ -230,7 +231,6 @@ class EmbeddingAPIClient:
                 if not skip_failures:
                     logger.warning("Embed batch %d failed, aborting all", batch_idx)
                     return []
-                    logger.warning("Embed batch %d failed, marking %d items as None", batch_idx, actual_batch_size)
                 all_embeddings.extend([None] * actual_batch_size)
 
         return all_embeddings[:len(texts)]
@@ -355,7 +355,7 @@ class RerankAPIClient:
 
                         # 可重试的状态码
                         if resp.status in (429, 500, 502, 503, 504) and attempt < max_retries - 1:
-                            delay = base_delay * (2 ** attempt)
+                            delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)
                             logger.warning("Rerank %s, retrying in %.1fs (%d/%d)", resp.status, delay, attempt + 1, max_retries)
                             await asyncio.sleep(delay)
                             continue
@@ -367,7 +367,7 @@ class RerankAPIClient:
 
                 except asyncio.TimeoutError:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)
+                        delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)
                         logger.warning("Rerank timeout, retrying in %.1fs (%d/%d)", delay, attempt + 1, max_retries)
                         await asyncio.sleep(delay)
                         continue
@@ -377,7 +377,7 @@ class RerankAPIClient:
 
                 except Exception as e:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)
+                        delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)
                         logger.warning("Rerank error: %s, retrying in %.1fs (%d/%d)", e, delay, attempt + 1, max_retries)
                         await asyncio.sleep(delay)
                         continue

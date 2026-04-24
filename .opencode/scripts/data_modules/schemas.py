@@ -76,15 +76,6 @@ class DataAgentOutput(BaseModel):
     warnings: List[str] = Field(default_factory=list)
 
 
-class ErrorSchema(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
-    code: str
-    message: str
-    suggestion: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
-
-
 def validate_data_agent_output(payload: Dict[str, Any]) -> DataAgentOutput:
     return DataAgentOutput.model_validate(payload)
 

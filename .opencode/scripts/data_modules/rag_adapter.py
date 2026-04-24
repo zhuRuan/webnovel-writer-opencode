@@ -99,12 +99,18 @@ class RAGAdapter:
         self._init_backends()
 
     def _init_backends(self):
-        """初始化后端（使用 BackendFactory）"""
+        """初始化后端"""
         self._init_temporal_graph()
-        self._backends["vector"] = VectorSearchBackend(config=self.config, rag_adapter=self)
-        self._backends["temporal_graph"] = TemporalGraphBackendAdapter(
-            config=self.config, temporal_graph=self._temporal_graph
-        )
+        BackendFactory.register("vector", VectorSearchBackend)
+        BackendFactory.register("temporal_graph", TemporalGraphBackendAdapter)
+        vec = BackendFactory.create("vector", config=self.config)
+        if vec:
+            vec._rag = self
+        tg = BackendFactory.create("temporal_graph", config=self.config)
+        if tg:
+            tg._graph = self._temporal_graph
+        self._backends["vector"] = vec or VectorSearchBackend(config=self.config, rag_adapter=self)
+        self._backends["temporal_graph"] = tg or TemporalGraphBackendAdapter(config=self.config, temporal_graph=self._temporal_graph)
 
     def get_backend(self, backend_type: str) -> Optional[Any]:
         """获取后端实例"""

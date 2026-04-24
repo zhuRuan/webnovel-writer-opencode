@@ -16,16 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from data_modules.rag_adapter import RAGAdapter
 from data_modules.config import DataModulesConfig
 from data_modules.entity_linker import EntityLinker
-
-
-class StubClient:
-    async def embed(self, texts):
-        return [[1.0, 0.0] for _ in texts]
-    async def embed_batch(self, texts, skip_failures=True):
-        return [[1.0, 0.0] for _ in texts]
-    async def rerank(self, query, documents, top_n=None):
-        top_n = top_n or len(documents)
-        return [{"index": i, "relevance_score": 1.0 / (i + 1)} for i in range(min(top_n, len(documents)))]
+from .doubles import StubClient
 
 
 @pytest.fixture

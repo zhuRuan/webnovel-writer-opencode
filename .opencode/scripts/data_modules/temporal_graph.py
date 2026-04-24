@@ -236,15 +236,6 @@ class TemporalGraphIndex:
         }
 
     def save_to_db(self, db_path: str) -> int:
-        """
-        持久化到 SQLite 数据库
-        
-        Args:
-            db_path: index.db 路径
-        
-        Returns:
-            保存的边数量
-        """
         import sqlite3
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -272,28 +263,34 @@ class TemporalGraphIndex:
             )
         """)
         
-        cursor.execute("DELETE FROM graph_nodes")
-        cursor.execute("DELETE FROM graph_edges")
+        cursor.execute("BEGIN")
+        try:
+            cursor.execute("DELETE FROM graph_nodes")
+            cursor.execute("DELETE FROM graph_edges")
+            
+            for node in self._nodes.values():
+                cursor.execute(
+                    "INSERT INTO graph_nodes VALUES (?, ?, ?, ?, ?, ?)",
+                    (node.id, node.type, node.name, node.tier,
+                     node.first_appearance, node.last_appearance)
+                )
+            
+            for edge in self._edges.values():
+                cursor.execute(
+                    "INSERT INTO graph_edges VALUES (?, ?, ?, ?, ?, ?)",
+                    (edge.src, edge.rel, edge.tgt, edge.weight,
+                     edge.last_seen_chapter, edge.count)
+                )
+            
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            edge_count = len(self._edges)
+            conn.close()
         
-        for node in self._nodes.values():
-            cursor.execute(
-                "INSERT INTO graph_nodes VALUES (?, ?, ?, ?, ?, ?)",
-                (node.id, node.type, node.name, node.tier,
-                 node.first_appearance, node.last_appearance)
-            )
-        
-        for edge in self._edges.values():
-            cursor.execute(
-                "INSERT INTO graph_edges VALUES (?, ?, ?, ?, ?, ?)",
-                (edge.src, edge.rel, edge.tgt, edge.weight,
-                 edge.last_seen_chapter, edge.count)
-            )
-        
-        conn.commit()
-        edge_count = len(self._edges)
-        conn.close()
-        
-        logger.info(f"Graph 持久化完成: {len(self._nodes)} 节点, {edge_count} 边")
+        logger.debug(f"Graph 持久化完成: {len(self._nodes)} 节点, {edge_count} 条边")
         return edge_count
 
     def load_from_db(self, db_path: str) -> bool:

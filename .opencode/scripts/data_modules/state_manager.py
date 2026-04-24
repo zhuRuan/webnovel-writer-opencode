@@ -29,12 +29,6 @@ import filelock
 from .config import get_config
 from .observability import safe_append_perf_timing, safe_log_tool_call
 
-try:
-    from .exceptions import StateManagerError
-except ImportError:
-    StateManagerError = None
-
-
 logger = getLogger(__name__)
 
 try:
@@ -1578,8 +1572,10 @@ def main():
         resolved_root = resolve_project_root(args.project_root)
         config = DataModulesConfig.from_project_root(resolved_root)
 
+    from logging import getLogger as _getLogger
     manager = StateManager(config)
-    logger = IndexManager(config)
+    _state_mgr_logger = _getLogger(__name__)
+    index_manager_for_log = IndexManager(config)
     tool_name = f"state_manager:{args.command or 'unknown'}"
 
     def _append_timing(success: bool, *, error_code: str | None = None, error_message: str | None = None, chapter: int | None = None):
@@ -1596,13 +1592,13 @@ def main():
 
     def emit_success(data=None, message: str = "ok", chapter: int | None = None):
         print_success(data, message=message)
-        safe_log_tool_call(logger, tool_name=tool_name, success=True)
+        safe_log_tool_call(index_manager_for_log, tool_name=tool_name, success=True)
         _append_timing(True, chapter=chapter)
 
     def emit_error(code: str, message: str, suggestion: str | None = None, chapter: int | None = None):
         print_error(code, message, suggestion=suggestion)
         safe_log_tool_call(
-            logger,
+            index_manager_for_log,
             tool_name=tool_name,
             success=False,
             error_code=code,

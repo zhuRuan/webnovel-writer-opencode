@@ -67,6 +67,10 @@ def main():
             print("前端构建完成")
         except subprocess.CalledProcessError as e:
             print(f"前端构建失败: {e}", file=sys.stderr)
+            if e.stdout:
+                print(e.stdout.decode("utf-8", errors="replace"), file=sys.stderr)
+            if e.stderr:
+                print(e.stderr.decode("utf-8", errors="replace"), file=sys.stderr)
             sys.exit(1)
 
     # 延迟导入，以便先处理路径
@@ -80,7 +84,12 @@ def main():
     print(f"API 文档: {url}/docs")
 
     if not args.no_browser:
-        webbrowser.open(url)
+        import threading
+        def _open_browser():
+            import time
+            time.sleep(0.5)
+            webbrowser.open(url)
+        threading.Thread(target=_open_browser, daemon=True).start()
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 

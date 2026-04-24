@@ -51,11 +51,6 @@ from .index_reading_mixin import IndexReadingMixin
 from .index_observability_mixin import IndexObservabilityMixin
 from .observability import safe_append_perf_timing, safe_log_tool_call
 
-try:
-    from .exceptions import IndexManagerError
-except ImportError:
-    IndexManagerError = None
-
 
 @dataclass
 class ChapterMeta:
@@ -165,19 +160,6 @@ class ChaseDebtMeta:
     due_chapter: int = 0  # 截止章节
     override_contract_id: int = 0  # 关联的Override Contract
     status: str = "active"  # active / paid / overdue / written_off
-
-
-@dataclass
-class DebtEventMeta:
-    """债务事件日志 (v5.3 引入)"""
-
-    debt_id: int
-    event_type: (
-        str  # created / interest_accrued / partial_payment / full_payment / overdue
-    )
-    amount: float
-    chapter: int
-    note: str = ""
 
 
 @dataclass
@@ -658,23 +640,12 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
     @contextmanager
     def _get_conn(self):
         """获取数据库连接"""
-        query_time = 0.0
         conn = sqlite3.connect(str(self.config.index_db))
         conn.row_factory = sqlite3.Row
         try:
             yield conn
         finally:
-            query_time = conn.total_changes
             conn.close()
-
-        if hasattr(self.config, 'project_root'):
-            from .observability import safe_append_perf_timing
-            safe_append_perf_timing(
-                self.config.project_root,
-                tool_name="index_manager.query",
-                success=True,
-                elapsed_ms=int(query_time * 10),
-            )
 
     # ==================== 章节操作 ====================
 

@@ -345,7 +345,7 @@ def main():
     resolved_root = resolve_project_root(args.project_root)
     config = DataModulesConfig.from_project_root(resolved_root)
     backup = not args.no_backup
-    logger = IndexManager(config)
+    migrate_logger = IndexManager(config)
     tool_name = "migrate_state_to_sqlite"
 
     try:
@@ -358,7 +358,7 @@ def main():
     except Exception as exc:
         print_error("MIGRATE_FAILED", str(exc), suggestion="检查 state.json 与 index.db 权限")
         try:
-            logger.log_tool_call(tool_name, False, error_code="MIGRATE_FAILED", error_message=str(exc))
+            migrate_logger.log_tool_call(tool_name, False, error_code="MIGRATE_FAILED", error_message=str(exc))
         except Exception:
             pass
         raise SystemExit(1)
@@ -366,14 +366,14 @@ def main():
     if stats.get("errors", 0) > 0:
         print_error("MIGRATE_ERRORS", "迁移出现错误", details=stats)
         try:
-            logger.log_tool_call(tool_name, False, error_code="MIGRATE_ERRORS", error_message="迁移出现错误")
+            migrate_logger.log_tool_call(tool_name, False, error_code="MIGRATE_ERRORS", error_message="迁移出现错误")
         except Exception:
             pass
         raise SystemExit(1)
 
     print_success({"project": str(config.project_root), **stats}, message="migrated")
     try:
-        logger.log_tool_call(tool_name, True)
+        migrate_logger.log_tool_call(tool_name, True)
     except Exception:
         pass
 

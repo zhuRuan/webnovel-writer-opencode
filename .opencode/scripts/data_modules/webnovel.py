@@ -36,8 +36,6 @@ from logger import get_logger, setup_logging
 
 
 COMMAND_REGISTRY = {
-    # 命令: (类型, 目标, 是否需要 project_root)
-    # 类型: "data_module" | "script" | "special"
     "index": {"type": "data_module", "target": "index_manager", "needs_root": True},
     "state": {"type": "data_module", "target": "state_manager", "needs_root": True},
     "rag": {"type": "data_module", "target": "rag_adapter", "needs_root": True},
@@ -54,8 +52,10 @@ COMMAND_REGISTRY = {
     "archive": {"type": "script", "target": "archive_manager.py", "needs_root": True},
     "export": {"type": "script", "target": "export_manager.py", "needs_root": True},
     "publish": {"type": "script", "target": "publish_manager.py", "needs_root": True},
-    "extract-context": {"type": "special", "target": "_extract_context", "needs_root": True},
-    "init": {"type": "special", "target": "_init_project", "needs_root": False},
+    "extract-context": {"type": "script", "target": "extract_chapter_context.py", "needs_root": True},
+    "init": {"type": "script", "target": "init_project.py", "needs_root": False},
+    "write-batch": {"type": "special", "target": "_start_write_batch", "needs_root": True},
+    "dashboard": {"type": "special", "target": "_start_dashboard", "needs_root": True},
 }
 
 
@@ -123,6 +123,106 @@ def _run_script(script_name: str, argv: list[str]) -> int:
         raise FileNotFoundError(f"未找到脚本: {script_path}")
     proc = subprocess.run([sys.executable, str(script_path), *argv])
     return int(proc.returncode or 0)
+
+
+def _kill_port(port: int) -> None:
+    """清理占用指定端口的进程（Windows）"""
+    import subprocess
+    try:
+        result = subprocess.run(
+            f'netstat -ano | findstr ":{port}"',
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+            parts = line.split()
+            if len(parts) >= 5 and parts[3] == "LISTENING":
+                pid = parts[-1].strip()
+                if pid and pid != "0":
+                    try:
+                        subprocess.run(f"taskkill /PID {pid} /F", shell=True, capture_output=True)
+                        print(f"已终止旧进程 PID: {pid}")
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+
+def _start_dashboard(args: argparse.Namespace) -> int:
+    """启动后台 dashboard 子进程"""
+    import os as _os
+    import socket as _socket
+    import subprocess as _subprocess
+    import time as _time
+    import webbrowser as _webbrowser
+    from pathlib import Path as _Path
+
+    project_root = _resolve_root(args.project_root)
+    opencode_dir = str(_Path(__file__).resolve().parent.parent.parent)
+    env = _os.environ.copy()
+    env["PYTHONPATH"] = f"{opencode_dir}{_os.pathsep}{env.get('PYTHONPATH', '')}"
+
+    _kill_port(args.port)
+
+    cmd = [
+        sys.executable, "-m", "dashboard.server",
+        "--project-root", str(project_root),
+        "--host", args.host,
+        "--port", str(args.port),
+    ]
+    if args.no_browser:
+        cmd.append("--no-browser")
+
+    log_file = _Path(opencode_dir) / "dashboard.log"
+    creation_flags = 0
+    if sys.platform == "win32":
+        creation_flags = _subprocess.CREATE_NEW_PROCESS_GROUP | _subprocess.DETACHED_PROCESS
+
+    with open(log_file, "w", encoding="utf-8") as log_f:
+        proc = _subprocess.Popen(
+            cmd, env=env, cwd=opencode_dir,
+            stdout=log_f, stderr=_subprocess.STDOUT,
+            creationflags=creation_flags,
+        )
+
+    url = f"http://{args.host}:{args.port}"
+    ready = False
+    for i in range(40):
+        _time.sleep(0.3)
+        if proc.poll() is not None:
+            print(f"Dashboard 启动失败（进程已退出，退出码: {proc.returncode}）", file=sys.stderr)
+            print(f"日志文件: {log_file}", file=sys.stderr)
+            try:
+                with open(log_file, "r", encoding="utf-8") as f:
+                    print(f.read(), file=sys.stderr)
+            except Exception:
+                pass
+            return 1
+        try:
+            with _socket.create_connection((args.host, args.port), timeout=0.5):
+                ready = True
+                break
+        except (ConnectionRefusedError, OSError):
+            continue
+
+    if not ready:
+        print(f"Dashboard 启动超时（等待 {40*0.3:.0f} 秒后仍未就绪）", file=sys.stderr)
+        print(f"日志文件: {log_file}", file=sys.stderr)
+        proc.terminate()
+        return 1
+
+    print(f"Dashboard 启动: {url}")
+    print(f"API 文档: {url}/docs")
+    print(f"进程 PID: {proc.pid}")
+    print(f"日志文件: {log_file}")
+
+    if not args.no_browser:
+        _webbrowser.open(url)
+
+    return 0
 
 
 def cmd_where(args: argparse.Namespace) -> int:
@@ -293,7 +393,6 @@ def main() -> None:
     p_dashboard.add_argument("--host", default="127.0.0.1", help="监听地址")
     p_dashboard.add_argument("--port", type=int, default=8765, help="监听端口")
     p_dashboard.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
-    p_dashboard.add_argument("--force", action="store_true", help="强制重启（清理旧进程）")
 
     # write-batch 命令（批量写作）
     p_write_batch = sub.add_parser("write-batch", help="批量写作工具")
@@ -322,181 +421,41 @@ def main() -> None:
 
     cmd = COMMAND_REGISTRY.get(tool)
 
-    if tool == "init":
-        raise SystemExit(_run_script("init_project.py", rest))
-    if tool == "checkers":
-        raise SystemExit(_run_data_module("checkers_manager", rest))
     if tool == "publish":
         if rest and rest[0] == "setup-browser":
             raise SystemExit(_run_script("publish_manager.py", rest))
 
-    project_root = _resolve_root(args.project_root)
-    forward_args = ["--project-root", str(project_root)]
+    if cmd is None:
+        print(f"未知命令: {tool}", file=sys.stderr)
+        raise SystemExit(2)
 
-    if tool == "index":
-        raise SystemExit(_run_data_module("index_manager", [*forward_args, *rest]))
-    if tool == "state":
-        raise SystemExit(_run_data_module("state_manager", [*forward_args, *rest]))
-    if tool == "rag":
-        raise SystemExit(_run_data_module("rag_adapter", [*forward_args, *rest]))
-    if tool == "style":
-        raise SystemExit(_run_data_module("style_sampler", [*forward_args, *rest]))
-    if tool == "entity":
-        raise SystemExit(_run_data_module("entity_linker", [*forward_args, *rest]))
-    if tool == "context":
-        raise SystemExit(_run_data_module("context_manager", [*forward_args, *rest]))
-    if tool == "migrate":
-        raise SystemExit(_run_data_module("migrate_state_to_sqlite", [*forward_args, *rest]))
-    if tool == "checkers":
-        raise SystemExit(_run_data_module("checkers_manager", rest))
+    # special 命令需要自定义处理
+    if cmd["type"] == "special":
+        if cmd["target"] == "_start_write_batch":
+            from pathlib import Path as _Path
+            skill_root = _Path(__file__).resolve().parent.parent / "skills" / "webnovel-write-batch"
+            skill_script = skill_root / "SKILL.md"
+            if not skill_script.exists():
+                logger.error(f"批量写作 skill 不存在: {skill_script}")
+                raise SystemExit(1)
+            logger.info(f"批量写作 skill 路径: {skill_script}")
+            raise SystemExit(0)
+        if cmd["target"] == "_start_dashboard":
+            return _start_dashboard(args)
+        raise SystemExit(2)
 
-    if tool == "workflow":
-        raise SystemExit(_run_script("workflow_manager.py", [*forward_args, *rest]))
-    if tool == "status":
-        raise SystemExit(_run_script("status_reporter.py", [*forward_args, *rest]))
-    if tool == "update-state":
-        raise SystemExit(_run_script("update_state.py", [*forward_args, *rest]))
-    if tool == "backup":
-        raise SystemExit(_run_script("backup_manager.py", [*forward_args, *rest]))
-    if tool == "archive":
-        raise SystemExit(_run_script("archive_manager.py", [*forward_args, *rest]))
-    if tool == "extract-context":
-        return_args = [*forward_args, "--chapter", str(args.chapter), "--format", str(args.format)]
-        raise SystemExit(_run_script("extract_chapter_context.py", return_args))
+    project_root = _resolve_root(args.project_root) if cmd["needs_root"] else None
+    forward_args = ["--project-root", str(project_root)] if project_root else rest
+    forward_rest = [*forward_args, *rest] if project_root else rest
 
-    # write-batch 命令（批量写作）- 通过 Skill 执行
-    if tool == "write-batch":
-        import os
-        skill_root = Path(__file__).resolve().parent.parent / "skills" / "webnovel-write-batch"
-        skill_script = skill_root / "SKILL.md"
-        if not skill_script.exists():
-            logger.error(f"批量写作 skill 不存在: {skill_script}")
-            raise SystemExit(1)
-        logger.info(f"批量写作 skill 路径: {skill_script}")
-        raise SystemExit(0)
-
-    if tool == "export":
-        raise SystemExit(_run_script("export_manager.py", [*forward_args, *rest]))
-
-    if tool == "genimg":
-        raise SystemExit(_run_data_module("image_generator", [*forward_args, *rest]))
-
-    if tool == "publish":
-        raise SystemExit(_run_script("publish_manager.py", [*forward_args, *rest]))
-
-    # dashboard 是交互式长驻服务，作为后台子进程启动，避免 agent 超时
-    if tool == "dashboard":
-        import os
-        import subprocess
-        import time
-        import webbrowser
-        import socket
-
-        def _kill_port(port: int) -> None:
-            """清理占用指定端口的进程（Windows）"""
-            try:
-                result = subprocess.run(
-                    f'netstat -ano | findstr ":{port}"',
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                )
-                for line in result.stdout.strip().split("\n"):
-                    if not line:
-                        continue
-                    parts = line.split()
-                    if len(parts) >= 5 and parts[3] == "LISTENING":
-                        pid = parts[-1].strip()
-                        if pid and pid != "0":
-                            try:
-                                subprocess.run(
-                                    f"taskkill /PID {pid} /F",
-                                    shell=True,
-                                    capture_output=True,
-                                )
-                                print(f"已终止旧进程 PID: {pid}")
-                            except Exception:
-                                pass
-            except Exception:
-                pass
-
-        # 确保 .opencode 在 PYTHONPATH 中，使 import dashboard 生效
-        # __file__ 在 data_modules/webnovel.py，所以 parent.parent.parent 才是 .opencode 目录
-        opencode_dir = str(Path(__file__).resolve().parent.parent.parent)
-        scripts_dir = str(Path(__file__).resolve().parent.parent)
-        env = os.environ.copy()
-        env["PYTHONPATH"] = f"{opencode_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
-
-        # 清理端口占用
-        _kill_port(args.port)
-
-        # 启动后台进程
-        cmd = [
-            sys.executable, "-m", "dashboard.server",
-            "--project-root", str(project_root),
-            "--host", args.host,
-            "--port", str(args.port),
-        ]
-        if args.no_browser:
-            cmd.append("--no-browser")
-
-        # 日志文件路径（放在 .opencode 目录下）
-        log_file = Path(opencode_dir) / "dashboard.log"
-
-        # Windows 下使用 CREATE_NEW_PROCESS_GROUP + DETACHED_PROCESS 确保子进程独立运行
-        creation_flags = 0
-        if sys.platform == "win32":
-            creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
-
-        with open(log_file, "w", encoding="utf-8") as log_f:
-            proc = subprocess.Popen(
-                cmd,
-                env=env,
-                cwd=opencode_dir,
-                stdout=log_f,
-                stderr=subprocess.STDOUT,
-                creationflags=creation_flags,
-            )
-
-        # 等待服务就绪（通过检测端口监听状态）
-        url = f"http://{args.host}:{args.port}"
-        ready = False
-        for i in range(40):
-            time.sleep(0.3)
-            # 先检查进程是否还活着
-            if proc.poll() is not None:
-                # 进程已退出，打印日志内容
-                print(f"Dashboard 启动失败（进程已退出，退出码: {proc.returncode}）", file=sys.stderr)
-                print(f"日志文件: {log_file}", file=sys.stderr)
-                try:
-                    with open(log_file, "r", encoding="utf-8") as f:
-                        print(f.read(), file=sys.stderr)
-                except Exception:
-                    pass
-                return 1
-            # 再检查端口是否监听
-            try:
-                with socket.create_connection((args.host, args.port), timeout=0.5):
-                    ready = True
-                    break
-            except (ConnectionRefusedError, OSError):
-                continue
-
-        if not ready:
-            print(f"Dashboard 启动超时（等待 {40*0.3:.0f} 秒后仍未就绪）", file=sys.stderr)
-            print(f"日志文件: {log_file}", file=sys.stderr)
-            proc.terminate()
-            return 1
-
-        print(f"Dashboard 启动: {url}")
-        print(f"API 文档: {url}/docs")
-        print(f"进程 PID: {proc.pid}")
-        print(f"日志文件: {log_file}")
-
-        if not args.no_browser:
-            webbrowser.open(url)
-
-        return 0
+    if cmd["type"] == "data_module":
+        raise SystemExit(_run_data_module(cmd["target"], forward_rest))
+    if cmd["type"] == "script":
+        # extract-context 需要额外的 --chapter/--format 参数
+        if tool == "extract-context":
+            extra = ["--chapter", str(args.chapter), "--format", str(args.format)]
+            raise SystemExit(_run_script(cmd["target"], [*forward_args, *extra]))
+        raise SystemExit(_run_script(cmd["target"], forward_rest))
 
     raise SystemExit(2)
 

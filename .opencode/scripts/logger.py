@@ -68,7 +68,7 @@ def _load_env_config() -> tuple[str, str, str, str]:
                     if "=" in line:
                         key, value = line.split("=", 1)
                         key = key.strip()
-                        value = value.strip()
+                        value = value.strip().strip('"\'')
                         if key == "LOG_LEVEL":
                             env_level = value
                         elif key == "LOG_FILE":
