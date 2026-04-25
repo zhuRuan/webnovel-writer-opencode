@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import re
 import sys
-from logging import getLogger
+from logger import get_logger
 from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
@@ -50,7 +50,7 @@ except ImportError:
     DebtTracker = None
 
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ContextManager:

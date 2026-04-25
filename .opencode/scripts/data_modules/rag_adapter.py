@@ -14,7 +14,7 @@ import asyncio
 import sqlite3
 import json
 import math
-from logging import getLogger
+from logger import get_logger
 import shutil
 import hashlib
 from pathlib import Path
@@ -44,7 +44,7 @@ from .rag_backend import (
 )
 
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 RAG_SCHEMA_VERSION = "3"
 VECTOR_REQUIRED_COLUMNS = (

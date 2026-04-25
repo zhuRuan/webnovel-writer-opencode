@@ -436,7 +436,7 @@ def main() -> None:
             skill_root = _Path(__file__).resolve().parent.parent / "skills" / "webnovel-write-batch"
             skill_script = skill_root / "SKILL.md"
             if not skill_script.exists():
-                logger.error(f"批量写作 skill 不存在: {skill_script}")
+                logger.error("批量写作 skill 不存在: %s", skill_script)
                 raise SystemExit(1)
             logger.info(f"批量写作 skill 路径: {skill_script}")
             raise SystemExit(0)

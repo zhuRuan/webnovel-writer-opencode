@@ -87,12 +87,34 @@ def _parse_module_levels() -> dict[str, str]:
     """解析模块级日志配置 LOG_MODULE_LEVELS
     
     支持格式: "module1=DEBUG,module2=INFO"
+    从环境变量或 .env 文件读取
     """
     global _module_levels
     if _module_levels:
         return _module_levels
     
+    # Try environment variable first, then .env file
     env = os.environ.get("LOG_MODULE_LEVELS", "")
+    if not env:
+        # Read from .env file
+        env_file = _get_project_root() / ".env"
+        if env_file.exists():
+            try:
+                with open(env_file, encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        if "=" in line:
+                            key, value = line.split("=", 1)
+                            key = key.strip()
+                            value = value.strip().strip('"\'')
+                            if key == "LOG_MODULE_LEVELS":
+                                env = value
+                                break
+            except Exception:
+                pass
+    
     if not env:
         return _module_levels
     
@@ -147,7 +169,7 @@ def setup_logging(
         log_file_abs = None
 
     root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
+    root_logger.setLevel(logging.DEBUG)
 
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)

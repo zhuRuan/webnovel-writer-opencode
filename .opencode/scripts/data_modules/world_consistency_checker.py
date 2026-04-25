@@ -16,11 +16,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
-from logging import getLogger
+from logger import get_logger
 
 from .world_state_tracker import WorldStateTracker
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

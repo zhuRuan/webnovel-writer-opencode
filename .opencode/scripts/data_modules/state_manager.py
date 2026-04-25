@@ -17,7 +17,7 @@ import json
 import sys
 import time
 from copy import deepcopy
-from logging import getLogger
+from logger import get_logger
 from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
@@ -29,7 +29,7 @@ import filelock
 from .config import get_config
 from .observability import safe_append_perf_timing, safe_log_tool_call
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 try:
     # 当 scripts 目录在 sys.path 中（常见：从 scripts/ 运行）
@@ -1572,7 +1572,7 @@ def main():
         resolved_root = resolve_project_root(args.project_root)
         config = DataModulesConfig.from_project_root(resolved_root)
 
-    from logging import getLogger as _getLogger
+    from logger import get_logger as _getLogger
     manager = StateManager(config)
     _state_mgr_logger = _getLogger(__name__)
     index_manager_for_log = IndexManager(config)

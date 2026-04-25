@@ -16,13 +16,13 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-from logging import getLogger
+from logger import get_logger
 
 import requests
 
 from .config import get_config
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

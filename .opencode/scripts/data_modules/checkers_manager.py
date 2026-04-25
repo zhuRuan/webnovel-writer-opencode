@@ -17,7 +17,7 @@ import json
 import sys
 import time
 from dataclasses import dataclass
-from logging import getLogger
+from logger import get_logger
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -26,7 +26,7 @@ import yaml
 from .condition_evaluator import ConditionEvaluator, TriggerCondition
 
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CodeCheckerProtocol:

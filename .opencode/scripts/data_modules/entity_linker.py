@@ -86,8 +86,8 @@ class EntityLinker:
         word_count = self._rag_adapter.rebuild_custom_dict(reason="entity_change")
         
         if word_count > 0 and abs(word_count - self._last_word_count) / max(self._last_word_count, 1) > 0.1:
-            from logging import getLogger
-            logger = getLogger(__name__)
+            from logger import get_logger
+            logger = get_logger(__name__)
             logger.info("[分词词典] 增量重建完成: %d 词条", word_count)
             self._last_word_count = word_count
         

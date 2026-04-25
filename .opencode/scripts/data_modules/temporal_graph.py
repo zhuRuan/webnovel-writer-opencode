@@ -12,9 +12,9 @@ TemporalGraphIndex - 时序感知图索引
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Set
-from logging import getLogger
+from logger import get_logger
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -290,7 +290,7 @@ class TemporalGraphIndex:
             edge_count = len(self._edges)
             conn.close()
         
-        logger.debug(f"Graph 持久化完成: {len(self._nodes)} 节点, {edge_count} 条边")
+        logger.debug("Graph 持久化完成: %d 节点, %d 条边", len(self._nodes), edge_count)
         return edge_count
 
     def load_from_db(self, db_path: str) -> bool:
@@ -309,7 +309,7 @@ class TemporalGraphIndex:
         
         import os
         if not os.path.exists(db_path):
-            logger.warning(f"Graph DB 不存在: {db_path}")
+            logger.warning("Graph DB 不存在: %s", db_path)
             return False
         
         try:
@@ -349,7 +349,7 @@ class TemporalGraphIndex:
             
             conn.close()
             
-            logger.info(f"Graph 加载完成: {len(self._nodes)} 节点, {len(self._edges)} 边")
+            logger.info("Graph 加载完成: %d 节点, %d 边", len(self._nodes), len(self._edges))
             return True
             
         except Exception as e:

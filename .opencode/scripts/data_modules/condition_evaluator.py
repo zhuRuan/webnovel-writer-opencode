@@ -13,9 +13,9 @@
 
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from logging import getLogger
+from logger import get_logger
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

@@ -20,9 +20,9 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional
-from logging import getLogger
+from logger import get_logger
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DebtType(Enum):

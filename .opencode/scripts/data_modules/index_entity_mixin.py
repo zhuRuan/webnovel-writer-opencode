@@ -9,12 +9,12 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-from logging import getLogger
+from logger import get_logger
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class IndexEntityMixin:

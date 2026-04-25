@@ -17,9 +17,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
-from logging import getLogger
+from logger import get_logger
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

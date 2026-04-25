@@ -14,7 +14,7 @@ Params: aid=2503&app_name=muye_novel
 
 import json
 import re
-from logging import getLogger
+from logger import get_logger
 from typing import Any, Dict, List, Optional
 
 from playwright.async_api import Page
@@ -26,7 +26,7 @@ from .exceptions import (
     PublisherError,
 )
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 BASE_URL = "https://fanqienovel.com"
 _COMMON_PARAMS = "aid=2503&app_name=muye_novel"
