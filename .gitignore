@@ -96,3 +96,17 @@ prompts/
 # 推广素材（本地生成）
 webnovel-promo/
 landing-page/
+
+# Environment config (contains API keys)
+.env
+
+
+# Story system runtime output
+.story-system/
+
+# Node.js artifacts
+node_modules/
+.npm-cache/
+
+# Test runtime artifacts
+.tmp_story_system_engine/

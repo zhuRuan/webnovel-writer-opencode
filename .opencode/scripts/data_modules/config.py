@@ -142,6 +142,24 @@ class DataModulesConfig:
         """框架级词典路径（不依赖项目）"""
         return Path(__file__).parent.parent.parent / "dicts" / "webnovel_dict.txt"
 
+    # ================= Story System 路径 =================
+    @property
+    def story_system_dir(self) -> Path:
+        return self.project_root / ".story-system"
+
+    @property
+    def story_system_master_json(self) -> Path:
+        return self.story_system_dir / "MASTER_SETTING.json"
+
+    @property
+    def story_system_anti_patterns_json(self) -> Path:
+        return self.story_system_dir / "anti-patterns.json"
+
+    # ================= CSV Reference 路径 =================
+    @property
+    def csv_reference_dir(self) -> Path:
+        return self.project_root / ".opencode" / "references" / "csv"
+
     def resolve_world_preset(self) -> dict:
         """解析世界观预设配置"""
         preset_name = getattr(self, "world_preset", "xianxia")

@@ -56,6 +56,7 @@ COMMAND_REGISTRY = {
     "init": {"type": "script", "target": "init_project.py", "needs_root": False},
     "write-batch": {"type": "special", "target": "_start_write_batch", "needs_root": True},
     "dashboard": {"type": "special", "target": "_start_dashboard", "needs_root": True},
+    "chapter-path": {"type": "special", "target": "_chapter_path", "needs_root": True},
 }
 
 
@@ -311,6 +312,18 @@ def cmd_use(args: argparse.Namespace) -> int:
     return 0
 
 
+def _chapter_path(args: argparse.Namespace) -> int:
+    """打印指定章节的文件路径（用于 SKILL.md 流程）"""
+    from pathlib import Path
+    from chapter_paths import default_chapter_draft_path
+
+    project_root = _resolve_root(args.project_root)
+    chapter_num = args.chapter
+    path = default_chapter_draft_path(project_root, chapter_num)
+    print(path)
+    return 0
+
+
 def main() -> None:
     setup_logging()
     logger = get_logger(__name__)
@@ -397,6 +410,11 @@ def main() -> None:
     # write-batch 命令（批量写作）
     p_write_batch = sub.add_parser("write-batch", help="批量写作工具")
     p_write_batch.add_argument("args", nargs=argparse.REMAINDER)
+
+    # chapter-path 命令（打印章节文件路径）
+    p_chapter_path = sub.add_parser("chapter-path", help="打印章节文件路径")
+    p_chapter_path.add_argument("--chapter", type=int, required=True, help="章节号")
+    p_chapter_path.set_defaults(func=_chapter_path)
 
     # genimg 命令（ModelScope 文生图）
     p_genimg = sub.add_parser("genimg", help="ModelScope 文生图工具")

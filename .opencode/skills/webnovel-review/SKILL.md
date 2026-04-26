@@ -23,19 +23,43 @@ allowed-tools: Read Grep Write Edit Bash Task AskUserQuestion
 
 ## 执行流程
 
-### Step 1：加载参考
+### Step 1：初始化
 
+**环境变量**：
 ```bash
-cat "${SKILL_ROOT}/../../references/shared/core-constraints.md"
+export SCRIPTS_DIR=".opencode/scripts"
+export SKILL_ROOT=".opencode/skills/webnovel-review"
+export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" where)"
 ```
 
-### Step 2：加载项目状态
+**若目标章缺少 runtime 合同，先补齐（可选，不阻断）**：
+```bash
+GENRE=$(python -X utf8 -c "import json; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json')); print(s.get('project',{}).get('genre',''))")
+python -X utf8 "${SCRIPTS_DIR}/story_system.py" "" --project-root "${PROJECT_ROOT}" --chapter "${CHAPTER_NUM}" --persist --emit-runtime-contracts --format json 2>/dev/null || true
+```
+
+### Step 2：加载参考
+
+**必读**：
+```bash
+cat "${SKILL_ROOT}/../../references/shared/core-constraints.md"
+cat "${SKILL_ROOT}/../../references/review-schema.md"
+cat "${SKILL_ROOT}/../../references/review/blocking-override-guidelines.md"
+```
+
+### Step 3：加载项目状态
 
 ```bash
 cat "$PROJECT_ROOT/.webnovel/state.json"
 ```
 
-### Step 3：调用审查器
+**决策树入口**：
+- 若项目根不合法或缺少 `.webnovel/state.json` → **阻断**
+- 若正文文件不存在 → **阻断**
+- 若 reviewer 返回 `blocking=true` issue → 进入用户裁决
+- 所有 issue 均为非 blocking → 正常落库，流程结束
+
+### Step 4：调用审查器
 
 **动态加载审查器**（从 registry.yaml）：
 ```bash
@@ -60,7 +84,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode {standard|minim
 }
 ```
 
-### Step 4：生成审查报告
+### Step 5：生成审查报告
 
 保存到：`审查报告/第{start}-{end}章审查报告.md`
 
@@ -75,25 +99,25 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode {standard|minim
 - 🟠 中优先级（建议修改）
 ```
 
-### Step 5：保存审查指标
+### Step 6：保存审查指标
 
 ```bash
 python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index save-review-metrics --data '@review_metrics.json'
 ```
 
-### Step 6：写回 state.json
+### Step 7：写回 state.json
 
 ```bash
 python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" update-state -- --add-review "{start}-{end}" "审查报告/第{start}-{end}章审查报告.md"
 ```
 
-### Step 7：处理 critical 问题
+### Step 8：处理 critical 问题
 
 如 `severity_counts.critical > 0`，使用 AskUserQuestion 询问：
 - A) 立即修复（推荐）
 - B) 仅保存报告，稍后处理
 
-### Step 8：收尾
+### Step 9：收尾
 
 ```bash
 python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" workflow complete-task --artifacts '{"ok":true}' || true

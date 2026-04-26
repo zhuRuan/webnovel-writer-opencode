@@ -66,7 +66,9 @@ echo "章节文件将写入: ${CHAPTER_PATH}"
 | `../../checkers/registry.yaml` | 审查器列表 | Step 3 |
 | `../../checkers/schema.yaml` | 审查器输出格式 | Step 3 |
 | `../../references/shared/core-constraints.md` | 写作硬约束 | Step 2A |
-| `../../data_modules/debt_tracker.py` | 债务追踪模块 | Step 1.5 (新增) |
+| `../../references/csv/裁决规则.csv` | 题材裁决元数据 | Step 0 / Step 2A |
+| `../../references/csv/` (全表) | CSV 结构化知识检索 | Step 2A 按需 |
+| `../../data_modules/debt_tracker.py` | 债务追踪模块 | Step 1.5 |
 | `references/polish-guide.md` | 问题修复、Anti-AI | Step 4 |
 | `references/writing/typesetting.md` | 排版规则 | Step 4 |
 | `references/style-adapter.md` | 风格转译 | Step 2B |
@@ -100,6 +102,15 @@ fi
 # 确保章节号为整数
 CHAPTER_NUM=$((10#${CHAPTER_NUM}))
 echo "将撰写第 ${CHAPTER_NUM} 章"
+```
+
+**CSV 参考预检**：（Step 2A 检索用，不阻断）
+```bash
+# 读取题材用于 CSV 检索过滤（state.json 为唯一真源）
+GENRE=$(python -X utf8 -c "import json; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json')); print(s.get('project',{}).get('genre',''))")
+
+# story-system 合同树刷新（可选，缺失不阻断）
+python -X utf8 "${SCRIPTS_DIR}/story_system.py" "${CHAPTER_NUM}" --project-root "${PROJECT_ROOT}" --chapter "${CHAPTER_NUM}" --persist --emit-runtime-contracts --format json 2>/dev/null || true
 ```
 
 **硬门槛**：preflight 必须成功。失败则阻断。
@@ -202,6 +213,16 @@ fi
 - 单一"创作执行包"（任务书 + Context Contract + 直写提示词），供 Step 2A 直接消费，不再拆分独立 Step 1.5。
 
 ### Step 2A：正文起草
+
+**CSV 结构化知识检索**（按需触发）：
+```bash
+# 触发条件：新角色 → 命名规则，战斗 → 场景写法，多角色对话 → 写作技法
+#          情感描写 → 写作技法，高频桥段 → 桥段套路，世界观设定 → 金手指与设定
+python -X utf8 "${SCRIPTS_DIR}/reference_search.py" --skill write --table "场景写法" --query "战斗描写" --genre "${GENRE}" --max-results 3
+
+# 裁决规则表（题材级梳理路线与毒点权重）
+python -X utf8 "${SCRIPTS_DIR}/reference_search.py" --skill write --table "裁决规则" --query "${GENRE}" --max-results 1
+```
 
 执行前必须加载：
 ```bash
@@ -385,7 +406,22 @@ Task 3:
 - dimension_scores 按 registry.yaml 中的 dimension_mapping 映射
 - 若 `critical > 0`，必须修复后才能进入 Step 4
 
-#### 3.5 保存审查指标
+#### 3.5 review-pipeline CLI 审查（替代方案）
+
+也可通过 review-pipeline CLI 执行统一审查（使用上游统一 reviewer agent）：
+```bash
+python -X utf8 "${SCRIPTS_DIR}/review_pipeline.py" \
+  --project-root "${PROJECT_ROOT}" \
+  --chapter "${CHAPTER_NUM}" \
+  --review-result "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
+  --fulfillment-result "${PROJECT_ROOT}/.webnovel/tmp/fulfillment_results.json" \
+  --disambiguation-result "${PROJECT_ROOT}/.webnovel/tmp/disambiguation_results.json" \
+  --extraction-result "${PROJECT_ROOT}/.webnovel/tmp/extraction_results.json"
+```
+
+选择说明：checkers 体系（6 专门 agent）适合精细维度控制；review-pipeline（1 统一 agent）适合快速低 token 消耗。两者互斥。
+
+#### 3.6 保存审查指标
 
 审查指标落库（必做）：
 ```bash
