@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 跨平台安装脚本 - Webnovel Writer for OpenCode
-自动检测依赖、安装配置、增量更新 .env
+自动检测依赖、安装配置
 """
 
 import sys
@@ -121,10 +121,10 @@ def print_success_box(title: str, lines: list):
     max_len = max(display_width(title), max(display_width(l) for l in lines)) + 2
     print()
     print(f"{Colors.GREEN}┏{'━' * max_len}┓{Colors.NC}")
-    print(f"{Colors.GREEN}┃{Colors.NC} {pad_to_width(Colors.BOLD + title + Colors.NC, max_len - 1)} {Colors.GREEN}┃{Colors.NC}")
+    print(f"{Colors.GREEN}┃{Colors.NC} {pad_to_width(Colors.BOLD + title + Colors.NC, max_len - 2)} {Colors.GREEN}┃{Colors.NC}")
     print(f"{Colors.GREEN}┣{'━' * max_len}┫{Colors.NC}")
     for line in lines:
-        print(f"{Colors.GREEN}┃{Colors.NC} {pad_to_width(line, max_len - 1)} {Colors.GREEN}┃{Colors.NC}")
+        print(f"{Colors.GREEN}┃{Colors.NC} {pad_to_width(line, max_len - 2)} {Colors.GREEN}┃{Colors.NC}")
     print(f"{Colors.GREEN}┗{'━' * max_len}┛{Colors.NC}")
     print()
 
@@ -132,10 +132,10 @@ def print_manual_box(title: str, lines: list):
     max_len = max(display_width(title), max(display_width(l) for l in lines)) + 2
     print()
     print(f"{Colors.YELLOW}┏{'━' * max_len}┓{Colors.NC}")
-    print(f"{Colors.YELLOW}┃{Colors.NC} {pad_to_width(Colors.BOLD + Colors.YELLOW + title + Colors.NC, max_len - 1)} {Colors.YELLOW}┃{Colors.NC}")
+    print(f"{Colors.YELLOW}┃{Colors.NC} {pad_to_width(Colors.BOLD + Colors.YELLOW + title + Colors.NC, max_len - 2)} {Colors.YELLOW}┃{Colors.NC}")
     print(f"{Colors.YELLOW}┣{'━' * max_len}┫{Colors.NC}")
     for line in lines:
-        print(f"{Colors.YELLOW}┃{Colors.NC} {pad_to_width(line, max_len - 1)} {Colors.YELLOW}┃{Colors.NC}")
+        print(f"{Colors.YELLOW}┃{Colors.NC} {pad_to_width(line, max_len - 2)} {Colors.YELLOW}┃{Colors.NC}")
     print(f"{Colors.YELLOW}┗{'━' * max_len}┛{Colors.NC}")
     print()
 
@@ -170,7 +170,6 @@ def retry(func, max_attempts=3, delay=5):
                 time.sleep(delay)
             else:
                 log_error(f"在 {max_attempts} 次尝试后仍失败")
-    return False
 
 # ---------- 远程下载 ----------
 def download_file(url: str, dest: Path, timeout: int = 30) -> bool:
@@ -186,53 +185,19 @@ def download_file(url: str, dest: Path, timeout: int = 30) -> bool:
 
 def download_template(timeout: int = 30):
     script_dir = Path(__file__).parent
-    env_file = Path(".env")
     
-    user_env = {}
-    if env_file.exists():
-        log_info("保存现有 .env 配置...")
-        with open(env_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, _ = line.split('=', 1)
-                    user_env[key] = line
-
-    env_url = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/.env"
-    env_template = script_dir / ".env.tmp"
-    if not download_file(env_url, env_template, timeout):
-        log_error("无法下载 .env 模板")
-
     req_url = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/requirements.txt"
     req_file = script_dir / "requirements.txt"
     if not download_file(req_url, req_file, timeout):
         log_warn("无法下载 requirements.txt")
-
-    if user_env:
-        log_info("合并用户配置 (保留 API Key)...")
-        with open(env_template, 'r', encoding='utf-8') as t:
-            with open(env_file, 'w', encoding='utf-8') as f:
-                for line in t:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, _ = line.split('=', 1)
-                        if key in user_env:
-                            f.write(f"{user_env[key]}\n")
-                        else:
-                            f.write(f"{line}\n")
-                    else:
-                        f.write(f"{line}\n")
-        log_info(".env 已更新 (保留原有配置)")
-        env_template.unlink()
     else:
-        env_template.rename(env_file)
-        log_info(".env 模板已创建")
+        log_info("requirements.txt 下载完成")
 
 # ---------- 文件操作 ----------
 def download_opencode(timeout: int = 30):
     script_dir = Path(__file__).parent
     
-    temp_dest = Path(".opencode_new")
+    temp_dest = script_dir / ".opencode_new"
     if temp_dest.exists():
         shutil.rmtree(temp_dest)
     
@@ -354,9 +319,9 @@ def main():
     print_step_done(step, total_steps, "系统依赖检查通过")
 
     step = 2
-    print_step(step, total_steps, "下载配置文件 (.env, requirements.txt)")
+    print_step(step, total_steps, "下载配置文件 (requirements.txt)")
     download_template(args.timeout)
-    print_step_done(step, total_steps, "配置文件就绪")
+    print_step_done(step, total_steps, "requirements.txt 已就绪")
 
     step = 3
     print_step(step, total_steps, "安装 .opencode 核心文件")
@@ -368,8 +333,13 @@ def main():
     install_requirements()
     print_step_done(step, total_steps, "Python 依赖后台安装中")
 
-    if args.skip_playwright or args.yes:
-        log_info("跳过 playwright 安装（--yes 或 --skip-playwright 模式）")
+    if args.skip_playwright:
+        log_info("跳过 playwright 安装（--skip-playwright 模式）")
+    elif args.yes:
+        log_info("自动模式，安装 playwright 及 chromium...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "playwright"], check=True)
+        retry(lambda: subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True))
+        log_info("playwright 安装完成")
     else:
         maybe_install_playwright()
 
