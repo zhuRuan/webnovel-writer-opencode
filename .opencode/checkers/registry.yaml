@@ -3,14 +3,28 @@
 
 # 审查器列表
 checkers:
+  unified-reviewer:
+    name: 统一审查器
+    name_en: Unified Reviewer
+    file: ../agents/unified-reviewer.md
+    category: core
+    enabled: true
+    description: 单Agent覆盖设定一致性/连贯性/OOC/追读力/爽点密度/节奏6维度
+    triggers: []
+    invoke_template: |
+      对第 {chapter} 章执行全面审查。
+      - 章节文件：{chapter_file}
+      - 项目根：{PROJECT_ROOT}
+      - 审查器定义见：.opencode/agents/unified-reviewer.md
+
   consistency-checker:
     name: 设定一致性检查
     name_en: Consistency Checker
     file: ../agents/consistency-checker.md
-    category: core          # core | conditional
+    category: core
     enabled: true
     description: 战力/地点/时间线/实体一致性检查
-    triggers: []            # core 类型无需 triggers
+    triggers: []
     invoke_template: |
       对第 {chapter} 章执行设定一致性审查。
       - 章节文件：{chapter_file}
@@ -99,45 +113,34 @@ checkers:
       - 项目根：{PROJECT_ROOT}
       - 审查器定义见：.opencode/agents/pacing-checker.md
 
-  world-consistency-checker:
-    name: 世界观一致性检查
-    name_en: World Consistency Checker
-    file: ../agents/world-consistency-checker.md
-    category: conditional
-    enabled: true
-    description: 检测战力崩坏、道具复用、势力平衡、时间线矛盾
-    triggers:
-      - type: condition
-        expression: "chapter_number >= 5 and chapter_number % 10 == 0"
-      - type: condition
-        expression: "chapter_type == 'climax'"
-    invoke_template: |
-      对第 {chapter} 章执行世界观一致性检查。
-      - 章节文件：{chapter_file}
-      - 项目根：{PROJECT_ROOT}
-      - 审查器定义见：.opencode/agents/world-consistency-checker.md
-
 # 审查模式配置
 modes:
-  standard:
-    description: 标准模式（auto 路由，核心 + 条件命中）
-    include_categories: [core, conditional]
-  minimal:
-    description: 最小模式（只跑核心审查器）
+  unified_review:
+    description: 统一审查模式（默认，单Agent覆盖6维度）
     include_categories: [core]
+    selected_checkers: [unified-reviewer]
+  standard:
+    description: 精细审查模式（6个独立Agent）
+    include_categories: [core, conditional]
+    exclude_checkers: [unified-reviewer]
+  minimal:
+    description: 最小模式（统一审查）
+    include_categories: [core]
+    selected_checkers: [unified-reviewer]
   full:
-    description: 完整模式（强制启用所有审查器）
+    description: 完整模式（6独立Agent全部强制）
     include_categories: [core, conditional]
     force_conditional: true
+    exclude_checkers: [unified-reviewer]
 
 # 审查器维度映射（用于 dimension_scores 计算）
 dimension_mapping:
-  爽点密度: [high-point-checker]
-  设定一致性: [consistency-checker]
-  节奏控制: [pacing-checker]
-  人物塑造: [ooc-checker]
-  连贯性: [continuity-checker]
-  追读力: [reader-pull-checker]
+  设定一致性: [consistency-checker, unified-reviewer]
+  连贯性: [continuity-checker, unified-reviewer]
+  人物塑造: [ooc-checker, unified-reviewer]
+  追读力: [reader-pull-checker, unified-reviewer]
+  爽点密度: [high-point-checker, unified-reviewer]
+  节奏控制: [pacing-checker, unified-reviewer]
 
 # 时间线闸门配置
 timeline_gate:

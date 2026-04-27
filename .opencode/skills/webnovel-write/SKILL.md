@@ -12,7 +12,7 @@ description: |
   默认产出2000-2500字，包含完整流程：
   预检 → 上下文搜集 → 起草 → 审查 → 润色 → 数据回写 → Git备份 → 强制终止确认。
   **禁止在无用户明确指令情况下自动循环写下一章**。
-  配合--fast跳过风格转译，--minimal仅基础审查。
+   风格转译已并入Step 2A。--minimal仅统一审查（跳过条件审查器），--legacy-checkers使用6个独立审查agent。
 allowed-tools: Read Write Edit Grep Bash Task
 ---
 
@@ -22,13 +22,14 @@ allowed-tools: Read Write Edit Grep Bash Task
 
 | 模式 | 流程 |
 |------|------|
-| 标准 | Step 0 → 0.5 → **1.5** → 1 → 2A → 2B → 3 → **3.6** → 4 → 5 → 6 → **Step 7** |
-| --fast | Step 0 → 0.5 → **1.5** → 1 → 2A → 3 → **3.6** → 4 → 5 → 6 → **Step 7** |
-| --minimal | Step 0 → 0.5 → 1 → 2A → 3 → 4 → 5 → 6 → **Step 7** |
+| 标准（统一审查） | Step 0 → 0.5 → **1.5** → 1 → 2A（含风格） → 3（统一审查） → **3.6** → 4（条件执行） → 5 → 6 → **Step 7** |
+| --legacy-checkers | Step 0 → 0.5 → **1.5** → 1 → 2A（含风格） → 3（6独立审查） → **3.6** → 4 → 5 → 6 → **Step 7** |
+| --minimal | Step 0 → 0.5 → 1 → 2A（含风格） → 3（统一审查） → 4（条件执行） → 5 → 6 → **Step 7** |
 
 **新增步骤**：
 - **Step 1.5**：创作前置检查（债务硬约束阻断）
 - **Step 3.6**：分层审查增强（Code Layer → LLM）
+- **风格转译已合并**：原 Step 2B 网络风格约束已并入 Step 2A 起草阶段，一步产出符合网文风格的正文。
 
 **产出**：`正文/第N卷/第NNNN章-{title}.md`（自动适配卷目录）、`review_metrics`、`.webnovel/summaries/chNNNN.md`
 
@@ -71,7 +72,7 @@ echo "章节文件将写入: ${CHAPTER_PATH}"
 | `../../data_modules/debt_tracker.py` | 债务追踪模块 | Step 1.5 |
 | `references/polish-guide.md` | 问题修复、Anti-AI | Step 4 |
 | `references/writing/typesetting.md` | 排版规则 | Step 4 |
-| `references/style-adapter.md` | 风格转译 | Step 2B |
+| `references/style-adapter.md` | 风格转译（已并入 Step 2A） | Step 2A |
 | `references/step-1.5-contract.md` | Context Contract 模板 | Step 1 输出验证 |
 | `references/core-constraints.md` | 中文写作约束 | Step 2A |
 
@@ -129,7 +130,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" wor
 ```
 
 要求：
-- `--step-id` 仅允许：`Step 1` / `Step 2A` / `Step 2B` / `Step 3` / `Step 4` / `Step 5` / `Step 6`。
+- `--step-id` 仅允许：`Step 1` / `Step 2A` / `Step 3` / `Step 4` / `Step 5` / `Step 6`。
 - 任何记录失败只记警告，不阻断写作。
 - 每个 Step 执行结束后，同样需要 `complete-step`（失败不阻断）。
 
@@ -212,7 +213,7 @@ fi
 输出：
 - 单一"创作执行包"（任务书 + Context Contract + 直写提示词），供 Step 2A 直接消费，不再拆分独立 Step 1.5。
 
-### Step 2A：正文起草
+### Step 2A：正文起草（含风格适配）
 
 **CSV 结构化知识检索**（按需触发）：
 ```bash
@@ -244,299 +245,185 @@ echo "章节文件将写入: ${CHAPTER_PATH}"
 - 禁止占位符正文（如 `[TODO]`、`[待补充]`）。
 - 保留承接关系：若上章有明确钩子，本章必须回应（可部分兑现）。
 
+**网文风格约束（从 style-adapter.md 引入，起草时同步执行）**：
+
+禁改红线（不改剧情/事件/角色结果/设定/伏笔内容）：
+- 长句（>40字）拆分，避免连续长句压读
+- 抽象判断 → 动作/反应/代价
+- 删除"总结式旁白"和大段纯解释
+- 章内至少有 1 个明确推进点（信息/行动/关系/局势其一）
+- 开头尽早进入冲突/风险/强情绪（建议前 200-400 字）
+- 后段或章末设置未闭合问题/期待锚点
+- 微兑现建议按章型安排 1-3 次
+- 钩子类型优先"选择钩/危机钩"
+
+分题材风格加权：
+- 玄幻/修仙/高武：动作与结果比重更高
+- 都市/直播/电竞：信息节奏更快，"反馈-反应-反制"三连
+- 言情/替身/狗血：情绪弧线前置，关键场景有关系位移
+- 悬疑/规则怪谈/克苏鲁：线索投放可回收，恐惧来自规则
+
+AI痕迹预防：
+- "非常愤怒"改为"动作+生理+决策"三段式
+- "总而言之/可以说"改为直接结论动作
+- 连续三句同句式时改至少一处为短句爆点
+
+章节类型适配：
+
+| 章节类型 | 字数下限 | 字数上限 | 爽点要求 | 微兑现次数 |
+|---------|---------|---------|---------|-----------|
+| **常规推进章** | 1500字 | 2500字 | 至少1个爽点 | 1-3次 |
+| **过渡章** | 1000字 | 1500字 | 0-1次小爽点 | 0-1次 |
+| **高潮章/战斗章** | 2000字 | 4000字 | 多个爽点，至少1个大爽点 | 3-5次 |
+
 中文思维写作约束（硬规则）：
 - **禁止"先英后中"**：不得先用英文工程化骨架（如 ABCDE 分段、Summary/Conclusion 框架）组织内容，再翻译成中文。
 - **中文叙事单元优先**：以"动作、反应、代价、情绪、场景、关系位移"为基本叙事单元，不使用英文结构标签驱动正文生成。
 - **禁止英文结论话术**：正文、审查说明、润色说明、变更摘要、最终报告中不得出现 Overall / PASS / FAIL / Summary / Conclusion 等英文结论标题。
-- **英文仅限机器标识**：CLI flag（`--fast`）、checker id（`consistency-checker`）、DB 字段名（`anti_ai_force_check`）、JSON 键名等不可改的接口名保持英文，其余一律使用简体中文。
+- **英文仅限机器标识**：CLI flag（`--legacy-checkers`）、checker id（`consistency-checker`）、DB 字段名（`anti_ai_force_check`）、JSON 键名等不可改的接口名保持英文，其余一律使用简体中文。
 
 输出：
-- 章节草稿（可进入 Step 2B 或 Step 3）。
-
-### Step 2B：风格适配（`--fast` / `--minimal` 跳过）
-
-执行前加载：
-```bash
-cat "${SKILL_ROOT}/references/style-adapter.md"
-```
-
-硬要求：
-- 只做表达层转译，不改剧情事实、事件顺序、角色行为结果、设定规则。
-- 对"模板腔、说明腔、机械腔"做定向改写，为 Step 4 留出问题修复空间。
-
-输出：
-- 风格化正文（覆盖原章节文件）。
+- 章节草稿（已含网文风格，可直接进入 Step 3 审查）。
 
 ### Step 3：审查（必须由 Task 子代理执行）
 
-#### 3.1 确定应执行的审查器
+#### 3.1 审查模式选择
 
-执行前加载审查器配置：
-```bash
-# 获取当前模式审查器列表（standard/minimal/full）
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode ${MODE} --format json
+| 模式 | 命令参数 | 审查器 | 说明 |
+|------|---------|--------|------|
+| **统一审查（默认）** | 无（默认） | unified-reviewer | 1个Agent覆盖所有审查维度 |
+| 精细审查 | `--legacy-checkers` | 6个独立Agent | 保留原有多Agent审查 |
+| --minimal | 同上 | unified-reviewer | 统一审查 |
+| --full | `--legacy-checkers` + `--full` | 6个独立Agent（全部强制） | 完整审查 |
 
-# 验证审查器配置完整性
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers validate
+#### 3.2 统一审查执行（默认路径）
+
+使用 Task 调用 `unified-reviewer` agent：
+
+```markdown
+Task:
+  subagent: unified-reviewer
+  prompt: |
+    对第 {chapter} 章执行全面审查。
+    - 章节文件：{chapter_file}
+    - 项目根：{PROJECT_ROOT}
+    - 审查器定义见：.opencode/agents/unified-reviewer.md
 ```
 
-其中 `${MODE}` 根据写作模式确定：standard（默认）、minimal（--minimal）、full（--full）。
+unified-reviewer 覆盖所有审查维度：
+- 设定一致性（战力/地点/时间线/实体）
+- 连贯性（场景过渡/情节线/伏笔管理/逻辑流/大纲一致性）
+- 人物OOC（行为/语言风格/情感反应/成长轨迹）
+- 追读力（硬约束/软建议/钩子强度/微兑现/模式重复）
+- 爽点密度（模式识别/密度/类型多样性/执行质量）
+- 节奏（Strand Weave 平衡/疲劳风险）
 
-审查器配置来源：`../../checkers/registry.yaml`（配置） + `../../agents/*.md`（实现）
+#### 3.3 精细审查执行（`--legacy-checkers` 路径，保留兼容）
 
-**模式判定**（来自 registry.yaml `modes` 配置）：
-- `--minimal`：`--mode minimal`（只执行 core 类别审查器）
-- `--fast`/标准：`--mode standard`（执行 core + conditional 类别）
-- `--full`：`--mode full`（强制启用所有 conditional 审查器）
+**⚠️ 必须并行执行，禁止串行**
+
+所有审查器必须在**同一消息中**并行调用。
+
+加载审查器配置：
+```bash
+cat "${SKILL_ROOT}/../../checkers/registry.yaml"
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode {standard|minimal|full} --format json
+```
+
+并行调用（同一消息中全部发出）：
+```
+Task: subagent=consistency-checker, prompt={invoke_template} + 章节文件/项目根
+Task: subagent=continuity-checker, prompt={invoke_template} + 章节文件/项目根
+Task: subagent=ooc-checker, prompt={invoke_template} + 章节文件/项目根
+Task: subagent=reader-pull-checker, prompt=...（条件触发）
+Task: subagent=high-point-checker, prompt=...（条件触发）
+Task: subagent=pacing-checker, prompt=...（条件触发）
+```
 
 **审查器分类**（来自 registry.yaml）：
-- 核心审查器（`category: core`）：始终执行，由 registry.yaml 的 `triggers: []` 定义
-- 条件审查器（`category: conditional`）：满足 triggers 条件时执行：
+- 核心审查器（`category: core`）：always execute
+- 条件审查器（`category: conditional`）：trigger condition-based
   - `reader-pull-checker`：非过渡章、有未闭合问题
   - `high-point-checker`：关键章/高潮章、有战斗/打脸/反转信号
   - `pacing-checker`：章号 >= 10 或节奏失衡风险
 
-**审查器完整配置**请参考 `registry.yaml` 的 `checkers` 节点。
+#### 3.4 审查器输出格式
 
-#### 3.2 调用审查器（关键）
-
-**⚠️ 必须并行执行，禁止串行**
-
-所有审查器必须在**同一消息中**并行调用，**禁止逐个串行执行**。
-
-**加载审查器配置**：
-```bash
-# 加载 registry.yaml 获取完整配置（包括 invoke_template）
-cat "${SKILL_ROOT}/../../checkers/registry.yaml"
-
-# 根据模式获取应执行的审查器列表
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode {standard|minimal|full} --format json
-```
-
-**并行调用模板**（必须按此格式执行）：
-
-```markdown
-# 错误示例（串行，禁止）
-Task 1: 调用 consistency-checker，等待完成
-Task 2: 调用 continuity-checker，等待完成  ← 错误！
-
-# 正确示例（并行，同一消息中全部发出）
-Task 1:
-  subagent: consistency-checker
-  prompt: |
-    {invoke_template}
-    - 章节文件：{chapter_file}
-    - 项目根：{PROJECT_ROOT}
-
-Task 2:
-  subagent: continuity-checker
-  prompt: |
-    {invoke_template}
-    - 章节文件：{chapter_file}
-    - 项目根：{PROJECT_ROOT}
-
-Task 3:
-  subagent: ooc-checker
-  prompt: |
-    {invoke_template}
-    - 章节文件：{chapter_file}
-    - 项目根：{PROJECT_ROOT}
-```
-
-**动态构建步骤**：
-1. 从 registry.yaml 的 `checkers` 节点获取每个审查器的 `invoke_template`
-2. 替换模板中的占位符：`{chapter}`、`{chapter_file}`、`{PROJECT_ROOT}`
-3. 在**同一条消息中**使用多个 Task 工具调用所有审查器（非串行等待）
-
-**⚠️ 重要约束**：
-- 必须让 OpenCode 加载 agent 文件的完整定义（registry.yaml 的 `file` 字段指向 .opencode/agents/*.md）
-- **不要**在 prompt 中包含具体检查项、JSON 模板、评分标准
-- prompt 中只传递必要参数（章节号、文件路径、项目根）
-- 如需传递额外上下文（如上章钩子、大纲标签），只放在 prompt 最后作为"背景信息"
-
-#### 3.3 审查器输出格式约束
-
-所有审查器必须返回符合 schema.yaml 的统一格式：
-
+所有审查器返回遵循 schema.yaml 的 JSON：
 ```json
 {
-  "agent": "审查器ID（必须与 registry.yaml 一致）",
+  "agent": "审查器ID",
   "chapter": 章节号,
   "overall_score": 0-100,
   "pass": true/false,
-  "issues": [
-    {
-      "id": "ISSUE_001",
-      "type": "问题类型",
-      "severity": "critical|high|medium|low",
-      "description": "问题描述",
-      "location": "位置（如第5段）",
-      "suggestion": "修复建议"
-    }
-  ],
+  "issues": [{"id":"ISSUE_001","type":"问题类型","severity":"critical|high|medium|low","description":"..","location":"..","suggestion":".."}],
   "metrics": {...},
   "summary": "一句话总结"
 }
 ```
 
-**字段统一性要求**：
-- ✅ 使用 `overall_score`（不是 `score`）
-- ✅ `severity` 使用 `critical/high/medium/low`（全小写）
-- ✅ `issues` 是数组，每个 issue 包含 `severity` 和 `suggestion`
-
-#### 3.4 汇总审查结果
-
-各审查器返回后，按以下格式汇总：
+#### 3.5 汇总审查结果
 
 ```json
 {
-  "checker_results": [
-    {"agent": "审查器ID", "overall_score": 85, "pass": true, "issues": [...]},
-    ...
-  ],
-  "overall_score": "各审查器评分的平均值",
+  "checker_results": [...],
+  "overall_score": "加权平均",
   "severity_counts": {"critical": 0, "high": 0, "medium": 0, "low": 0},
-  "critical_issues": ["关键问题列表"],
+  "critical_issues": ["清单"],
   "can_proceed": "severity_counts.critical == 0"
 }
 ```
 
-**汇总规则**：
-- `overall_score` = 各审查器 `overall_score` 的加权平均
-- dimension_scores 按 registry.yaml 中的 dimension_mapping 映射
-- 若 `critical > 0`，必须修复后才能进入 Step 4
+若 `critical > 0`，必须修复后才能进入 Step 4。
 
-#### 3.5 review-pipeline CLI 审查（替代方案）
+#### 3.6 分层审查增强（Code → LLM）
 
-也可通过 review-pipeline CLI 执行统一审查（使用上游统一 reviewer agent）：
+Code 层检查（战力/道具一致性 + 债务）：
 ```bash
-python -X utf8 "${SCRIPTS_DIR}/review_pipeline.py" \
-  --project-root "${PROJECT_ROOT}" \
-  --chapter "${CHAPTER_NUM}" \
-  --review-result "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
-  --fulfillment-result "${PROJECT_ROOT}/.webnovel/tmp/fulfillment_results.json" \
-  --disambiguation-result "${PROJECT_ROOT}/.webnovel/tmp/disambiguation_results.json" \
-  --extraction-result "${PROJECT_ROOT}/.webnovel/tmp/extraction_results.json"
+LAYERED_RESULT=$(python -X utf8 -c "
+import sys; sys.path.insert(0, '${SCRIPTS_DIR}')
+from data_modules.checkers_manager import CheckersManager
+result = CheckersManager.run_layered_checkers(
+    ${CHAPTER_NUM}, '''${CHAPTER_CONTENT}''',
+    {'project_root': '${PROJECT_ROOT}'}, run_llm=False
+)
+import json; print(json.dumps(result, ensure_ascii=False))
+" 2>/dev/null || echo '{}')
+echo "Code Layer 结果: $LAYERED_RESULT"
 ```
 
-选择说明：checkers 体系（6 专门 agent）适合精细维度控制；review-pipeline（1 统一 agent）适合快速低 token 消耗。两者互斥。
+阻断规则：Code layer 发现 critical → 阻断；债务硬约束违反 → 阻断；**字数不足 → 阻断**
 
-#### 3.6 保存审查指标
+#### 3.7 字数硬性检查
 
-审查指标落库（必做）：
+```bash
+MIN_WORDS=1500  # 过渡章=1000，高潮章/战斗章=2000
+ACTUAL_WORDS=$(python -X utf8 -c "
+import re
+text = open('${PROJECT_ROOT}/${CHAPTER_PATH}', encoding='utf-8').read()
+words = sum(len(re.findall(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', line)) for line in text.split('\n'))
+print(words)
+")
+if [ "$ACTUAL_WORDS" -lt "$MIN_WORDS" ]; then
+    echo "⚠️ 字数不足: $ACTUAL_WORDS < $MIN_WORDS，需补充"
+    echo "SKIP_REVIEW=true"
+fi
+```
+
+#### 3.8 保存审查指标
+
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index save-review-metrics --data "@${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json"
 ```
 
-review_metrics 字段约束：
-```json
-{
-  "start_chapter": 100,
-  "end_chapter": 100,
-  "overall_score": 85.0,
-  "dimension_scores": {"爽点密度": 8.5, "设定一致性": 8.0, "节奏控制": 7.8, "人物塑造": 8.2, "连贯性": 9.0, "追读力": 8.7},
-  "severity_counts": {"critical": 0, "high": 1, "medium": 2, "low": 0},
-  "critical_issues": ["问题描述"],
-  "report_file": "审查报告/第100-100章审查报告.md",
-  "notes": "单个字符串；selected_checkers / timeline_gate 等扩展信息压成单行"
-}
-```
+硬要求：`--minimal` 也必须产出 `overall_score`；未落库不得进入 Step 5。
 
-**硬要求**：
-- `--minimal` 也必须产出 `overall_score`
-- 未落库 `review_metrics` 不得进入 Step 5
+### Step 4：润色（问题修复优先，**条件执行**）
 
-#### 3.6 分层审查增强（Code → LLM）
-
-执行 Code 层检查（战力/道具一致性 + 债务）：
-```bash
-# 分层审查（Code Layer 快速）
-LAYERED_RESULT=$(python -X utf8 -c "
-import sys
-sys.path.insert(0, '${SCRIPTS_DIR}')
-from data_modules.checkers_manager import CheckersManager
-result = CheckersManager.run_layered_checkers(
-    ${CHAPTER_NUM},
-    '''${CHAPTER_CONTENT}''',  # 需要读取章节文件
-    {'project_root': '${PROJECT_ROOT}'},
-    run_llm=False  # 先只运行 Code checkers
-)
-import json
-print(json.dumps(result, ensure_ascii=False))
-" 2>/dev/null || echo '{}')
-
-echo "Code Layer 结果: $LAYERED_RESULT"
-
-# 检查阻断
-if echo "$LAYERED_RESULT" | grep -q '"blocked": true'; then
-    echo "⚠️ Code 层阻断: 检测到严重问题"
-    echo "请修复后重新提交审查"
-fi
-```
-
-**阻断规则**：
-- Code layer (world-consistency) 发现 critical 问题 → 阻断
-- 债务硬约束违反 → 阻断
-- **字数不足 → 阻断（必须补充达标）**
-
-#### 3.7 字数硬性检查（必须执行）
-
-**⚠️ 此检查在所有审查之前执行，字数不足将阻断流程**
-
-```bash
-# 字数检查（硬性，阻断流程）
-CHAPTER_TYPE=$(python -X utf8 -c "
-import sys, json
-sys.path.insert(0, '${SCRIPTS_DIR}')
-from data_modules.config import DataModulesConfig
-config = DataModulesConfig.from_project_root('${PROJECT_ROOT}')
-state_file = config.state_file
-if state_file.exists():
-    state = json.loads(state_file.read_text(encoding='utf-8'))
-    # 尝试从大纲获取章节类型
-    plot_outline = state.get('plot_outline', {})
-    # 默认为常规推进章
-    print('常规推进章')
-else:
-    print('常规推进章')
-" 2>/dev/null || echo "常规推进章")
-
-# 确定字数下限
-MIN_WORDS=1500
-if [ "$CHAPTER_TYPE" = "过渡章" ]; then
-    MIN_WORDS=1000
-elif [ "$CHAPTER_TYPE" = "高潮章" ] || [ "$CHAPTER_TYPE" = "战斗章" ]; then
-    MIN_WORDS=2000
-fi
-
-# 计算实际字数
-ACTUAL_WORDS=$(python -X utf8 -c "
-import re
-text = open('${PROJECT_ROOT}/${CHAPTER_PATH}', encoding='utf-8').read()
-# 统计中文字符数
-words = sum(len(re.findall(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', line)) for line in text.split('\n'))
-print(words)
-" 2>/dev/null || echo "0")
-
-echo "章节类型: $CHAPTER_TYPE"
-echo "字数下限: $MIN_WORDS"
-echo "实际字数: $ACTUAL_WORDS"
-
-if [ "$ACTUAL_WORDS" -lt "$MIN_WORDS" ]; then
-    echo "⚠️ 字数不足: $ACTUAL_WORDS < $MIN_WORDS"
-    echo "必须补充至 $MIN_WORDS 字以上才能进入审查"
-    # 字数不足时，跳过审查直接进入Step 4补充
-    echo "SKIP_REVIEW=true" > /tmp/word_check_${CHAPTER_NUM}.txt
-fi
-```
-
-**字数不足处理流程**：
-1. 字数不足 → 记录 `SKIP_REVIEW=true` → 直接进入 Step 4
-2. Step 4 优先在"未闭合问题"和"期待锚点"处补充内容
-3. 补充后重新计算字数，达标后退出 Step 4
-4. 若多次补充仍不足，标记为 deviation 但允许继续
-
-### Step 4：润色（问题修复优先）
+**条件执行判定**：
+- 审查汇总后：若 `critical == 0` 且 `high == 0` 且字数达标 → **跳过 Step 4，直接进入 Step 5**
+- 若 `critical > 0` 或 `high > 0` 或字数不足 → 执行 Step 4 修复
+- 跳过时必须输出简化报告："审查无 critical/high 问题，跳过润色"
 
 执行前必须加载：
 ```bash
@@ -551,37 +438,12 @@ if [ -f "/tmp/word_check_${CHAPTER_NUM}.txt" ]; then
     source "/tmp/word_check_${CHAPTER_NUM}.txt"
     if [ "$SKIP_REVIEW" = "true" ]; then
         echo "字数不足，优先补充内容..."
-        # 读取当前正文
-        CURRENT_CONTENT=$(cat "${PROJECT_ROOT}/${CHAPTER_PATH}")
-        # 计算当前字数
-        CURRENT_WORDS=$(python -X utf8 -c "
-import re
-text = '''$CURRENT_CONTENT'''
-words = len(re.findall(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', text))
-print(words)
-")
-        # 补充目标字数（按章节类型）
-        TARGET_WORDS=$((MIN_WORDS - CURRENT_WORDS + 500))  # 多补500字缓冲
-        echo "需要补充: 约 $TARGET_WORDS 字"
-        echo "补充策略："
-        echo "1. 在章末添加'未闭合问题'扩展"
-        echo "2. 在章节中部补充'期待锚点'场景"
-        echo "3. 增加对话/动作细节描写"
-        echo "4. 补充角色内心活动"
+        # 补充策略：
+        # 1. 在章末添加'未闭合问题'扩展
+        # 2. 在章节中部补充'期待锚点'场景
+        # 3. 增加对话/动作细节描写
+        # 4. 补充角色内心活动
         # 补充完成后重新计算字数
-        NEW_WORDS=$(python -X utf8 -c "
-import re
-text = open('${PROJECT_ROOT}/${CHAPTER_PATH}', encoding='utf-8').read()
-words = len(re.findall(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', text))
-print(words)
-")
-        if [ "$NEW_WORDS" -ge "$MIN_WORDS" ]; then
-            echo "字数补充完成: $NEW_WORDS 字 ≥ $MIN_WORDS 字"
-            rm -f "/tmp/word_check_${CHAPTER_NUM}.txt"
-        else
-            echo "⚠️ 字数仍不足: $NEW_WORDS < $MIN_WORDS"
-            echo "标记为 deviation，继续流程"
-        fi
     fi
 fi
 ```

@@ -395,20 +395,28 @@ class CheckersManager:
                 mode_config = modes[mode]
                 include_categories = mode_config.get("include_categories", [])
                 force_conditional = mode_config.get("force_conditional", False)
+                selected_checkers = mode_config.get("selected_checkers", None)
+                exclude_checkers = mode_config.get("exclude_checkers", [])
 
-                # core 类型
-                if checker_config.get("category") == "core":
-                    if "core" not in include_categories:
-                        continue
+                if checker_id in exclude_checkers:
+                    continue
 
-                # conditional 类型
-                elif checker_config.get("category") == "conditional":
-                    if "conditional" not in include_categories:
+                if selected_checkers is not None:
+                    if checker_id not in selected_checkers:
                         continue
-                    # full 模式下强制启用 conditional
-                    if not force_conditional and checker_config.get("category") == "conditional":
-                        # 需要检查触发条件，这里简化处理
-                        pass
+                else:
+                    # core 类型
+                    if checker_config.get("category") == "core":
+                        if "core" not in include_categories:
+                            continue
+
+                    # conditional 类型
+                    elif checker_config.get("category") == "conditional":
+                        if "conditional" not in include_categories:
+                            continue
+                        # full 模式下强制启用 conditional
+                        if not force_conditional and checker_config.get("category") == "conditional":
+                            pass
 
             result.append({
                 "id": checker_id,
@@ -441,9 +449,17 @@ class CheckersManager:
         mode_config = modes[mode]
         include_categories = mode_config.get("include_categories", [])
         force_conditional = mode_config.get("force_conditional", False)
+        selected_checkers = mode_config.get("selected_checkers", None)
+        exclude_checkers = mode_config.get("exclude_checkers", [])
+
+        # 如果指定了 selected_checkers，直接返回对应 checker
+        if selected_checkers is not None:
+            return [c for c in selected_checkers if c in checkers]
 
         result: List[str] = []
         for checker_id, checker_config in checkers.items():
+            if checker_id in exclude_checkers:
+                continue
             if not checker_config.get("enabled", True):
                 continue
 
@@ -454,8 +470,6 @@ class CheckersManager:
                 if force_conditional:
                     result.append(checker_id)
                 else:
-                    # standard 模式下需要根据触发条件决定
-                    # 这里返回所有 conditional，调用方需要进一步判断
                     result.append(checker_id)
 
         return result
@@ -789,7 +803,7 @@ def main() -> None:
 
     # list 命令
     p_list = sub.add_parser("list", help="列出审查器")
-    p_list.add_argument("--mode", "-m", choices=["standard", "minimal", "full"], help="审查模式")
+    p_list.add_argument("--mode", "-m", choices=["standard", "minimal", "full", "unified_review"], help="审查模式")
     p_list.add_argument("--category", "-c", choices=["core", "conditional"], help="类别")
     p_list.add_argument("--all", "-a", action="store_true", help="显示所有（包括禁用的）")
     p_list.add_argument("--format", "-f", choices=["text", "json"], default="text", help="输出格式")
