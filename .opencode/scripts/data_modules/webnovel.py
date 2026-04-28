@@ -34,6 +34,8 @@ from runtime_compat import normalize_windows_path
 from project_locator import resolve_project_root, write_current_project_pointer, update_global_registry_current_project
 from logger import get_logger, setup_logging
 
+from .exceptions import ConfigError
+
 
 COMMAND_REGISTRY = {
     "index": {"type": "data_module", "target": "index_manager", "needs_root": True},
@@ -99,7 +101,7 @@ def _run_data_module(module: str, argv: list[str]) -> int:
     mod = importlib.import_module(f"data_modules.{module}")
     main = getattr(mod, "main", None)
     if not callable(main):
-        raise RuntimeError(f"data_modules.{module} 缺少可调用的 main()")
+        raise ConfigError(f"data_modules.{module} 缺少可调用的 main()")
 
     old_argv = sys.argv
     try:
@@ -121,7 +123,7 @@ def _run_script(script_name: str, argv: list[str]) -> int:
     """
     script_path = _scripts_dir() / script_name
     if not script_path.is_file():
-        raise FileNotFoundError(f"未找到脚本: {script_path}")
+        raise ConfigError(f"未找到脚本: {script_path}")
     proc = subprocess.run([sys.executable, str(script_path), *argv])
     return int(proc.returncode or 0)
 

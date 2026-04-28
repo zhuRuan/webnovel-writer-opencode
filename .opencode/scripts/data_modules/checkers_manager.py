@@ -21,6 +21,8 @@ from logger import get_logger
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from .exceptions import ConfigError
+
 import yaml
 
 from .condition_evaluator import ConditionEvaluator, TriggerCondition
@@ -350,14 +352,14 @@ class CheckersManager:
     def load_registry(self) -> Dict[str, Any]:
         """加载审查器注册表"""
         if not self.registry_path.exists():
-            raise FileNotFoundError(f"注册表不存在: {self.registry_path}")
+            raise ConfigError(f"注册表不存在: {self.registry_path}")
         with open(self.registry_path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
 
     def load_schema(self) -> Dict[str, Any]:
         """加载 Schema 定义"""
         if not self.schema_path.exists():
-            raise FileNotFoundError(f"Schema 不存在: {self.schema_path}")
+            raise ConfigError(f"Schema 不存在: {self.schema_path}")
         with open(self.schema_path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
 
@@ -444,7 +446,7 @@ class CheckersManager:
         checkers = registry.get("checkers", {})
 
         if mode not in modes:
-            raise ValueError(f"未知模式: {mode}，可用模式: {list(modes.keys())}")
+            raise ConfigError(f"未知模式: {mode}，可用模式: {list(modes.keys())}")
 
         mode_config = modes[mode]
         include_categories = mode_config.get("include_categories", [])

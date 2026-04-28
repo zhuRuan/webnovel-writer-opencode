@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any
 from typing import List, Optional, Tuple
 
+from .exceptions import ConfigError
+
 
 def _extract_flag_value(argv: List[str], flag: str) -> Tuple[Optional[str], List[str]]:
     """
@@ -82,12 +84,12 @@ def load_json_arg(raw: str) -> Any:
       - 特例：'@-' 表示从 stdin 读取
     """
     if raw is None:
-        raise ValueError("missing json arg")
+        raise ConfigError("missing json arg")
     text = str(raw).strip()
     if text.startswith("@"):
         target = text[1:].strip()
         if not target:
-            raise ValueError("invalid json arg: '@' without path")
+            raise ConfigError("invalid json arg: '@' without path")
         if target == "-":
             content = sys.stdin.read()
         else:
