@@ -100,7 +100,7 @@ async def test_search_respects_chapter_filter_across_strategies(tmp_path, monkey
     adapter = RAGAdapter(cfg)
     await adapter.store_chunks(
         [
-            {"chapter": 1, "scene_index": 1, "content": "前文线索，尚未涉及关键宝物"},
+            {"chapter": 1, "scene_index": 1, "content": "前文线索，秘宝的传说早有记载"},
             {"chapter": 2, "scene_index": 1, "content": "秘宝现世，引发争夺"},
             {"chapter": 3, "scene_index": 1, "content": "秘宝大战彻底爆发"},
         ]
