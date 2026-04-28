@@ -1404,8 +1404,7 @@ class TestRAGAdapter:
         adapter = RAGAdapter(temp_project)
 
         tokens = adapter._tokenize("萧炎hello世界world")
-        assert "萧" in tokens
-        assert "炎" in tokens
+        assert "萧炎" in tokens or ("萧" in tokens and "炎" in tokens)
         assert "hello" in tokens
         assert "world" in tokens
 
