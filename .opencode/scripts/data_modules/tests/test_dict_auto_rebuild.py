@@ -11,8 +11,6 @@ import sys
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from data_modules.rag_adapter import RAGAdapter
 from data_modules.config import DataModulesConfig
 from data_modules.entity_linker import EntityLinker
