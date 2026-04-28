@@ -199,14 +199,6 @@ aggregation_schema:
     issues: array         # 扁平化问题列表
     dimension_scores: object
     selected_checkers: array
-    
-  dimension_mapping:
-    爽点密度: [high-point-checker]
-    设定一致性: [consistency-checker]
-    节奏控制: [pacing-checker]
-    人物塑造: [ooc-checker]
-    连贯性: [continuity-checker]
-    追读力: [reader-pull-checker]
 
 # 审查指标落库 Schema（用于 index.db.review_metrics）
 review_metrics_schema:
