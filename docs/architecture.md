@@ -30,10 +30,10 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                      OpenCode                               │
 ├─────────────────────────────────────────────────────────────┤
-│  Skills (10个): init / plan / write / review / export /    │
+│  Skills (12个): init / plan / write / review / export /    │
 │                dashboard / query / resume / learn / publish│
 ├─────────────────────────────────────────────────────────────┤
-│  Agents (8个): context-agent / data-agent /                 │
+│  Agents (9个): context-agent / data-agent /                 │
 │                 6 维 Checker                                 │
 ├─────────────────────────────────────────────────────────────┤
 │  Data Layer: state.json / index.db / vectors.db            │
@@ -79,7 +79,6 @@
 ```
 data_modules/
 ├── config.py              # 配置系统（题材预设）
-├── config_defaults.py     # 配置默认值
 ├── config_presets.py    # 世界观预设（xianxia/urban/scifi）
 ├── exceptions.py         # 统一异常体系
 ├── rag_adapter.py        # RAG + 动态词典
@@ -135,14 +134,14 @@ backend = BackendFactory.create("vector")
 ```
 项目目录/
 ├── .opencode/              # OpenCode 配置
-│   ├── skills/            # 10个 Skills
+│   ├── skills/            # 12个 Skills
 │   ├── dashboard/         # 可视化面板（独立模块）
 │   │   ├── app.py         # FastAPI 应用
 │   │   ├── server.py      # 服务器配置
 │   │   ├── watcher.py     # 文件监听
 │   │   ├── publish_bridge.py # 发布数据桥接
 │   │   └── frontend/      # React 前端
-│   ├── agents/           # 8个 Agents（context-agent, data-agent, 6个 Checker）
+│   ├── agents/           # 9个 Agents（context-agent, data-agent, 6个 Checker, unified-reviewer）
 │   ├── checkers/         # 审查器配置驱动
 │   ├── dicts/            # 自定义词典（中文分词优化）
 │   ├── scripts/          # Python 核心脚本

@@ -106,7 +106,7 @@ python .opencode/scripts/webnovel.py publish list-books --project-root <项目�
 python .opencode/scripts/webnovel.py publish upload --book-id <ID> --range "1-10" --mode draft --project-root <项目路径>
 
 # 可视化看板
-python -m opencode.dashboard --project-root <项目路径>
+python .opencode/scripts/webnovel.py dashboard --port 8765
 
 # 章节同步
 python .opencode/scripts/sync_chapters_to_db.py --project-root <项目路径>
