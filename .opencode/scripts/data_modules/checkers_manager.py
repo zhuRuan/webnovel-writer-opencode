@@ -702,7 +702,7 @@ def cmd_list(args: argparse.Namespace) -> int:
             enabled_only=not args.all,
             format=args.format,
         )
-    except FileNotFoundError as e:
+    except ConfigError as e:
         print(f"错误: {e}", file=sys.stderr)
         return 1
 
