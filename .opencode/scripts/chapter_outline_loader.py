@@ -153,7 +153,7 @@ def _append_plot_value(target: Dict[str, Any], field: str, value: str) -> None:
         target.setdefault(field, [])
         candidates = [value]
         if field in {"mandatory_nodes", "prohibitions"}:
-            split_values = [part.strip() for part in re.split(r"[，；;|]+", value) if part.strip()]
+            split_values = [part.strip() for part in re.split(r"[，、；;|]+", value) if part.strip()]
             if split_values:
                 candidates = split_values
         for item in candidates:
