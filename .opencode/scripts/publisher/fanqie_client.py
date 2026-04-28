@@ -12,13 +12,16 @@ Encoding: application/x-www-form-urlencoded;charset=UTF-8
 Params: aid=2503&app_name=muye_novel
 """
 
+import asyncio
 import json
 import re
+import time
 from logger import get_logger
 from typing import Any, Dict, List, Optional
 
 from playwright.async_api import Page
 
+from . import config
 from .exceptions import (
     BookCreationError,
     ChapterPublishError,
@@ -27,9 +30,6 @@ from .exceptions import (
 )
 
 logger = get_logger(__name__)
-
-BASE_URL = "https://fanqienovel.com"
-_COMMON_PARAMS = "aid=2503&app_name=muye_novel"
 
 _FEMALE_GENRES = {"言情", "女频", "现代言情", "古代言情", "仙侠言情", "豪门", "穿越", "宫斗"}
 
@@ -104,10 +104,19 @@ class FanqieClient:
 
     通过 page.evaluate(fetch) 在浏览器 JS 上下文执行请求，
     确保 cookies 和浏览器指纹与真实用户一致。
+
+    支持自动重试（指数退避）和请求耗时统计。
     """
 
-    def __init__(self, page: Page):
+    def __init__(
+        self,
+        page: Page,
+        max_retries: int = config.MAX_RETRIES,
+        debug: bool = False,
+    ):
         self.page = page
+        self.max_retries = max_retries
+        self.debug = debug
 
     async def _fetch(
         self,
@@ -116,70 +125,87 @@ class FanqieClient:
         form: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        """在浏览器页面上下文中执行 fetch 请求
+        """在浏览器页面上下文中执行 fetch 请求（带重试）
 
         Returns:
             API 响应的 data 字段
         Raises:
             PublisherError: 请求或 API 错误时抛出
         """
-        url = f"{BASE_URL}{path}?{_COMMON_PARAMS}"
+        url = f"{config.BASE_URL}{path}?{config.COMMON_PARAMS}"
         if params:
             url += "&" + "&".join(f"{k}={v}" for k, v in params.items())
 
         form_json = json.dumps(form, ensure_ascii=False) if form else ""
 
-        result = await self.page.evaluate(
-            """async ([url, method, formJson]) => {
-                try {
-                    const opts = { method, credentials: 'include' };
-                    if (formJson) {
-                        const obj = JSON.parse(formJson);
-                        opts.body = new URLSearchParams(obj).toString();
-                        opts.headers = {
-                            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-                        };
+        last_error = None
+        for attempt in range(self.max_retries):
+            start_time = time.monotonic()
+            result = await self.page.evaluate(
+                """async ([url, method, formJson]) => {
+                    try {
+                        const opts = { method, credentials: 'include' };
+                        if (formJson) {
+                            const obj = JSON.parse(formJson);
+                            opts.body = new URLSearchParams(obj).toString();
+                            opts.headers = {
+                                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                            };
+                        }
+                        const resp = await fetch(url, opts);
+                        const text = await resp.text();
+                        return { ok: true, status: resp.status, body: text };
+                    } catch (e) {
+                        return { ok: false, error: String(e) };
                     }
-                    const resp = await fetch(url, opts);
-                    const text = await resp.text();
-                    return { ok: true, status: resp.status, body: text };
-                } catch (e) {
-                    return { ok: false, error: String(e) };
-                }
-            }""",
-            [url, method, form_json],
-        )
-
-        if not result.get("ok"):
-            raise NetworkError(f"fetch 错误: {result.get('error')}", {"path": path, "url": url})
-
-        raw = result.get("body", "")
-        status = result.get("status", 0)
-
-        if "/article/" in path or "/publish" in path or "book/create" in path:
-            logger.info("%s %s → HTTP %d  body=%s", method, path, status, raw[:500])
-        else:
-            logger.debug("%s %s → HTTP %d  body=%r", method, path, status, raw[:200])
-
-        if not raw:
-            raise NetworkError(f"API {path} 返回空响应 (HTTP {status})", {"path": path, "url": url})
-
-        try:
-            body = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise NetworkError(
-                f"API {path} 返回非 JSON (HTTP {status}): {raw[:300]}",
-                {"path": path},
-            ) from exc
-
-        if body.get("code") != 0:
-            raise PublisherError(
-                f"API {path} 失败: {body.get('message', 'unknown error')}",
-                {"path": path, "code": body.get("code"), "form": form},
+                }""",
+                [url, method, form_json],
             )
+            elapsed_ms = (time.monotonic() - start_time) * 1000
 
-        data = body.get("data")
-        return data if data is not None else {}
+            if not result.get("ok"):
+                last_error = NetworkError(
+                    f"fetch 错误 (attempt {attempt + 1}/{self.max_retries}): {result.get('error')}",
+                    {"path": path, "url": url},
+                )
+                if attempt < self.max_retries - 1:
+                    wait_s = min(config.RETRY_BACKOFF_BASE * (2 ** attempt), config.RETRY_BACKOFF_MAX)
+                    logger.warning("请求失败，%.1fs 后重试... (%s %s)", wait_s, method, path)
+                    await asyncio.sleep(wait_s)
+                    continue
+                raise last_error
+
+            raw = result.get("body", "")
+            status = result.get("status", 0)
+
+            log_msg = "%s %s → HTTP %d (%.0fms)" % (method, path, status, elapsed_ms)
+            if self.debug or ("/article/" in path or "/publish" in path or "book/create" in path):
+                logger.info("%s  body=%s", log_msg, raw[:500])
+            else:
+                logger.debug("%s  body=%r", log_msg, raw[:200])
+
+            if not raw:
+                raise NetworkError(
+                    f"API {path} 返回空响应 (HTTP {status})",
+                    {"path": path, "url": url},
+                )
+
+            try:
+                body = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise NetworkError(
+                    f"API {path} 返回非 JSON (HTTP {status}): {raw[:300]}",
+                    {"path": path},
+                ) from exc
+
+            if body.get("code") != 0:
+                raise PublisherError(
+                    f"API {path} 失败: {body.get('message', 'unknown error')}",
+                    {"path": path, "code": body.get("code"), "form": form},
+                )
+
+            data = body.get("data")
+            return data if data is not None else {}
 
     async def _post(self, path: str, form: Dict[str, Any]) -> Any:
         """POST 请求"""

@@ -6,6 +6,7 @@
 提供浏览器管理、登录认证和 HTTP API 客户端功能。
 """
 
+from . import config
 from .auth import (
     check_auth_state,
     ensure_logged_in,
@@ -24,6 +25,7 @@ from .exceptions import (
 from .fanqie_client import FanqieClient
 
 __all__ = [
+    "config",
     "FanqieClient",
     "BrowserManager",
     "PublisherError",
