@@ -142,6 +142,10 @@ class DataModulesConfig:
         """框架级词典路径（不依赖项目）"""
         return Path(__file__).parent.parent.parent / "dicts" / "webnovel_dict.txt"
 
+    @property
+    def scratchpad_file(self) -> Path:
+        return self.webnovel_dir / "scratchpad.json"
+
     # ================= Story System 路径 =================
     @property
     def story_system_dir(self) -> Path:
