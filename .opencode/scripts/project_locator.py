@@ -23,6 +23,7 @@ from runtime_compat import normalize_windows_path
 
 DEFAULT_PROJECT_DIR_NAMES: tuple[str, ...] = ("webnovel-project",)
 CURRENT_PROJECT_POINTER_REL: Path = Path(".opencode") / ".webnovel-current-project"
+CURRENT_PROJECT_POINTER_REL_CLAUDE: Path = Path(".claude") / ".webnovel-current-project"
 
 # 用户级全局映射（当 skills/agents 安装在 ~/.opencode 时，项目目录可能在任意盘符）
 # 该文件用于在"空上下文 + CWD 不在项目内"的情况下仍能定位到正确 project_root。
@@ -263,6 +264,7 @@ def _pointer_candidates(cwd: Path, *, stop_at: Optional[Path] = None) -> Iterabl
     """Yield candidate pointer files from cwd up to parents (bounded by stop_at when provided)."""
     for candidate in (cwd, *cwd.parents):
         yield candidate / CURRENT_PROJECT_POINTER_REL
+        yield candidate / CURRENT_PROJECT_POINTER_REL_CLAUDE
         if stop_at is not None and candidate == stop_at:
             break
 
