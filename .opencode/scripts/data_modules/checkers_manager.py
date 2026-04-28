@@ -59,7 +59,7 @@ class CheckersManager:
         self.checkers_dir = checkers_dir
         self.registry_path = checkers_dir / "registry.yaml"
         self.schema_path = checkers_dir / "schema.yaml"
-        self.agents_dir = checkers_dir / "agents"
+        self.agents_dir = checkers_dir.parent / "agents"
         self.templates_dir = checkers_dir / "templates"
         self._config = config
 
@@ -672,7 +672,7 @@ permission:
         # 更新注册表
         new_checker = {
             "name": name,
-            "file": f"agents/{checker_id}.md",
+            "file": f"../agents/{checker_id}.md",
             "category": category,
             "enabled": True,
             "description": description,
