@@ -331,7 +331,7 @@ async def test_embedding_exception_and_close(tmp_path, monkeypatch):
     assert session.closed is True
 
 
-def test_rerank_headers_payload_and_stats(tmp_path, capsys):
+def test_rerank_headers_payload_and_stats(tmp_path, caplog):
     config = DataModulesConfig.from_project_root(tmp_path)
     config.rerank_api_key = "rk-test"
     client = RerankAPIClient(config)
@@ -346,8 +346,7 @@ def test_rerank_headers_payload_and_stats(tmp_path, capsys):
     modal._embed_client.stats.total_calls = 1
     modal._embed_client.stats.total_time = 2.0
     modal.print_stats()
-    output = capsys.readouterr().out
-    assert "EMBED" in output
+    assert "EMBED" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -480,7 +479,7 @@ async def test_rerank_modal_retry_and_warmup(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_modal_client_helpers(tmp_path, monkeypatch, capsys):
+async def test_modal_client_helpers(tmp_path, monkeypatch, caplog):
     config = DataModulesConfig.from_project_root(tmp_path)
     client = ModalAPIClient(config)
 
@@ -500,8 +499,7 @@ async def test_modal_client_helpers(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(client, "_warmup_embed", fail_warmup)
     monkeypatch.setattr(client, "_warmup_rerank", ok_warmup)
     await client.warmup()
-    output = capsys.readouterr().out
-    assert "[FAIL]" in output
+    assert "[FAIL]" in caplog.text
 
     async def fake_get_session():
         return FakeSession([])
