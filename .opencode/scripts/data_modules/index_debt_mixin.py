@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from .exceptions import IndexManagerError
 
 
 class IndexDebtMixin:
@@ -86,7 +87,7 @@ class IndexDebtMixin:
             row = cursor.fetchone()
             if not row:
                 # UPSERT 后查不到记录是异常情况，不应发生
-                raise RuntimeError(
+                raise IndexManagerError(
                     f"Override Contract UPSERT 后无法获取 id: "
                     f"chapter={contract.chapter}, type={contract.constraint_type}, "
                     f"id={contract.constraint_id}"

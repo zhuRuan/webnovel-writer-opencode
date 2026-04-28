@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from data_modules.state_manager import StateManager, EntityState
+from data_modules.exceptions import StateManagerError
 from data_modules.index_manager import IndexManager, EntityMeta
 
 
@@ -564,5 +565,5 @@ def test_save_state_timeout(monkeypatch, temp_project):
             return False
 
     monkeypatch.setattr(sm.filelock, "FileLock", FakeLock)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(StateManagerError):
         manager.save_state()

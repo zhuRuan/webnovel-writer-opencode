@@ -28,6 +28,7 @@ import filelock
 
 from .config import get_config
 from .observability import safe_append_perf_timing, safe_log_tool_call
+from .exceptions import StateManagerError
 
 logger = get_logger(__name__)
 
@@ -478,7 +479,7 @@ class StateManager:
                     )
 
         except filelock.Timeout:
-            raise RuntimeError("无法获取 state.json 文件锁，请稍后重试")
+            raise StateManagerError("无法获取 state.json 文件锁，请稍后重试")
 
     def _sync_to_sqlite(self) -> bool:
         """同步待处理数据到 SQLite（v5.1 引入，v5.4 沿用）"""

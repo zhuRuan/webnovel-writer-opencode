@@ -33,6 +33,7 @@ from .config import get_config
 from .api_client import get_client
 from .index_manager import IndexManager
 from .query_router import QueryRouter
+from .exceptions import StateManagerError
 from .observability import safe_append_perf_timing, safe_log_tool_call
 from .temporal_graph import TemporalGraphIndex
 from .rag_backend import (
@@ -454,7 +455,7 @@ class RAGAdapter:
     def _backup_vector_db(self, reason: str) -> Path:
         db_path = Path(self.config.vector_db)
         if not db_path.exists():
-            raise FileNotFoundError(f"vectors.db 不存在: {db_path}")
+            raise StateManagerError(f"vectors.db 不存在: {db_path}")
         backup_dir = self.config.webnovel_dir / "backups"
         backup_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
