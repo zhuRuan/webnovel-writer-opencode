@@ -11,6 +11,7 @@ import json
 import sys
 
 from .checkers_manager import CheckersManager
+from .cli_output import print_success, print_error, print_warning, print_info, print_table
 from .exceptions import ConfigError
 
 
@@ -26,30 +27,32 @@ def cmd_list(args: argparse.Namespace) -> int:
             format=args.format,
         )
     except ConfigError as e:
-        print(f"错误: {e}", file=sys.stderr)
+        print_error("CONFIG_ERROR", str(e))
         return 1
 
     if args.format == "json":
         print(json.dumps(checkers, ensure_ascii=False, indent=2))
     else:
-        print(f"审查器列表 (共 {len(checkers)} 个):\n")
+        headers = ["状态", "类别", "审查器", "触发条件"]
+        rows = []
         for checker in checkers:
-            category_label = "[核心]" if checker["category"] == "core" else "[条件]"
-            enabled_label = "✓" if checker["enabled"] else "✗"
-            print(f"{enabled_label} {category_label} {checker['id']}: {checker['name']}")
+            enabled = "✓" if checker["enabled"] else "✗"
+            category = "[核心]" if checker["category"] == "core" else "[条件]"
             triggers = checker.get("triggers", [])
+            trigger_desc = ""
             if triggers:
-                trigger_desc = []
+                parts = []
                 for t in triggers[:2]:
                     if isinstance(t, dict):
                         expr = t.get("expression") or t.get("keywords", "(条件)")
                         if isinstance(expr, list):
                             expr = ", ".join(expr[:2])
-                        trigger_desc.append(str(expr))
+                        parts.append(str(expr))
                     else:
-                        trigger_desc.append(str(t))
-                print(f"    触发: {'; '.join(trigger_desc)}")
-            print()
+                        parts.append(str(t))
+                trigger_desc = "; ".join(parts)
+            rows.append([enabled, category, f"{checker['id']}: {checker['name']}", trigger_desc])
+        print_table(headers, rows)
 
     return 0
 
@@ -64,22 +67,19 @@ def cmd_validate(args: argparse.Namespace) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         if result["valid"]:
-            print("✓ 配置验证通过")
+            print_success(message="配置验证通过")
         else:
-            print("✗ 配置验证失败")
+            print_error("VALIDATE_FAIL", "配置验证失败")
 
         if result["errors"]:
-            print("\n错误:")
             for error in result["errors"]:
-                print(f"  - {error}")
+                print_error("CONFIG_ERROR", error)
 
         if result["warnings"]:
-            print("\n警告:")
             for warning in result["warnings"]:
-                print(f"  - {warning}")
+                print_warning(warning)
 
-        print(f"\n审查器数量: {result.get('checker_count', 0)}")
-        print(f"模式数量: {result.get('mode_count', 0)}")
+        print_info(f"审查器: {result.get('checker_count', 0)}个, 模式: {result.get('mode_count', 0)}个")
 
     return 0 if result["valid"] else 1
 
@@ -99,10 +99,9 @@ def cmd_create(args: argparse.Namespace) -> int:
     )
 
     if result["success"]:
-        print(f"✓ 审查器创建成功: {args.id}")
-        print(f"  文件: {result['agent_file']}")
+        print_success(message=f"审查器创建成功: {args.id}")
     else:
-        print(f"✗ 创建失败: {result.get('error')}")
+        print_error("CREATE_FAILED", result.get('error', '未知错误'))
         return 1
 
     return 0
@@ -116,7 +115,7 @@ def cmd_schema(args: argparse.Namespace) -> int:
     if schema:
         print(json.dumps(schema, ensure_ascii=False, indent=2))
     else:
-        print(f"未找到审查器 {args.checker} 的 Schema", file=sys.stderr)
+        print_error("NOT_FOUND", f"未找到审查器 {args.checker} 的 Schema")
         return 1
 
     return 0
