@@ -46,6 +46,7 @@ COMMAND_REGISTRY = {
     "context": {"type": "data_module", "target": "context_manager", "needs_root": True},
     "migrate": {"type": "data_module", "target": "migrate_state_to_sqlite", "needs_root": True},
     "checkers": {"type": "data_module", "target": "checkers_cli", "needs_root": False},
+    "observability": {"type": "data_module", "target": "observability_cli", "needs_root": True},
     "genimg": {"type": "data_module", "target": "image_generator", "needs_root": True},
     "workflow": {"type": "script", "target": "workflow_manager.py", "needs_root": True},
     "status": {"type": "script", "target": "status_reporter.py", "needs_root": True},
@@ -371,6 +372,10 @@ def main() -> None:
     # checkers 子命令（审查器配置管理）
     p_checkers = sub.add_parser("checkers", help="审查器配置管理")
     p_checkers.add_argument("args", nargs=argparse.REMAINDER)
+
+    # observability 命令
+    p_obs = sub.add_parser("observability", help="观测数据报告")
+    p_obs.add_argument("args", nargs=argparse.REMAINDER)
 
     # Pass-through to scripts
     p_workflow = sub.add_parser("workflow", help="转发到 workflow_manager.py")
