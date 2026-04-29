@@ -37,6 +37,54 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_token_report(args: argparse.Namespace) -> int:
+    """Show per-chapter token consumption."""
+    from pathlib import Path
+    try:
+        config = get_config(Path(args.project_root) if args.project_root else None)
+        project_root = str(config.project_root)
+    except Exception:
+        print("无项目目录，无法读取观测数据。")
+        return 1
+
+    timings = read_perf_timings(
+        project_root,
+        tool_name="context_manager.build_context",
+        limit=args.last,
+    )
+
+    if not timings:
+        print("无上下文构建记录。")
+        return 0
+
+    chapters: dict[int, int] = {}
+    for t in timings:
+        meta = t.get("meta", {})
+        ch = meta.get("chapter")
+        tokens = meta.get("estimated_tokens")
+        if ch is not None and tokens is not None:
+            if ch not in chapters:
+                chapters[ch] = tokens
+
+    if not chapters:
+        print("无 Token 估算数据（需要更新后的 ContextManager 生成的数据）。")
+        return 0
+
+    if args.format == "json":
+        import json as _json
+        print(_json.dumps(chapters, ensure_ascii=False, indent=2))
+    else:
+        print(f"Token 消耗（最近 {len(chapters)} 章）:\n")
+        total = 0
+        for ch in sorted(chapters.keys()):
+            t = chapters[ch]
+            total += t
+            print(f"  第{ch:>4d}章  {t:>6d} tokens")
+        print(f"\n  总计: {total} tokens  平均: {total // len(chapters)} tokens/章")
+
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="观测数据报告工具")
     parser.add_argument("--project-root", help="项目根目录（默认自动检测）")
@@ -47,6 +95,11 @@ def main() -> None:
     p_report.add_argument("--last", "-n", type=int, default=1000, help="最近 N 条记录（默认 1000）")
     p_report.add_argument("--format", "-f", choices=["text", "json"], default="text", help="输出格式")
     p_report.set_defaults(func=cmd_report)
+
+    p_token = sub.add_parser("token-report", help="查看 Token 消耗报告")
+    p_token.add_argument("--last", "-n", type=int, default=1000, help="最近 N 条记录")
+    p_token.add_argument("--format", "-f", choices=["text", "json"], default="text", help="输出格式")
+    p_token.set_defaults(func=cmd_token_report)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
