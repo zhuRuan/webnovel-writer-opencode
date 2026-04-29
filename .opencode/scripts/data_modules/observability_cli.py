@@ -14,8 +14,13 @@ from .observability import read_perf_timings, compute_stats, format_perf_report
 
 def cmd_report(args: argparse.Namespace) -> int:
     """Generate performance report."""
-    config = get_config()
-    project_root = args.project_root or str(config.project_root)
+    from pathlib import Path
+    try:
+        config = get_config(Path(args.project_root) if args.project_root else None)
+        project_root = str(config.project_root)
+    except Exception:
+        print("无项目目录，无法读取观测数据。")
+        return 1
 
     timings = read_perf_timings(
         project_root,

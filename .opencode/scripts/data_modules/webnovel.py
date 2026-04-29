@@ -46,7 +46,7 @@ COMMAND_REGISTRY = {
     "context": {"type": "data_module", "target": "context_manager", "needs_root": True},
     "migrate": {"type": "data_module", "target": "migrate_state_to_sqlite", "needs_root": True},
     "checkers": {"type": "data_module", "target": "checkers_cli", "needs_root": False},
-    "observability": {"type": "data_module", "target": "observability_cli", "needs_root": True},
+    "observability": {"type": "data_module", "target": "observability_cli", "needs_root": False},
     "genimg": {"type": "data_module", "target": "image_generator", "needs_root": True},
     "workflow": {"type": "script", "target": "workflow_manager.py", "needs_root": True},
     "status": {"type": "script", "target": "status_reporter.py", "needs_root": True},
