@@ -88,6 +88,9 @@ class ContextManager:
         self._memory_cache: Dict[int, Dict[str, Any]] = {}
         self._memory_cache_max = 128
         self._memory_cache_enabled = getattr(self.config, 'context_memory_cache_enabled', True)
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self._token_usage: Dict[int, int] = {}
 
     def _is_snapshot_compatible(self, cached: Dict[str, Any], template: str) -> bool:
         """判断快照是否可用于当前模板。"""
@@ -123,6 +126,27 @@ class ContextManager:
                 pass
         self._memory_cache[key] = context
 
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Return cache hit/miss stats."""
+        total = self._cache_hits + self._cache_misses
+        return {
+            "hits": self._cache_hits,
+            "misses": self._cache_misses,
+            "hit_rate": round(self._cache_hits / total, 3) if total > 0 else 0.0,
+        }
+
+    def get_token_usage(self, last_n: int = 20) -> Dict[str, Any]:
+        """Return recent token usage stats."""
+        items = sorted(self._token_usage.items(), reverse=True)[:last_n]
+        if not items:
+            return {"chapters": {}, "total_tokens": 0, "avg_tokens": 0}
+        tokens = [t for _, t in items]
+        return {
+            "chapters": {ch: t for ch, t in items},
+            "total_tokens": sum(tokens),
+            "avg_tokens": int(sum(tokens) / len(tokens)),
+        }
+
     def build_context(
         self,
         chapter: int,
@@ -145,6 +169,7 @@ class ContextManager:
 
         mem_cached = self._get_from_memory_cache(chapter, template)
         if mem_cached:
+            self._cache_hits += 1
             snapshot_hit = True
             if hasattr(self.config, 'project_root'):
                 safe_append_perf_timing(
@@ -155,6 +180,8 @@ class ContextManager:
                     meta={"memory_cache_hit": True, "chapter": chapter, "template": template},
                 )
             return mem_cached
+
+        self._cache_misses += 1
 
         if use_snapshot:
             try:
@@ -199,6 +226,7 @@ class ContextManager:
             self._set_to_memory_cache(chapter, template, assembled)
 
         context_size = len(json.dumps(assembled, ensure_ascii=False))
+        self._token_usage[chapter] = int(context_size * 0.75)
 
         if hasattr(self.config, 'project_root'):
             safe_append_perf_timing(
@@ -215,6 +243,8 @@ class ContextManager:
                     "context_size": context_size,
                     "chapter": chapter,
                     "template": template,
+                    "cache_stats": self.get_cache_stats(),
+                    "estimated_tokens": int(context_size * 0.75),
                 },
             )
 
