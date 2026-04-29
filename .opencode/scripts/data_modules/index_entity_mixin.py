@@ -121,6 +121,27 @@ class IndexEntityMixin:
                 conn.commit()
                 return True
 
+    def apply_entity_delta(self, delta: dict) -> bool:
+        """Apply an entity delta from a projection writer commit payload."""
+        from .index_manager import EntityMeta
+
+        entity_id = str(delta.get("entity_id") or delta.get("id") or "").strip()
+        if not entity_id:
+            return False
+        chapter = int(delta.get("chapter") or 0)
+        entity = EntityMeta(
+            id=entity_id,
+            type=str(delta.get("type") or "角色").strip() or "角色",
+            canonical_name=str(delta.get("canonical_name") or delta.get("name") or entity_id).strip(),
+            tier=str(delta.get("tier") or "装饰").strip() or "装饰",
+            desc=str(delta.get("desc") or "").strip(),
+            current=dict(delta.get("current") or {}),
+            first_appearance=chapter,
+            last_appearance=chapter,
+            is_protagonist=bool(delta.get("is_protagonist", False)),
+        )
+        return self.upsert_entity(entity, update_metadata=True)
+
     def get_entity(self, entity_id: str) -> Optional[Dict]:
         """获取单个实体"""
         with self._get_conn() as conn:

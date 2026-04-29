@@ -19,9 +19,21 @@ class IndexProjectionWriter:
         manager = IndexManager(DataModulesConfig.from_project_root(self.project_root))
         applied_count = 0
         for delta in self._collect_entity_deltas(commit_payload):
-            result = manager.apply_entity_delta(delta)
-            if result:
+            if "from_entity" in delta and "to_entity" in delta:
+                from .index_manager import RelationshipMeta
+                rel = RelationshipMeta(
+                    from_entity=delta["from_entity"],
+                    to_entity=delta["to_entity"],
+                    type=str(delta.get("relationship_type") or delta.get("type") or "").strip(),
+                    description=str(delta.get("description") or "").strip(),
+                    chapter=int(delta.get("chapter") or 0),
+                )
+                manager.upsert_relationship(rel)
                 applied_count += 1
+            else:
+                result = manager.apply_entity_delta(delta)
+                if result:
+                    applied_count += 1
         return {
             "applied": applied_count > 0,
             "writer": "index",

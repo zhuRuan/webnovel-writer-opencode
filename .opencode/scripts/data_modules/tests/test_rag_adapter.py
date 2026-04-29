@@ -24,6 +24,7 @@ from .doubles import StubClient, StubClientWithFailures, StubClientAuthFailure, 
 def temp_project(tmp_path, monkeypatch):
     cfg = DataModulesConfig.from_project_root(tmp_path)
     cfg.ensure_dirs()
+    (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(rag_module, "get_client", lambda config: StubClient())
     return cfg
 

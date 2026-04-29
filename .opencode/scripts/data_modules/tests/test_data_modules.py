@@ -42,6 +42,7 @@ def temp_project():
     with tempfile.TemporaryDirectory() as tmpdir:
         config = DataModulesConfig.from_project_root(tmpdir)
         config.ensure_dirs()
+        (Path(tmpdir) / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
         yield config
 
 
@@ -1233,6 +1234,8 @@ class TestIndexManager:
                 "--project-root",
                 root,
                 "save-chapter-reading-power",
+                "--chapter",
+                "3",
                 "--data",
                 json.dumps(
                     {

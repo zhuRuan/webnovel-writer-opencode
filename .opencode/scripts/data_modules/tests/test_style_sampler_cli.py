@@ -18,6 +18,7 @@ from data_modules.config import DataModulesConfig
 def temp_project(tmp_path):
     cfg = DataModulesConfig.from_project_root(tmp_path)
     cfg.ensure_dirs()
+    (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
     return cfg
 
 

@@ -85,6 +85,7 @@ def test_accepted_commit_updates_state_json_end_to_end(tmp_path):
 def test_index_projection_writer_applies_entity_delta(tmp_path):
     cfg = DataModulesConfig.from_project_root(tmp_path)
     cfg.ensure_dirs()
+    (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
     writer = IndexProjectionWriter(tmp_path)
 
     result = writer.apply(
@@ -111,6 +112,7 @@ def test_index_projection_writer_applies_entity_delta(tmp_path):
 def test_index_projection_writer_derives_relationship_from_event(tmp_path):
     cfg = DataModulesConfig.from_project_root(tmp_path)
     cfg.ensure_dirs()
+    (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
     writer = IndexProjectionWriter(tmp_path)
 
     result = writer.apply(
@@ -141,6 +143,7 @@ def test_index_projection_writer_derives_relationship_from_event(tmp_path):
 def test_index_projection_writer_derives_artifact_entity_from_event(tmp_path):
     cfg = DataModulesConfig.from_project_root(tmp_path)
     cfg.ensure_dirs()
+    (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
     writer = IndexProjectionWriter(tmp_path)
 
     result = writer.apply(
