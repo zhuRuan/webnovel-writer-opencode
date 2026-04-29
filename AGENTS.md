@@ -5,7 +5,7 @@
 ```bash
 python install.py                              # 安装/更新
 python .opencode/scripts/webnovel.py <cmd>     # 唯一 CLI 入口
-python .opencode/scripts/run_all_tests.py      # 全量测试
+python .opencode/scripts/run_all_tests.py      # 全量测试（519 passed / 0 failed）
 python .opencode/scripts/webnovel.py where     # 当前项目根
 
 ## 项目结构
@@ -27,8 +27,10 @@ python .opencode/scripts/webnovel.py where     # 当前项目根
 │   │   ├── rag_adapter.py / rag_backend.py  # RAG 抽象
 │   │   ├── state_manager.py / index_manager.py
 │   │   ├── exceptions.py    # 统一异常（WebnovelError 基类）
-│   │   ├── observability.py # 性能埋点
-│   │   └── tests/ (~55 个测试文件)
+│   │   ├── observability.py # 性能埋点 + 聚合统计
+│   │   ├── checkers_cli.py  # 审查器 CLI 命令
+│   │   ├── observability_cli.py # 观测数据 CLI 命令
+│   │   └── tests/ (~62 个测试文件)
 │   ├── project_locator.py   # 项目根检测（查 .webnovel/state.json）
 │   ├── init_project.py      # /webnovel-init 后端（生成 .env + 骨架）
 │   └── run_all_tests.py     # pytest data_modules/tests/ -v
@@ -53,8 +55,8 @@ python .opencode/scripts/webnovel.py where     # 当前项目根
 - 新增模块测试放 `test_*.py`，统一放 `data_modules/tests/`
 
 ### 异常层级
-`WebnovelError` ← `StateManagerError | IndexManagerError | APIClientError | ConfigError`  
-已定义，但各模块尚未批量迁移（渐进式接入）。
+`WebnovelError` ← `StateManagerError | IndexManagerError | APIClientError | ConfigError`
+已接入 7 个模块：`cli_args`、`checkers_manager`、`story_contracts`、`webnovel`、`rag_adapter`、`state_manager`、`index_debt_mixin`。
 
 ### RAG 后端抽象
 ```python
@@ -71,6 +73,14 @@ backend = BackendFactory.create("vector")   # str | None
 
 ### 性能埋点
 写入 `{project_root}/.webnovel/observability/data_agent_timing.jsonl`，覆盖 `state_manager.save_state`, `context_manager.build_context`, `api_client.embed`, `checkers_manager.run_layered_checkers`。
+
+### 可观测性
+`observability.py` 提供 `read_perf_timings()` / `compute_stats()` / `format_perf_report()` 聚合方法。CLI 命令：
+```bash
+python .opencode/scripts/webnovel.py observability report                    # 性能总览
+python .opencode/scripts/webnovel.py observability report --tool context_manager.build_context  # 按工具过滤
+python .opencode/scripts/webnovel.py observability token-report             # Token 消耗报告
+```
 
 ### IndexManager
 混入模式：`index_chapter_mixin.py` / `index_entity_mixin.py` / `index_debt_mixin.py` / `index_reading_mixin.py` / `index_observability_mixin.py`。通过 `manager.get_service("chapters")` 访问。
@@ -94,5 +104,4 @@ FastAPI + React，首次使用需在 `.opencode/dashboard/frontend/` 执行 `npm
 由 `install.py` 从远程下载（合并已有 key），`init_project.py` 为新项目生成。Keys: `EMBED_*`, `RERANK_*`, `IMAGE_*`, `LOG_*`。不提交到版本库。
 
 ### 已知限制
-- `checkers list` 命令报 `TypeError`（`triggers` 字段类型不匹配）
-- 部分 CLI 测试在 temp 目录失败（缺 `.webnovel/state.json`）
+- 部分 CLI 测试依赖 `.webnovel/state.json`，在 temp dir 中需手动创建
