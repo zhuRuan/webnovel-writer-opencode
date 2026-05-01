@@ -9,6 +9,7 @@ import hashlib
 from typing import Any, Dict, List
 
 from ..config import DataModulesConfig, get_config
+from ..observability import safe_append_perf_timing
 from .schema import MemoryItem
 from .store import ScratchpadManager
 
@@ -30,6 +31,8 @@ class MemoryWriter:
         stats["items_outdated"] += int(result.get("outdated", 0))
 
     def update_from_chapter_result(self, chapter: int, result: Dict[str, Any]) -> Dict[str, Any]:
+        import time
+        start = time.perf_counter()
         stats: Dict[str, Any] = {
             "chapter": int(chapter),
             "items_added": 0,
@@ -38,7 +41,6 @@ class MemoryWriter:
             "warnings": [],
         }
 
-        # Stage 2: 零成本结构化映射
         for change in result.get("state_changes", []) or []:
             entity_id = str(change.get("entity_id", "") or "").strip()
             field = str(change.get("field", "") or "").strip()
@@ -125,11 +127,18 @@ class MemoryWriter:
             )
             self._upsert(item, stats)
 
-        # Stage 4: Data Agent 深度提取扩展
         memory_facts = result.get("memory_facts") or {}
         if isinstance(memory_facts, dict):
             self._apply_memory_facts(chapter, memory_facts, stats)
 
+        elapsed = int((time.perf_counter() - start) * 1000)
+        safe_append_perf_timing(
+            self.config.project_root,
+            tool_name="memory_writer.update_from_chapter_result",
+            success=True,
+            elapsed_ms=elapsed,
+            chapter=chapter,
+        )
         return stats
 
     def _apply_memory_facts(self, chapter: int, memory_facts: Dict[str, Any], stats: Dict[str, Any]) -> None:

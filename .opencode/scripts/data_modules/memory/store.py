@@ -30,6 +30,8 @@ except ImportError:  # pragma: no cover
 
 from filelock import FileLock
 
+from ..observability import safe_append_perf_timing
+
 
 class ScratchpadManager:
     def __init__(self, config: DataModulesConfig | None = None):
@@ -38,14 +40,26 @@ class ScratchpadManager:
         self._lock = FileLock(str(self.path) + ".lock", timeout=30)
 
     def load(self) -> ScratchpadData:
+        import time
+        start = time.perf_counter()
         if not self.path.exists():
             return ScratchpadData.empty()
         payload = read_json_safe(self.path, default={})
         if not isinstance(payload, dict):
             return ScratchpadData.empty()
-        return ScratchpadData.from_dict(payload)
+        result = ScratchpadData.from_dict(payload)
+        elapsed = int((time.perf_counter() - start) * 1000)
+        safe_append_perf_timing(
+            self.config.project_root,
+            tool_name="memory_store.load",
+            success=True,
+            elapsed_ms=elapsed,
+        )
+        return result
 
     def save(self, data: ScratchpadData, _use_lock: bool = True) -> None:
+        import time
+        start = time.perf_counter()
         self.config.ensure_dirs()
         if bool(getattr(self.config, "memory_compactor_enabled", True)):
             threshold = max(1, int(getattr(self.config, "memory_compactor_threshold", 500)))
@@ -58,11 +72,20 @@ class ScratchpadManager:
         payload["meta"]["last_updated"] = now_iso()
         payload["meta"]["total_items"] = data.count_items()
         atomic_write_json(self.path, payload, use_lock=_use_lock, backup=True)
+        elapsed = int((time.perf_counter() - start) * 1000)
+        safe_append_perf_timing(
+            self.config.project_root,
+            tool_name="memory_store.save",
+            success=True,
+            elapsed_ms=elapsed,
+        )
 
     def _key_for(self, item: MemoryItem) -> tuple[Any, ...]:
         return memory_item_key(item)
 
     def upsert_item(self, item: MemoryItem) -> Dict[str, int]:
+        import time
+        start = time.perf_counter()
         normalized = item.normalized()
         with self._lock:
             data = self.load()
@@ -76,7 +99,6 @@ class ScratchpadManager:
             for row in rows:
                 row_key = self._key_for(row)
                 if row_key == target_key and row.id != normalized.id:
-                    # 同 key 旧值降级为 outdated，保留审计轨迹
                     if row.status != "outdated":
                         row = MemoryItem(**{**asdict(row), "status": "outdated", "updated_at": now_iso()})
                         outdated += 1
@@ -91,6 +113,13 @@ class ScratchpadManager:
             setattr(data, bucket, new_rows)
             self.save(data, _use_lock=False)
 
+        elapsed = int((time.perf_counter() - start) * 1000)
+        safe_append_perf_timing(
+            self.config.project_root,
+            tool_name="memory_store.upsert_item",
+            success=True,
+            elapsed_ms=elapsed,
+        )
         return {
             "added": 0 if replaced_existing else 1,
             "updated": 1 if replaced_existing else 0,

@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 
 from ..config import DataModulesConfig, get_config
 from ..index_manager import IndexManager
+from ..observability import safe_append_perf_timing
 from .schema import MemoryItem
 from .store import ScratchpadManager
 from .budget import allocate_limits
@@ -37,6 +38,8 @@ class MemoryOrchestrator:
         self.store = ScratchpadManager(self.config)
 
     def build_memory_pack(self, chapter: int, task_type: str = "write") -> Dict[str, Any]:
+        import time
+        start = time.perf_counter()
         outline = load_chapter_outline(self.config.project_root, chapter, max_chars=1500)
 
         working = self._build_working_memory(chapter=chapter, outline=outline)
@@ -71,11 +74,18 @@ class MemoryOrchestrator:
                 }
             )
 
+        elapsed = int((time.perf_counter() - start) * 1000)
+        safe_append_perf_timing(
+            self.config.project_root,
+            tool_name="memory_orchestrator.build_memory_pack",
+            success=True,
+            elapsed_ms=elapsed,
+            chapter=chapter,
+        )
         return {
             "working_memory": working_items,
             "episodic_memory": episodic_items,
             "semantic_memory": semantic_payload,
-            # long_term_facts 保持对外 contract：仅包含可直接注入的长期语义事实。
             "long_term_facts": semantic_payload,
             "active_constraints": active_constraints,
             "recent_changes": list(recent_changes),
