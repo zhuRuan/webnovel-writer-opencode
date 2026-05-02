@@ -1,148 +1,155 @@
 ---
 name: webnovel-review
-description: 审查章节质量并生成报告。用于用户说"审查第X章"、"质量报告"、"章节检查"时，或执行/webnovel-review命令。调用审查代理执行设定一致性、连贯性、人物OOC、追读力等多维检查，产出带评分的审查报告和改进建议。配合--full执行完整审查（包含节奏、爽点检查），--range指定章节范围。
+description: 使用审查 Agent 评估章节质量，生成报告并写回审查指标。
 allowed-tools: Read Grep Write Edit Bash Task AskUserQuestion
 ---
 
-# 网文审查 Skill
+# Quality Review Skill
 
-## 快速参考
+## 目标
 
-| 参数 | 说明 |
-|------|------|
-| `--full` | 完整审查（包含节奏、爽点检查） |
-| `--range 1-5` | 审查指定章节范围 |
+- 解析真实书项目根目录，按统一流程完成章节审查。
+- 调用统一 `unified-reviewer` 生成结构化问题列表与审查报告。
+- 把审查指标写入 `index.db`，并把审查记录写入 `.webnovel/state.json` 兼容投影。
+- 若存在关键问题，明确交给用户决定是否立即返工。
 
-**产出**：`审查报告/第X-Y章审查报告.md`、`review_metrics` 落库
+## 常见误区
 
-## 核心约束
+- ❌ 没看 reviewer 原始 JSON 就直接口头总结
+- ❌ 有 blocking issue 仍将流程视为通过
+- ❌ 把 report 文件生成等同于已落库（`save-review-metrics` 未跑）
+- ❌ 主流程伪造 `overall_score` 或审查结论
+- ❌ 按需参考一次性全部读完
 
-- **审查深度**：Core（默认4项）vs Full（+节奏/爽点）
-- **critical 问题**：必须用 AskUserQuestion 询问用户处理方式
-- **审查指标**：必须落库（index.db）
+## 优先级链
+
+1. 用户明确要求（最高）
+2. `blocking=true` 硬门槛
+3. 项目私有约束（设定集、已有剧情）
+4. skill 默认流程
+5. reference 建议（最低）
+
+## 决策树入口
+
+- 若项目根不合法或缺少 `.webnovel/state.json` → **阻断**
+- 若正文文件不存在 → **阻断**
+- 若 reviewer 返回 `blocking=true` issue → 进入 Step 6 用户裁决
+- 若所有 issue 均为非 blocking → 正常落库，流程结束
 
 ## 执行流程
 
-### Step 1：初始化
+### Step 1：解析项目根目录并建立环境变量
 
-**环境变量**：
 ```bash
-export SCRIPTS_DIR=".opencode/scripts"
+export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 export SKILL_ROOT=".opencode/skills/webnovel-review"
-export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" where)"
+export SCRIPTS_DIR=".opencode/scripts"
+export PROJECT_ROOT="$(python "${SCRIPTS_DIR}/webnovel.py" where)"
 ```
 
-**若目标章缺少 runtime 合同，先补齐（可选，不阻断）**：
-```bash
-GENRE=$(python -X utf8 -c "import json; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json')); print(s.get('project',{}).get('genre',''))")
-python -X utf8 "${SCRIPTS_DIR}/story_system.py" "" --project-root "${PROJECT_ROOT}" --chapter "${CHAPTER_NUM}" --persist --emit-runtime-contracts --format json 2>/dev/null || true
-```
+要求：
+- `PROJECT_ROOT` 必须包含 `.webnovel/state.json`
+- 任一关键目录不存在时立即阻断
 
-### Step 2：加载参考
+### Step 2：按需加载参考资料
 
-**必读**：
-```bash
-cat "${SKILL_ROOT}/../../references/shared/core-constraints.md"
-cat "${SKILL_ROOT}/../../references/review-schema.md"
-cat "${SKILL_ROOT}/../../references/review/blocking-override-guidelines.md"
-```
+#### md 必读
 
-### Step 3：加载项目状态
+| Trigger | Reference |
+|---------|-----------|
+| always | `../../references/shared/core-constraints.md` |
+| always | `../../references/review-schema.md` |
 
-```bash
-cat "$PROJECT_ROOT/.webnovel/state.json"
-```
+#### md 按需
 
-**决策树入口**：
-- 若项目根不合法或缺少 `.webnovel/state.json` → **阻断**
-- 若正文文件不存在 → **阻断**
-- 若 reviewer 返回 `blocking=true` issue → 进入用户裁决
-- 所有 issue 均为非 blocking → 正常落库，流程结束
+| Trigger | Reference |
+|---------|-----------|
+| 审查涉及爽点或钩子分析 | `../../references/shared/cool-points-guide.md` |
+| 审查涉及多线交织 | `../../references/shared/strand-weave-pattern.md` |
+| ai_flavor issue ≥ 3 | `../../skills/webnovel-write/references/anti-ai-guide.md` |
+| blocking issue 需用户决策 (Step 6) | `../../references/review/blocking-override-guidelines.md` |
 
-### Step 4：调用审查器
-
-**动态加载审查器**（从 registry.yaml）：
-```bash
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode {standard|minimal|full} --format json
-```
-
-**审查器分类**：
-- `core`：始终执行
-- `conditional`：满足触发条件时执行
-
-**Task 调用**：使用 registry.yaml 中的 `invoke_template` 调用各审查器
-
-**审查器输出格式**：
-```json
-{
-  "agent": "审查器ID",
-  "chapter": 章节号,
-  "overall_score": 0-100,
-  "pass": true/false,
-  "issues": [{"severity": "critical|high|medium|low", "description": "...", "suggestion": "..."}],
-  "summary": "一句话总结"
-}
-```
-
-### Step 5：生成审查报告
-
-保存到：`审查报告/第{start}-{end}章审查报告.md`
-
-```markdown
-# 第 {start}-{end} 章质量审查报告
-
-## 综合评分
-- 爽点密度 / 设定一致性 / 节奏控制 / 人物塑造 / 连贯性 / 追读力
-
-## 修改优先级
-- 🔴 高优先级（必须修改）
-- 🟠 中优先级（建议修改）
-```
-
-### Step 6：保存审查指标
+### Step 3：加载项目投影状态与待审正文
 
 ```bash
-python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index save-review-metrics --data '@review_metrics.json'
+cat "${PROJECT_ROOT}/.webnovel/state.json"
 ```
 
-### Step 7：写回 state.json
+要求：
+- 明确当前章节号与对应正文文件
+- 若缺少正文或兼容状态文件，立即阻断
+
+### Step 4：调用统一审查 Agent
+
+必须通过 `Task` 工具调用 `unified-reviewer`，禁止主流程伪造结论。
+
+```text
+Task(
+  subagent_type: "unified-reviewer",
+  prompt: "chapter={chapter_num}; chapter_file={chapter_file}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
+)
+```
+
+输入：
+- `chapter`
+- `chapter_file`
+- `project_root`
+- `scripts_dir`
+
+输出约束：
+- 只输出 JSON
+- 每个 issue 必须有 `evidence`
+- 不输出 `overall_score`
+
+中间产物约定：
+- reviewer 原始结果：`${PROJECT_ROOT}/.webnovel/tmp/review_results.json`
+- 落库指标：`${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json`
+
+### Step 5：生成审查报告并落库
+
+报告保存到：`审查报告/第{chapter_num}章审查报告.md`
+
+标准文件流：
 
 ```bash
-python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" update-state -- --add-review "{start}-{end}" "审查报告/第{start}-{end}章审查报告.md"
+python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \
+  --chapter {chapter_num} \
+  --review-results "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
+  --metrics-out "${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json" \
+  --report-file "审查报告/第{chapter_num}章审查报告.md"
+
+python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index save-review-metrics \
+  --data "@${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json"
 ```
 
-### Step 8：处理 critical 问题
+要求：
+- `review-pipeline` 生成的 `review_metrics.json` 必须可直接写入 `review_metrics` 表
+- 阻断判断以 reviewer 原始结果中的 `blocking=true` 为准
 
-如 `severity_counts.critical > 0`，使用 AskUserQuestion 询问：
-- A) 立即修复（推荐）
-- B) 仅保存报告，稍后处理
+### Step 6：写入兼容审查记录并处理阻断
 
-### Step 9：收尾
+先写入兼容审查记录：
 
 ```bash
-python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" workflow complete-task --artifacts '{"ok":true}' || true
+python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" update-state -- --add-review "{chapter_num}-{chapter_num}" "审查报告/第{chapter_num}章审查报告.md"
 ```
 
-## 审查指标 JSON 格式
+如存在任意 `blocking=true` 问题，必须使用 `AskUserQuestion` 询问用户：
+- 立即修复
+- 仅保存报告，稍后处理
 
-```json
-{
-  "start_chapter": 1,
-  "end_chapter": 5,
-  "overall_score": 75,
-  "dimension_scores": {
-    "爽点密度": 8,
-    "设定一致性": 7,
-    "节奏控制": 7,
-    "人物塑造": 8,
-    "连贯性": 9,
-    "追读力": 9
-  },
-  "severity_counts": {"critical": 0, "high": 2, "medium": 3, "low": 1}
-}
-```
+若用户选择立即修复：
+- 输出返工清单
+- 在用户明确授权下做最小修改
 
-## 验证
+若用户选择稍后处理：
+- 保留报告与指标记录，结束流程
 
-- 审查报告文件存在
-- review_metrics 已落库
+## 成功标准
+
+1. 已解析真实书项目根目录。
+2. 已通过 `unified-reviewer` 输出结构化问题 JSON。
+3. 审查报告已生成。
+4. `review_metrics` 已写入 `index.db`。
+5. 审查记录已写入 `.webnovel/state.json` 兼容投影。
+6. 如存在阻断问题，用户已明确选择处理策略。
