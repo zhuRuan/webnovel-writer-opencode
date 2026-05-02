@@ -96,6 +96,8 @@ prompts/
 # 推广素材（本地生成）
 webnovel-promo/
 landing-page/
+superpowers-main/
+webnovel-writer-master/
 
 # Environment config (contains API keys)
 .env

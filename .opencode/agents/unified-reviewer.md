@@ -1,8 +1,11 @@
 ---
 name: reviewer
 description: 统一审查 agent。检查正文的设定一致性、叙事连贯性、角色一致性、时间线、AI味，输出结构化问题清单。
-tools: Read, Grep, Bash
-model: inherit
+mode: subagent
+permission:
+  read: allow
+  grep: allow
+  bash: ask
 ---
 
 # reviewer（统一审查 agent）
