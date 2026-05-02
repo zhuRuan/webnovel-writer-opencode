@@ -12,7 +12,7 @@ description: |
   默认产出2000-2500字，包含完整流程：
   预检 → 上下文搜集 → 起草 → 审查 → 润色 → 数据回写 → Git备份 → 强制终止确认。
   **禁止在无用户明确指令情况下自动循环写下一章**。
-   风格转译已并入Step 2A。--minimal仅统一审查（跳过条件审查器），--legacy-checkers使用6个独立审查agent。
+ 
 allowed-tools: Read Write Edit Grep Bash Task
 ---
 
@@ -23,8 +23,6 @@ allowed-tools: Read Write Edit Grep Bash Task
 | 模式 | 流程 |
 |------|------|
 | 标准（统一审查） | Step 0 → 0.5 → **1.5** → 1 → 2A（含风格） → 3（统一审查） → **3.6** → 4（条件执行） → 5 → 6 → **Step 7** |
-| --legacy-checkers | Step 0 → 0.5 → **1.5** → 1 → 2A（含风格） → 3（6独立审查） → **3.6** → 4 → 5 → 6 → **Step 7** |
-| --minimal | Step 0 → 0.5 → 1 → 2A（含风格） → 3（统一审查） → 4（条件执行） → 5 → 6 → **Step 7** |
 
 **新增步骤**：
 - **Step 1.5**：创作前置检查（债务硬约束阻断）
@@ -280,7 +278,7 @@ AI痕迹预防：
 - **禁止"先英后中"**：不得先用英文工程化骨架（如 ABCDE 分段、Summary/Conclusion 框架）组织内容，再翻译成中文。
 - **中文叙事单元优先**：以"动作、反应、代价、情绪、场景、关系位移"为基本叙事单元，不使用英文结构标签驱动正文生成。
 - **禁止英文结论话术**：正文、审查说明、润色说明、变更摘要、最终报告中不得出现 Overall / PASS / FAIL / Summary / Conclusion 等英文结论标题。
-- **英文仅限机器标识**：CLI flag（`--legacy-checkers`）、checker id（`consistency-checker`）、DB 字段名（`anti_ai_force_check`）、JSON 键名等不可改的接口名保持英文，其余一律使用简体中文。
+- **英文仅限机器标识**：DB 字段名（`anti_ai_force_check`）、JSON 键名等不可改的接口名保持英文，其余一律使用简体中文。
 
 输出：
 - 章节草稿（已含网文风格，可直接进入 Step 3 审查）。
@@ -292,9 +290,7 @@ AI痕迹预防：
 | 模式 | 命令参数 | 审查器 | 说明 |
 |------|---------|--------|------|
 | **统一审查（默认）** | 无（默认） | unified-reviewer | 1个Agent覆盖所有审查维度 |
-| 精细审查 | `--legacy-checkers` | 6个独立Agent | 保留原有多Agent审查 |
-| --minimal | 同上 | unified-reviewer | 统一审查 |
-| --full | `--legacy-checkers` + `--full` | 6个独立Agent（全部强制） | 完整审查 |
+| 统一审查 | 默认 | unified-reviewer | 单Agent覆盖全部维度 |
 
 #### 3.2 统一审查执行（默认路径）
 
@@ -317,35 +313,6 @@ unified-reviewer 覆盖所有审查维度：
 - 追读力（硬约束/软建议/钩子强度/微兑现/模式重复）
 - 爽点密度（模式识别/密度/类型多样性/执行质量）
 - 节奏（Strand Weave 平衡/疲劳风险）
-
-#### 3.3 精细审查执行（`--legacy-checkers` 路径，保留兼容）
-
-**⚠️ 必须并行执行，禁止串行**
-
-所有审查器必须在**同一消息中**并行调用。
-
-加载审查器配置：
-```bash
-cat "${SKILL_ROOT}/../../checkers/registry.yaml"
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" checkers list --mode {standard|minimal|full} --format json
-```
-
-并行调用（同一消息中全部发出）：
-```
-Task: subagent=consistency-checker, prompt={invoke_template} + 章节文件/项目根
-Task: subagent=continuity-checker, prompt={invoke_template} + 章节文件/项目根
-Task: subagent=ooc-checker, prompt={invoke_template} + 章节文件/项目根
-Task: subagent=reader-pull-checker, prompt=...（条件触发）
-Task: subagent=high-point-checker, prompt=...（条件触发）
-Task: subagent=pacing-checker, prompt=...（条件触发）
-```
-
-**审查器分类**（来自 registry.yaml）：
-- 核心审查器（`category: core`）：always execute
-- 条件审查器（`category: conditional`）：trigger condition-based
-  - `reader-pull-checker`：非过渡章、有未闭合问题
-  - `high-point-checker`：关键章/高潮章、有战斗/打脸/反转信号
-  - `pacing-checker`：章号 >= 10 或节奏失衡风险
 
 #### 3.4 审查器输出格式
 
@@ -416,7 +383,7 @@ fi
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index save-review-metrics --data "@${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json"
 ```
 
-硬要求：`--minimal` 也必须产出 `overall_score`；未落库不得进入 Step 5。
+硬要求：审查指标未落库不得进入 Step 5。
 
 ### Step 4：润色（问题修复优先，**条件执行**）
 
