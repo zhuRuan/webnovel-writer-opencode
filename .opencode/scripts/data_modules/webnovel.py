@@ -45,7 +45,6 @@ COMMAND_REGISTRY = {
     "entity": {"type": "data_module", "target": "entity_linker", "needs_root": True},
     "context": {"type": "data_module", "target": "context_manager", "needs_root": True},
     "migrate": {"type": "data_module", "target": "migrate_state_to_sqlite", "needs_root": True},
-    "checkers": {"type": "data_module", "target": "checkers_cli", "needs_root": False},
     "memory": {"type": "data_module", "target": "memory_cli", "needs_root": True},
     "observability": {"type": "data_module", "target": "observability_cli", "needs_root": False},
     "genimg": {"type": "data_module", "target": "image_generator", "needs_root": True},
@@ -369,10 +368,6 @@ def main() -> None:
 
     p_migrate = sub.add_parser("migrate", help="转发到 migrate_state_to_sqlite")
     p_migrate.add_argument("args", nargs=argparse.REMAINDER)
-
-    # checkers 子命令（审查器配置管理）
-    p_checkers = sub.add_parser("checkers", help="审查器配置管理")
-    p_checkers.add_argument("args", nargs=argparse.REMAINDER)
 
     # memory 命令（记忆数据管理）
     p_memory = sub.add_parser("memory", help="记忆数据管理")
