@@ -348,6 +348,18 @@ class ContextManager:
             nodes = []
         core["planned_nodes"] = nodes
 
+        cpn_review = None
+        try:
+            from .prewrite_validator import PrewriteValidator
+            validator = PrewriteValidator(self.config.project_root)
+            if nodes:
+                cpn_review = validator._review_cpn_consistency(
+                    chapter, nodes, self.index_manager
+                )
+        except Exception:
+            pass
+        core["cpn_review"] = cpn_review
+
         scene = {
             "location_context": state.get("protagonist_state", {}).get("location", {}),
             "appearing_characters": self._load_recent_appearances(
