@@ -139,6 +139,15 @@ class MemoryWriter:
             elapsed_ms=elapsed,
             chapter=chapter,
         )
+
+        try:
+            from ..index_manager import IndexManager
+            index_mgr = IndexManager(self.config)
+            index_mgr.mark_chapter_nodes_fulfilled(chapter)
+            stats["nodes_fulfilled"] = True
+        except Exception:
+            pass
+
         return stats
 
     def _apply_memory_facts(self, chapter: int, memory_facts: Dict[str, Any], stats: Dict[str, Any]) -> None:
