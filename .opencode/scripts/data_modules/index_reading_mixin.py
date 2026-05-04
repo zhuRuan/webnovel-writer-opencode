@@ -132,6 +132,10 @@ class IndexReadingMixin:
                 stats[hook] = stats.get(hook, 0) + 1
             return stats
 
+    def get_chapter_nodes(self, chapter: int) -> list:
+        """Get planning nodes (CBN/CPN/CEN) for a chapter."""
+        return self.get_chapter_nodes(chapter)
+
     # ==================== v5.4 审查指标 ====================
 
     def save_review_metrics(self, metrics: ReviewMetrics) -> None:
