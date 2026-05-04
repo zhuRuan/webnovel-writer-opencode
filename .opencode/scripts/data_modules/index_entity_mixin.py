@@ -697,6 +697,88 @@ class IndexEntityMixin:
             )
             return [dict(row) for row in cursor.fetchall()]
 
+    def get_relationship_at_chapter(
+        self, entity_a: str, entity_b: str, chapter: int
+    ) -> dict | None:
+        """Get the relationship state between two entities at a given chapter.
+
+        Looks at relationship_events up to and including the given chapter,
+        returning the most recent event's state.
+
+        Returns:
+            dict with keys: from_entity, to_entity, type, action, polarity,
+            strength, description, chapter, or None if no relationship exists.
+        """
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT from_entity, to_entity, type, action, polarity,
+                          strength, description, chapter
+                   FROM relationship_events
+                   WHERE chapter <= ?
+                     AND ((from_entity = ? AND to_entity = ?)
+                          OR (from_entity = ? AND to_entity = ?))
+                   ORDER BY chapter DESC, rowid DESC
+                   LIMIT 1""",
+                (chapter, entity_a, entity_b, entity_b, entity_a),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            return {
+                "from_entity": row[0],
+                "to_entity": row[1],
+                "type": row[2],
+                "action": row[3],
+                "polarity": row[4],
+                "strength": row[5],
+                "description": row[6],
+                "chapter": row[7],
+            }
+
+    def get_entity_relationships_at_chapter(
+        self, entity_id: str, chapter: int
+    ) -> list:
+        """Get all relationships for an entity at a given chapter.
+
+        Returns list of unique relationship states (latest per pair).
+        """
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT from_entity, to_entity, type, action, polarity,
+                          strength, description, chapter
+                   FROM relationship_events AS re
+                   WHERE chapter <= ?
+                     AND (from_entity = ? OR to_entity = ?)
+                     AND rowid = (
+                         SELECT MAX(rowid)
+                         FROM relationship_events AS re2
+                         WHERE re2.chapter <= ?
+                           AND (
+                               (re2.from_entity = re.from_entity AND re2.to_entity = re.to_entity)
+                               OR
+                               (re2.from_entity = re.to_entity AND re2.to_entity = re.from_entity)
+                           )
+                     )
+                   ORDER BY chapter DESC""",
+                (chapter, entity_id, entity_id, chapter),
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "from_entity": r[0],
+                    "to_entity": r[1],
+                    "type": r[2],
+                    "action": r[3],
+                    "polarity": r[4],
+                    "strength": r[5],
+                    "description": r[6],
+                    "chapter": r[7],
+                }
+                for r in rows
+            ]
+
     def _load_effective_relationship_edges(
         self,
         chapter: Optional[int] = None,
