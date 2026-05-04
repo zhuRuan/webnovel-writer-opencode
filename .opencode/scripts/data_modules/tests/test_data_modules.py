@@ -28,6 +28,7 @@ from data_modules.index_manager import (
     EntityMeta,
     StateChangeMeta,
     RelationshipMeta,
+    RelationshipEventMeta,
     OverrideContractMeta,
     ChaseDebtMeta,
     ChapterReadingPowerMeta,
@@ -1020,6 +1021,54 @@ class TestIndexManager:
         assert result["ok"] == 0
         assert result["warning"] == 0
         assert result["reviewed_nodes"] == []
+
+    def test_temporal_relationship_query(self, temp_project):
+        """Query relationship state at a specific chapter."""
+        manager = IndexManager(temp_project)
+
+        manager.record_relationship_event(
+            RelationshipEventMeta(
+                from_entity="Alice",
+                to_entity="Bob",
+                type="ally",
+                action="create",
+                polarity=1,
+                strength=0.8,
+                description="初次结盟",
+                chapter=1,
+            )
+        )
+        manager.record_relationship_event(
+            RelationshipEventMeta(
+                from_entity="Alice",
+                to_entity="Bob",
+                type="ally",
+                action="update",
+                polarity=1,
+                strength=0.9,
+                description="关系加深",
+                chapter=3,
+            )
+        )
+
+        rel = manager.get_relationship_at_chapter("Alice", "Bob", 1)
+        assert rel is not None
+        assert rel["type"] == "ally"
+        assert rel["polarity"] == 1
+
+        rel = manager.get_relationship_at_chapter("Alice", "Bob", 0)
+        assert rel is None
+
+        rel = manager.get_relationship_at_chapter("Bob", "Alice", 1)
+        assert rel is not None
+        assert rel["type"] == "ally"
+
+        rel = manager.get_relationship_at_chapter("Alice", "Bob", 3)
+        assert rel is not None
+        assert rel["strength"] == 0.9
+
+        rels = manager.get_entity_relationships_at_chapter("Alice", 3)
+        assert len(rels) >= 1
 
     def test_index_manager_cli(self, temp_project, monkeypatch, capsys):
         root = str(temp_project.project_root)
