@@ -988,6 +988,39 @@ class TestIndexManager:
         count = manager.mark_chapter_nodes_fulfilled(7)
         assert count == 0
 
+    def test_cpn_review_basic(self, temp_project):
+        manager = IndexManager(temp_project)
+        nodes = [
+            {"node_type": "cbn", "goal": "主角进入秘境", "seq": 0},
+            {"node_type": "cpn", "goal": "发现古老阵法", "seq": 1},
+            {"node_type": "cpn", "goal": "激活陷阱被围困", "seq": 2},
+            {"node_type": "cen", "goal": "逃出生天获得传承", "seq": 999},
+        ]
+        manager.save_chapter_nodes(10, nodes)
+
+        from data_modules.prewrite_validator import PrewriteValidator
+        validator = PrewriteValidator(temp_project.project_root)
+        result = validator._review_cpn_consistency(10, nodes, manager)
+
+        assert "reviewed_nodes" in result
+        assert len(result["reviewed_nodes"]) == 4
+        assert result["total"] == 4
+        assert isinstance(result["ok"], int)
+        assert isinstance(result["warning"], int)
+        cpn_reviewed = [r for r in result["reviewed_nodes"] if r["node_type"] == "cpn"]
+        assert len(cpn_reviewed) == 2
+
+    def test_cpn_review_empty_nodes(self, temp_project):
+        manager = IndexManager(temp_project)
+        from data_modules.prewrite_validator import PrewriteValidator
+        validator = PrewriteValidator(temp_project.project_root)
+        result = validator._review_cpn_consistency(1, [], manager)
+
+        assert result["total"] == 0
+        assert result["ok"] == 0
+        assert result["warning"] == 0
+        assert result["reviewed_nodes"] == []
+
     def test_index_manager_cli(self, temp_project, monkeypatch, capsys):
         root = str(temp_project.project_root)
         manager = IndexManager(temp_project)
