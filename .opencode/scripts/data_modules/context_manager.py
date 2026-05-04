@@ -360,6 +360,21 @@ class ContextManager:
             pass
         core["cpn_review"] = cpn_review
 
+        relationship_snapshot = []
+        try:
+            state_path = self.config.project_root / ".webnovel" / "state.json"
+            if state_path.exists():
+                state = json.loads(state_path.read_text(encoding="utf-8"))
+                protagonist = (state.get("protagonist_state", {}) or {}).get("name", "")
+                if protagonist:
+                    rels = self.index_manager.get_entity_relationships_at_chapter(
+                        protagonist, chapter
+                    )
+                    relationship_snapshot = rels[:10]
+        except Exception:
+            pass
+        core["relationship_snapshot"] = relationship_snapshot
+
         scene = {
             "location_context": state.get("protagonist_state", {}).get("location", {}),
             "appearing_characters": self._load_recent_appearances(
