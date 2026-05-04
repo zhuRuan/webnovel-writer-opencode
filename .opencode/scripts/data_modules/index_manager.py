@@ -617,6 +617,20 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                 "CREATE INDEX IF NOT EXISTS idx_checklist_score_value ON writing_checklist_scores(score)"
             )
 
+            # 章节规划节点表（CBN/CPN/CEN from outline parsing）
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chapter_nodes (
+                    chapter INTEGER NOT NULL,
+                    node_type TEXT NOT NULL,
+                    goal TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    seq INTEGER NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (chapter, node_type, seq)
+                )
+            """)
+
             conn.commit()
 
         self._migrate_schema()
@@ -648,6 +662,84 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
             conn.close()
 
     # ==================== 章节操作 ====================
+
+    # ==================== 章节规划节点 ====================
+
+    def save_chapter_nodes(self, chapter: int, nodes: list) -> int:
+        """Persist chapter planning nodes (CBN/CPN/CEN) from outline parsing.
+
+        Args:
+            chapter: Chapter number.
+            nodes: List of dicts with keys: node_type, goal, seq.
+
+        Returns:
+            Number of nodes inserted.
+        """
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            inserted = 0
+            for node in nodes:
+                try:
+                    cursor.execute(
+                        """INSERT OR REPLACE INTO chapter_nodes
+                           (chapter, node_type, goal, status, seq, updated_at)
+                           VALUES (?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP)""",
+                        (
+                            chapter,
+                            str(node.get("node_type", "")),
+                            str(node.get("goal", "")),
+                            int(node.get("seq", 0)),
+                        ),
+                    )
+                    inserted += 1
+                except Exception:
+                    pass
+            conn.commit()
+            return inserted
+
+    def get_chapter_nodes(self, chapter: int) -> list:
+        """Get planning nodes for a chapter.
+
+        Returns:
+            List of dicts with keys: chapter, node_type, goal, status, seq.
+        """
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT chapter, node_type, goal, status, seq
+                   FROM chapter_nodes
+                   WHERE chapter = ?
+                   ORDER BY seq""",
+                (chapter,),
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "chapter": r[0],
+                    "node_type": r[1],
+                    "goal": r[2],
+                    "status": r[3],
+                    "seq": r[4],
+                }
+                for r in rows
+            ]
+
+    def mark_chapter_nodes_fulfilled(self, chapter: int) -> int:
+        """Mark all pending nodes for a chapter as fulfilled.
+
+        Returns:
+            Number of nodes updated.
+        """
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """UPDATE chapter_nodes
+                   SET status = 'fulfilled', updated_at = CURRENT_TIMESTAMP
+                   WHERE chapter = ? AND status = 'pending'""",
+                (chapter,),
+            )
+            conn.commit()
+            return cursor.rowcount
 
 # ==================== CLI 接口 ====================
 
