@@ -55,12 +55,7 @@ allowed-tools: Task Read Write Bash
 | "写第53-60章" | 范围 = `53` 到 `60` |
 | "批量写53-60章" | 同上 |
 
-**审查级别选项**：
-| 选项 | 说明 |
-|------|------|
-| `--review-level minimal` | 只执行核心审查器（一致性、连贯性、OOC） |
-| `--review-level standard` | 核心 + 条件触发审查器（默认） |
-| `--review-level full` | 强制执行所有审查器 |
+不再使用 checkers 模式，统一使用 unified-reviewer 单 Agent 审查。
 
 ---
 
@@ -69,7 +64,6 @@ allowed-tools: Task Read Write Bash
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
 | `--range` | 章节范围，如 53-60 | 自动解析 |
-| `--review-level` | 审查级别 | standard |
 | `--resume` | 从断点恢复 | - |
 | `--force` | 绕过 20 章上限 | - |
 
@@ -130,7 +124,6 @@ fi
   "failed_chapters": [],
   "chapter_results": {},
   "metadata": {
-    "review_level": "standard",
     "created_at": "ISO timestamp"
   }
 }
@@ -240,50 +233,25 @@ echo "$DRAFT_CONTENT" > "${PROJECT_ROOT}/${CHAPTER_PATH}"
 
 ---
 
-#### 2.3 并行审查（核心审查器）
+#### 2.3 统一审查
 
 ```markdown
-Task 1:
-  subagent: consistency-checker
+Task:
+  subagent: unified-reviewer
   prompt: |
-    对第 {chapter} 章执行设定一致性审查。
-    - 章节文件：{PROJECT_ROOT}/{CHAPTER_PATH}
-    - 项目根：{PROJECT_ROOT}
-
-Task 2:
-  subagent: continuity-checker
-  prompt: |
-    对第 {chapter} 章执行连贯性审查。
-    - 章节文件：{PROJECT_ROOT}/{CHAPTER_PATH}
-    - 项目根：{PROJECT_ROOT}
-
-Task 3:
-  subagent: ooc-checker
-  prompt: |
-    对第 {chapter} 章执行人物 OOC 审查。
-    - 章节文件：{PROJECT_ROOT}/{CHAPTER_PATH}
-    - 项目根：{PROJECT_ROOT}
+    chapter={chapter}; chapter_file=${PROJECT_ROOT}/${CHAPTER_PATH};
+    project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。
+    严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。
 ```
 
----
+unified-reviewer 覆盖全部 6 维度：设定一致性 / 时间线 / 叙事连贯 / 角色一致性 / 逻辑 / AI味。
 
-#### 2.4 可选审查（条件触发）
-
-```markdown
-# 当 --review-level 不是 minimal 时执行
-Task 4:
-  subagent: reader-pull-checker
-  prompt: |
-    对第 {chapter} 章执行追读力审查。
-    - 章节文件：{PROJECT_ROOT}/{CHAPTER_PATH}
-    - 项目根：{PROJECT_ROOT}
-
-Task 5:
-  subagent: pacing-checker
-  prompt: |
-    对第 {chapter} 章执行节奏审查。
-    - 章节文件：{PROJECT_ROOT}/{CHAPTER_PATH}
-    - 项目根：{PROJECT_ROOT}
+```bash
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \
+  --chapter {chapter} \
+  --review-results "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
+  --metrics-out "${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json" \
+  --report-file "审查报告/第{chapter}章审查报告.md"
 ```
 
 ---
@@ -540,7 +508,7 @@ git -c i18n.commitEncoding=UTF-8 commit -m "批量写作完成: 第{S}-{E}章"
 {
   "task_id": "batch_20260410_103000",
   "range": {"start": 53, "end": 60},
-  "mode": "standard",
+  "mode": "unified",
   "status": "running|completed|failed|stopped",
   "current_chapter": 55,
   "completed_chapters": [53, 54],
@@ -559,7 +527,7 @@ git -c i18n.commitEncoding=UTF-8 commit -m "批量写作完成: 第{S}-{E}章"
 |---------|---------|
 | **上章完整性检查失败** | **立即停止**，禁止继续，提示执行 --resume 修复 |
 | 章节起草失败 | 记录到 `failed_chapters`，继续下一章 |
-| 审查 critical | 记录 deviation，继续（除非 `--stop-on-fail`） |
+| 审查 blocking | 记录 deviation，继续（除非 `--stop-on-fail`） |
 | Data Agent 失败 | 重试 3 次，仍失败则记录到 failed_chapters 并停止 |
 | Git 提交失败 | 警告但继续，不阻断 |
 | 分批暂停点超时 | 30 秒无响应自动保存当前进度并退出 |
