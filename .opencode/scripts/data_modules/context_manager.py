@@ -342,6 +342,12 @@ class ContextManager:
             ),
         }
 
+        try:
+            nodes = self.index_manager.get_chapter_nodes(chapter)
+        except Exception:
+            nodes = []
+        core["planned_nodes"] = nodes
+
         scene = {
             "location_context": state.get("protagonist_state", {}).get("location", {}),
             "appearing_characters": self._load_recent_appearances(
