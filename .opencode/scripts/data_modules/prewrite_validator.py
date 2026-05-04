@@ -100,9 +100,19 @@ class PrewriteValidator:
         ok_count = sum(1 for r in reviewed if r["status"] == "ok")
         warning_count = sum(1 for r in reviewed if r["status"] == "warning")
 
+        relationship_context = {}
+        try:
+            for name in entity_context:
+                rels = index_manager.get_entity_relationships_at_chapter(name, chapter)
+                if rels:
+                    relationship_context[name] = rels[:5]
+        except Exception:
+            pass
+
         return {
             "reviewed_nodes": reviewed,
             "entity_context": entity_context,
+            "relationship_context": relationship_context,
             "active_rules": active_rules,
             "open_loops_from_last_cen": open_loops,
             "total": total,
