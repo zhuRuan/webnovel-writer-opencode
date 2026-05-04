@@ -948,6 +948,46 @@ class TestIndexManager:
         assert trend["score_avg"] > 0
         assert trend["completion_avg"] > 0
 
+    def test_chapter_nodes_persistence(self, temp_project):
+        """Save and retrieve chapter planning nodes."""
+        manager = IndexManager(temp_project)
+        nodes = [
+            {"node_type": "cbn", "goal": "主角进入城主府", "seq": 0},
+            {"node_type": "cpn", "goal": "发现密道线索", "seq": 1},
+            {"node_type": "cpn", "goal": "触发陷阱机关", "seq": 2},
+            {"node_type": "cen", "goal": "拿到密室钥匙", "seq": 999},
+        ]
+        inserted = manager.save_chapter_nodes(42, nodes)
+        assert inserted == 4
+
+        retrieved = manager.get_chapter_nodes(42)
+        assert len(retrieved) == 4
+        assert retrieved[0]["node_type"] == "cbn"
+        assert retrieved[0]["goal"] == "主角进入城主府"
+        assert retrieved[0]["status"] == "pending"
+        assert retrieved[3]["node_type"] == "cen"
+
+    def test_chapter_nodes_fulfillment(self, temp_project):
+        """Mark chapter nodes as fulfilled."""
+        manager = IndexManager(temp_project)
+        nodes = [
+            {"node_type": "cbn", "goal": "开局", "seq": 0},
+            {"node_type": "cen", "goal": "收尾", "seq": 999},
+        ]
+        manager.save_chapter_nodes(7, nodes)
+
+        retrieved = manager.get_chapter_nodes(7)
+        assert all(n["status"] == "pending" for n in retrieved)
+
+        count = manager.mark_chapter_nodes_fulfilled(7)
+        assert count == 2
+
+        retrieved = manager.get_chapter_nodes(7)
+        assert all(n["status"] == "fulfilled" for n in retrieved)
+
+        count = manager.mark_chapter_nodes_fulfilled(7)
+        assert count == 0
+
     def test_index_manager_cli(self, temp_project, monkeypatch, capsys):
         root = str(temp_project.project_root)
         manager = IndexManager(temp_project)
