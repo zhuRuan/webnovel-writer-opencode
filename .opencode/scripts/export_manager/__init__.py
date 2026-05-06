@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 from typing import Optional
 
@@ -72,16 +71,26 @@ def collect_chapters(
 def _parse_range(spec: str, max_num: int = 0) -> set[int]:
     """解析范围字符串: '1-50', '1,3,5', 'all'"""
     allowed: set[int] = set()
-    for part in spec.split(","):
-        part = part.strip()
-        if "-" in part:
-            lo_s, hi_s = part.split("-", 1)
-            lo, hi = int(lo_s.strip()), int(hi_s.strip())
-            allowed.update(range(lo, hi + 1))
-        else:
-            allowed.add(int(part))
+    try:
+        for part in spec.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if "-" in part:
+                lo_s, hi_s = part.split("-", 1)
+                lo, hi = int(lo_s.strip()), int(hi_s.strip())
+                allowed.update(range(lo, hi + 1))
+            else:
+                allowed.add(int(part))
+    except ValueError:
+        print(f"错误：章节范围格式无效，预期格式: 1-50 / 1,3,5，实际收到: {spec}")
+        return set()
     if max_num > 0:
+        before = len(allowed)
         allowed = {n for n in allowed if 1 <= n <= max_num}
+        dropped = before - len(allowed)
+        if dropped > 0:
+            print(f"警告：{dropped} 个章节号超出实际范围(1-{max_num})，已忽略")
     return allowed
 
 
@@ -106,7 +115,7 @@ def cmd_export(args: argparse.Namespace) -> int:
         print("错误：正文/ 目录不存在或无章节文件。请先使用 /webnovel-write 创建章节。")
         return 1
 
-    fmt = args.format or "md"
+    fmt = args.format
     output = args.output
     if not output:
         title = args.title or project_root.name
