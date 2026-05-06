@@ -4,8 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Optional
+
+# 确保 scripts 目录在 Python path 中（subprocess 运行时不会自动添加）
+_scripts_root = Path(__file__).resolve().parent.parent
+if str(_scripts_root) not in sys.path:
+    sys.path.insert(0, str(_scripts_root))
 
 
 # ── 章节收集 ─────────────────────────────────────────────
@@ -125,14 +131,14 @@ def cmd_export(args: argparse.Namespace) -> int:
     Path(output).parent.mkdir(parents=True, exist_ok=True)
 
     if fmt == "md":
-        from .markdown import export_markdown
+        from export_manager.markdown import export_markdown
         title = args.title or project_root.name
         export_markdown(chapters, Path(output), title)
     elif fmt == "txt":
-        from .txt import export_txt
+        from export_manager.txt import export_txt
         export_txt(chapters, Path(output))
     elif fmt == "epub":
-        from .epub import export_epub
+        from export_manager.epub import export_epub
         export_epub(
             chapters=chapters,
             output_path=Path(output),
