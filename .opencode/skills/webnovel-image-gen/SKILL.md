@@ -1,6 +1,7 @@
 ---
 name: webnovel-image-gen
 description: 使用 ModelScope Qwen-Image 生成小说封面和角色图片。立即使用此 skill 当用户说：生成图片、生成封面、角色图、小说封面、人物画像。无论是单个角色还是批量从设定集扫描，都使用此 skill。
+compatibility: opencode
 allowed-tools: Read Write Edit Bash Task
 ---
 
@@ -26,12 +27,12 @@ python .opencode/scripts/webnovel.py --project-root "${PROJECT_ROOT}" genimg gen
 ## 环境设置
 
 ```bash
-export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
-export SCRIPTS_DIR="$(cd "$(dirname "$0")/../../.opencode/scripts" && pwd)"
+export WORKSPACE_ROOT="${PWD}"
+export SCRIPTS_DIR="${PWD}/.opencode/scripts"
 
 # 获取项目根目录
-python "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where
 export PROJECT_ROOT="$(python "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
+test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "❌ PROJECT_ROOT 解析失败"; exit 1; }
 ```
 
 ## .env 配置

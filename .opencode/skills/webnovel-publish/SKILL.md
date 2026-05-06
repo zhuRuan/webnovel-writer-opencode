@@ -1,6 +1,7 @@
 ---
 name: webnovel-publish
 description: 将网文章节发布到番茄小说平台。立即使用此 skill 当用户说：发布小说、发布章节、上传到番茄、发布到番茄小说、上传章节、发布草稿。包含登录认证、书籍管理、章节上传的完整交互式流程引导。
+compatibility: opencode
 allowed-tools: Read Write Edit Glob Grep Bash Question Task
 ---
 

@@ -1,7 +1,8 @@
 ---
 name: webnovel-review
 description: 使用审查 Agent 评估章节质量，生成报告并写回审查指标。
-allowed-tools: Read Grep Write Edit Bash Task AskUserQuestion
+compatibility: opencode
+allowed-tools: Read Grep Write Edit Bash Agent AskUserQuestion
 ---
 
 # Quality Review Skill
@@ -9,8 +10,9 @@ allowed-tools: Read Grep Write Edit Bash Task AskUserQuestion
 ## 目标
 
 - 解析真实书项目根目录，按统一流程完成章节审查。
-- 调用统一 `unified-reviewer` 生成结构化问题列表与审查报告。
-- 把审查指标写入 `index.db`，并把审查记录写入 `.webnovel/state.json` 兼容投影。
+- 调用统一 `reviewer` 生成结构化问题列表与审查报告。
+- 把审查指标写入 `index.db`，并把审查记录写入 `.webnovel/state.json` 兼容投影，主链事实仍以 review contract 与 accepted `CHAPTER_COMMIT` 为准。
+- 审查时优先依据 `.story-system/reviews/chapter_{NNN}.review.json` 与 latest accepted `CHAPTER_COMMIT` 判断主链事实。
 - 若存在关键问题，明确交给用户决定是否立即返工。
 
 ## 常见误区
@@ -41,15 +43,27 @@ allowed-tools: Read Grep Write Edit Bash Task AskUserQuestion
 ### Step 1：解析项目根目录并建立环境变量
 
 ```bash
-export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
-export SKILL_ROOT=".opencode/skills/webnovel-review"
-export SCRIPTS_DIR=".opencode/scripts"
-export PROJECT_ROOT="$(python "${SCRIPTS_DIR}/webnovel.py" where)"
+export WORKSPACE_ROOT="${PWD}"
+export SKILL_ROOT="${PWD}/.opencode/skills/webnovel-review"
+export SCRIPTS_DIR="${PWD}/.opencode/scripts"
+export PROJECT_ROOT="$(python "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
+test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "❌ PROJECT_ROOT 解析失败"; exit 1; }
+```
+
+若目标章缺少 runtime 合同，先补齐：
+
+```bash
+GENRE="$(python -X utf8 -c "import json,sys; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json',encoding='utf-8')); print(s.get('project',{}).get('genre',''))")"
+
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" \
+  story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --chapter {chapter_num} --persist --emit-runtime-contracts --format both
 ```
 
 要求：
 - `PROJECT_ROOT` 必须包含 `.webnovel/state.json`
 - 任一关键目录不存在时立即阻断
+- `CHAPTER_GOAL` 必须来自详细大纲真实目标；若 `chapter_brief.meta.query` 仍是 `{章纲目标}` / `第N章章纲目标`，按系统问题记录。
+- 中高严重度 `ai_flavor` issue 会由 review-pipeline 回流到 `.story-system/anti_patterns.json`，作为后续写章避雷模式。
 
 ### Step 2：按需加载参考资料
 
@@ -81,11 +95,11 @@ cat "${PROJECT_ROOT}/.webnovel/state.json"
 
 ### Step 4：调用统一审查 Agent
 
-必须通过 `Task` 工具调用 `unified-reviewer`，禁止主流程伪造结论。
+必须通过 `Agent` 工具调用 `reviewer`，禁止主流程伪造结论或口头总结代替 subagent 输出。
 
 ```text
-Task(
-  subagent_type: "unified-reviewer",
+Agent(
+  subagent_type: "reviewer",
   prompt: "chapter={chapter_num}; chapter_file={chapter_file}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
 )
 ```
@@ -109,16 +123,22 @@ Task(
 
 报告保存到：`审查报告/第{chapter_num}章审查报告.md`
 
+报告结构：
+- 总览（问题数 / 阻断数）
+- 阻断问题
+- 其他问题
+- 修复方向
+
 标准文件流：
 
 ```bash
-python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \
   --chapter {chapter_num} \
   --review-results "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
   --metrics-out "${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json" \
   --report-file "审查报告/第{chapter_num}章审查报告.md"
 
-python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index save-review-metrics \
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index save-review-metrics \
   --data "@${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json"
 ```
 
@@ -128,7 +148,7 @@ python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index save-
 
 ### Step 6：写入兼容审查记录并处理阻断
 
-先写入兼容审查记录：
+先写入兼容审查记录（read-model/projection，不是写后事实真源）：
 
 ```bash
 python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" update-state -- --add-review "{chapter_num}-{chapter_num}" "审查报告/第{chapter_num}章审查报告.md"
@@ -148,7 +168,7 @@ python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" update-stat
 ## 成功标准
 
 1. 已解析真实书项目根目录。
-2. 已通过 `unified-reviewer` 输出结构化问题 JSON。
+2. 已通过 `reviewer` 输出结构化问题 JSON。
 3. 审查报告已生成。
 4. `review_metrics` 已写入 `index.db`。
 5. 审查记录已写入 `.webnovel/state.json` 兼容投影。

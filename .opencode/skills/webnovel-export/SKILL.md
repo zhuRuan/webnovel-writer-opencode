@@ -1,171 +1,92 @@
 ---
 name: webnovel-export
-description: 将网文正文导出为 Markdown/TXT/EPUB 格式。立即使用此 skill 当用户说：导出、发布小说、导出章节、生成电子书、导出 TXT、导出 Markdown、导出 EPUB、下载小说、输出正文章节。无论用户是否明确说"导出"，只要意图是将章节内容输出为文件，就使用此 skill。包含预检、导出、验证、workflow 记录的完整流程。
-allowed-tools: Read Write Edit Bash Task
+description: 将网文正文导出为 Markdown/TXT/EPUB 格式。立即使用此 skill 当用户说：导出、导出小说、导出章节、生成电子书、导出 TXT、导出 Markdown、导出 EPUB、下载小说、输出正文。
+compatibility: opencode
+allowed-tools: Read Bash
 ---
 
 # 正文导出
 
-## 快速开始
-
-```bash
-# 交互式导出（推荐）
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export
-
-# 命令行导出
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export --format markdown --range 1-50
-```
-
 ## 目标
 
-将网文正文导出为不同格式，便于发布或存档。导出是只读操作，不需要审查/润色。
+将网文正文导出为 Markdown / TXT / EPUB 格式，便于发布或存档。导出是只读操作，不修改项目文件。
 
 ## 支持格式
 
-| 格式 | 文件扩展 | 说明 |
-|------|----------|------|
-| Markdown | `.md` | 可用任何编辑器打开，推荐 |
-| TXT | `.txt` | 纯文本，最通用 |
-| EPUB | `.epub` | 电子书，阅读器可用 |
+| 格式 | 扩展名 | 依赖 |
+|------|--------|------|
+| Markdown | `.md` | 无 |
+| TXT | `.txt` | 无 |
+| EPUB | `.epub` | ebooklib（未安装时提示） |
 
 ## 环境设置
 
 ```bash
-export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
-export SCRIPTS_DIR="$(cd "$(dirname "$0")/../../scripts" && pwd)"
-
-# 获取项目根目录
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" preflight
+export WORKSPACE_ROOT="${PWD}"
+export SCRIPTS_DIR="${PWD}/.opencode/scripts"
 export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
+test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "❌ PROJECT_ROOT 解析失败"; exit 1; }
 ```
 
 ## 执行流程
 
-### Step 1：预检
+### Step 1：列出章节
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export list
 ```
 
-验证：
-- 项目存在 `.webnovel/state.json` 或 `正文/` 目录
-- 有可导出的章节文件
+验证输出并确认导出范围。
 
 ### Step 2：导出
 
 | 场景 | 命令 |
 |------|------|
-| 交互式导出 | `export` |
-| 导出全部 | `export --format markdown` |
-| 导出前50章 | `export --range 1-50 --format txt` |
-| 导出第1卷 | `export --volume 1 --format epub --author "作者名"` |
-| 指定文件名 | `export --format markdown --output 我的小说.md` |
+| 交互式导出（推荐） | `webnovel.py export export` |
+| 全部章节 Markdown | `webnovel.py export export --format md` |
+| 指定范围 | `webnovel.py export export --format md --range 1-50` |
+| 按卷导出 | `webnovel.py export export --format epub --volume 1 --author "作者名"` |
+| 指定输出路径 | `webnovel.py export export --format txt --output 导出/第一卷.txt` |
 
 **参数说明**：
 
-| 参数 | 说明 | 示例 |
-|------|------|------|
-| `--format` | 输出格式 | `markdown`, `txt`, `epub` |
-| `--range` | 章节范围 | `1-10`, `1,3,5`, `all` |
-| `--volume` | 按卷导出 | `1`, `2` |
-| `--output` | 输出路径 | `小说.md`, `导出/第一卷.txt` |
-| `--author` | 作者名 | 仅 EPUB 需要 |
-| `--cover` | 封面图路径 | `cover.jpg`, `images/封面.png` |
-| `--style` | 自定义 CSS | `style.css` |
-| `--cover-size` | 封面裁剪尺寸 | `1200x1600` |
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--format` | 输出格式：md / txt / epub | md |
+| `--range` | 章节范围：1-50 / 1,3,5 / all | all |
+| `--volume` | 按卷导出 | - |
+| `--output` | 输出文件路径 | 导出/{书名}.{ext} |
+| `--title` | 书名 | 项目目录名 |
+| `--author` | 作者名（EPUB 元数据） | - |
+| `--cover` | 封面图片路径（EPUB） | 自动检测 图片/封面/ |
+| `--style` | 自定义 CSS 文件（EPUB） | 默认内嵌样式 |
+| `--cover-size` | 封面裁剪尺寸（EPUB） | 1200x1600 |
 
 ### Step 3：验证
 
 ```bash
 # 检查文件存在且非空
-test -s "${PROJECT_ROOT}/导出/小说.md"
+test -s "${PROJECT_ROOT}/导出/小说.md" && echo "导出成功"
 ```
-
-### Step 4：记录 workflow
-
-```bash
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" workflow complete-task --artifacts '{"ok": true}' || true
-```
-
-## 输出格式定义
-
-导出文件必须满足：
-
-1. **文件位置**：默认在 `{PROJECT_ROOT}/导出/` 目录
-2. **文件命名**：
-   - `小说.md` / `小说.txt` / `小说.epub`（全部章节）
-   - 用户指定名称（使用 `--output` 时）
-3. **内容要求**：
-   - 去除 frontmatter（`---` 之间的元数据）
-   - 保留章节标题
-   - 章节之间有分隔符
-4. **EPUB 特殊**：
-   - 包含书名和作者
-   - 章节作为独立 HTML 文件
 
 ## 充分性闸门
 
-完成前必须验证：
-
-- [ ] 预检通过（章节文件存在）
+- [ ] 项目存在 正文/ 目录且有章节文件
 - [ ] 导出命令返回码为 0
 - [ ] 输出文件存在且大小 > 0
 
-## 常见错误
+## 常见问题
 
 | 错误 | 原因 | 解决 |
 |------|------|------|
-| 未找到章节 | `正文/` 目录不存在 | 先用 `/webnovel-write` 创建章节 |
-| 导出失败 | ebooklib 未安装 | `pip install ebooklib` |
-| 格式不支持 | 用了不支持的格式 | 使用 markdown/txt/epub |
+| 未找到章节 | 正文/ 目录不存在 | 先用 `/webnovel-write` 写章节 |
+| EPUB 导出失败 | ebooklib 未安装 | `pip install ebooklib` |
+| 封面未裁剪 | Pillow 未安装 | `pip install Pillow`，不影响导出 |
 
-## 封面和样式配置
+## EPUB 封面与样式
 
-### 自动检测
+**自动检测**：
+- `图片/封面/` — 目录下最新的 jpg/png 图片作为封面
+- `style.css` — 项目根目录下自动加载
 
-EPUB 导出时会自动检测以下文件：
-- `{project_root}/图片/封面/` - 目录下最新的图片作为封面
-- `{project_root}/style.css` - 自定义样式
-
-### 自定义 CSS 示例
-
-```css
-/* 首行缩进（默认样式）*/
-body {
-    font-family: "SimSun", "Songti SC", serif;
-    line-height: 1.8;
-    text-indent: 2em;
-    margin: 1em;
-}
-h1, h2, h3 {
-    text-align: center;
-    text-indent: 0;
-}
-```
-
-### 封面裁剪
-
-封面会自动裁剪到标准尺寸（默认 1200x1600），使用居中裁剪。
-
-### 使用示例
-
-```bash
-# 使用默认封面和样式
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export --format epub
-
-# 指定自定义封面
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export --format epub --cover images/my_cover.jpg
-
-# 指定自定义样式
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export --format epub --style my_style.css
-
-# 同时指定封面和样式
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export --format epub --cover cover.jpg --style style.css --cover-size 1200x1600 --author "作者名"
-```
-
-## 依赖
-
-- Python 3.10+
-- `ebooklib`（EPUB 导出需要）
-
-> 注意：`ebooklib` 已在 `init.bat`/`init.sh` 安装 requirements.txt 时一并安装。
+**默认内嵌 CSS**：宋体/楷体，首行缩进 2em，行高 1.8。

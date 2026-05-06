@@ -1,273 +1,191 @@
 ---
 name: webnovel-write
-description: |
-  撰写网文章节。当用户说"写一章"、"写第X章"、"继续写"、"创作章节"、"起草章节"时，
-  或执行/webnovel-write命令时**必须使用此 skill**。
-  
-  ## 触发条件
-  - 单章操作："写第64章"、"写第5章"、"重写第64章"、"继续写下一章"
-  - 注意：多章操作（如"写第64-70章"、"重写64-70章"、"连续写5章"）→ 使用 webnovel-write-batch
-  
-  ## 功能说明
-  默认产出2000-2500字，包含完整流程：
-  预检 → 上下文搜集 → 起草 → 审查 → 润色 → 数据回写 → Git备份 → 强制终止确认。
-  **禁止在无用户明确指令情况下自动循环写下一章**。
- 
-allowed-tools: Read Write Edit Grep Bash Task
+description: 产出可发布章节，完整执行上下文→起草→审查→润色→提交→备份。
+compatibility: opencode
+allowed-tools: Read Write Edit Grep Bash Agent
 ---
 
-# 网文写作 Skill
+# 写章流程
 
-## 快速参考
+## 目标
 
-| 步骤 | 说明 |
+产出可发布章节到 `正文/第{NNNN}章-{title}.md`。默认 2000-2500 字，用户/大纲另有要求时从之。
+
+## 模式
+
+| 模式 | 流程 |
 |------|------|
-| Step 0 | 预检（项目根、章节号、题材） |
-| Step 1 | Context Agent（生成创作执行包） |
-| Step 2 | 正文起草（含风格适配） |
-| Step 3 | 统一审查（unified-reviewer → review-pipeline） |
-| Step 4 | 润色（问题修复 → Anti-AI 终检） |
-| Step 5 | Data Agent（实体提取 → state/index/memory 回写） |
-| Step 6 | Git 备份 + 终止确认 |
+| 默认 | Step 1→2→3→4→5→6 |
+| `--fast` | Step 1→2→3(轻量)→4→5→6 |
+| `--minimal` | Step 1→2→4(仅排版)→5→6 |
 
-**产出**：`正文/第N卷/第NNNN章-{title}.md`（自动适配卷目录）、`审查报告/第N章审查报告.md`、`.webnovel/summaries/chNNNN.md`
+## 硬规则
 
-## 路径工具
+- 禁止并步、跳步、伪造审查
+- 必须使用 `Agent` 工具调用指定 subagent；不得用主流程口头代替 subagent 输出
+- blocking issue 未解决不进 Step 4/5
+- 失败只补跑失败步骤，不回退
+- 参考资料按步骤按需加载
 
-获取章节文件的默认路径（自动适配卷目录）：
+## 优先级
+
+用户要求 > 状态机硬门槛 > 项目约束（总纲/设定/记忆）> skill 流程 > reference 建议
+
+## CSV 检索（Step 2 按需）
+
 ```bash
-CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter ${CHAPTER_NUM})
-echo "章节文件将写入: ${CHAPTER_PATH}"
+python -X utf8 "${SCRIPTS_DIR}/reference_search.py" --skill write --table {表名} --query "{关键词}" --genre {题材}
 ```
 
-## 核心约束
-
-- **禁止跳步**：审查（Step 3）必须由 Task 子代理执行
-- **禁止并步**：每个 Step 独立执行
-- **最小回滚**：失败只重跑该 Step，不回滚已通过步骤
-- **中文写作**：禁止"先英后中"、英文结论话术
-
-## References（按需加载）
-
-| 文件 | 用途 | 触发 |
-|------|------|------|
-| `../../references/shared/core-constraints.md` | 写作硬约束 | Step 2 |
-| `../../references/csv/裁决规则.csv` | 题材裁决元数据 | Step 0 / Step 2 |
-| `../../references/csv/` (全表) | CSV 结构化知识检索 | Step 2 按需 |
-| `references/polish-guide.md` | 问题修复、Anti-AI | Step 4 |
-| `references/writing/typesetting.md` | 排版规则 | Step 4 |
-
-## 工具
-
-- **Read/Grep**：读取 state、大纲、参考文件
-- **Bash**：运行 webnovel.py 命令
-- **Task**：调用 context-agent、unified-reviewer、data-agent
+触发条件：新角色→命名规则，战斗→场景写法，多角色对话→写作技法，情感描写→写作技法，高频桥段→场景写法。
 
 ## 执行流程
 
-### Step 0：预检
+### 准备：预检
 
 ```bash
-# 确认项目根
-SCRIPTS_DIR=".opencode/scripts"
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" preflight
-PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" where)"
+export WORKSPACE_ROOT="${PWD}"
+export SCRIPTS_DIR="${PWD}/.opencode/scripts"
+export SKILL_ROOT="${PWD}/.opencode/skills/webnovel-write"
 
-# 优先级：用户指定章节号 > state.json 自动计算
-if [ -n "${CHAPTER_NUM}" ]; then
-    echo "使用用户指定章节号: ${CHAPTER_NUM}"
-else
-    CHAPTER_NUM=$(python -X utf8 -c "
-import json
-s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json'))
-print(s['progress'].get('current_chapter', 0) + 1)
-")
-    echo "从 state.json 自动获取下一章: ${CHAPTER_NUM}"
-fi
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" preflight
+export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
 
-# 确保章节号为整数
-CHAPTER_NUM=$((10#${CHAPTER_NUM}))
-echo "将撰写第 ${CHAPTER_NUM} 章"
+# 验证 PROJECT_ROOT 解析正确（防止写到错误位置）
+test -n "$PROJECT_ROOT" || { echo "❌ PROJECT_ROOT 为空，where 命令可能失败"; exit 1; }
+test -d "$PROJECT_ROOT" || { echo "❌ PROJECT_ROOT 目录不存在: $PROJECT_ROOT"; exit 1; }
+test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "❌ ${PROJECT_ROOT}/.webnovel/state.json 不存在，PROJECT_ROOT 解析错误"; exit 1; }
+echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 
-# 读取题材
-GENRE=$(python -X utf8 -c "
-import json
-s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json'))
-print(s.get('project',{}).get('genre',''))
-")
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" placeholder-scan --format text
 ```
 
-**硬门槛**：preflight 必须成功。
+### 准备：刷新合同树
 
-### Step 1：Context Agent
+genre 从 `.webnovel/state.json` 的初始化配置快照读取，用于刷新合同树；写前主链真源仍是 `.story-system/` 合同。调用 story-system 前必须先从详细大纲解析真实本章目标，禁止传 `{章纲目标}`、`第N章章纲目标` 等占位 query。
 
-使用 Task 调用 `context-agent`，生成3层创作执行包。
-
-```markdown
-Task:
-  subagent: context-agent
-  prompt: |
-    chapter={chapter_num}
-    project_root=${PROJECT_ROOT}
-    scripts_dir=${SCRIPTS_DIR}
-    storage_path=${PROJECT_ROOT}/.webnovel
-    state_file=${PROJECT_ROOT}/.webnovel/state.json
-```
-
-硬要求：
-- 若 `state` 或大纲不可用，立即阻断并返回缺失项。
-- 输出必须包含3层执行包：任务书（8板块）+ Context Contract + 直写提示词。
-
-### Step 2：正文起草（含风格适配）
-
-**CSV 结构化知识检索**（按需触发）：
 ```bash
-python -X utf8 "${SCRIPTS_DIR}/reference_search.py" --skill write --table "场景写法" --query "战斗描写" --genre "${GENRE}" --max-results 3
-python -X utf8 "${SCRIPTS_DIR}/reference_search.py" --skill write --table "裁决规则" --query "${GENRE}" --max-results 1
+GENRE="$(python -X utf8 -c "import json,sys; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json',encoding='utf-8')); print(s.get('project',{}).get('genre',''))")"
+
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
+  story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --chapter {chapter_num} --persist --emit-runtime-contracts --format both
 ```
 
-执行前加载：
-```bash
-cat "${SKILL_ROOT}/../../references/shared/core-constraints.md"
+必备文件：`MASTER_SETTING.json`（调性/禁忌）、`volume_{NNN}.json`（卷级节奏）、`chapter_{NNN}.review.json`（必须节点/禁区）。缺失则阻断。
 
-# 获取章节文件的默认路径（自动适配卷目录）
-CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter ${CHAPTER_NUM})
-echo "章节文件将写入: ${CHAPTER_PATH}"
+`chapter_{NNN}.json` 必须优先检查顶层 `chapter_directive`。`chapter_focus` 只能来自 `chapter_directive.goal` 或真实 query，不得从 `dynamic_context` 的参考摘要继承。
+
+写作任务书排序必须固定为：
+1. 本章硬性约束：`chapter_directive.goal/time_anchor/chapter_span/countdown/chapter_end_open_question`
+2. CBN/CPNs/CEN 与 `must_cover_nodes`
+3. 本章禁区：`forbidden_zones`，违反即不通过
+4. 风格指引：reasoning、主角卡 OOC 警戒、anti_patterns
+5. 场景写法补充：`dynamic_context`，仅作风格参考，不能覆盖章纲约束
+
+### Step 1：context-agent 生成写作任务书
+
+必须使用 `Agent` 工具调用 `context-agent`，不得由主流程自行整理任务书。
+
+```text
+Agent(
+  subagent_type: "context-agent",
+  prompt: "chapter={chapter_num}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; storage_path=${PROJECT_ROOT}/.webnovel; state_file=${PROJECT_ROOT}/.webnovel/state.json（projection/read-model，仅兼容读取）。先 research，再按 本章硬性约束→CBN/CPNs/CEN→本章禁区→风格指引→dynamic_context补充参考 的顺序输出五段写作任务书。"
+)
 ```
 
-硬要求：
-- 只输出纯正文到 `${CHAPTER_PATH}`。
-- **字数下限（按章节类型）**：
-  - 常规推进章：≥1500字
-  - 过渡章：≥1000字
-  - 高潮章/战斗章：≥2000字
-- 默认 2000-2500 字；大纲/用户更高要求时从之。
-- 禁止占位符正文。保留上章钩子承接。
+产物：一份写作任务书，能独立支撑 Step 2 起草。
 
-**网文风格约束**：
-- 长句（>40字）拆分，避免连续长句
-- 抽象判断 → 动作/反应/代价
-- 删除"总结式旁白"和大段纯解释
-- 章内至少 1 个明确推进点
-- 开头尽早进入冲突（前 200-400 字）
-- 章末设置未闭合问题/期待锚点
-- 微兑现按章型安排 1-3 次
+### Step 2：起草正文
 
-AI痕迹预防：
-- "非常愤怒" → "动作+生理+决策"三段式
-- "总而言之/可以说" → 直接结论动作
-- 连续三句同句式时改至少一处为短句爆点
+只根据任务书起草。不加载 core-constraints/anti-ai-guide（已内化到任务书）。只输出纯正文，无占位符。有结构化节点时围绕 CBN→CPNs→CEN 展开。中文思维写作。
 
-章节类型适配：
+### Step 3：审查
 
-| 类型 | 字数下限 | 字数上限 | 爽点要求 | 微兑现次数 |
-|------|---------|---------|---------|-----------|
-| 常规推进章 | 1500 | 2500 | ≥1个爽点 | 1-3 |
-| 过渡章 | 1000 | 1500 | 0-1次小爽点 | 0-1 |
-| 高潮/战斗章 | 2000 | 4000 | ≥1个大爽点 | 3-5 |
+必须使用 `Agent` 工具调用 `reviewer`，不得由主流程伪造审查 JSON。
 
-### Step 3：统一审查
-
-使用 Task 调用 `unified-reviewer` agent：
-
-```markdown
-Task:
-  subagent: unified-reviewer
-  prompt: |
-    chapter={chapter_num}; chapter_file=${CHAPTER_PATH};
-    project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。
-    严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。
+```text
+Agent(
+  subagent_type: "reviewer",
+  prompt: "chapter={chapter_num}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
+)
 ```
 
-unified-reviewer 覆盖 6 维度：设定一致性 / 时间线 / 叙事连贯 / 角色一致性 / 逻辑 / AI味。
-
-**审查流水线**：
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \
-  --chapter ${CHAPTER_NUM} \
+  --chapter {chapter_num} \
   --review-results "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
   --metrics-out "${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json" \
-  --report-file "审查报告/第${CHAPTER_NUM}章审查报告.md"
-
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index save-review-metrics \
-  --data "@${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json"
+  --report-file "审查报告/第{chapter_num}章审查报告.md" \
+  --save-metrics
 ```
 
-`blocking=true` → 修复后重审，不进 Step 4。
+blocking=true → 修复后重审，不进 Step 4。`--fast` 只检查 setting/timeline/continuity。`--minimal` 跳过。
 
-### Step 4：润色（条件执行）
+### Step 4：润色
 
-**条件**：`blocking=true` 必须已修复。仅有 `high/medium/low` issue 时执行修复。
+加载 `polish-guide.md`、`typesetting.md`、`style-adapter.md`。
 
-加载：
-```bash
-cat "${SKILL_ROOT}/references/polish-guide.md"
-cat "${SKILL_ROOT}/references/writing/typesetting.md"
+顺序：修复非 blocking issue → 风格适配 → 排版 → Anti-AI 终检。
+
+只改表达不改事实。`anti_ai_force_check=fail` 时不进 Step 5。`--minimal` 仅排版。
+
+### Step 5：提交
+
+#### 5.1 Data Agent 提取事实
+
+必须使用 `Agent` 工具调用 `data-agent`，产出 fulfillment_result / disambiguation_result / extraction_result 三份 JSON，并复用 Step 3 的 review_results。
+
+```text
+Agent(
+  subagent_type: "data-agent",
+  prompt: "chapter={chapter_num}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。从正文提取事实，生成 .webnovel/tmp/ 下的 fulfillment_result.json、disambiguation_result.json、extraction_result.json；不直接写 state/index/summaries/memory。"
+)
 ```
 
-执行顺序：
-1. 修复 blocking issue（若存在）
-2. 修复 high/medium issue
-3. 执行 Anti-AI 全文终检
-4. 字数终检（达标后才能输出）
+Data Agent 只提取事实+生成 artifacts，不直接写 state/index/summaries/memory。
 
-输出：
-- 润色后正文（覆盖章节文件）
-- 变更摘要（修复项、anti_ai_force_check、word_count）
-
-### Step 5：Data Agent
-
-使用 Task 调用 `data-agent`：
-
-```markdown
-Task:
-  subagent: data-agent
-  prompt: |
-    chapter=${CHAPTER_NUM}
-    chapter_file=${CHAPTER_PATH}
-    project_root=${PROJECT_ROOT}
-    scripts_dir=${SCRIPTS_DIR}
-    storage_path=${PROJECT_ROOT}/.webnovel
-    state_file=${PROJECT_ROOT}/.webnovel/state.json
-```
-
-Data Agent 执行：实体提取 → 消歧 → 写入 state.json / index.db / 摘要 / 向量索引。
-
-检查产物（最小白名单）：
-- `.webnovel/state.json`
-- `.webnovel/index.db`
-- `.webnovel/summaries/ch{chapter_padded}.md`
-
-### Step 6：Git 备份 + 终止确认
+#### 5.2 CHAPTER_COMMIT
 
 ```bash
-git add .
-git -c i18n.commitEncoding=UTF-8 commit -m "第${CHAPTER_NUM}章: ${title}"
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-commit \
+  --chapter {chapter_num} \
+  --review-result "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
+  --fulfillment-result "${PROJECT_ROOT}/.webnovel/tmp/fulfillment_result.json" \
+  --disambiguation-result "${PROJECT_ROOT}/.webnovel/tmp/disambiguation_result.json" \
+  --extraction-result "${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json"
 ```
 
+自动判定：blocking_count>0 或 missed_nodes 非空 或 pending 非空 → rejected，否则 accepted。
+
+#### 5.3 验证投影
+
+projection_status 五项（state/index/summary/memory/vector）全部 done 或 skipped。
+
+chapter_status 由 projection writer 自动推进：accepted→committed，rejected→rejected。
+
+#### 5.4 失败隔离
+
+commit 未生成→重跑 5.2。projection 失败→只补跑失败项。不回退 Step 1-4。
+
+### Step 6：Git 备份
+
 ```bash
-if [ -z "${AUTO_CONTINUE}" ]; then
-    echo "========================================"
-    echo "⚠️  工作流终止，等待用户明确指令"
-    echo "========================================"
-    echo "如需继续写下一章，请明确说："
-    echo "  - '写第${NEXT_CHAPTER}章'"
-    echo "  - '继续写'"
-    echo "========================================"
-    return 0 2>/dev/null || true
-fi
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" backup \
+  --chapter {chapter_num} \
+  --chapter-title "{title}"
 ```
+
+备份必须以解析后的 `PROJECT_ROOT` 为准，禁止从工作区父目录执行裸全量 Git add，避免把书项目仓库作为父仓库的嵌入仓库/submodule 加入。
 
 ## 充分性闸门
 
-1. 章节正文文件存在且非空
-2. 审查已落库（review_metrics 已写入 index.db）
+1. 正文文件存在且非空
+2. 审查已落库（`--minimal` 除外）
 3. blocking=true 必须停在 Step 3
-4. Step 5 已回写 state.json、index.db、summaries
-5. 章节文件、摘要文件齐全
+4. anti_ai_force_check=pass（`--minimal` 除外）
+5. accepted CHAPTER_COMMIT，projection 五项 done/skipped
+6. chapter_status=committed（projection 自动推进）
 
 ## 失败恢复
 
-- 审查缺失 → 重跑 Step 3
-- 润色失真 → 恢复 Step 2 输出并重做 Step 4
-- 摘要/状态缺失 → 重跑 Step 5
+审查缺失→重跑 Step 3。摘要/状态/记忆缺失→重跑 Step 5。润色失真→回 Step 4 修复后重跑 Step 5。

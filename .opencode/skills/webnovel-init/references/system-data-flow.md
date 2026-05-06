@@ -11,12 +11,12 @@ purpose: 重定向到权威版本
 
 ## 权威版本位置
 
-`.opencode/skills/webnovel-query/references/system-data-flow.md`
+`${PWD}/.opencode/skills/webnovel-query/references/system-data-flow.md`
 
 ## 加载方式
 
 ```bash
-cat ".opencode/skills/webnovel-query/references/system-data-flow.md"
+cat "${PWD}/.opencode/skills/webnovel-query/references/system-data-flow.md"
 ```
 
 ## 快速参考
