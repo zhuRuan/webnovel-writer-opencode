@@ -32,35 +32,8 @@ from typing import Optional
 
 from runtime_compat import normalize_windows_path
 from project_locator import resolve_project_root, write_current_project_pointer, update_global_registry_current_project
-from logger import get_logger, setup_logging
 
-from .exceptions import ConfigError
-
-
-COMMAND_REGISTRY = {
-    "index": {"type": "data_module", "target": "index_manager", "needs_root": True},
-    "state": {"type": "data_module", "target": "state_manager", "needs_root": True},
-    "rag": {"type": "data_module", "target": "rag_adapter", "needs_root": True},
-    "style": {"type": "data_module", "target": "style_sampler", "needs_root": True},
-    "entity": {"type": "data_module", "target": "entity_linker", "needs_root": True},
-    "context": {"type": "data_module", "target": "context_manager", "needs_root": True},
-    "migrate": {"type": "data_module", "target": "migrate_state_to_sqlite", "needs_root": True},
-    "memory": {"type": "data_module", "target": "memory_cli", "needs_root": True},
-    "observability": {"type": "data_module", "target": "observability_cli", "needs_root": False},
-    "genimg": {"type": "data_module", "target": "image_generator", "needs_root": True},
-    "workflow": {"type": "script", "target": "workflow_manager.py", "needs_root": True},
-    "status": {"type": "script", "target": "status_reporter.py", "needs_root": True},
-    "update-state": {"type": "script", "target": "update_state.py", "needs_root": True},
-    "backup": {"type": "script", "target": "backup_manager.py", "needs_root": True},
-    "archive": {"type": "script", "target": "archive_manager.py", "needs_root": True},
-    "export": {"type": "script", "target": "export_manager.py", "needs_root": True},
-    "publish": {"type": "script", "target": "publish_manager.py", "needs_root": True},
-    "extract-context": {"type": "script", "target": "extract_chapter_context.py", "needs_root": True},
-    "init": {"type": "script", "target": "init_project.py", "needs_root": False},
-    "write-batch": {"type": "special", "target": "_start_write_batch", "needs_root": True},
-    "dashboard": {"type": "special", "target": "_start_dashboard", "needs_root": True},
-    "chapter-path": {"type": "special", "target": "_chapter_path", "needs_root": True},
-}
+from .story_runtime_health import build_story_runtime_health
 
 
 def _scripts_dir() -> Path:
@@ -95,6 +68,42 @@ def _strip_project_root_args(argv: list[str]) -> list[str]:
     return out
 
 
+PASSTHROUGH_TOOLS = {
+    "index",
+    "state",
+    "rag",
+    "style",
+    "entity",
+    "context",
+    "memory",
+    "migrate",
+    "status",
+    "update-state",
+    "backup",
+    "archive",
+    "init",
+    "story-system",
+    "memory-contract",
+    "project-memory",
+}
+
+
+def _passthrough_tail(argv: list[str], tool: str) -> list[str]:
+    i = 0
+    while i < len(argv):
+        token = argv[i]
+        if token == "--project-root":
+            i += 2
+            continue
+        if token.startswith("--project-root="):
+            i += 1
+            continue
+        if token == tool:
+            return list(argv[i + 1 :])
+        i += 1
+    return []
+
+
 def _run_data_module(module: str, argv: list[str]) -> int:
     """
     Import `data_modules.<module>` and call its main(), while isolating sys.argv.
@@ -102,7 +111,7 @@ def _run_data_module(module: str, argv: list[str]) -> int:
     mod = importlib.import_module(f"data_modules.{module}")
     main = getattr(mod, "main", None)
     if not callable(main):
-        raise ConfigError(f"data_modules.{module} 缺少可调用的 main()")
+        raise RuntimeError(f"data_modules.{module} 缺少可调用的 main()")
 
     old_argv = sys.argv
     try:
@@ -120,119 +129,39 @@ def _run_script(script_name: str, argv: list[str]) -> int:
     """
     Run a script under `.claude/scripts/` via a subprocess.
 
-    用途：兼容没有 main() 的脚本（例如 workflow_manager.py）。
+    用途：兼容没有 main() 的脚本。
     """
     script_path = _scripts_dir() / script_name
     if not script_path.is_file():
-        raise ConfigError(f"未找到脚本: {script_path}")
+        raise FileNotFoundError(f"未找到脚本: {script_path}")
     proc = subprocess.run([sys.executable, str(script_path), *argv])
     return int(proc.returncode or 0)
 
 
-def _kill_port(port: int) -> None:
-    """清理占用指定端口的进程（Windows）"""
-    import subprocess
-    try:
-        result = subprocess.run(
-            f'netstat -ano | findstr ":{port}"',
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-        for line in result.stdout.strip().split("\n"):
-            if not line:
-                continue
-            parts = line.split()
-            if len(parts) >= 5 and parts[3] == "LISTENING":
-                pid = parts[-1].strip()
-                if pid and pid != "0":
-                    try:
-                        subprocess.run(f"taskkill /PID {pid} /F", shell=True, capture_output=True)
-                        print(f"已终止旧进程 PID: {pid}")
-                    except Exception:
-                        pass
-    except Exception:
-        pass
-
-
-def _start_dashboard(args: argparse.Namespace) -> int:
-    """启动后台 dashboard 子进程"""
-    import os as _os
-    import socket as _socket
-    import subprocess as _subprocess
-    import time as _time
-    import webbrowser as _webbrowser
-    from pathlib import Path as _Path
-
-    project_root = _resolve_root(args.project_root)
-    opencode_dir = str(_Path(__file__).resolve().parent.parent.parent)
-    env = _os.environ.copy()
-    env["PYTHONPATH"] = f"{opencode_dir}{_os.pathsep}{env.get('PYTHONPATH', '')}"
-
-    _kill_port(args.port)
-
-    cmd = [
-        sys.executable, "-m", "dashboard.server",
-        "--project-root", str(project_root),
-        "--host", args.host,
-        "--port", str(args.port),
-    ]
-    if args.no_browser:
-        cmd.append("--no-browser")
-
-    log_file = _Path(opencode_dir) / "dashboard.log"
-    creation_flags = 0
-    if sys.platform == "win32":
-        creation_flags = _subprocess.CREATE_NEW_PROCESS_GROUP | _subprocess.DETACHED_PROCESS
-
-    with open(log_file, "w", encoding="utf-8") as log_f:
-        proc = _subprocess.Popen(
-            cmd, env=env, cwd=opencode_dir,
-            stdout=log_f, stderr=_subprocess.STDOUT,
-            creationflags=creation_flags,
-        )
-
-    url = f"http://{args.host}:{args.port}"
-    ready = False
-    for i in range(40):
-        _time.sleep(0.3)
-        if proc.poll() is not None:
-            print(f"Dashboard 启动失败（进程已退出，退出码: {proc.returncode}）", file=sys.stderr)
-            print(f"日志文件: {log_file}", file=sys.stderr)
-            try:
-                with open(log_file, "r", encoding="utf-8") as f:
-                    print(f.read(), file=sys.stderr)
-            except Exception:
-                pass
-            return 1
-        try:
-            with _socket.create_connection((args.host, args.port), timeout=0.5):
-                ready = True
-                break
-        except (ConnectionRefusedError, OSError):
-            continue
-
-    if not ready:
-        print(f"Dashboard 启动超时（等待 {40*0.3:.0f} 秒后仍未就绪）", file=sys.stderr)
-        print(f"日志文件: {log_file}", file=sys.stderr)
-        proc.terminate()
-        return 1
-
-    print(f"Dashboard 启动: {url}")
-    print(f"API 文档: {url}/docs")
-    print(f"进程 PID: {proc.pid}")
-    print(f"日志文件: {log_file}")
-
-    if not args.no_browser:
-        _webbrowser.open(url)
-
-    return 0
-
-
 def cmd_where(args: argparse.Namespace) -> int:
-    root = _resolve_root(args.project_root)
+    try:
+        root = _resolve_root(args.project_root)
+    except FileNotFoundError as exc:
+        print(_project_root_diagnostic(args.project_root, exc), file=sys.stderr)
+        return 1
     print(str(root))
     return 0
+
+
+def _project_root_diagnostic(
+    explicit_project_root: Optional[str], exc: FileNotFoundError
+) -> str:
+    if explicit_project_root:
+        return (
+            "未找到有效书项目根目录（需要包含 .webnovel/state.json）: "
+            f"{explicit_project_root}\n"
+            f"detail: {exc}"
+        )
+    return (
+        "当前工作区还没有激活的书项目（未找到 .webnovel/state.json）。\n"
+        "请先运行 webnovel init 创建项目，或运行 webnovel use <project_root> 绑定已有书项目。\n"
+        f"detail: {exc}"
+    )
 
 
 def _build_preflight_report(explicit_project_root: Optional[str]) -> dict:
@@ -251,10 +180,22 @@ def _build_preflight_report(explicit_project_root: Optional[str]) -> dict:
 
     project_root = ""
     project_root_error = ""
+    story_runtime: dict = {}
     try:
         resolved_root = _resolve_root(explicit_project_root)
         project_root = str(resolved_root)
         checks.append({"name": "project_root", "ok": True, "path": project_root})
+        story_runtime = build_story_runtime_health(resolved_root)
+    except FileNotFoundError as exc:
+        project_root_error = _project_root_diagnostic(explicit_project_root, exc)
+        checks.append(
+            {
+                "name": "project_root",
+                "ok": False,
+                "path": explicit_project_root or "",
+                "error": project_root_error,
+            }
+        )
     except Exception as exc:
         project_root_error = str(exc)
         checks.append({"name": "project_root", "ok": False, "path": explicit_project_root or "", "error": project_root_error})
@@ -266,6 +207,7 @@ def _build_preflight_report(explicit_project_root: Optional[str]) -> dict:
         "skill_root": str(skill_root),
         "checks": checks,
         "project_root_error": project_root_error,
+        "story_runtime": story_runtime,
     }
 
 
@@ -280,6 +222,14 @@ def cmd_preflight(args: argparse.Namespace) -> int:
             print(f"{status} {item['name']}: {path}")
             if item.get("error"):
                 print(f"  detail: {item['error']}")
+        story_runtime = report.get("story_runtime") or {}
+        if story_runtime:
+            print(
+                "INFO story_runtime: "
+                f"chapter={story_runtime.get('chapter')} "
+                f"mainline_ready={story_runtime.get('mainline_ready')} "
+                f"latest_commit_status={story_runtime.get('latest_commit_status')}"
+            )
     return 0 if report["ok"] else 1
 
 
@@ -287,7 +237,9 @@ def cmd_use(args: argparse.Namespace) -> int:
     project_root = normalize_windows_path(args.project_root).expanduser()
     try:
         project_root = project_root.resolve()
-    except Exception:
+    except Exception as exc:
+        import sys
+        print(f"⚠️ path.resolve() 失败 ({project_root}): {exc}", file=sys.stderr)
         project_root = project_root
 
     workspace_root: Optional[Path] = None
@@ -295,7 +247,9 @@ def cmd_use(args: argparse.Namespace) -> int:
         workspace_root = normalize_windows_path(args.workspace_root).expanduser()
         try:
             workspace_root = workspace_root.resolve()
-        except Exception:
+        except Exception as exc:
+            import sys
+            print(f"⚠️ path.resolve() 失败 ({workspace_root}): {exc}", file=sys.stderr)
             workspace_root = workspace_root
 
     # 1) 写入工作区指针（若工作区内存在 `.claude/`）
@@ -315,21 +269,7 @@ def cmd_use(args: argparse.Namespace) -> int:
     return 0
 
 
-def _chapter_path(args: argparse.Namespace) -> int:
-    """打印指定章节的文件路径（用于 SKILL.md 流程）"""
-    from pathlib import Path
-    from chapter_paths import default_chapter_draft_path
-
-    project_root = _resolve_root(args.project_root)
-    chapter_num = args.chapter
-    path = default_chapter_draft_path(project_root, chapter_num)
-    print(path)
-    return 0
-
-
 def main() -> None:
-    setup_logging()
-    logger = get_logger(__name__)
     parser = argparse.ArgumentParser(description="webnovel unified CLI")
     parser.add_argument("--project-root", help="书项目根目录或工作区根目录（可选，默认自动检测）")
 
@@ -366,21 +306,13 @@ def main() -> None:
     p_context = sub.add_parser("context", help="转发到 context_manager")
     p_context.add_argument("args", nargs=argparse.REMAINDER)
 
+    p_memory = sub.add_parser("memory", help="转发到 memory.store")
+    p_memory.add_argument("args", nargs=argparse.REMAINDER)
+
     p_migrate = sub.add_parser("migrate", help="转发到 migrate_state_to_sqlite")
     p_migrate.add_argument("args", nargs=argparse.REMAINDER)
 
-    # memory 命令（记忆数据管理）
-    p_memory = sub.add_parser("memory", help="记忆数据管理")
-    p_memory.add_argument("args", nargs=argparse.REMAINDER)
-
-    # observability 命令
-    p_obs = sub.add_parser("observability", help="观测数据报告")
-    p_obs.add_argument("args", nargs=argparse.REMAINDER)
-
     # Pass-through to scripts
-    p_workflow = sub.add_parser("workflow", help="转发到 workflow_manager.py")
-    p_workflow.add_argument("args", nargs=argparse.REMAINDER)
-
     p_status = sub.add_parser("status", help="转发到 status_reporter.py")
     p_status.add_argument("args", nargs=argparse.REMAINDER)
 
@@ -400,87 +332,175 @@ def main() -> None:
     p_extract_context.add_argument("--chapter", type=int, required=True, help="目标章节号")
     p_extract_context.add_argument("--format", choices=["text", "json"], default="text", help="输出格式")
 
-    # export 命令（正文导出）
-    p_export = sub.add_parser("export", help="正文导出工具")
+    p_story_system = sub.add_parser("story-system", help="转发到 story_system.py")
+    p_story_system.add_argument("args", nargs=argparse.REMAINDER)
+
+    p_story_events = sub.add_parser("story-events", help="转发到 story_events.py")
+    p_story_events.add_argument("--chapter", type=int, default=0, help="目标章节号")
+    p_story_events.add_argument("--limit", type=int, default=200, help="查询条数")
+    p_story_events.add_argument("--health", action="store_true", help="输出事件链健康信息")
+
+    p_commit = sub.add_parser("chapter-commit", help="转发到 chapter_commit.py")
+    p_commit.add_argument("--chapter", type=int, required=True, help="目标章节号")
+    p_commit.add_argument("--review-result", default="", help="review_result JSON 文件")
+    p_commit.add_argument("--fulfillment-result", default="", help="fulfillment_result JSON 文件")
+    p_commit.add_argument("--disambiguation-result", default="", help="disambiguation_result JSON 文件")
+    p_commit.add_argument("--extraction-result", default="", help="extraction_result JSON 文件")
+
+    p_memory_contract = sub.add_parser("memory-contract", help="转发到 memory_cli.py")
+    p_memory_contract.add_argument("args", nargs=argparse.REMAINDER)
+
+    p_project_memory = sub.add_parser("project-memory", help="转发到 project_memory.py")
+    p_project_memory.add_argument("args", nargs=argparse.REMAINDER)
+
+    p_review_pipeline = sub.add_parser("review-pipeline", help="转发到 review_pipeline.py")
+    p_review_pipeline.add_argument("--chapter", type=int, required=True, help="目标章节号")
+    p_review_pipeline.add_argument("--review-results", required=True, help="reviewer 原始结果 JSON 文件")
+    p_review_pipeline.add_argument("--metrics-out", default="", help="metrics 输出文件")
+    p_review_pipeline.add_argument("--report-file", default="", help="审查报告路径")
+    p_review_pipeline.add_argument("--save-metrics", action="store_true", help="直接写入 index.db")
+
+    p_placeholder_scan = sub.add_parser("placeholder-scan", help="扫描大纲/设定集未补齐占位")
+    p_placeholder_scan.add_argument("--format", choices=["json", "text"], default="json", help="输出格式")
+
+    p_master_outline_sync = sub.add_parser("master-outline-sync", help="当前卷规划完成后写回 V+1 最小总纲锚点")
+    p_master_outline_sync.add_argument("--volume", type=int, required=True, help="当前已完成规划的卷号")
+    p_master_outline_sync.add_argument("--writeback-file", default="", help="显式结构化写回 JSON")
+    p_master_outline_sync.add_argument("--format", choices=["json", "text"], default="json", help="输出格式")
+
+    p_export = sub.add_parser("export", help="导出正文为 Markdown/TXT/EPUB")
     p_export.add_argument("args", nargs=argparse.REMAINDER)
 
-    # publish 命令（番茄小说发布）
-    p_publish = sub.add_parser("publish", help="番茄小说发布工具")
-    p_publish.add_argument("args", nargs=argparse.REMAINDER)
+    knowledge_parser = sub.add_parser("knowledge", help="时序知识查询")
+    knowledge_sub = knowledge_parser.add_subparsers(dest="knowledge_action")
 
-    # dashboard 命令（可视化面板）
-    p_dashboard = sub.add_parser("dashboard", help="启动可视化小说管理面板（只读 Web Dashboard）")
-    p_dashboard.add_argument("--host", default="127.0.0.1", help="监听地址")
-    p_dashboard.add_argument("--port", type=int, default=8765, help="监听端口")
-    p_dashboard.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
+    qs_parser = knowledge_sub.add_parser("query-entity-state", help="查询实体在指定章节的状态")
+    qs_parser.add_argument("--entity", required=True, help="实体 ID")
+    qs_parser.add_argument("--at-chapter", type=int, required=True, help="目标章节号")
 
-    # write-batch 命令（批量写作）
-    p_write_batch = sub.add_parser("write-batch", help="批量写作工具")
-    p_write_batch.add_argument("args", nargs=argparse.REMAINDER)
-
-    # chapter-path 命令（打印章节文件路径）
-    p_chapter_path = sub.add_parser("chapter-path", help="打印章节文件路径")
-    p_chapter_path.add_argument("--chapter", type=int, required=True, help="章节号")
-    p_chapter_path.set_defaults(func=_chapter_path)
-
-    # genimg 命令（ModelScope 文生图）
-    p_genimg = sub.add_parser("genimg", help="ModelScope 文生图工具")
-    p_genimg.add_argument("args", nargs=argparse.REMAINDER)
+    qr_parser = knowledge_sub.add_parser("query-relationships", help="查询实体在指定章节的关系")
+    qr_parser.add_argument("--entity", required=True, help="实体 ID")
+    qr_parser.add_argument("--at-chapter", type=int, required=True, help="目标章节号")
 
     # 兼容：允许 `--project-root` 出现在任意位置（减少 agents/skills 拼命令的出错率）
     from .cli_args import normalize_global_project_root
 
     argv = normalize_global_project_root(sys.argv[1:])
-    args = parser.parse_args(argv)
+    args, unknown_args = parser.parse_known_args(argv)
 
     # where/use 直接执行
     if hasattr(args, "func"):
+        if unknown_args:
+            parser.error(f"unrecognized arguments: {' '.join(unknown_args)}")
         code = int(args.func(args) or 0)
         raise SystemExit(code)
 
     tool = args.tool
-    rest = list(getattr(args, "args", []) or [])
+    if unknown_args and tool not in PASSTHROUGH_TOOLS:
+        parser.error(f"unrecognized arguments: {' '.join(unknown_args)}")
+
+    rest = _passthrough_tail(argv, tool) if tool in PASSTHROUGH_TOOLS else list(getattr(args, "args", []) or [])
+    # argparse.REMAINDER 可能以 `--` 开头占位，这里去掉
     if rest[:1] == ["--"]:
         rest = rest[1:]
     rest = _strip_project_root_args(rest)
 
-    cmd = COMMAND_REGISTRY.get(tool)
+    # init 是创建项目，不应该依赖/注入已存在 project_root
+    if tool == "init":
+        raise SystemExit(_run_script("init_project.py", rest))
 
-    if tool == "publish":
-        if rest and rest[0] == "setup-browser":
-            raise SystemExit(_run_script("publish_manager.py", rest))
+    # 其余工具：统一解析 project_root 后前置给下游
+    project_root = _resolve_root(args.project_root)
+    forward_args = ["--project-root", str(project_root)]
 
-    if cmd is None:
-        print(f"未知命令: {tool}", file=sys.stderr)
-        raise SystemExit(2)
+    if tool == "index":
+        raise SystemExit(_run_data_module("index_manager", [*forward_args, *rest]))
+    if tool == "state":
+        raise SystemExit(_run_data_module("state_manager", [*forward_args, *rest]))
+    if tool == "rag":
+        raise SystemExit(_run_data_module("rag_adapter", [*forward_args, *rest]))
+    if tool == "style":
+        raise SystemExit(_run_data_module("style_sampler", [*forward_args, *rest]))
+    if tool == "entity":
+        raise SystemExit(_run_data_module("entity_linker", [*forward_args, *rest]))
+    if tool == "context":
+        raise SystemExit(_run_data_module("context_manager", [*forward_args, *rest]))
+    if tool == "memory":
+        raise SystemExit(_run_data_module("memory.store", [*forward_args, *rest]))
+    if tool == "migrate":
+        raise SystemExit(_run_data_module("migrate_state_to_sqlite", [*forward_args, *rest]))
 
-    # special 命令需要自定义处理
-    if cmd["type"] == "special":
-        if cmd["target"] == "_start_write_batch":
-            from pathlib import Path as _Path
-            skill_root = _Path(__file__).resolve().parent.parent / "skills" / "webnovel-write-batch"
-            skill_script = skill_root / "SKILL.md"
-            if not skill_script.exists():
-                logger.error("批量写作 skill 不存在: %s", skill_script)
-                raise SystemExit(1)
-            logger.info(f"批量写作 skill 路径: {skill_script}")
+    if tool == "status":
+        raise SystemExit(_run_script("status_reporter.py", [*forward_args, *rest]))
+    if tool == "update-state":
+        raise SystemExit(_run_script("update_state.py", [*forward_args, *rest]))
+    if tool == "backup":
+        raise SystemExit(_run_script("backup_manager.py", [*forward_args, *rest]))
+    if tool == "archive":
+        raise SystemExit(_run_script("archive_manager.py", [*forward_args, *rest]))
+    if tool == "extract-context":
+        return_args = [*forward_args, "--chapter", str(args.chapter), "--format", str(args.format)]
+        raise SystemExit(_run_script("extract_chapter_context.py", return_args))
+    if tool == "story-system":
+        raise SystemExit(_run_script("story_system.py", [*forward_args, *rest]))
+    if tool == "story-events":
+        return_args = [*forward_args, "--limit", str(args.limit)]
+        if args.chapter:
+            return_args.extend(["--chapter", str(args.chapter)])
+        if args.health:
+            return_args.append("--health")
+        raise SystemExit(_run_script("story_events.py", return_args))
+    if tool == "chapter-commit":
+        return_args = [*forward_args, "--chapter", str(args.chapter)]
+        if args.review_result:
+            return_args.extend(["--review-result", str(args.review_result)])
+        if args.fulfillment_result:
+            return_args.extend(["--fulfillment-result", str(args.fulfillment_result)])
+        if args.disambiguation_result:
+            return_args.extend(["--disambiguation-result", str(args.disambiguation_result)])
+        if args.extraction_result:
+            return_args.extend(["--extraction-result", str(args.extraction_result)])
+        raise SystemExit(_run_script("chapter_commit.py", return_args))
+    if tool == "memory-contract":
+        raise SystemExit(_run_script("memory_cli.py", [*forward_args, *rest]))
+    if tool == "project-memory":
+        raise SystemExit(_run_script("project_memory.py", [*forward_args, *rest]))
+    if tool == "review-pipeline":
+        return_args = [
+            *forward_args,
+            "--chapter", str(args.chapter),
+            "--review-results", str(args.review_results),
+        ]
+        if args.metrics_out:
+            return_args.extend(["--metrics-out", str(args.metrics_out)])
+        if args.report_file:
+            return_args.extend(["--report-file", str(args.report_file)])
+        if args.save_metrics:
+            return_args.append("--save-metrics")
+        raise SystemExit(_run_script("review_pipeline.py", return_args))
+    if tool == "placeholder-scan":
+        raise SystemExit(_run_data_module("placeholder_scanner", [*forward_args, "--format", str(args.format)]))
+    if tool == "master-outline-sync":
+        return_args = [*forward_args, "--volume", str(args.volume), "--format", str(args.format)]
+        if args.writeback_file:
+            return_args.extend(["--writeback-file", str(args.writeback_file)])
+        raise SystemExit(_run_script("update_master_outline.py", return_args))
+
+    if tool == "export":
+        raise SystemExit(_run_script("export_manager/__init__.py", [*forward_args, *rest]))
+
+    if tool == "knowledge":
+        from .knowledge_query import KnowledgeQuery
+        from .cli_output import print_success
+        kq = KnowledgeQuery(project_root)
+        if args.knowledge_action == "query-entity-state":
+            result = kq.entity_state_at_chapter(args.entity, args.at_chapter)
+            print_success(result, message="entity_state_at_chapter")
             raise SystemExit(0)
-        if cmd["target"] == "_start_dashboard":
-            return _start_dashboard(args)
-        raise SystemExit(2)
-
-    project_root = _resolve_root(args.project_root) if cmd["needs_root"] else None
-    forward_args = ["--project-root", str(project_root)] if project_root else rest
-    forward_rest = [*forward_args, *rest] if project_root else rest
-
-    if cmd["type"] == "data_module":
-        raise SystemExit(_run_data_module(cmd["target"], forward_rest))
-    if cmd["type"] == "script":
-        # extract-context 需要额外的 --chapter/--format 参数
-        if tool == "extract-context":
-            extra = ["--chapter", str(args.chapter), "--format", str(args.format)]
-            raise SystemExit(_run_script(cmd["target"], [*forward_args, *extra]))
-        raise SystemExit(_run_script(cmd["target"], forward_rest))
+        elif args.knowledge_action == "query-relationships":
+            result = kq.entity_relationships_at_chapter(args.entity, args.at_chapter)
+            print_success(result, message="entity_relationships_at_chapter")
+            raise SystemExit(0)
 
     raise SystemExit(2)
 
