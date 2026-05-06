@@ -98,9 +98,22 @@ fi
 ## 逐章循环
 
 > **每章 = webnovel-write 完整流程。不简化、不跳步、不合步。**
->
+
+### Step 0: 环境变量验证（每章开始前强制）
+
+```bash
+# 验证关键变量已设置且目录存在
+test -n "$PROJECT_ROOT" || { echo "❌ PROJECT_ROOT 未设置"; exit 1; }
+test -n "$SCRIPTS_DIR" || { echo "❌ SCRIPTS_DIR 未设置"; exit 1; }
+test -d "$PROJECT_ROOT" || { echo "❌ PROJECT_ROOT 目录不存在: $PROJECT_ROOT"; exit 1; }
+# 确认 .webnovel 在 PROJECT_ROOT 内（防止写到父目录）
+test -d "${PROJECT_ROOT}/.webnovel" || { echo "❌ ${PROJECT_ROOT}/.webnovel 不存在，PROJECT_ROOT 可能不正确"; exit 1; }
+echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
+```
+
 > 每章开始前重现此清单：
 > ```
+> □ 0. 环境变量验证
 > □ A. 上章完整性检查（N > S 时）
 > □ 1. 预检 + 刷新合同树
 > □ 2. context-agent → 写作任务书
@@ -427,6 +440,7 @@ python -c "import json; s=json.load(open('$BATCH_STATE')); assert $N in s['compl
 
 | 场景 | 处理 | 阻断 |
 |------|------|------|
+| 环境变量未设置/PROJECT_ROOT 错误 | 立即停止 | 阻断 |
 | 上章完整性失败 | 立即停止 | 阻断 |
 | preflight/合同树失败 | 检查缺失文件→修复→重试1次→停止 | 阻断 |
 | context-agent 失败 | 重试1次→停止 | 阻断 |
