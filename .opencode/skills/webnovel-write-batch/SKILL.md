@@ -1,589 +1,359 @@
 ---
 name: webnovel-write-batch
 description: |
-  批量写作技能。当用户要求多章节连续写作时**必须使用此 skill**。
-  
-  ## 触发条件（严格匹配）
+  连续写作多章。当用户要求多章写作时必须使用此 skill。
+
+  ## 触发条件
   - "连续写N章"、"写第X-Y章"、"批量写X-Y章"、"一次写N章"
-  - "重写第X-Y章"、"重新写X-Y章"、"改写第X-Y章"、"修改第X-Y章"
+  - "重写第X-Y章"、"修改第X-Y章"
   - "多章"、"多章节"
-  
-  ## 区分规则（重要）
-  - 单章操作（如"写第64章"、"重写第64章"）→ 使用 webnovel-write
-  - **多章操作**（如"写64-70章"、"重写64-70章"、"连续写5章"）→ **必须使用 webnovel-write-batch**
-  
-  ## 功能说明
-  由 Agent 在单次回复中循环执行，支持断点恢复和灵活审查级别。
-  包含：预检 → 逐章（上下文搜集→起草→审查→润色→Data Agent→Git）→ 分批暂停点 → 汇总报告
-allowed-tools: Task Read Write Bash
+
+  ## 区分规则
+  - 单章 → webnovel-write
+  - 多章 → 必须使用本 skill
+compatibility: opencode
+allowed-tools: Read Write Edit Grep Bash Agent
 ---
 
-# 批量写作技能
+# 批量写作
 
-## 🧠 Agent 执行前必读
+## ⛔ 硬规则（Anti-Laziness）
 
-> **关键决策**：当用户输入涉及**多个章节**时，必须使用本 skill。
-> 当用户输入涉及**单个章节**时，必须使用 webnovel-write。
+以下规则针对 AI 在长循环中的已知偷懒模式。**逐章执行前必须重现此清单。**
 
-**触发条件**：用户输入包含以下表述时，按本技能执行：
-- "连续写N章"
-- "写第X-Y章"（如"写第64-70章"）
-- "批量写X-Y章"
-- "一次写N章"
-- **"重写第X-Y章"、"重新写X-Y章"、"改写X-Y章"**
-- **"修改第X-Y章"、"修订第X-Y章"**
-- **"多章"、"多章节"**
-- 执行 `/webnovel-write-batch` 命令
+| # | 禁止 | 正确做法 |
+|---|------|---------|
+| 1 | 口头描述代替 `Agent()` 调用 | 必须使用 Agent 工具调用 context-agent / reviewer / data-agent |
+| 2 | 跳过审查 | 每章必须运行 reviewer。blocking=false 也不能跳过 |
+| 3 | 用 Read 工具代替验证命令 | 每步后必须运行 bash 验证命令（test -s / ls / python -c） |
+| 4 | "稍后更新" batch_state | 每章完成后立即用 python -c 写 JSON，写完后重新读取验证 |
+| 5 | 章数多了开始跳步 | 每章开始前重现 Step 1-9 清单。3 章后强制暂停 |
+| 6 | 子代理失败后假装成功 | 每个 Agent() 调用后检查输出文件是否存在且非空。失败重试 1 次→仍失败则停止 |
+| 7 | 审查和润色合并执行 | 先拿到审查结果 → 再修改正文。禁止在审查前修改 |
 
-**核心原则**：
-1. 在**本次回复**内完成所有章节的生成，**不要**多次调用单章命令
-2. 每完成一章立即更新 `.batch_state.json`，支持随时中断恢复
-3. 循环结束后输出汇总报告
-
-**禁止行为**：
-- ❌ 在单次回复中多次调用 `/webnovel-write` 命令
-- ❌ 每章单独输出"是否继续写下一章？"
-- ❌ 在无用户指令时自动启动下一批次
-
----
-
-## 参数解析规则
-
-| 用户表述示例 | 解析逻辑 |
-|-------------|---------|
-| "连续写2章" | 读取 `state.json` 中 `current_chapter`，范围 = `current+1` 到 `current+2` |
-| "写第53-60章" | 范围 = `53` 到 `60` |
-| "批量写53-60章" | 同上 |
-
-不再使用 checkers 模式，统一使用 unified-reviewer 单 Agent 审查。
-
----
-
-## 快速参考
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `--range` | 章节范围，如 53-60 | 自动解析 |
-| `--resume` | 从断点恢复 | - |
-| `--force` | 绕过 20 章上限 | - |
-
----
-
-## 执行清单
-
-### Step 0: 预检与初始化
-
-#### 0.1 解析章节范围
-
-1. 从用户输入提取起始章 `S` 和结束章 `E`
-2. 若用户说"连续写N章"，读取 `state.json` 获取 `current_chapter`，设 `S = current + 1`
-3. 若无法解析，询问用户明确范围
-
-#### 0.2 检查大纲存在性
+## 环境设置
 
 ```bash
-# 检查章节大纲目录
-OUTLINE_DIR="${PROJECT_ROOT}/大纲"
-
-# 抽样检查前3章和后3章的大纲
-for ch in $(seq "$S" "$((S+2))" "$E" | head -6); do
-    CHAPTER_OUTLINE="${OUTLINE_DIR}/第${ch}章.md"
-    if [ ! -f "$CHAPTER_OUTLINE" ]; then
-        echo "⚠️ 缺少大纲：第${ch}章"
-    fi
-done
+export WORKSPACE_ROOT="${PWD}"
+export SCRIPTS_DIR="${PWD}/.opencode/scripts"
+export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
 ```
 
-#### 0.3 检测断点
+## Step 0: 解析章节范围
+
+- "写第9-15章" → S=9, E=15
+- "连续写3章" → 读 .webnovel/state.json 的 current_chapter，S=N+1, E=N+3
+- "批量写5章" → 同上，E=S+4
+
+若无法解析，询问用户明确范围。上限 20 章（可通过 --force 参数绕过）。
+
+## Step 0.5: 断点恢复
 
 ```bash
-BATCH_STATE_FILE=".opencode/skills/webnovel-write-batch/.batch_state.json"
+BATCH_STATE="${PROJECT_ROOT}/.webnovel/batch_state.json"
 
-if [ -f "$BATCH_STATE_FILE" ]; then
-    STATUS=$(python -c "import json; d=json.load(open('${BATCH_STATE_FILE}')); print(d.get('status'))")
-    if [ "$STATUS" = "running" ]; then
-        echo "检测到未完成的批量任务"
-        # 询问用户是否恢复或重新开始
-    fi
+if [ -f "$BATCH_STATE" ]; then
+  STATUS=$(python -c "import json; print(json.load(open('$BATCH_STATE')).get('status',''))")
+  if [ "$STATUS" = "running" ]; then
+    echo "检测到未完成的批量任务"
+    python -c "
+import json
+s = json.load(open('$BATCH_STATE'))
+print(f'  已完成: 第{s[\"completed_chapters\"]}章')
+print(f'  待恢复: 第{s[\"current_chapter\"]}章')
+"
+    # 询问用户：继续 / 重新开始 / 放弃
+  elif [ "$STATUS" = "completed" ]; then
+    echo "上一次批量任务已完成。"
+    # 询问是否开始新批次
+  fi
 fi
 ```
 
----
+## Step 0.6: 初始化 batch_state（新任务）
 
-### Step 1: 初始化批量状态
-
-创建或更新 `.batch_state.json`：
-
-```json
-{
-  "task_id": "batch_YYYYMMDD_HHMM",
-  "range": {"start": S, "end": E},
-  "status": "running",
-  "current_chapter": S,
-  "completed_chapters": [],
-  "failed_chapters": [],
-  "chapter_results": {},
-  "metadata": {
-    "created_at": "ISO timestamp"
-  }
+```bash
+if [ ! -f "$BATCH_STATE" ] || [ "$STATUS" != "running" ]; then
+  python -c "
+import json, datetime
+s = {
+  'task_id': f'batch_{datetime.datetime.utcnow().strftime(\"%Y%m%d_%H%M%S\")}',
+  'range': {'start': $S, 'end': $E},
+  'status': 'running',
+  'current_chapter': $S,
+  'completed_chapters': [],
+  'failed_chapters': [],
+  'chapter_results': {},
+  'created_at': datetime.datetime.utcnow().isoformat() + 'Z'
 }
-```
-
----
-
-### Step 2: 章节循环（严格版本）
-
-> **重要**：严禁跳过任何子步骤。每章结束必须执行 2.6（数据落盘）和 2.7（状态更新）。
-
-#### 2.0 上章完整性检查（强制防呆）
-
-> **⚠️ 本检查在每章正文开始前必执行，不可跳过。**
-
-在开始撰写第 N 章正文之前，必须执行以下验证：
-
-```
-上章完整性验证（第 N-1 章）：
-1. 检查第 N-1 章的最终文件是否已存在于章节目录
-2. 检查 .batch_state.json 中的 completed_chapters 数组是否包含 N-1
-3. 检查 .webnovel/summaries/ch{prevChapter}.md 是否存在（Data Agent 产出）
-
-验证条件：
-- 若任一条件不满足 → 立即停止循环
-- 错误信息：检测到第 N-1 章状态异常。请执行 /webnovel-write-batch --resume 修复。
-- 禁止继续生成新章节
-```
-
-> **原理**：防止长循环后期注意力衰减时，Agent 忽略上一轮的状态更新错误。
-
----
-
-#### 循环控制
-
-```
-for chapter in [S, S+1, ..., E]:
-    # 1. 先执行 2.0 上章完整性检查
-    if chapter > S:
-        PREV = chapter - 1
-        if PREV not in batch_state.completed_chapters:
-            # 立即停止，不允许跳过
-            print("❌ 检测到第", PREV, "章状态异常，必须修复后才能继续")
-            break
-
-    # 2. 执行 2.1-2.7（写作、审查、数据回写）
-    ...
-
-    # 3. 执行 2.8 分批暂停点（每 3 章）
-    if (chapter - S + 1) % 3 == 0:
-        触发分批暂停点
-```
-
-> **⚠️ 两层防护**：2.0 检查防止状态异常积累，2.8 暂停点防止注意力衰减。
-
----
-
-#### 2.1 获取上下文
-
-```markdown
-Task:
-  subagent: context-agent
-  prompt: |
-    为第 {chapter} 章收集创作上下文。
-
-    ## 项目信息
-    - 项目根：{PROJECT_ROOT}
-    - 当前章节：{chapter}
-    - 总范围：第 {S} 章到第 {E} 章
-
-    ## 任务
-    1. 读取本章大纲：{OUTLINE_DIR}/第{chapter}章.md
-    2. 读取总纲：{PROJECT_ROOT}/大纲/总纲.md
-    3. 读取 state.json 获取项目状态
-    4. 如有前两章，读取其结尾 2000 字用于承接
-
-    ## 输出
-    输出创作执行包，包含：
-    - 7 板块任务书
-    - Context Contract 全字段
-    - 写作执行包（章节节拍、不可变事实清单、禁止事项）
-```
-
----
-
-#### 2.2 起草正文
-
-- 基于简报撰写章节正文
-- **字数下限（按章节类型，硬性约束）**：
-  - 常规推进章：≥1500字
-  - 过渡章：≥1000字
-  - 高潮章/战斗章：≥2000字
-- 字数低于下限必须补充至达标，方可进入审查
-- 规则：
-  - 开头：承接上章钩子，建立本章基调
-  - 发展：通过冲突/行动推进剧情
-  - 高潮：关键转折或爽点
-  - 结尾：留下本章钩子，为下章铺垫
-
-- 输出到章节文件：
-```bash
-CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" \
-    --project-root "${PROJECT_ROOT}" \
-    chapter-path --chapter {chapter})
-echo "$DRAFT_CONTENT" > "${PROJECT_ROOT}/${CHAPTER_PATH}"
-```
-
----
-
-#### 2.3 统一审查
-
-```markdown
-Task:
-  subagent: unified-reviewer
-  prompt: |
-    chapter={chapter}; chapter_file=${PROJECT_ROOT}/${CHAPTER_PATH};
-    project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。
-    严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。
-```
-
-unified-reviewer 覆盖全部 6 维度：设定一致性 / 时间线 / 叙事连贯 / 角色一致性 / 逻辑 / AI味。
-
-```bash
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \
-  --chapter {chapter} \
-  --review-results "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
-  --metrics-out "${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json" \
-  --report-file "审查报告/第{chapter}章审查报告.md"
-```
-
----
-
-#### 2.5 润色定稿
-
-**字数检查（硬性）**：
-```bash
-# 计算实际字数
-ACTUAL_WORDS=$(python -X utf8 -c "
-import re
-text = open('${PROJECT_ROOT}/${CHAPTER_PATH}', encoding='utf-8').read()
-words = len(re.findall(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', text))
-print(words)
-")
-
-# 确定字数下限（根据章节类型）
-# 默认常规推进章1500字，若有大纲可读取章节类型
-MIN_WORDS=1500
-# 若为高潮章/战斗章设置为2000字
-# 若为过渡章设置为1000字
-
-echo "实际字数: $ACTUAL_WORDS"
-echo "字数下限: $MIN_WORDS"
-
-if [ "$ACTUAL_WORDS" -lt "$MIN_WORDS" ]; then
-    echo "⚠️ 字数不足，需要补充内容..."
-    # 字数不足时，在"未闭合问题"和"期待锚点"处补充
-    # 补充策略：
-    # 1. 扩展章末钩子描述
-    # 2. 增加角色内心活动
-    # 3. 补充场景细节描写
-    # 4. 增加对话/动作描写
+open('$BATCH_STATE', 'w').write(json.dumps(s, ensure_ascii=False, indent=2))
+"
 fi
 ```
 
-1. **字数补充（若不足）**：优先在"未闭合问题"和"期待锚点"处补充
-2. 综合所有审查反馈
-3. 修复 critical/high 问题
-4. 执行 Anti-AI 检测
-5. 生成最终正文，覆盖章节文件
-6. **字数终检**：润色后再次检查字数，达标后才能输出
-
 ---
 
-#### 2.6 Data Agent - 状态与索引回写
+## 逐章循环（For chapter = S to E）
 
-> **⚠️ 强制要求**：本步骤**必须执行**，不得跳过。跳过此步骤将导致状态不一致。
+> 每章执行前，先重现 Step 1-9 清单。长循环中注意力衰减是真实存在的，清单是最后防线。
 
-**执行前检查**：
-- [ ] 章节文件已生成且非空
-- [ ] 审查分数已计算（OVERALL_SCORE）
-- [ ] review_metrics.json 已保存
+```
+对于第 N 章（N = S, S+1, ..., E）：
 
-**Task 调用（必须执行）**：
-
-```markdown
-Task:
-  subagent: data-agent
-  prompt: |
-    处理第 {chapter} 章的数据回写。
-
-    ## 参数
-    - 章节文件：{PROJECT_ROOT}/{CHAPTER_PATH}
-    - 审查分数：{OVERALL_SCORE}
-    - 项目根：{PROJECT_ROOT}
-    - 存储路径：.webnovel/
-    - 状态文件：.webnovel/state.json
-
-    ## 必须完成的子步骤
-    1. 加载上下文
-    2. AI 实体提取
-    3. 实体消歧
-    4. 写入 state.json（更新 progress.current_chapter、entity、relations）
-    5. 写入 index.db（RAG 向量索引）
-    6. 写入章节摘要 .webnovel/summaries/ch{chapter_padded}.md
-
-    ## 执行后验证
-    确认以下文件已更新：
-    - .webnovel/state.json
-    - .webnovel/index.db
-    - .webnovel/summaries/ch{chapter_padded}.md
+  Step 1 □ 上章完整性检查（N > S 时）
+  Step 2 □ context-agent → 写作任务书
+  Step 3 □ 起草正文（2000-2500字）
+  Step 4 □ reviewer → 审查报告
+  Step 5 □ 评估 + 修复
+  Step 6 □ data-agent → 事实提取
+  Step 7 □ chapter-commit
+  Step 8 □ 更新 batch_state
+  Step 9 □ 进度反馈
 ```
 
 ---
 
-#### 2.7 Git 备份
+### Step 1: 上章完整性检查（N > S 时强制，不可跳过）
 
 ```bash
-cd "${PROJECT_ROOT}"
-git add "${CHAPTER_PATH}" ".webnovel/state.json" ".webnovel/index.db" ".webnovel/summaries/"
-git -c i18n.commitEncoding=UTF-8 commit -m "第{chapter}章: 写作完成 [review={OVERALL_SCORE}]"
+if [ "$N" -gt "$S" ]; then
+  PREV=$((N - 1))
+  
+  # 检查 N-1 章文件存在
+  CHAPTER_FILE=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter $PREV)
+  if [ ! -s "${PROJECT_ROOT}/${CHAPTER_FILE}" ]; then
+    echo "❌ 第${PREV}章文件缺失。立即停止。"
+    echo "   请先修复第${PREV}章再继续。"
+    exit 1
+  fi
+
+  # 检查 batch_state 包含 N-1
+  IN_BATCH=$(python -c "import json; s=json.load(open('$BATCH_STATE')); print($PREV in s.get('completed_chapters',[]))")
+  if [ "$IN_BATCH" != "True" ]; then
+    echo "❌ 第${PREV}章未在 batch_state 中标记完成。立即停止。"
+    exit 1
+  fi
+
+  echo "✅ 第${PREV}章完整性检查通过"
+fi
 ```
 
-> **⚠️ Git 提交失败处理**：如果提交失败（非空仓库无变更可忽略），记录警告但**不得阻断**。已完成的 Data Agent 回写是持久化的。
+跳过此步的后果：前一章数据未落盘，继续写会导致状态永久断裂。
 
 ---
 
-#### 2.8 更新批量状态
+### Step 2: context-agent → 写作任务书
 
+**使用 Agent 工具调用 context-agent，不得口头描述代替。调用后检查输出。**
+
+```
+Agent(
+  subagent_type: "context-agent",
+  prompt: "chapter=N; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; storage_path=${PROJECT_ROOT}/.webnovel; state_file=${PROJECT_ROOT}/.webnovel/state.json（projection/read-model）。先 research，再按 本章硬性约束→CPNs/CEN→本章禁区→风格指引→dynamic_context补充参考 的顺序输出五段写作任务书。"
+)
+```
+
+验证任务书非空且包含关键段落。若失败或返回空，重试 1 次。仍失败→停止。
+
+---
+
+### Step 3: 起草正文
+
+主 AI 基于任务书 + 章纲写正文，2000-2500 字。
+
+```bash
+# 确定章节文件路径
+CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter $N)
+
+# 写入正文后验证
+CHAPTER_FILE="${PROJECT_ROOT}/${CHAPTER_PATH}"
+test -s "$CHAPTER_FILE" || echo "❌ 章节文件为空"
+
+# 字数检查
+WORDS=$(python -c "
+import re
+t = open('$CHAPTER_FILE', encoding='utf-8').read()
+print(len(re.findall(r'[一-鿿]', t)))
+")
+echo "字数: $WORDS"
+if [ "$WORDS" -lt 1500 ]; then
+  echo "⚠️ 字数不足 1500，需补充"
+fi
+```
+
+字数不足时补充，直到 ≥1500。
+
+---
+
+### Step 4: reviewer → 审查
+
+**使用 Agent 工具调用 reviewer，不得跳过。blocking=false 也不能跳过。**
+
+```
+Agent(
+  subagent_type: "reviewer",
+  prompt: "chapter=N; chapter_file=${PROJECT_ROOT}/${CHAPTER_PATH}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
+)
+```
+
+验证审查结果：
 ```bash
 python -c "
 import json
-with open('${BATCH_STATE_FILE}', 'r', encoding='utf-8') as f:
-    state = json.load(f)
-
-state['completed_chapters'].append({chapter})
-state['current_chapter'] = {chapter} + 1
-state['chapter_results']['{chapter}'] = {{
-    'status': 'success',
-    'score': {OVERALL_SCORE},
-    'words': {WORD_COUNT},
-    'data_agent_completed': True,
-    'completed_at': '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
-}}
-
-with open('${BATCH_STATE_FILE}', 'w', encoding='utf-8') as f:
-    json.dump(state, f, ensure_ascii=False, indent=2)
+d = json.load(open('${PROJECT_ROOT}/.webnovel/tmp/review_results.json'))
+assert isinstance(d, dict), 'review_results 不是 JSON 对象'
+print(f'blocking: {d.get(\"blocking\",\"unknown\")}, score: {d.get(\"score\",\"unknown\")}')
 "
 ```
 
-> **⚠️ 状态更新失败处理**：如果 batch_state.json 更新失败，重试 3 次。仍失败则记录到 failed_chapters 并停止批量任务。
+---
+
+### Step 5: 评估 + 修复
+
+```
+读取 review_results.json:
+  if blocking_issues 数量 > 0:
+    1. 修复正文中每个 blocking issue
+    2. 重新运行 Step 4（reviewer）
+    3. 若仍有 blocking → 再修再审（最多 2 轮）
+    4. 2 轮后仍有 blocking → 标记本章 failed，记录原因，继续下一章
+  
+  if blocking = 0（或 non-blocking only）:
+    针对 suggestions 做轻量润色（措辞/节奏/钩子强度）
+```
+
+这是创意判断环节，不自动化。
 
 ---
 
-#### 2.9 进度反馈
+### Step 6: data-agent → 事实提取
+
+**使用 Agent 工具调用 data-agent，不得跳过。**
 
 ```
-✅ 第{chapter}章已完成
-   - 审查得分: {OVERALL_SCORE}
-   - 字数: ~{WORD_COUNT}
-   - Data Agent: ✓ 已回写
-   - Git: ✓ 已提交
-   - 进度: [{chapter}/{E}]
+Agent(
+  subagent_type: "data-agent",
+  prompt: "chapter=N; chapter_file=${PROJECT_ROOT}/${CHAPTER_PATH}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。从正文提取事实，生成 .webnovel/tmp/ 下的 fulfillment_result.json、disambiguation_result.json、extraction_result.json；不直接写 state/index/summaries/memory。"
+)
+```
+
+验证输出文件：
+```bash
+for f in fulfillment_result.json disambiguation_result.json extraction_result.json; do
+  FP="${PROJECT_ROOT}/.webnovel/tmp/${f}"
+  if [ ! -s "$FP" ]; then
+    echo "❌ 缺失: $f"
+  else
+    echo "✅ $f ($(wc -c < $FP) bytes)"
+  fi
+done
+```
+
+任一缺失→重试 Agent 调用 1 次。仍缺失→标记 failed 并停止。
+
+---
+
+### Step 7: chapter-commit
+
+```bash
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-commit \
+  --chapter $N \
+  --review-result "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
+  --fulfillment-result "${PROJECT_ROOT}/.webnovel/tmp/fulfillment_result.json" \
+  --disambiguation-result "${PROJECT_ROOT}/.webnovel/tmp/disambiguation_result.json" \
+  --extraction-result "${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json"
+```
+
+检查输出包含 `accepted`。失败→检查 JSON 格式→修复→重试(最多3次)。仍失败→标记 failed 并停止。
+
+---
+
+### Step 8: 更新 batch_state
+
+```bash
+SCORE=$(python -c "import json; print(json.load(open('${PROJECT_ROOT}/.webnovel/tmp/review_results.json')).get('score',0))")
+
+python -c "
+import json, pathlib, datetime
+p = pathlib.Path('$BATCH_STATE')
+s = json.loads(p.read_text())
+s['completed_chapters'].append($N)
+s['current_chapter'] = $N + 1
+s['chapter_results'][str($N)] = {
+    'status': 'success',
+    'score': $SCORE,
+    'words': $WORDS,
+    'completed_at': datetime.datetime.utcnow().isoformat() + 'Z'
+}
+p.write_text(json.dumps(s, ensure_ascii=False, indent=2))
+"
+
+# 验证写入
+python -c "import json; s=json.load(open('$BATCH_STATE')); assert $N in s['completed_chapters'], '写入验证失败'; print('✅ batch_state 已验证')"
+```
+
+更新失败→重试 3 次。仍失败→停止。
+
+---
+
+### Step 9: 进度反馈
+
+```
+✅ 第{N}章完成 | 审查: {SCORE}/100 | 字数: {WORDS} | 进度: {N-S+1}/{E-S+1}
 ```
 
 ---
 
-#### 2.10 分批暂停点（抗注意力衰减）
+### Step 10: 分批暂停点（每 3 章）
 
-> **⚠️ 本检查在每 3 章完成后必执行，不可跳过。**
+```
+当 (N - S + 1) % 3 == 0 且 N != E:
+  ═══════════════════════════════════════
+  🚦 已完成第 {S}-{N} 章（共 {N-S+1} 章）
+  
+  章节摘要：
+  第{S}章 ✅ score:{xx} words:{xxxx}
+  第{S+1}章 ✅ score:{xx} words:{xxxx}
+  ...
+  
+  batch_state 完整性: ✅
+  
+  确认下一步：
+  - "继续" 撰写第 {N+1}-{min(N+3, E)} 章
+  - "停止" 保存进度并退出
+  ═══════════════════════════════════════
 
-在完成第 3、6、9 章...后（即每 3 章），**必须**暂停并等待用户确认：
+若用户设置 AUTO_CONTINUE=1，跳过暂停直接继续。
+```
+
+---
+
+## 循环完成：汇总报告
 
 ```
 ═══════════════════════════════════════
-🚦 分批暂停点 - 第 {batch} 批已完成
-═══════════════════════════════════════
-已完成：第 {S}-{chapter} 章（{batch_count} 章）
-
-本批次状态：
-├── 章节文件：✓ 已落盘
-├── Data Agent：✓ 已回写（{data_agent_count} 次成功）
-├── Git 提交：✓ 已完成
-└── batch_state：✓ 已更新
-
-请确认下一步操作：
-1. 输入 "继续" 撰写下一批次（第 {next_batch_start}-{next_batch_end} 章）
-2. 输入 "停止" 保存进度并退出
-3. 输入 "检查" 查看详细状态
-
-> 注意：超过 3 章未暂停会导致注意力衰减，请及时确认
-═══════════════════════════════════════
-```
-
-> **原理**：每 3 章强制重置 Agent 注意力，防止长循环导致流程被"内部压缩"。
-
-> **自动模式**（可选）：若用户设置 `AUTO_CONTINUE=1`，跳过暂停点直接继续。
-
----
-
-### 重置后的循环验证
-
-> **每次暂停点后重新进入循环时，2.0 上章完整性检查仍然生效。**
-
----
-
-#### 章内验证点（每章必须通过）
-
-**在进入下一章之前，必须验证本章以下项目全部完成**：
-
-```
-章内完成检查（第{chapter}章）：
-├── [✓] 章节文件存在且非空
-├── [✓] Data Agent 已执行（state.json/index.db/summaries 已更新）
-├── [✓] Git 已提交（或记录警告）
-└── [✓] batch_state.json 已更新
-
-若任何一项未完成，**必须回退完成后再继续**。
-```
-
----
-
-### Step 3: 汇总报告
-
-循环结束后：
-
-1. 更新 `.batch_state.json`：`status = "completed"`
-
-2. 输出汇总表格：
-
-```
-## 批量写作完成报告
+📊 批量写作完成
 
 | 章节 | 状态 | 得分 | 字数 |
 |------|------|------|------|
-| 第53章 | ✅ | 87 | 2340 |
-| 第54章 | ✅ | 85 | 2280 |
 | ... | ... | ... | ... |
 
-**总计**：N 章节完成，平均得分 XX.X
+总计: {count} 章 | 成功: {success} | 失败: {failed}
+平均得分: {avg}
+═══════════════════════════════════════
 ```
 
-3. Git 批量提交（可选）：
+更新 batch_state status = "completed"。
 
-```bash
-cd "${PROJECT_ROOT}"
-git add -A
-git -c i18n.commitEncoding=UTF-8 commit -m "批量写作完成: 第{S}-{E}章"
-```
+## 失败处理速查
 
----
-
-## 断点恢复（--resume）
-
-### 检测与恢复流程
-
-```
-1. 检测 .batch_state.json 是否存在
-2. 读取 status 字段
-3. 若 status = "running":
-   - 获取 current_chapter 作为新的 S
-   - 继续执行 Step 2 循环
-4. 若 status = "completed":
-   - 显示汇总报告
-   - 询问是否执行新批次
-```
-
-### 恢复选项
-
-| 选项 | 说明 |
-|------|------|
-| 继续当前章节 | 从 `current_chapter` 重新开始 |
-| 跳过已完成章节 | 从 `completed_chapters[-1] + 1` 开始 |
-| 重新开始 | 删除 batch_state，重新执行 |
-
----
-
-## 状态文件格式
-
-详见 `references/batch-protocol.md`：
-
-```json
-{
-  "task_id": "batch_20260410_103000",
-  "range": {"start": 53, "end": 60},
-  "mode": "unified",
-  "status": "running|completed|failed|stopped",
-  "current_chapter": 55,
-  "completed_chapters": [53, 54],
-  "failed_chapters": [],
-  "chapter_results": {
-    "53": {"status": "success", "score": 87, "words": 2340}
-  }
-}
-```
-
----
-
-## 失败处理
-
-| 失败场景 | 处理方式 |
-|---------|---------|
-| **上章完整性检查失败** | **立即停止**，禁止继续，提示执行 --resume 修复 |
-| 章节起草失败 | 记录到 `failed_chapters`，继续下一章 |
-| 审查 blocking | 记录 deviation，继续（除非 `--stop-on-fail`） |
-| Data Agent 失败 | 重试 3 次，仍失败则记录到 failed_chapters 并停止 |
-| Git 提交失败 | 警告但继续，不阻断 |
-| 分批暂停点超时 | 30 秒无响应自动保存当前进度并退出 |
-
----
-
-## 充分性闸门（每章必须满足）
-
-**未满足以下条件，不得进入下一章或结束批量任务**：
-
-| # | 检查项 | 验证方法 | 对应步骤 |
-|---|--------|---------|----------|
-| 0 | **上章完整性检查** | completed_chapters 包含上一章 | 2.0 |
-| 1 | 章节文件已生成且非空 | `test -s` | 2.2 |
-| 2 | **字数达标** | 实际字数 ≥ 字数下限 | 2.5 |
-| 3 | 审查分数已计算 | review_metrics.json 存在 | 2.3 |
-| 4 | **Data Agent 已回写** | state.json/index.db/summaries 更新 | 2.6 |
-| 5 | **batch_state.json 已更新** | completed_chapters 包含当前章 | 2.8 |
-| 6 | Git 提交已完成 | commit 存在 | 2.7 |
-| - | 分批暂停点（每 3 章） | 用户确认或 AUTO_CONTINUE | 2.10 |
-
-**字数下限标准**：
-- 常规推进章：≥1500字
-- 过渡章：≥1000字
-- 高潮章/战斗章：≥2000字
-
-**⚠️ 关键约束**：
-- **上章完整性检查（#0）是**强制防呆**，任何章节开始前必检**
-- Data Agent 回写（Step 2.6）是**硬性要求**，不得跳过
-- 若 Data Agent 失败，重试 3 次后仍失败，记录到 failed_chapters 并停止批量任务
-- 分批暂停点（#-1）是**抗注意力衰减**机制，每 3 章必须触发
-- 只有通过全部检查，才能进入下一章
-
----
-
-## 工作流终止规则
-
-批量任务完成后**必须终止**，除非用户明确要求：
-
-```
-⚠️ 批量写作任务已终止
-
-如需执行其他操作，请明确说明：
-- "继续写下一批章节"
-- "/webnovel-write-batch --range 61-68"
-- "/webnovel-review --range 53-60"
-```
-
----
-
-## 故障排除
-
-| 问题 | 解决方案 |
-|------|---------|
-| 批量上限报错 | 添加 `--force` 参数 |
-| 大纲缺失警告 | 继续执行，使用通用章节结构 |
-| 审查失败 | 检查 chapter_results 中的 issues |
-| Git 提交失败 | 检查 Git 状态，可能是无新变更 |
-| batch_state 损坏 | 删除后重新执行 |
+| 场景 | 处理 | 阻断 |
+|------|------|------|
+| 上章完整性失败 | 立即停止 | 阻断 |
+| context-agent 失败 | 重试1次→停止 | 阻断 |
+| 字数不足 | 补充→重检 | 章内 |
+| reviewer blocking(1-2轮) | 修→审 | 章内 |
+| reviewer blocking(3轮) | 标记failed→继续 | 否 |
+| data-agent 失败 | 重试1次→标记failed并停止 | 阻断 |
+| chapter-commit 失败 | 修复→重试(3次)→停止 | 阻断 |
+| batch_state 更新失败 | 重试3次→停止 | 阻断 |
