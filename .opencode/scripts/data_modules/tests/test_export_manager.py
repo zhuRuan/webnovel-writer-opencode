@@ -1,87 +1,179 @@
+"""Tests for export_manager module."""
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 
-_scripts_dir = Path(__file__).resolve().parent.parent.parent
+import pytest
+
+# Ensure scripts/ is on the path
+_scripts_dir = Path(__file__).resolve().parents[2]
 if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))
 
-from export_manager import ExportManager
+from export_manager import collect_chapters, _parse_range
+from export_manager.markdown import export_markdown
+from export_manager.txt import export_txt, _strip_markdown
 
 
-def test_parse_chapter_range(tmp_path):
-    (tmp_path / "正文").mkdir()
-    (tmp_path / "正文" / "第0001章-起始.md").write_text("# 第1章", encoding="utf-8")
-    (tmp_path / "正文" / "第0002章-发展.md").write_text("# 第2章", encoding="utf-8")
-    (tmp_path / "正文" / "第0003章-高潮.md").write_text("# 第3章", encoding="utf-8")
-    (tmp_path / "正文" / "第0005章-结局.md").write_text("# 第5章", encoding="utf-8")
+class TestParseRange:
+    def test_single(self):
+        assert _parse_range("5") == {5}
 
-    manager = ExportManager(str(tmp_path))
-    assert manager.parse_chapter_range("1-3") == [1, 2, 3]
-    assert manager.parse_chapter_range("1,3,5") == [1, 3, 5]
-    assert manager.parse_chapter_range("1,3-5") == [1, 3, 4, 5]
-    assert manager.parse_chapter_range("all") == [1, 2, 3, 5]
+    def test_range(self):
+        assert _parse_range("1-5") == {1, 2, 3, 4, 5}
 
+    def test_comma_mix(self):
+        assert _parse_range("1-3,5,7-9") == {1, 2, 3, 5, 7, 8, 9}
 
-def test_get_chapter_list(tmp_path):
-    (tmp_path / "正文").mkdir()
-    (tmp_path / "正文" / "第0001章.md").write_text("内容", encoding="utf-8")
-    (tmp_path / "正文" / "第0003章.md").write_text("内容", encoding="utf-8")
-    (tmp_path / "正文" / "notes.md").write_text("不是章节", encoding="utf-8")
-
-    manager = ExportManager(str(tmp_path))
-    assert manager.get_chapter_list() == [1, 3]
+    def test_clamped(self):
+        assert _parse_range("1-100", max_num=5) == {1, 2, 3, 4, 5}
 
 
-def test_get_chapter_content(tmp_path):
-    (tmp_path / "正文").mkdir()
-    (tmp_path / "正文" / "第0001章-觉醒.md").write_text("正文内容", encoding="utf-8")
+class TestCollectChapters:
+    def test_empty_dir(self, tmp_path):
+        (tmp_path / "正文").mkdir()
+        result = collect_chapters(tmp_path)
+        assert result == []
 
-    manager = ExportManager(str(tmp_path))
-    title, content = manager.get_chapter_content(1)
-    assert "觉醒" in title or title == "第1章"
-    assert "正文内容" in content
+    def test_no_chapters_dir(self, tmp_path):
+        result = collect_chapters(tmp_path)
+        assert result == []
 
-    title2, content2 = manager.get_chapter_content(99)
-    assert content2 == ""
+    def test_flat_layout(self, tmp_path):
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章-标题.md").write_text("# 第1章 测试", encoding="utf-8")
+        (tmp_path / "正文" / "第0002章-继续.md").write_text("# 第2章 继续", encoding="utf-8")
+
+        result = collect_chapters(tmp_path)
+        assert len(result) == 2
+        assert result[0][0] == 1
+        assert result[0][1] == "第1章 测试"
+        assert result[1][0] == 2
+
+    def test_volume_layout(self, tmp_path):
+        vol_dir = tmp_path / "正文" / "第1卷"
+        vol_dir.mkdir(parents=True)
+        (vol_dir / "第001章-开篇.md").write_text("# 第1章 开篇", encoding="utf-8")
+        (vol_dir / "第002章-发展.md").write_text("# 第2章 发展", encoding="utf-8")
+
+        result = collect_chapters(tmp_path)
+        assert len(result) == 2
+
+    def test_mixed_layout(self, tmp_path):
+        """平铺和卷布局混合时正确收集。"""
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章-旧格式.md").write_text("# 旧1", encoding="utf-8")
+        vol_dir = tmp_path / "正文" / "第1卷"
+        vol_dir.mkdir(parents=True)
+        (vol_dir / "第002章-新格式.md").write_text("# 新2", encoding="utf-8")
+
+        result = collect_chapters(tmp_path)
+        assert len(result) == 2
+
+    def test_range_filter(self, tmp_path):
+        (tmp_path / "正文").mkdir()
+        for i in range(1, 6):
+            (tmp_path / "正文" / f"第{i:04d}章.md").write_text(f"# 第{i}章", encoding="utf-8")
+
+        result = collect_chapters(tmp_path, range_spec="2-4")
+        assert len(result) == 3
+        assert [r[0] for r in result] == [2, 3, 4]
+
+    def test_volume_filter(self, tmp_path):
+        v1_dir = tmp_path / "正文" / "第1卷"
+        v1_dir.mkdir(parents=True)
+        v2_dir = tmp_path / "正文" / "第2卷"
+        v2_dir.mkdir(parents=True)
+        # 第1卷: 章 1-50; 第2卷: 章 51-100
+        (v1_dir / "第001章.md").write_text("# 1", encoding="utf-8")
+        (v2_dir / "第051章.md").write_text("# 51", encoding="utf-8")
+
+        result = collect_chapters(tmp_path, volume=1)
+        assert len(result) == 1
+        assert result[0][0] == 1
+
+        result = collect_chapters(tmp_path, volume=2)
+        assert len(result) == 1
+        assert result[0][0] == 51
 
 
-def test_export_to_txt(tmp_path):
-    (tmp_path / "正文").mkdir()
-    (tmp_path / "正文" / "第0001章-起始.md").write_text("第一章内容", encoding="utf-8")
-    (tmp_path / "正文" / "第0002章-发展.md").write_text("第二章内容", encoding="utf-8")
+class TestMarkdownExport:
+    def test_basic(self, tmp_path):
+        chapters_dir = tmp_path / "正文"
+        chapters_dir.mkdir()
+        ch1 = chapters_dir / "第0001章.md"
+        ch1.write_text("# 第1章 开始\n\n正文内容。", encoding="utf-8")
+        ch2 = chapters_dir / "第0002章.md"
+        ch2.write_text("# 第2章 继续\n\n更多内容。", encoding="utf-8")
 
-    manager = ExportManager(str(tmp_path))
-    output = tmp_path / "output.txt"
+        chapters = collect_chapters(tmp_path)
+        output = tmp_path / "导出" / "小说.md"
+        output.parent.mkdir()
 
-    count = manager.export_to_txt([1, 2], str(output))
-    assert count == 2
-    assert output.exists()
+        export_markdown(chapters, output, title="测试小说")
 
-    text = output.read_text(encoding="utf-8")
-    assert "第一章内容" in text
-    assert "第二章内容" in text
-
-
-def test_export_to_markdown(tmp_path):
-    (tmp_path / "正文").mkdir()
-    (tmp_path / "正文" / "第0001章-起始.md").write_text("第一章内容", encoding="utf-8")
-    (tmp_path / "正文" / "第0002章-发展.md").write_text("第二章内容", encoding="utf-8")
-
-    manager = ExportManager(str(tmp_path))
-    output = tmp_path / "output.md"
-
-    count = manager.export_to_markdown([1, 2], str(output))
-    assert count == 2
-    assert output.exists()
-
-    md = output.read_text(encoding="utf-8")
-    assert "第一章内容" in md
-    assert "第二章内容" in md
-    assert "## " in md
+        content = output.read_text(encoding="utf-8")
+        assert "# 测试小说" in content
+        assert "# 第1章 开始" in content
+        assert "正文内容。" in content
+        assert "---" in content
 
 
-def test_empty_chapters(tmp_path):
-    (tmp_path / "正文").mkdir()
-    manager = ExportManager(str(tmp_path))
-    assert manager.get_chapter_list() == []
-    assert manager.parse_chapter_range("all") == []
+class TestTxtExport:
+    def test_basic(self, tmp_path):
+        chapters_dir = tmp_path / "正文"
+        chapters_dir.mkdir()
+        ch1 = chapters_dir / "第0001章.md"
+        ch1.write_text("# 第1章 测试\n\n**粗体**和*斜体*。", encoding="utf-8")
+
+        chapters = collect_chapters(tmp_path)
+        output = tmp_path / "导出" / "小说.txt"
+        output.parent.mkdir()
+
+        export_txt(chapters, output)
+
+        content = output.read_text(encoding="utf-8")
+        assert "第1章" in content
+        assert "粗体" in content
+        assert "斜体" in content
+        assert "**" not in content  # markdown stripped
+
+    def test_strip_markdown(self):
+        assert _strip_markdown("**粗体**文字") == "粗体文字"
+        assert _strip_markdown("*斜体*文字") == "斜体文字"
+        assert _strip_markdown("[链接](http://x.com)") == "链接"
+        assert _strip_markdown("普通文字") == "普通文字"
+
+
+class TestEpubImportError:
+    def test_import_error(self, tmp_path, monkeypatch):
+        """模拟 ebooklib 未安装时退出。"""
+        chapters_dir = tmp_path / "正文"
+        chapters_dir.mkdir()
+        (chapters_dir / "第0001章.md").write_text("# 测试", encoding="utf-8")
+        chapters = collect_chapters(tmp_path)
+
+        output = tmp_path / "导出" / "小说.epub"
+        output.parent.mkdir()
+
+        # Remove ebooklib from sys.modules cache if present, to force __import__ call
+        sys.modules.pop("ebooklib", None)
+
+        # Mock import to simulate missing ebooklib
+        import builtins
+
+        _orig_import = builtins.__import__
+
+        def _mock_import(name, *args, **kwargs):
+            if name == "ebooklib":
+                raise ImportError("No module named 'ebooklib'")
+            return _orig_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", _mock_import)
+
+        from export_manager.epub import export_epub
+
+        with pytest.raises(SystemExit) as exc:
+            export_epub(chapters, output, title="测试", author="作者")
+        assert exc.value.code == 1
