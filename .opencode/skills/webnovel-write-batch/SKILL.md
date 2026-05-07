@@ -46,8 +46,25 @@ test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { e
 ## Step 0: 解析章节范围
 
 - "写第9-15章" → S=9, E=15
-- "连续写3章" → 读 .webnovel/state.json 的 current_chapter，S=N+1, E=N+3
+- "连续写3章" → **扫描文件系统获取最新章节号**（同单章 Step 0），S=最新章+1, E=S+2
 - "批量写5章" → 同上，E=S+4
+
+**禁止依赖 state.json 的 current_chapter 或对话记忆来确定起始章号。** 章节文件是唯一真源。
+
+```bash
+LATEST=$(python -c "
+import re
+from pathlib import Path
+text_dir = Path('${PROJECT_ROOT}') / '正文'
+nums = []
+for f in text_dir.rglob('第*章*.md'):
+    m = re.match(r'第0*(\d+)章', f.name)
+    if m:
+        nums.append(int(m.group(1)))
+print(max(nums) if nums else 0)
+")
+echo "最新章节: 第${LATEST}章"
+```
 
 若无法解析，询问用户明确范围。上限 3 章（可通过 `--force` 参数绕过，上限 5 章）。
 
