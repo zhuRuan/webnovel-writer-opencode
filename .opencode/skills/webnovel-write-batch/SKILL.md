@@ -35,10 +35,12 @@ allowed-tools: Read Write Edit Grep Bash Agent
 ## 环境设置
 
 ```bash
-export WORKSPACE_ROOT="${PWD}"
 export SCRIPTS_DIR="${PWD}/.opencode/scripts"
 export SKILL_ROOT="${PWD}/.opencode/skills/webnovel-write"
-export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
+test -d "${SCRIPTS_DIR}" || { echo "错误: 未找到 ${SCRIPTS_DIR}，请确保当前目录是 webnovel-writer 仓库根目录"; exit 1; }
+
+export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PWD}" where)"
+test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "错误: PROJECT_ROOT 解析失败，请用 --project-root 显式指定"; exit 1; }
 ```
 
 ## Step 0: 解析章节范围

@@ -44,13 +44,13 @@ python -X utf8 "${SCRIPTS_DIR}/reference_search.py" --skill write --table {表�
 ### 准备：预检
 
 ```bash
-export WORKSPACE_ROOT="${PWD}"
 export SCRIPTS_DIR="${PWD}/.opencode/scripts"
 export SKILL_ROOT="${PWD}/.opencode/skills/webnovel-write"
+test -d "${SCRIPTS_DIR}" || { echo "错误: 未找到 ${SCRIPTS_DIR}，请确保当前目录是 webnovel-writer 仓库根目录"; exit 1; }
 
 # 先解析 PROJECT_ROOT（避免 preflight 内部重复解析）
-export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
-test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "❌ PROJECT_ROOT 解析失败"; exit 1; }
+export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PWD}" where)"
+test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "错误: PROJECT_ROOT 解析失败，请用 --project-root 显式指定"; exit 1; }
 echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" preflight
