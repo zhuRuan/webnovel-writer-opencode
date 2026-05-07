@@ -18,7 +18,7 @@ from installer.fetch import (
 
 class TestMirrors:
     def test_mirrors_list_not_empty(self):
-        assert len(MIRRORS) >= 0
+        assert len(MIRRORS) > 0
         assert isinstance(MIRRORS, list)
 
     def test_build_urls_default(self):
