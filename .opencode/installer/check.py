@@ -4,7 +4,6 @@ import sys
 import shutil
 import subprocess
 import platform as _platform
-from pathlib import Path
 
 from installer.ui import info, warn, error
 
