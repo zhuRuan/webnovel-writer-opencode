@@ -23,14 +23,14 @@ allowed-tools: Read Write Edit Grep Bash Agent
 
 | # | 禁止 | 正确做法 |
 |---|------|---------|
-| 1 | 口头描述代替 `Agent()` 调用 | 必须使用 Agent 工具调用 context-agent / reviewer / data-agent |
+| 1 | 口头描述代替 `Agent()` 调用 | 必须使用 Agent 工具调用 context-agent / chapter-writer-agent / reviewer / data-agent |
 | 2 | 跳过审查 | 每章必须运行 reviewer Agent + review-pipeline。blocking=false 也不能跳过 |
 | 3 | 用 Read 工具代替验证命令 | 每步后必须运行 bash 验证命令（test -s / ls / python -c） |
 | 4 | "稍后更新" batch_state | 每章完成后立即用 python -c 写 JSON，写完后重新读取验证 |
-| 5 | 章数多了开始跳步/简化流程 | 每章必须完整执行 webnovel-write 的 7 步，不得缩减。3 章后强制暂停 |
+| 5 | 章数多了开始跳步/简化流程 | 每章必须完整执行本 skill 的 9 步，不得缩减。3 章后强制暂停 |
 | 6 | 子代理失败后假装成功 | 每个 Agent() 调用后检查输出文件是否存在且非空。失败重试 1 次→仍失败则停止 |
-| 7 | 审查和润色合并执行 | 先拿到审查结果 → 再修改正文。禁止在审查前修改 |
-| 8 | 用简化版代替完整单章流程 | 批量中每章 = 单章 webnovel-write 完整流程。不得以"批量模式"为借口降级 |
+| 7 | 审查和润色合并执行 | chapter-writer-agent 先写正文 → reviewer 审查 → 有 blocking 则回传修复。禁止在审查前自行修改 |
+| 8 | 用简化版代替完整单章流程 | 每章 = 完整闭环。chapter-writer-agent 在干净上下文中执行创作，质量等同于单章 |
 
 ## 环境设置
 
@@ -109,7 +109,25 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pre
 
 ## 逐章循环
 
-> **每章 = webnovel-write 完整流程。不简化、不跳步、不合步。**
+> **每章 = 9 步完整闭环。创作在独立 subagent 干净上下文中执行。**
+
+### 逐章检查清单（每章开始前重现）
+
+```
+□ 0. 环境变量验证
+□ A. 上章完整性检查（N > S 时）
+□ 1. 刷新合同树
+□ 2. Agent(context-agent) → 写作任务书
+□ 3. Agent(chapter-writer-agent) → 起草+润色
+□ 4. Agent(reviewer) → 审查结果
+□ 5. review-pipeline → 判定 blocking
+□ 6. blocking? → 提取反馈 → 回到 3（最多 2 轮）
+□ 7. Agent(data-agent) → 事实提取
+□ 8. chapter-commit + 验证投影 + Git 备份
+□ 9. 更新 batch_state + 进度反馈
+```
+
+---
 
 ### Step 0: 环境变量验证（每章开始前强制）
 
@@ -120,21 +138,6 @@ test -d "$PROJECT_ROOT" || { echo "❌ PROJECT_ROOT 目录不存在: $PROJECT_RO
 test -d "${PROJECT_ROOT}/.webnovel" || { echo "❌ ${PROJECT_ROOT}/.webnovel 不存在，PROJECT_ROOT 可能不正确"; exit 1; }
 echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 ```
-
-> 每章开始前重现此清单：
-> ```
-> □ 0. 环境变量验证
-> □ A. 上章完整性检查（N > S 时）
-> □ 1. 刷新合同树
-> □ 2. context-agent → 写作任务书
-> □ 3. 起草正文（2000-2500字）
-> □ 4. 审查（reviewer Agent + review-pipeline）
-> □ 5. 润色（polish-guide + typesetting + style-adapter）
-> □ 6. 提交（data-agent → chapter-commit → 验证投影）
-> □ 7. Git 备份
-> □ B. 更新 batch_state
-> □ C. 进度反馈
-> ```
 
 ---
 
@@ -183,7 +186,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 
 ---
 
-### Step 2: context-agent → 写作任务书
+### Step 2: Agent(context-agent) → 写作任务书
 
 **必须使用 Agent 工具调用 context-agent，不得由主流程自行整理。**
 
@@ -194,22 +197,49 @@ Agent(
 )
 ```
 
-产物：一份写作任务书，能独立支撑 Step 3 起草。验证任务书非空且包含"硬性约束"或"CBN"字样。若失败或返回空，重试 1 次。仍失败→停止。
+验证：任务书非空且包含"硬性约束"或"CBN"字样。失败或返回空→重试 1 次→仍失败则停止。
 
 ---
 
-### Step 3: 起草正文
+### Step 3: Agent(chapter-writer-agent) → 起草+润色
 
-只根据任务书起草。不加载 core-constraints/anti-ai-guide（已内化到任务书）。只输出纯正文，无占位符。有结构化节点时围绕 CBN→CPNs→CEN 展开。中文思维写作。
+**核心变更：原来主线程的起草(Step 3)和润色(Step 5)合并为一次 Agent 调用，在干净上下文中完成完整创作闭环。**
+
+传入 prompt 结构：
+
+```text
+Agent(
+  subagent_type: "chapter-writer-agent",
+  prompt: """
+【章节】第{N}章
+【字数】2000-2500 字
+
+【写作任务书】
+{context-agent 产出的完整任务书}
+
+【章纲约束】
+{从 chapter_{NNN}.json 提取的 chapter_directive.goal / time_anchor / countdown / chapter_end_open_question / must_cover_nodes / forbidden_zones}
+
+【润色指南】
+- 风格适配：与 MASTER_SETTING 保持一致的人称/视角/叙事距离
+- 排版：标题格式 `## 第{NNNN}章 标题`，段落间空行，对话分行
+- Anti-AI 终检：消除"不是...而是..."句式、段落首尾总结句、冗余"突然/忽然"、机械动作罗列、直接情感告知
+
+【审查反馈】
+（首轮为空。修复轮时填入：）
+- [{category}] {description} (位置: {location})
+"""
+)
+```
+
+**验证：**
 
 ```bash
-CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter $N)
+CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter {N})
 CHAPTER_FILE="${PROJECT_ROOT}/${CHAPTER_PATH}"
 
-# 写入正文后验证
-test -s "$CHAPTER_FILE" || echo "❌ 章节文件为空"
+test -s "$CHAPTER_FILE" || { echo "❌ 章节文件为空"; exit 1; }
 
-# 字数检查
 WORDS=$(python -c "
 import re
 t = open('$CHAPTER_FILE', encoding='utf-8').read()
@@ -217,17 +247,15 @@ print(len(re.findall(r'[一-鿿]', t)))
 ")
 echo "字数: $WORDS"
 if [ "$WORDS" -lt 1500 ]; then
-  echo "⚠️ 字数不足 1500，需补充"
+  echo "⚠️ 字数不足 1500"
 fi
 ```
 
-字数不足时补充，直到 ≥1500。
+字数不足→重试 chapter-writer-agent（提示字数不足）。仍不足→标记 warning 继续。
 
 ---
 
-### Step 4: 审查
-
-#### 4.1 reviewer Agent
+### Step 4: Agent(reviewer) → 审查
 
 **必须使用 Agent 工具调用 reviewer，不得由主流程伪造审查 JSON。**
 
@@ -238,7 +266,9 @@ Agent(
 )
 ```
 
-#### 4.2 review-pipeline
+---
+
+### Step 5: review-pipeline
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \
@@ -250,50 +280,50 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" rev
 ```
 
 验证审查结果：
+
 ```bash
 python -c "
 import json
 d = json.load(open('${PROJECT_ROOT}/.webnovel/tmp/review_results.json'))
 assert isinstance(d, dict), 'review_results 不是 JSON 对象'
-print(f'blocking: {d.get(\"blocking\",\"unknown\")}, score: {d.get(\"score\",\"unknown\")}')
+blocking_count = len([i for i in d.get('issues',[]) if i.get('severity')=='blocking'])
+print(f'blocking: {blocking_count}, score: {d.get(\"score\",\"unknown\")}')
 "
 ```
 
-blocking=true → 修复后重审，不进 Step 5。
+---
+
+### Step 6: 修复轮
+
+```
+blocking_count > 0 → 进入修复轮（最多 2 轮）
+
+修复轮流程：
+  round = 0
+  while blocking_count > 0 and round < 2:
+    1. 从 review_results.json 提取 blocking issues 文本：
+       python -c "import json; d=json.load(open('${PROJECT_ROOT}/.webnovel/tmp/review_results.json')); [print(f\"- [{i.get('category','')}] {i.get('description','')} (位置: {i.get('location','')})\") for i in d.get('issues',[]) if i.get('severity')=='blocking']"
+
+    2. Agent(chapter-writer-agent) 修复模式
+       将提取的 issue 列表填入 prompt 的【审查反馈】部分
+       prompt 明确指出："修复模式：只修改上述审查反馈指出的具体问题，不大面积重写。保留未涉及部分的原文。"
+
+    3. Agent(reviewer) 重新审查
+       → 覆盖更新 review_results.json
+
+    4. review-pipeline 重新判定 blocking
+
+    5. round += 1
+
+  if blocking_count > 0:
+    标记本章 failed，记录 blocking issues 到 batch_state，继续下一章
+  else:
+    阻塞已清除，继续 Step 7
+```
 
 ---
 
-### Step 5: 润色
-
-加载 polish-guide、typesetting、style-adapter：
-```bash
-POLISH_GUIDE="${SKILL_ROOT}/polish-guide.md"
-TYPESETTING="${SKILL_ROOT}/typesetting.md"
-STYLE_ADAPTER="${SKILL_ROOT}/style-adapter.md"
-```
-
-顺序：修复非 blocking issue → 风格适配 → 排版 → Anti-AI 终检。
-
-只改表达不改事实。`anti_ai_force_check=fail` 时不进 Step 6。
-
-**blocking issue 处理：**
-```
-读取 review_results.json:
-  if blocking_issues 数量 > 0:
-    1. 修复正文中每个 blocking issue
-    2. 重新运行 Step 4（reviewer Agent + review-pipeline）
-    3. 若仍有 blocking → 再修再审（最多 2 轮）
-    4. 2 轮后仍有 blocking → 标记本章 failed，记录原因，继续下一章
-
-  if blocking = 0:
-    针对 suggestions 做轻量润色（措辞/节奏/钩子强度）
-```
-
----
-
-### Step 6: 提交
-
-#### 6.1 data-agent 提取事实
+### Step 7: Agent(data-agent) → 事实提取
 
 **必须使用 Agent 工具调用 data-agent，不得跳过或手动模拟。**
 
@@ -305,6 +335,7 @@ Agent(
 ```
 
 验证输出文件：
+
 ```bash
 for f in fulfillment_result.json disambiguation_result.json extraction_result.json; do
   FP="${PROJECT_ROOT}/.webnovel/tmp/${f}"
@@ -318,7 +349,9 @@ done
 
 任一缺失→重试 Agent 调用 1 次。仍缺失→标记 failed 并停止。
 
-#### 6.2 chapter-commit
+---
+
+### Step 8: chapter-commit + 验证投影 + Git 备份
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-commit \
@@ -331,19 +364,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" cha
 
 自动判定：blocking_count>0 或 missed_nodes 非空 或 pending 非空 → rejected，否则 accepted。
 
-#### 6.3 验证投影
+验证投影：projection_status 五项（state/index/summary/memory/vector）全部 done 或 skipped。
 
-projection_status 五项（state/index/summary/memory/vector）全部 done 或 skipped。
-
-chapter_status 由 projection writer 自动推进：accepted→committed，rejected→rejected。
-
-#### 6.4 失败隔离
-
-commit 未生成→重跑 6.2。projection 失败→只补跑失败项。不回退 Step 1-5。
-
----
-
-### Step 7: Git 备份
+失败隔离：commit 未生成→重跑 2 次。projection 失败→只补跑失败项。不回退 Step 1-7。
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" backup \
@@ -355,17 +378,17 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" bac
 
 ---
 
-### Step B: 更新 batch_state
+### Step 9: 更新 batch_state + 进度反馈
 
 ```bash
 python -c "
-import json, pathlib, datetime, os
+import json, pathlib, datetime
 
-# 1) 读取审查得分
-review_path = os.path.join('${PROJECT_ROOT}', '.webnovel', 'tmp', 'review_results.json')
+# 读取审查得分
+review_path = '${PROJECT_ROOT}/.webnovel/tmp/review_results.json'
 score = json.load(open(review_path)).get('score', 0)
 
-# 2) 更新 batch_state
+# 更新 batch_state
 p = pathlib.Path('$BATCH_STATE')
 s = json.loads(p.read_text())
 s['completed_chapters'].append($N)
@@ -378,7 +401,7 @@ s['chapter_results'][str($N)] = {
 }
 p.write_text(json.dumps(s, ensure_ascii=False, indent=2))
 
-# 3) 验证写入
+# 验证写入
 assert $N in s['completed_chapters'], '写入验证失败'
 print('✅ batch_state 已验证')
 "
@@ -386,24 +409,9 @@ print('✅ batch_state 已验证')
 
 更新失败→重试 3 次。仍失败→停止。
 
----
-
-### Step C: 进度反馈
-
 ```
 ✅ 第{N}章完成 | 审查: {SCORE}/100 | 字数: {WORDS} | 进度: {N-S+1}/{E-S+1}
 ```
-
----
-
-## 充分性闸门（每章）
-
-1. 正文文件存在且非空
-2. 审查已落库
-3. blocking=true 必须停在 Step 4
-4. anti_ai_force_check=pass
-5. accepted CHAPTER_COMMIT，projection 五项 done/skipped
-6. chapter_status=committed（projection 自动推进）
 
 ---
 
@@ -458,10 +466,10 @@ print('✅ batch_state 已验证')
 | preflight 失败（批前） | 修复环境→重试1次→停止 | 阻断 |
 | 合同树刷新失败 | 检查缺失文件→修复→重试1次→停止 | 阻断 |
 | context-agent 失败 | 重试1次→停止 | 阻断 |
-| 字数不足 | 补充→重检 | 章内 |
-| reviewer blocking(1-2轮) | 修→审（Agent + pipeline） | 章内 |
+| chapter-writer-agent 失败 | 重试1次→停止 | 阻断 |
+| 字数不足 | 重试 chapter-writer-agent | 章内 |
+| reviewer blocking(1-2轮) | 提取反馈→回传 chapter-writer-agent→重审 | 章内 |
 | reviewer blocking(3轮) | 标记failed→继续 | 否 |
-| 润色 anti_ai=fail | 修复→重检 | 章内 |
 | data-agent 失败 | 重试1次→标记failed并停止 | 阻断 |
 | chapter-commit 失败 | 修复→重试(3次)→停止 | 阻断 |
 | projection 失败 | 只补跑失败项 | 章内 |
