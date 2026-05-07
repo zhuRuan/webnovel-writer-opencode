@@ -93,6 +93,6 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" publish upload \
 | 问题 | 解决 |
 |------|------|
 | 登录超时 | 重新运行 setup-auth，3 分钟内扫码 |
-| 认证过期 | 删除 ~/.webnovel-publish/auth/ 重新登录 |
+| 认证过期 | 重新运行 setup-auth，3 分钟内扫码（认证存储在 `~/.webnovel-publish/browser_data/fanqie/`，仅目录存在不代表有效） |
 | 浏览器不弹 | 检查显示器配置 |
 | Playwright 未安装 | pip install playwright && playwright install chromium |

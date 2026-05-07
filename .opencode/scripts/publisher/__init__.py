@@ -61,7 +61,9 @@ async def _cmd_list_books(args: argparse.Namespace):
             print("未找到书籍")
         else:
             for i, book in enumerate(books, 1):
-                print(f"  {i}. {book.get('book_name', book.get('title', '未知'))}")
+                bid = book.get("book_id", "") or book.get("id", "")
+                name = book.get("book_name", book.get("title", "未知"))
+                print(f"  {i}. {name}  (book_id: {bid})")
     finally:
         await browser.close()
 
@@ -150,13 +152,13 @@ def _read_book_meta(project_root: Path):
     meta = BookMeta(title="", genre="", synopsis="", protagonist="")
     if state_file.is_file():
         s = json.loads(state_file.read_text(encoding="utf-8"))
-        proj = s.get("project", {}) if isinstance(s, dict) else {}
-        meta.title = proj.get("title", "") or project_root.name
-        meta.genre = proj.get("genre", "")
-        protag = proj.get("protagonist_state", {})
+        proj_info = s.get("project_info", {}) if isinstance(s, dict) else {}
+        meta.title = proj_info.get("title", "") or project_root.name
+        meta.genre = proj_info.get("genre", "")
+        protag = s.get("protagonist_state", {}) if isinstance(s, dict) else {}
         meta.protagonist = protag.get("name", "") if isinstance(
             protag, dict) else ""
-        meta.synopsis = proj.get("synopsis", "")
+        meta.synopsis = proj_info.get("synopsis", "")
     return meta
 
 
@@ -166,7 +168,7 @@ def _parse_range(spec: str, project_root: Path) -> list[int]:
         text_dir = project_root / "正文"
         if text_dir.is_dir():
             nums = []
-            for f in sorted(text_dir.glob("第*章*.md")):
+            for f in sorted(text_dir.rglob("第*章*.md")):
                 m = re.match(r"第(\d+)章", f.name)
                 if m:
                     nums.append(int(m.group(1)))
@@ -197,7 +199,7 @@ def _find_chapter_file(project_root: Path, index: int) -> Path | None:
     text_dir = project_root / "正文"
     if not text_dir.is_dir():
         return None
-    for f in text_dir.iterdir():
+    for f in text_dir.rglob("*.md"):
         m = re.match(rf"第{index:04d}章|第{index}章", f.name)
         if m:
             return f
