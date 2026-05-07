@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -134,7 +135,10 @@ def _run_script(script_name: str, argv: list[str]) -> int:
     script_path = _scripts_dir() / script_name
     if not script_path.is_file():
         raise FileNotFoundError(f"未找到脚本: {script_path}")
-    proc = subprocess.run([sys.executable, str(script_path), *argv])
+    proc = subprocess.run(
+        [sys.executable, "-X", "utf8", str(script_path), *argv],
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
     return int(proc.returncode or 0)
 
 

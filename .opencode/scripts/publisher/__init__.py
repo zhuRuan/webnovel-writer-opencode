@@ -42,9 +42,9 @@ async def _cmd_setup_auth(args: argparse.Namespace):
     try:
         ok = await adapter.setup_auth(page)
         if ok:
-            print(f"✅ {adapter.display_name} 登录成功，认证状态已自动保存")
+            print(f"[OK] {adapter.display_name} 登录成功，认证状态已自动保存")
         else:
-            print(f"❌ {adapter.display_name} 登录超时")
+            print(f"[FAIL] {adapter.display_name} 登录超时")
             sys.exit(1)
     finally:
         await browser.close()
@@ -77,9 +77,9 @@ async def _cmd_create_book(args: argparse.Namespace):
     try:
         book_id = await adapter.create_book(page, meta)
         if book_id:
-            print(f"✅ 书籍创建成功！book_id: {book_id}")
+            print(f"[OK] 书籍创建成功！book_id: {book_id}")
         else:
-            print("❌ 创建失败，请手动检查")
+            print("[FAIL] 创建失败，请手动检查")
             sys.exit(1)
     finally:
         await browser.close()
@@ -116,7 +116,7 @@ async def _cmd_upload(args: argparse.Namespace):
         for idx in to_upload:
             chapter_file = _find_chapter_file(project_root, idx)
             if not chapter_file:
-                print(f"  ⚠️ 第{idx}章文件未找到，跳过")
+                print(f"  [WARN] 第{idx}章文件未找到，跳过")
                 fail_count += 1
                 continue
 
@@ -131,10 +131,10 @@ async def _cmd_upload(args: argparse.Namespace):
                 uploaded.add(idx)
                 save_upload_log(args.platform, args.book_id, uploaded)
                 success_count += 1
-                print(f"  ✅ 第{idx}章 {result.message}")
+                print(f"  [OK] 第{idx}章 {result.message}")
             else:
                 fail_count += 1
-                print(f"  ❌ 第{idx}章 {result.message}")
+                print(f"  [FAIL] 第{idx}章 {result.message}")
 
             await asyncio.sleep(cfg.chapter_gap)
     finally:
