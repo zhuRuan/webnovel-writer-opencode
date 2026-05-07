@@ -302,7 +302,9 @@ class FanqieAdapter(BasePlatform):
         volume_id, volume_name = await self._get_first_volume(page, book_id)
 
         # Fanqie 标题格式: "第 X 章 标题" (5-30 chars)
-        full_title = f"第 {chapter.index} 章 {chapter.title}"
+        # 去除 chapter.title 中已有的"第X章"前缀，避免重复
+        clean_title = re.sub(r"^第\s*\d+\s*章\s*", "", chapter.title).strip()
+        full_title = f"第 {chapter.index} 章 {clean_title}"
         if len(full_title) > 30:
             full_title = full_title[:30]
 

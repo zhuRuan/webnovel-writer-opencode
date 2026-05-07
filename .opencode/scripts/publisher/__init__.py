@@ -61,7 +61,7 @@ async def _cmd_list_books(args: argparse.Namespace):
             print("未找到书籍")
         else:
             for i, book in enumerate(books, 1):
-                print(f"  {i}. {book.get('title', '未知')}")
+                print(f"  {i}. {book.get('book_name', book.get('title', '未知'))}")
     finally:
         await browser.close()
 
