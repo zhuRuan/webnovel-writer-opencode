@@ -88,11 +88,6 @@ RERANK_BASE_URL=https://api.jina.ai/v1
 RERANK_MODEL=jina-reranker-v3
 RERANK_API_KEY=your_api_key
 
-# 图片生成（ModelScope）
-IMAGE_BASE_URL=https://api-inference.modelscope.cn/v1
-IMAGE_MODEL=Qwen/Qwen-Image-2512
-IMAGE_API_KEY=your_api_key
-IMAGE_SIZE=1:1
 ```
 
 ### 在 OpenCode 中使用
@@ -108,7 +103,7 @@ IMAGE_SIZE=1:1
 /webnovel-dashboard    # 启动可视化看板
 /webnovel-query        # 查询设定
 /webnovel-learn        # 学习模式
-/webnovel-image-gen    # 图片生成（封面/角色）
+
 ```
 
 ## 项目结构

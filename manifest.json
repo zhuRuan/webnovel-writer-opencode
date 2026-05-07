@@ -1221,10 +1221,7 @@
       "sha256": "1d1dea8b3d31f306ac939a967ce1b46652a011828cd10f5dc54a7c770f076214",
       "size": 4411
     },
-    ".opencode/skills/webnovel-image-gen/SKILL.md": {
-      "sha256": "1568a8553cdbfc0e27c4d6eca79f64d76e3a0f115c7a7be23e279224483a8a06",
-      "size": 5264
-    },
+
     ".opencode/skills/webnovel-init/SKILL.md": {
       "sha256": "47bb3944a355b9678610dd2487c9ee967bfc2fb0b2521b8ce3b7b6eb972e07d0",
       "size": 18956
