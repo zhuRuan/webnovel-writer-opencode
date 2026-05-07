@@ -106,39 +106,25 @@ def _build_chapter_filename(project_root: Path, chapter_num: int, *, use_volume_
     return f"第{padded}章.md"
 
 
-def find_chapter_file(project_root: Path, chapter_num: int, *, use_volume_layout: Optional[bool] = None) -> Optional[Path]:
+def find_chapter_file(project_root: Path, chapter_num: int) -> Optional[Path]:
     """
     Find an existing chapter file for chapter_num under project_root/正文.
     Returns the first match (stable sorted order) or None if not found.
-    
-    Args:
-        project_root: 项目根目录
-        chapter_num: 章节号
-        use_volume_layout: True 强制卷布局，False 强制平坦布局，None 自动检测
     """
     chapters_dir = project_root / "正文"
     if not chapters_dir.exists():
         return None
 
-    # 自动检测布局偏好
-    if use_volume_layout is None:
-        # 检查是否存在卷目录
-        vol_dir = chapters_dir / f"第{volume_num_for_chapter(chapter_num)}卷"
-        use_volume_layout = vol_dir.exists()
-
-    if use_volume_layout:
-        vol_dir = chapters_dir / f"第{volume_num_for_chapter(chapter_num)}卷"
-        if vol_dir.exists():
-            candidates = sorted(vol_dir.glob(f"第{chapter_num:03d}章*.md")) + sorted(vol_dir.glob(f"第{chapter_num:04d}章*.md"))
-            for c in candidates:
-                if c.is_file():
-                    return c
-        return None
-
-    # 平坦布局
     legacy = chapters_dir / f"第{chapter_num:04d}章.md"
     if legacy.exists():
         return legacy
+
+    vol_dir = chapters_dir / f"第{volume_num_for_chapter(chapter_num)}卷"
+    if vol_dir.exists():
+        candidates = sorted(vol_dir.glob(f"第{chapter_num:03d}章*.md")) + sorted(vol_dir.glob(f"第{chapter_num:04d}章*.md"))
+        for c in candidates:
+            if c.is_file():
+                return c
 
     # Fallback: search anywhere under 正文/ (supports custom layouts)
     candidates = sorted(chapters_dir.rglob(f"第{chapter_num:03d}章*.md")) + sorted(chapters_dir.rglob(f"第{chapter_num:04d}章*.md"))
@@ -149,37 +135,21 @@ def find_chapter_file(project_root: Path, chapter_num: int, *, use_volume_layout
     return None
 
 
-def default_chapter_draft_path(project_root: Path, chapter_num: int, *, use_volume_layout: Optional[bool] = None) -> Path:
+def default_chapter_draft_path(project_root: Path, chapter_num: int, *, use_volume_layout: bool = False) -> Path:
     """
     Preferred draft path when creating a new chapter file.
 
     Args:
         project_root: 项目根目录
         chapter_num: 章节号
-        use_volume_layout: True 使用卷布局，False 使用平坦布局，None 自动检测（默认）
+        use_volume_layout: True 使用卷布局 (正文/第N卷/第NNN章-章节标题.md)，False 使用平坦布局 (正文/第NNNN章-章节标题.md)
 
-    自动检测：检查是否存在 "正文/第N卷/" 目录。
-    如果详细大纲已有章节标题，会附加到文件名中以提高可发现性。
+    Default is flat layout. If the detailed outline already has a chapter title,
+    append it to the filename for better discoverability.
     """
-    # 自动检测布局偏好
-    if use_volume_layout is None:
-        chapters_dir = project_root / "正文"
-        if chapters_dir.exists():
-            for item in chapters_dir.iterdir():
-                if item.is_dir() and "卷" in item.name:
-                    use_volume_layout = True
-                    break
-            else:
-                use_volume_layout = False
-        else:
-            use_volume_layout = False
-
     if use_volume_layout:
         vol_dir = project_root / "正文" / f"第{volume_num_for_chapter(chapter_num)}卷"
-        vol_dir.mkdir(parents=True, exist_ok=True)
         return vol_dir / _build_chapter_filename(project_root, chapter_num, use_volume_layout=True)
     else:
-        chapters_dir = project_root / "正文"
-        chapters_dir.mkdir(parents=True, exist_ok=True)
-        return chapters_dir / _build_chapter_filename(project_root, chapter_num, use_volume_layout=False)
+        return project_root / "正文" / _build_chapter_filename(project_root, chapter_num, use_volume_layout=False)
 

@@ -8,22 +8,29 @@ from __future__ import annotations
 import json
 import re
 import sys
-from logger import get_logger
+import logging
 from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
 from typing import Any, Dict, List, Optional
 
 try:
-    from chapter_outline_loader import load_chapter_outline
+    from chapter_outline_loader import (
+        load_chapter_outline,
+        load_chapter_plot_structure,
+    )
 except ImportError:  # pragma: no cover
-    from scripts.chapter_outline_loader import load_chapter_outline
+    from scripts.chapter_outline_loader import (
+        load_chapter_outline,
+        load_chapter_plot_structure,
+    )
 
 from .config import get_config
 from .index_manager import IndexManager, WritingChecklistScoreMeta
 from .context_ranker import ContextRanker
-from .snapshot_manager import SnapshotManager, SnapshotVersionMismatch
-from .observability import safe_append_perf_timing
+from .prewrite_validator import PrewriteValidator
+from .story_contracts import read_json_if_exists
+from .story_runtime_sources import RuntimeSourceSnapshot, load_runtime_sources
 from .context_weights import (
     DEFAULT_TEMPLATE as CONTEXT_DEFAULT_TEMPLATE,
     TEMPLATE_WEIGHTS as CONTEXT_TEMPLATE_WEIGHTS,
@@ -44,13 +51,8 @@ from .writing_guidance_builder import (
     is_checklist_item_completed,
 )
 
-try:
-    from .debt_tracker import DebtTracker
-except ImportError:
-    DebtTracker = None
 
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class ContextManager:
@@ -60,249 +62,83 @@ class ContextManager:
     EXTRA_SECTIONS = {
         "story_skeleton",
         "memory",
+        "long_term_memory",
         "preferences",
         "alerts",
         "reader_signal",
         "genre_profile",
         "writing_guidance",
+        "plot_structure",
+        "story_contract",
+        "runtime_status",
+        "latest_commit",
+        "prewrite_validation",
     }
     SECTION_ORDER = [
         "core",
+        "story_contract",
+        "runtime_status",
+        "latest_commit",
+        "prewrite_validation",
         "scene",
         "global",
         "reader_signal",
         "genre_profile",
         "writing_guidance",
+        "plot_structure",
         "story_skeleton",
         "memory",
+        "long_term_memory",
         "preferences",
         "alerts",
     ]
     SUMMARY_SECTION_RE = re.compile(r"##\s*剧情摘要\s*\r?\n(.*?)(?=\r?\n##|\Z)", re.DOTALL)
 
-    def __init__(self, config=None, snapshot_manager: Optional[SnapshotManager] = None):
+    def __init__(self, config=None):
         self.config = config or get_config()
-        self.snapshot_manager = snapshot_manager or SnapshotManager(self.config)
         self.index_manager = IndexManager(self.config)
         self.context_ranker = ContextRanker(self.config)
-        self._memory_cache: Dict[int, Dict[str, Any]] = {}
-        self._memory_cache_max = 128
-        self._memory_cache_enabled = getattr(self.config, 'context_memory_cache_enabled', True)
-        self._cache_hits = 0
-        self._cache_misses = 0
-        self._token_usage: Dict[int, int] = {}
-
-    def _is_snapshot_compatible(self, cached: Dict[str, Any], template: str) -> bool:
-        """判断快照是否可用于当前模板。"""
-        if not isinstance(cached, dict):
-            return False
-
-        meta = cached.get("meta")
-        if not isinstance(meta, dict):
-            return template == self.DEFAULT_TEMPLATE
-
-        cached_template = meta.get("template")
-        if not isinstance(cached_template, str):
-            return template == self.DEFAULT_TEMPLATE
-
-        return cached_template == template
-
-    def _get_from_memory_cache(self, chapter: int, template: str) -> Optional[Dict[str, Any]]:
-        """从内存缓存获取"""
-        if not self._memory_cache_enabled:
-            return None
-        key = (chapter, template)
-        return self._memory_cache.get(key)
-
-    def _set_to_memory_cache(self, chapter: int, template: str, context: Dict[str, Any]) -> None:
-        """存入内存缓存"""
-        if not self._memory_cache_enabled:
-            return
-        key = (chapter, template)
-        if len(self._memory_cache) >= self._memory_cache_max:
-            try:
-                self._memory_cache.pop(next(iter(self._memory_cache)))
-            except StopIteration:
-                pass
-        self._memory_cache[key] = context
-
-    def get_cache_stats(self) -> Dict[str, Any]:
-        """Return cache hit/miss stats."""
-        total = self._cache_hits + self._cache_misses
-        return {
-            "hits": self._cache_hits,
-            "misses": self._cache_misses,
-            "hit_rate": round(self._cache_hits / total, 3) if total > 0 else 0.0,
-        }
-
-    def get_token_usage(self, last_n: int = 20) -> Dict[str, Any]:
-        """Return recent token usage stats."""
-        items = sorted(self._token_usage.items(), reverse=True)[:last_n]
-        if not items:
-            return {"chapters": {}, "total_tokens": 0, "avg_tokens": 0}
-        tokens = [t for _, t in items]
-        return {
-            "chapters": {ch: t for ch, t in items},
-            "total_tokens": sum(tokens),
-            "avg_tokens": int(sum(tokens) / len(tokens)),
-        }
 
     def build_context(
         self,
         chapter: int,
         template: str | None = None,
-        use_snapshot: bool = True,
-        save_snapshot: bool = True,
         max_chars: Optional[int] = None,
     ) -> Dict[str, Any]:
-        import time
-
-        start_time = time.perf_counter()
-        snapshot_hit = False
-        snapshot_load_time = 0.0
-
         template = template or self.DEFAULT_TEMPLATE
         self._active_template = template
         if template not in self.TEMPLATE_WEIGHTS:
             template = self.DEFAULT_TEMPLATE
             self._active_template = template
 
-        mem_cached = self._get_from_memory_cache(chapter, template)
-        if mem_cached:
-            self._cache_hits += 1
-            snapshot_hit = True
-            if hasattr(self.config, 'project_root'):
-                safe_append_perf_timing(
-                    self.config.project_root,
-                    tool_name="context_manager.build_context",
-                    success=True,
-                    elapsed_ms=1,
-                    meta={"memory_cache_hit": True, "chapter": chapter, "template": template},
-                )
-            return mem_cached
-
-        self._cache_misses += 1
-
-        if use_snapshot:
-            try:
-                snap_start = time.perf_counter()
-                cached = self.snapshot_manager.load_snapshot(chapter)
-                snapshot_load_time = time.perf_counter() - snap_start
-                if cached and self._is_snapshot_compatible(cached, template):
-                    snapshot_hit = True
-                    payload = cached.get("payload", cached)
-                    self._set_to_memory_cache(chapter, template, payload)
-                    if hasattr(self.config, 'project_root'):
-                        safe_append_perf_timing(
-                            self.config.project_root,
-                            tool_name="context_manager.build_context",
-                            success=True,
-                            elapsed_ms=int(snapshot_load_time * 1000),
-                            meta={"snapshot_hit": True, "chapter": chapter, "template": template},
-                        )
-                    return payload
-            except SnapshotVersionMismatch:
-                pass
-
         pack = self._build_pack(chapter)
-        pack_time = time.perf_counter() - start_time - snapshot_load_time
-
         if getattr(self.config, "context_ranker_enabled", True):
-            rank_start = time.perf_counter()
             pack = self.context_ranker.rank_pack(pack, chapter)
-            rank_time = time.perf_counter() - rank_start
-        else:
-            rank_time = 0.0
 
-        assemble_start = time.perf_counter()
-        assembled = self.assemble_context(pack, template=template, max_chars=max_chars)
-        assemble_time = time.perf_counter() - assemble_start
+        return self._assemble_json_payload(pack, template=template)
 
-        total_time = time.perf_counter() - start_time
-
-        if save_snapshot:
-            meta = {"template": template}
-            self.snapshot_manager.save_snapshot(chapter, assembled, meta=meta)
-            self._set_to_memory_cache(chapter, template, assembled)
-
-        context_size = len(json.dumps(assembled, ensure_ascii=False))
-        self._token_usage[chapter] = int(context_size * 0.75)
-
-        if hasattr(self.config, 'project_root'):
-            safe_append_perf_timing(
-                self.config.project_root,
-                tool_name="context_manager.build_context",
-                success=True,
-                elapsed_ms=int(total_time * 1000),
-                meta={
-                    "snapshot_hit": snapshot_hit,
-                    "snapshot_load_ms": int(snapshot_load_time * 1000),
-                    "pack_ms": int(pack_time * 1000),
-                    "rank_ms": int(rank_time * 1000),
-                    "assemble_ms": int(assemble_time * 1000),
-                    "context_size": context_size,
-                    "chapter": chapter,
-                    "template": template,
-                    "cache_stats": self.get_cache_stats(),
-                    "estimated_tokens": int(context_size * 0.75),
-                },
-            )
-
-        return assembled
-
-    def assemble_context(
-        self,
-        pack: Dict[str, Any],
-        template: str = DEFAULT_TEMPLATE,
-        max_chars: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    def _assemble_json_payload(self, pack: Dict[str, Any], template: str = DEFAULT_TEMPLATE) -> Dict[str, Any]:
         chapter = int((pack.get("meta") or {}).get("chapter") or 0)
         weights = self._resolve_template_weights(template=template, chapter=chapter)
-        max_chars = max_chars or 8000
-        extra_budget = int(self.config.context_extra_section_budget or 0)
 
-        sections = {}
+        payload: Dict[str, Any] = {
+            "meta": {
+                **(pack.get("meta") or {}),
+                "context_contract_version": "v3",
+            },
+        }
+
         for section_name in self.SECTION_ORDER:
-            if section_name in pack:
-                sections[section_name] = pack[section_name]
+            if section_name in pack and section_name != "global":
+                content = pack[section_name]
+                weight = weights.get(section_name, 0.0)
+                if weight > 0 or section_name in self.EXTRA_SECTIONS:
+                    payload[section_name] = content
 
-        assembled: Dict[str, Any] = {"meta": pack.get("meta", {}), "sections": {}}
-        for name, content in sections.items():
-            weight = weights.get(name, 0.0)
-            if weight > 0:
-                budget = int(max_chars * weight)
-            elif name in self.EXTRA_SECTIONS and extra_budget > 0:
-                budget = extra_budget
-            else:
-                budget = None
-            text = self._compact_json_text(content, budget)
-            assembled["sections"][name] = {"content": content, "text": text, "budget": budget}
-
-        assembled["template"] = template
-        assembled["weights"] = weights
         if chapter > 0:
-            assembled.setdefault("meta", {})["context_weight_stage"] = self._resolve_context_stage(chapter)
-        
-        if DebtTracker and getattr(self.config, "context_debt_aware_budget_enabled", True):
-            debt_threshold = getattr(self.config, "context_debt_aware_threshold", 2)
-            foreshadow_weight = getattr(self.config, "context_debt_aware_foreshadow_weight", 0.15)
-            
-            tracker = DebtTracker()
-            active_debts = tracker.check_active_debts()
-            
-            if len(active_debts) > debt_threshold:
-                adjusted_weights = dict(weights)
-                adjusted_weights["global"] = adjusted_weights.get("global", 0) + foreshadow_weight
-                adjusted_weights["scene"] = max(0, adjusted_weights.get("scene", 0) - foreshadow_weight)
-                assembled["weights"] = adjusted_weights
-                assembled["meta"]["debt_aware"] = {
-                    "active_debts": len(active_debts),
-                    "threshold": debt_threshold,
-                    "foreshadow_weight": foreshadow_weight,
-                }
-                logger.info(f"债务感知预算启用: %d 活跃债务 → foreshadow %.0f%%", len(active_debts), foreshadow_weight * 100)
-        
-        return assembled
+            payload["meta"]["context_weight_stage"] = self._resolve_context_stage(chapter)
+
+        return payload
 
     def filter_invalid_items(self, items: List[Dict[str, Any]], source_type: str, id_key: str) -> List[Dict[str, Any]]:
         confirmed = self.index_manager.get_invalid_ids(source_type, status="confirmed")
@@ -328,6 +164,19 @@ class ContextManager:
 
     def _build_pack(self, chapter: int) -> Dict[str, Any]:
         state = self._load_state()
+        runtime_sources = load_runtime_sources(self.config.project_root, chapter)
+        use_orchestrator = bool(getattr(self.config, "context_use_memory_orchestrator", False))
+
+        orchestrator_pack: Dict[str, Any] = {}
+        if use_orchestrator:
+            try:
+                from .memory.orchestrator import MemoryOrchestrator
+
+                orchestrator = MemoryOrchestrator(self.config)
+                orchestrator_pack = orchestrator.build_memory_pack(chapter)
+            except Exception as exc:
+                logger.warning("memory_orchestrator_failed: %s", exc)
+
         core = {
             "chapter_outline": self._load_outline(chapter),
             "protagonist_snapshot": state.get("protagonist_state", {}),
@@ -341,39 +190,21 @@ class ContextManager:
                 window=self.config.context_recent_meta_window,
             ),
         }
-
-        try:
-            nodes = self.index_manager.get_chapter_nodes(chapter)
-        except Exception:
-            nodes = []
-        core["planned_nodes"] = nodes
-
-        cpn_review = None
-        try:
-            from .prewrite_validator import PrewriteValidator
-            validator = PrewriteValidator(self.config.project_root)
-            if nodes:
-                cpn_review = validator._review_cpn_consistency(
-                    chapter, nodes, self.index_manager
-                )
-        except Exception:
-            pass
-        core["cpn_review"] = cpn_review
-
-        relationship_snapshot = []
-        try:
-            state_path = self.config.project_root / ".webnovel" / "state.json"
-            if state_path.exists():
-                state = json.loads(state_path.read_text(encoding="utf-8"))
-                protagonist = (state.get("protagonist_state", {}) or {}).get("name", "")
-                if protagonist:
-                    rels = self.index_manager.get_entity_relationships_at_chapter(
-                        protagonist, chapter
-                    )
-                    relationship_snapshot = rels[:10]
-        except Exception:
-            pass
-        core["relationship_snapshot"] = relationship_snapshot
+        if use_orchestrator and orchestrator_pack:
+            working_items = list(orchestrator_pack.get("working_memory") or [])
+            outline_item = next((x for x in working_items if x.get("source") == "outline"), None)
+            state_item = next((x for x in working_items if x.get("source") == "state_export"), None)
+            summary_items = [
+                {"chapter": x.get("chapter"), "summary": x.get("content")}
+                for x in working_items
+                if x.get("source") == "summary"
+            ]
+            core["chapter_outline"] = str(outline_item.get("content", "")) if outline_item else core["chapter_outline"]
+            if isinstance(state_item, dict) and isinstance(state_item.get("content"), dict):
+                state_export = dict(state_item.get("content") or {})
+                core["protagonist_snapshot"] = state_export.get("protagonist_state", core["protagonist_snapshot"])
+            if summary_items:
+                core["recent_summaries"] = summary_items
 
         scene = {
             "location_context": state.get("protagonist_state", {}).get("location", {}),
@@ -384,6 +215,9 @@ class ContextManager:
         scene["appearing_characters"] = self.filter_invalid_items(
             scene["appearing_characters"], source_type="entity", id_key="entity_id"
         )
+        story_contract = self._build_story_contract_from_runtime(runtime_sources)
+        runtime_status = runtime_sources.to_dict()
+        latest_commit = runtime_sources.latest_commit or {}
 
         global_ctx = {
             "worldview_skeleton": self._load_setting("世界观"),
@@ -393,23 +227,37 @@ class ContextManager:
 
         preferences = self._load_json_optional(self.config.webnovel_dir / "preferences.json")
         memory = self._load_json_optional(self.config.webnovel_dir / "project_memory.json")
+        long_term_memory: Dict[str, Any] = orchestrator_pack if orchestrator_pack else {}
         story_skeleton = self._load_story_skeleton(chapter)
         alert_slice = max(0, int(self.config.context_alerts_slice))
         reader_signal = self._load_reader_signal(chapter)
-        genre_profile = self._load_genre_profile(state)
+        genre_profile = self._build_runtime_genre_profile(state, story_contract)
         writing_guidance = self._build_writing_guidance(chapter, reader_signal, genre_profile)
+        plot_structure = self._load_plot_structure(chapter)
+        prewrite_validation = PrewriteValidator(self.config.project_root).build(
+            chapter=chapter,
+            review_contract=story_contract.get("review_contract") or {},
+            plot_structure=plot_structure,
+            story_contract=story_contract,
+        )
 
         return {
             "meta": {"chapter": chapter},
             "core": core,
+            "story_contract": story_contract,
+            "runtime_status": runtime_status,
+            "latest_commit": latest_commit,
+            "prewrite_validation": prewrite_validation,
             "scene": scene,
             "global": global_ctx,
             "reader_signal": reader_signal,
             "genre_profile": genre_profile,
             "writing_guidance": writing_guidance,
+            "plot_structure": plot_structure,
             "story_skeleton": story_skeleton,
             "preferences": preferences,
             "memory": memory,
+            "long_term_memory": long_term_memory,
             "alerts": {
                 "disambiguation_warnings": (
                     state.get("disambiguation_warnings", [])[-alert_slice:] if alert_slice else []
@@ -417,46 +265,8 @@ class ContextManager:
                 "disambiguation_pending": (
                     state.get("disambiguation_pending", [])[-alert_slice:] if alert_slice else []
                 ),
-                "foreshadowing_overdue": self._load_foreshadowing_overdue(state, chapter),
             },
         }
-
-    def _load_foreshadowing_overdue(self, state: Dict[str, Any], current_chapter: int) -> List[Dict[str, Any]]:
-        """加载超期伏笔警报（v5.5 引入）"""
-        threshold = getattr(self.config, "foreshadowing_stale_threshold", 10)
-        plot_threads = state.get("plot_threads", {}) or {}
-        foreshadowing_list = plot_threads.get("foreshadowing", [])
-        if not foreshadowing_list:
-            return []
-
-        tier_weights = {"核心": 3.0, "重要": 2.5, "支线": 2.0, "装饰": 1.0}
-        result = []
-
-        for item in foreshadowing_list:
-            if not isinstance(item, dict):
-                continue
-            if item.get("status") != "未回收":
-                continue
-
-            last_ch = item.get("last_mentioned_chapter") or item.get("planted_chapter", 0)
-            elapsed = current_chapter - last_ch
-            if elapsed > threshold:
-                tier = item.get("tier", "支线")
-                tier_weight = tier_weights.get(tier, 1.0)
-                urgency = (elapsed / max(threshold, 1)) * tier_weight
-
-                result.append({
-                    "content": item.get("content"),
-                    "tier": tier,
-                    "planted_chapter": item.get("planted_chapter"),
-                    "last_mentioned_chapter": last_ch,
-                    "elapsed_chapters": elapsed,
-                    "urgency": round(urgency, 2),
-                })
-
-        result.sort(key=lambda x: x["urgency"], reverse=True)
-        max_urgent = getattr(self.config, "context_max_urgent_foreshadowing", 5)
-        return result[:max_urgent]
 
     def _load_reader_signal(self, chapter: int) -> Dict[str, Any]:
         if not getattr(self.config, "context_reader_signal_enabled", True):
@@ -475,12 +285,16 @@ class ContextManager:
         low_score_ranges: List[Dict[str, Any]] = []
         for row in review_trend.get("recent_ranges", []):
             score = row.get("overall_score")
-            if isinstance(score, (int, float)) and float(score) < 75:
+            notes = row.get("notes", "")
+            has_blocking = "blocking=" in notes and "blocking=0" not in notes
+            is_low_score = isinstance(score, (int, float)) and float(score) < 75
+            if is_low_score or has_blocking:
                 low_score_ranges.append(
                     {
                         "start_chapter": row.get("start_chapter"),
                         "end_chapter": row.get("end_chapter"),
-                        "overall_score": score,
+                        "overall_score": score if isinstance(score, (int, float)) else 0.0,
+                        "notes": notes,
                     }
                 )
 
@@ -550,6 +364,43 @@ class ContextManager:
             "reference_hints": refs,
             "composite_hints": composite_hints,
         }
+
+    def _build_runtime_genre_profile(
+        self,
+        state: Dict[str, Any],
+        story_contract: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        legacy_profile = self._load_genre_profile(state)
+        if legacy_profile:
+            legacy_profile = dict(legacy_profile)
+            legacy_profile["mode"] = "fallback_only"
+
+        primary_genre = str(
+            (
+                ((story_contract.get("master_setting") or {}).get("route") or {}).get("primary_genre")
+                or ""
+            )
+        ).strip()
+        if not primary_genre:
+            return legacy_profile or {}
+
+        runtime_profile = self._load_genre_profile({"project": {"genre": primary_genre}})
+        runtime_profile = dict(runtime_profile or {})
+        runtime_profile.setdefault("genre", primary_genre)
+        runtime_profile.setdefault("genre_raw", primary_genre)
+        runtime_profile.setdefault("genres", [primary_genre])
+        runtime_profile.setdefault("secondary_genres", [])
+        runtime_profile.setdefault("composite", len(runtime_profile.get("genres") or []) > 1)
+        runtime_profile.setdefault("reference_hints", [])
+        runtime_profile.setdefault("composite_hints", [])
+        runtime_profile["mode"] = "contract_first"
+
+        if legacy_profile:
+            runtime_profile["legacy_genre"] = legacy_profile.get("genre")
+            runtime_profile["legacy_genre_raw"] = legacy_profile.get("genre_raw")
+            runtime_profile["legacy_genres"] = list(legacy_profile.get("genres") or [])
+
+        return runtime_profile
 
     def _build_writing_guidance(
         self,
@@ -819,23 +670,6 @@ class ContextManager:
         profile_key = to_profile_key(genre)
         return profile_key in whitelist
 
-    def _compact_json_text(self, content: Any, budget: Optional[int]) -> str:
-        raw = json.dumps(content, ensure_ascii=False)
-        if budget is None or len(raw) <= budget:
-            return raw
-        if not getattr(self.config, "context_compact_text_enabled", True):
-            return raw[:budget]
-
-        min_budget = max(1, int(getattr(self.config, "context_compact_min_budget", 120)))
-        if budget <= min_budget:
-            return raw[:budget]
-
-        head_ratio = float(getattr(self.config, "context_compact_head_ratio", 0.65))
-        head_budget = int(budget * max(0.2, min(0.9, head_ratio)))
-        tail_budget = max(0, budget - head_budget - 10)
-        compact = f"{raw[:head_budget]}…[TRUNCATED]{raw[-tail_budget:] if tail_budget else ''}"
-        return compact[:budget]
-
     def _extract_genre_section(self, text: str, genre: str) -> str:
         return extract_genre_section(text, genre)
 
@@ -850,6 +684,19 @@ class ContextManager:
 
     def _load_outline(self, chapter: int) -> str:
         return load_chapter_outline(self.config.project_root, chapter, max_chars=1500)
+
+    def _load_plot_structure(self, chapter: int) -> Dict[str, Any]:
+        return load_chapter_plot_structure(self.config.project_root, chapter)
+
+    def _build_story_contract_from_runtime(self, runtime_sources: RuntimeSourceSnapshot) -> Dict[str, Any]:
+        story_root = self.config.story_system_dir
+        return {
+            "master_setting": runtime_sources.contracts.get("master") or {},
+            "chapter_brief": runtime_sources.contracts.get("chapter") or {},
+            "volume_brief": runtime_sources.contracts.get("volume") or {},
+            "review_contract": runtime_sources.contracts.get("review") or {},
+            "anti_patterns": read_json_if_exists(story_root / "anti_patterns.json") or [],
+        }
 
     def _load_recent_summaries(self, chapter: int, window: int = 3) -> List[Dict[str, Any]]:
         summaries = []
@@ -943,14 +790,12 @@ def main():
     parser.add_argument("--project-root", type=str, help="项目根目录")
     parser.add_argument("--chapter", type=int, required=True)
     parser.add_argument("--template", type=str, default=ContextManager.DEFAULT_TEMPLATE)
-    parser.add_argument("--no-snapshot", action="store_true")
-    parser.add_argument("--max-chars", type=int, default=8000)
 
     args = parser.parse_args()
 
     config = None
     if args.project_root:
-        # 允许传入“工作区根目录”，统一解析到真正的 book project_root（必须包含 .webnovel/state.json）
+        # 允许传入"工作区根目录"，统一解析到真正的 book project_root（必须包含 .webnovel/state.json）
         from project_locator import resolve_project_root
         from .config import DataModulesConfig
 
@@ -962,9 +807,6 @@ def main():
         payload = manager.build_context(
             chapter=args.chapter,
             template=args.template,
-            use_snapshot=not args.no_snapshot,
-            save_snapshot=True,
-            max_chars=args.max_chars,
         )
         print_success(payload, message="context_built")
         try:

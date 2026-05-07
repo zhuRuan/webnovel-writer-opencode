@@ -11,7 +11,6 @@ from data_modules.story_contracts import (
     merge_contract_layers,
     read_json_if_exists,
 )
-from data_modules.exceptions import ConfigError
 
 
 def test_story_contract_paths_resolve_expected_locations(tmp_path):
@@ -63,7 +62,7 @@ def test_read_json_if_exists_raises_value_error_with_path(tmp_path):
     bad_path = tmp_path / "bad.json"
     bad_path.write_text("{bad json", encoding="utf-8")
 
-    with pytest.raises(ConfigError) as exc:
+    with pytest.raises(ValueError) as exc:
         read_json_if_exists(bad_path)
 
     assert str(bad_path) in str(exc.value)

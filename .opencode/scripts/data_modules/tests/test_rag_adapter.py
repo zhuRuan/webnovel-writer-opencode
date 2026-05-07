@@ -17,14 +17,52 @@ import data_modules.rag_adapter as rag_module
 from data_modules.rag_adapter import RAGAdapter
 from data_modules.config import DataModulesConfig
 from data_modules.index_manager import EntityMeta, RelationshipMeta
-from .doubles import StubClient, StubClientWithFailures, StubClientAuthFailure, StubClientRerankFailure
+
+
+class StubClient:
+    async def embed(self, texts):
+        return [[1.0, 0.0] for _ in texts]
+
+    async def embed_batch(self, texts, skip_failures=True):
+        return [[1.0, 0.0] for _ in texts]
+
+    async def rerank(self, query, documents, top_n=None):
+        top_n = top_n or len(documents)
+        return [{"index": i, "relevance_score": 1.0 / (i + 1)} for i in range(min(top_n, len(documents)))]
+
+
+class StubClientWithFailures(StubClient):
+    async def embed_batch(self, texts, skip_failures=True):
+        if len(texts) == 1:
+            return [None]
+        return [None, [1.0, 0.0]]
+
+
+class StubEmbedClient401:
+    def __init__(self):
+        self.last_error_status = 401
+        self.last_error_message = "auth failed"
+
+
+class StubClientAuthFailure(StubClient):
+    def __init__(self):
+        self._embed_client = StubEmbedClient401()
+
+    async def embed(self, texts):
+        return None
+
+
+class StubClientRerankFailure(StubClient):
+    async def rerank(self, query, documents, top_n=None):
+        return []
 
 
 @pytest.fixture
 def temp_project(tmp_path, monkeypatch):
     cfg = DataModulesConfig.from_project_root(tmp_path)
     cfg.ensure_dirs()
-    (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+    if not cfg.state_file.exists():
+        cfg.state_file.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(rag_module, "get_client", lambda config: StubClient())
     return cfg
 
@@ -101,7 +139,7 @@ async def test_search_respects_chapter_filter_across_strategies(tmp_path, monkey
     adapter = RAGAdapter(cfg)
     await adapter.store_chunks(
         [
-            {"chapter": 1, "scene_index": 1, "content": "前文线索，秘宝的传说早有记载"},
+            {"chapter": 1, "scene_index": 1, "content": "前文线索，尚未涉及关键宝物"},
             {"chapter": 2, "scene_index": 1, "content": "秘宝现世，引发争夺"},
             {"chapter": 3, "scene_index": 1, "content": "秘宝大战彻底爆发"},
         ]
@@ -475,107 +513,3 @@ def test_rag_adapter_cli_search_shows_degraded_warning(temp_project, monkeypatch
     assert warnings
     assert warnings[0].get("code") == "DEGRADED_MODE"
     assert warnings[0].get("reason") == "embedding_auth_failed"
-
-
-# ==================== 分词增强测试 ====================
-
-class TestTokenizer:
-    """分词器测试"""
-
-    def test_tokenize_basic_chinese(self, temp_project):
-        """测试基本中文分词"""
-        RAGAdapter._jieba_initialized = False
-        RAGAdapter._jieba_loaded = False
-        adapter = RAGAdapter(temp_project)
-        tokens = adapter._tokenize("萧炎在天云宗修炼斗气")
-        assert len(tokens) > 0
-        assert "萧炎" in tokens or ("萧" in tokens and "炎" in tokens)
-
-    def test_tokenize_english(self, temp_project):
-        """测试英文分词"""
-        RAGAdapter._jieba_initialized = False
-        RAGAdapter._jieba_loaded = False
-        adapter = RAGAdapter(temp_project)
-        tokens = adapter._tokenize("Xiao Yan is training")
-        assert "xiao" in tokens or "yan" in tokens
-        assert "training" in tokens
-
-    def test_tokenize_number_normalization(self, temp_project):
-        """测试数字归一化"""
-        RAGAdapter._jieba_initialized = False
-        RAGAdapter._jieba_loaded = False
-        adapter = RAGAdapter(temp_project)
-
-        tokens = adapter._tokenize("3年之约")
-        if adapter._jieba_available:
-            assert "三年之约" in tokens
-        else:
-            assert "三" in tokens and "年" in tokens
-        
-        tokens = adapter._tokenize("第10章突破")
-        if adapter._jieba_available:
-            assert any("十" in t for t in tokens)
-        else:
-            assert "第" in tokens and "十" in tokens and "章" in tokens
-        
-        tokens = adapter._tokenize("斗气三段")
-        if adapter._jieba_available:
-            assert "三段" in tokens or "三" in tokens
-        else:
-            assert "三" in tokens and "段" in tokens
-
-    def test_tokenize_fallback_without_jieba(self, temp_project, monkeypatch):
-        """测试 jieba 不可用时的降级"""
-        RAGAdapter._jieba_initialized = False
-        RAGAdapter._jieba_loaded = False
-        import data_modules.rag_adapter as rag_mod
-        monkeypatch.setitem(sys.modules, 'jieba', None)
-        adapter = RAGAdapter(temp_project)
-        tokens = adapter._tokenize("萧炎修炼")
-        assert len(tokens) > 0
-
-    def test_tokenize_custom_dict_loaded(self, temp_project):
-        """测试自定义词典加载"""
-        RAGAdapter._jieba_initialized = False
-        RAGAdapter._jieba_loaded = False
-        adapter = RAGAdapter(temp_project)
-        if adapter._jieba_available:
-            tokens = adapter._tokenize("迦南学院")
-            assert "迦南学院" in tokens or "迦" in tokens
-
-    def test_normalize_numbers_year(self, temp_project):
-        """测试年份归一化"""
-        RAGAdapter._jieba_initialized = False
-        RAGAdapter._jieba_loaded = False
-        adapter = RAGAdapter(temp_project)
-        result = adapter._normalize_numbers("3年之约，5年后再战")
-        assert "三年之约" in result
-        assert "五年后" in result
-
-    def test_normalize_numbers_chapter(self, temp_project):
-        """测试章节归一化"""
-        RAGAdapter._jieba_initialized = False
-        RAGAdapter._jieba_loaded = False
-        adapter = RAGAdapter(temp_project)
-        result = adapter._normalize_numbers("第100章大战")
-        assert "第一百章大战" in result or ("第一百" in result and "章" in result)
-
-    @pytest.mark.asyncio
-    async def test_bm25_search_with_tokenization(self, temp_project):
-        """测试 BM25 搜索使用分词"""
-        RAGAdapter._jieba_initialized = False
-        RAGAdapter._jieba_loaded = False
-        adapter = RAGAdapter(temp_project)
-
-        await adapter.store_chunks([
-            {"chapter": 1, "scene_index": 1, "content": "萧炎在迦南学院修炼斗气"},
-        ])
-
-        results = adapter.bm25_search("萧炎", top_k=5)
-        assert len(results) >= 1
-
-        await adapter.store_chunks([
-            {"chapter": 2, "scene_index": 1, "content": "三年之约即将到来"},
-        ])
-        results = adapter.bm25_search("3年之约", top_k=5)
-        assert len(results) >= 1

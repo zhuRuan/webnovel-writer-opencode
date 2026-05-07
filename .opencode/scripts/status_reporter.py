@@ -89,7 +89,6 @@ from collections import defaultdict
 from project_locator import resolve_project_root
 from chapter_paths import extract_chapter_num_from_filename
 from runtime_compat import enable_windows_utf8_stdio
-from logger import get_logger, setup_logging
 
 # 导入配置
 try:
@@ -136,25 +135,9 @@ class StatusReporter:
         self.state = None
         self.chapters_data = []
         self._reading_power_cache: Dict[int, Optional[Dict[str, Any]]] = {}
-        self._chapter_index_cache: Dict[int, Optional[Dict[str, Any]]] = {}
-        self._entity_name_cache: Dict[str, str] = {}
-        self._analysis_cache: Dict[str, Any] = {}
 
         # v5.1 引入: 使用 IndexManager 读取实体
         self._index_manager = IndexManager(self.config)
-
-    def _reset_runtime_caches(self) -> None:
-        """清理与当前 state / scan 相关的运行时缓存。"""
-        self._reading_power_cache.clear()
-        self._chapter_index_cache.clear()
-        self._analysis_cache.clear()
-
-    def _get_cached_analysis(self, cache_key: str) -> Any:
-        return self._analysis_cache.get(cache_key)
-
-    def _set_cached_analysis(self, cache_key: str, value: Any) -> Any:
-        self._analysis_cache[cache_key] = value
-        return value
 
     def _extract_stats_field(self, content: str, field_name: str) -> str:
         """
@@ -180,7 +163,6 @@ class StatusReporter:
         if isinstance(self.state, dict):
             self.state = normalize_state_runtime_sections(self.state)
 
-        self._reset_runtime_caches()
         return True
 
     def _to_positive_int(self, value: Any) -> Optional[int]:
@@ -203,10 +185,6 @@ class StatusReporter:
 
     def _collect_foreshadowing_records(self) -> List[Dict[str, Any]]:
         """收集未回收伏笔，并基于真实字段构建分析记录。"""
-        cached = self._get_cached_analysis("foreshadowing_records")
-        if cached is not None:
-            return cached
-
         if not self.state:
             return []
 
@@ -300,7 +278,7 @@ class StatusReporter:
                 }
             )
 
-        return self._set_cached_analysis("foreshadowing_records", records)
+        return records
 
     def _get_chapter_meta(self, chapter: int) -> Dict[str, Any]:
         """读取指定章节的 chapter_meta（支持 0001/1 两种键）。"""
@@ -341,19 +319,6 @@ class StatusReporter:
         self._reading_power_cache[chapter] = record
         return record
 
-    def _get_chapter_index_cached(self, chapter: int) -> Optional[Dict[str, Any]]:
-        """读取并缓存章节索引记录。"""
-        if chapter in self._chapter_index_cache:
-            return self._chapter_index_cache[chapter]
-
-        try:
-            record = self._index_manager.get_chapter(chapter)
-        except Exception:
-            record = None
-
-        self._chapter_index_cache[chapter] = record
-        return record
-
     def _get_chapter_cool_points(self, chapter: int, chapter_data: Dict[str, Any]) -> Tuple[Optional[int], str]:
         """获取单章爽点数量（真实元数据优先）。"""
         reading_power = self._get_chapter_reading_power_cached(chapter)
@@ -376,9 +341,6 @@ class StatusReporter:
 
     def scan_chapters(self):
         """扫描所有章节文件"""
-        self.chapters_data = []
-        self._analysis_cache.clear()
-
         if not self.chapters_dir.exists():
             print(f"⚠️  正文目录不存在: {self.chapters_dir}")
             return
@@ -397,13 +359,11 @@ class StatusReporter:
         # 从 SQLite 获取所有角色的 canonical_name
         try:
             characters_from_db = self._index_manager.get_entities_by_type("角色")
-            for character in characters_from_db:
-                entity_id = str(character.get("id") or "").strip()
-                canonical_name = str(character.get("canonical_name") or entity_id).strip()
-                if entity_id and canonical_name:
-                    self._entity_name_cache.setdefault(entity_id, canonical_name)
-                if canonical_name:
-                    known_character_names.append(canonical_name)
+            known_character_names = [
+                c.get("canonical_name", c.get("id", ""))
+                for c in characters_from_db
+                if c.get("canonical_name")
+            ]
         except Exception:
             known_character_names = []
 
@@ -429,25 +389,19 @@ class StatusReporter:
             # v5.1 引入: 角色提取从 SQLite chapters 表读取
             characters: List[str] = []
             try:
-                chapter_info = self._get_chapter_index_cached(chapter_num)
+                chapter_info = self._index_manager.get_chapter(chapter_num)
                 if chapter_info and chapter_info.get("characters"):
                     stored = chapter_info["characters"]
                     if isinstance(stored, str):
-                        try:
-                            stored = json.loads(stored)
-                        except json.JSONDecodeError:
-                            stored = []
+                        stored = json.loads(stored)
                     if isinstance(stored, list):
                         for entity_id in stored:
                             entity_id = str(entity_id).strip()
                             if not entity_id:
                                 continue
-                            name = self._entity_name_cache.get(entity_id)
-                            if not name:
-                                entity = self._index_manager.get_entity(entity_id)
-                                name = entity.get("canonical_name", entity_id) if entity else entity_id
-                                if name:
-                                    self._entity_name_cache[entity_id] = name
+                            # 尝试获取 canonical_name
+                            entity = self._index_manager.get_entity(entity_id)
+                            name = entity.get("canonical_name", entity_id) if entity else entity_id
                             characters.append(name)
             except Exception:
                 characters = []
@@ -478,10 +432,6 @@ class StatusReporter:
 
     def analyze_characters(self) -> Dict:
         """分析角色活跃度（v5.1 引入，v5.4 沿用）"""
-        cached = self._get_cached_analysis("character_activity")
-        if cached is not None:
-            return cached
-
         if not self.state:
             return {}
 
@@ -493,18 +443,7 @@ class StatusReporter:
         except Exception:
             characters_list = []
 
-        # 预先汇总扫描结果，避免对每个角色重复遍历全量章节。
-        chapter_last_appearance: Dict[str, int] = {}
-        for ch_data in self.chapters_data:
-            chapter_num = int(ch_data.get("chapter", 0) or 0)
-            for char_name in ch_data.get("characters", []):
-                if not char_name:
-                    continue
-                chapter_last_appearance[char_name] = max(
-                    chapter_last_appearance.get(char_name, 0),
-                    chapter_num,
-                )
-
+        # 统计每个角色的最后出场章节
         character_activity = {}
 
         for char in characters_list:
@@ -515,7 +454,10 @@ class StatusReporter:
             # 查找最后出场章节
             last_appearance = char.get("last_appearance", 0) or 0
 
-            last_appearance = max(last_appearance, chapter_last_appearance.get(char_name, 0))
+            # 也从 chapters_data 中检查
+            for ch_data in self.chapters_data:
+                if char_name in ch_data.get("characters", []):
+                    last_appearance = max(last_appearance, ch_data["chapter"])
 
             absence = current_chapter - last_appearance
 
@@ -525,7 +467,7 @@ class StatusReporter:
                 "status": self._get_absence_status(absence)
             }
 
-        return self._set_cached_analysis("character_activity", character_activity)
+        return character_activity
 
     def _get_absence_status(self, absence: int) -> str:
         """判断掉线状态"""
@@ -540,12 +482,8 @@ class StatusReporter:
 
     def analyze_foreshadowing(self) -> List[Dict]:
         """分析伏笔深度"""
-        cached = self._get_cached_analysis("foreshadowing_analysis")
-        if cached is not None:
-            return cached
-
         records = self._collect_foreshadowing_records()
-        return self._set_cached_analysis("foreshadowing_analysis", [
+        return [
             {
                 "content": item["content"],
                 "planted_chapter": item["planted_chapter"],
@@ -555,7 +493,7 @@ class StatusReporter:
                 "status": item["status"],
             }
             for item in records
-        ])
+        ]
 
     def _get_foreshadowing_status(self, elapsed: int) -> str:
         """判断伏笔超时状态"""
@@ -578,10 +516,6 @@ class StatusReporter:
         紧急度计算公式：
         urgency = (已过章节 / 目标回收章节) × 层级权重
         """
-        cached = self._get_cached_analysis("foreshadowing_urgency")
-        if cached is not None:
-            return cached
-
         records = self._collect_foreshadowing_records()
         urgency_list = [
             {
@@ -599,10 +533,10 @@ class StatusReporter:
         ]
 
         # 先按“是否可计算”，再按紧急度降序
-        return self._set_cached_analysis("foreshadowing_urgency", sorted(
+        return sorted(
             urgency_list,
             key=lambda x: (x["urgency"] is None, -(x["urgency"] if x["urgency"] is not None else -1)),
-        ))
+        )
 
     def _get_urgency_status(self, urgency: float, remaining: int) -> str:
         """判断紧急度状态"""
@@ -740,10 +674,6 @@ class StatusReporter:
 
     def analyze_pacing(self) -> List[Dict]:
         """分析爽点节奏分布（每 N 章为一段）"""
-        cached = self._get_cached_analysis("pacing")
-        if cached is not None:
-            return cached
-
         segment_size = self.config.pacing_segment_size
         segments = []
 
@@ -792,7 +722,7 @@ class StatusReporter:
                 "dominant_source": dominant_source,
             })
 
-        return self._set_cached_analysis("pacing", segments)
+        return segments
 
     def _get_pacing_rating(self, words_per_point: Optional[float]) -> str:
         """判断节奏评级"""
@@ -918,6 +848,10 @@ class StatusReporter:
         if focus in ["all", "basic"]:
             report_lines.extend(self._generate_basic_stats())
 
+        # 记忆统计（长期记忆）
+        if focus in ["all", "basic"]:
+            report_lines.extend(self._generate_memory_section())
+
         # 角色活跃度
         if focus in ["all", "characters"]:
             report_lines.extend(self._generate_character_section())
@@ -944,96 +878,36 @@ class StatusReporter:
 
         return "\n".join(report_lines)
 
-    def to_dict(self, focus: str = "all") -> Dict[str, Any]:
-        """
-        将报告转换为字典格式（JSON 输出用）。
-
-        Args:
-            focus: 分析焦点，可选值为 'all', 'basic', 'characters',
-                   'foreshadowing', 'urgency', 'pacing', 'strand', 'relationships'
-
-        Returns:
-            包含各项分析结果的字典
-        """
-        logger = get_logger(__name__)
-
-        logger.info("Generating JSON dict with focus=%s", focus)
-
-        result: Dict[str, Any] = {
-            "generated_at": datetime.now().isoformat(),
-            "focus": focus,
-        }
+    def _generate_memory_section(self) -> List[str]:
+        """生成长期记忆统计章节（best-effort）。"""
+        try:
+            from data_modules.memory.store import ScratchpadManager
+        except Exception:
+            try:
+                from scripts.data_modules.memory.store import ScratchpadManager
+            except Exception:
+                return []
 
         try:
-            if focus in ["all", "basic"]:
-                result["basic_stats"] = self._get_basic_stats_dict()
+            manager = ScratchpadManager(self.config)
+            stats = manager.stats()
+            conflicts = manager.conflicts()
+        except Exception:
+            return []
 
-            if focus in ["all", "characters"]:
-                activity = self.analyze_characters()
-                dropped = {name: data for name, data in activity.items()
-                          if "掉线" in data["status"]}
-                result["characters"] = {
-                    "total": len(activity),
-                    "dropped": dropped,
-                    "active": {name: data for name, data in activity.items()
-                              if name not in dropped}
-                }
-
-            if focus in ["all", "foreshadowing"]:
-                result["foreshadowing"] = self.analyze_foreshadowing()
-
-            if focus in ["all", "foreshadowing", "urgency"]:
-                result["urgency"] = self.analyze_foreshadowing_urgency()
-
-            if focus in ["all", "pacing"]:
-                result["pacing"] = self.analyze_pacing()
-
-            if focus in ["all", "strand", "pacing"]:
-                result["strand"] = self.analyze_strand_weave()
-
-            if focus in ["all", "relationships"]:
-                result["relationships"] = self._get_relationships_dict()
-
-        except Exception as e:
-            logger.exception("Error generating JSON dict: %s", e)
-            result["error"] = str(e)
-
-        return result
-
-    def _get_basic_stats_dict(self) -> Dict[str, Any]:
-        """获取基本统计数据（字典格式）"""
-        if not self.state:
-            return {}
-
-        progress = self.state.get("progress", {})
-        current_chapter = progress.get("current_chapter", 0)
-        total_words = progress.get("total_words", 0)
-        target_words = self.state.get("project_info", {}).get("target_words", 2000000)
-
-        avg_words = total_words / current_chapter if current_chapter > 0 else 0
-        completion = (total_words / target_words * 100) if target_words > 0 else 0
-
-        return {
-            "current_chapter": current_chapter,
-            "total_words": total_words,
-            "avg_words_per_chapter": round(avg_words, 1),
-            "target_words": target_words,
-            "completion_percent": round(completion, 1),
-        }
-
-    def _get_relationships_dict(self) -> Dict[str, Any]:
-        """获取人际关系数据（字典格式）"""
-        if not self.state:
-            return {}
-
-        relationships = self.state.get("relationships", {})
-        if not isinstance(relationships, dict):
-            return {}
-
-        return {
-            "count": len(relationships),
-            "relationships": relationships,
-        }
+        return [
+            "## 🧠 长期记忆统计",
+            "",
+            f"- **总条目**: {stats.get('total', 0)}",
+            f"- **Active**: {stats.get('active', 0)}",
+            f"- **Outdated**: {stats.get('outdated', 0)}",
+            f"- **Contradicted**: {stats.get('contradicted', 0)}",
+            f"- **Tentative**: {stats.get('tentative', 0)}",
+            f"- **冲突键数量**: {len(conflicts)}",
+            "",
+            "---",
+            "",
+        ]
 
     def _generate_basic_stats(self) -> List[str]:
         """生成基本统计"""
@@ -1297,9 +1171,6 @@ class StatusReporter:
 def main():
     import argparse
 
-    setup_logging()
-    logger = get_logger(__name__)
-
     _enable_windows_utf8_stdio()
 
     parser = argparse.ArgumentParser(
@@ -1328,10 +1199,6 @@ def main():
                                             'strand', 'relationships'],
                        default='all', help='分析焦点（新增 urgency, strand）')
     parser.add_argument('--project-root', default='.', help='项目根目录')
-    parser.add_argument('--json', action='store_true',
-                       help='输出 JSON 格式（替代 Markdown）')
-    parser.add_argument('--pretty', action='store_true',
-                       help='美化 JSON 输出（与 --json 配合使用）')
 
     args = parser.parse_args()
 
@@ -1357,45 +1224,25 @@ def main():
     print("\n📊 正在分析...")
 
     # 生成报告
-    if args.json:
-        data = reporter.to_dict(args.focus)
-        output_file = Path(args.output)
-        if args.output == '.webnovel/health_report.md' and project_root != '.':
-            output_file = Path(project_root) / '.webnovel' / 'health_report.json'
-        output_file.parent.mkdir(parents=True, exist_ok=True)
+    report = reporter.generate_report(args.focus)
 
-        json_str = json.dumps(data, ensure_ascii=False, indent=2 if args.pretty else None)
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(json_str)
+    # 保存报告
+    output_file = Path(args.output)
+    if args.output == '.webnovel/health_report.md' and project_root != '.':
+        output_file = Path(project_root) / '.webnovel' / 'health_report.md'
+    output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        print(f"\n✅ JSON 报告已生成: {output_file}")
-        if args.pretty:
-            print("\n" + "="*60)
-            print("📄 JSON 预览：\n")
-            print(json_str[:1000])
-            if len(json_str) > 1000:
-                print("\n...")
-            print("="*60)
-    else:
-        report = reporter.generate_report(args.focus)
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(report)
 
-        # 保存报告
-        output_file = Path(args.output)
-        if args.output == '.webnovel/health_report.md' and project_root != '.':
-            output_file = Path(project_root) / '.webnovel' / 'health_report.md'
-        output_file.parent.mkdir(parents=True, exist_ok=True)
+    print(f"\n✅ 健康报告已生成: {output_file}")
 
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(report)
-
-        print(f"\n✅ 健康报告已生成: {output_file}")
-
-        # 预览报告（前 30 行）
-        print("\n" + "="*60)
-        print("📄 报告预览：\n")
-        print("\n".join(report.split("\n")[:30]))
-        print("\n...")
-        print("="*60)
+    # 预览报告（前 30 行）
+    print("\n" + "="*60)
+    print("📄 报告预览：\n")
+    print("\n".join(report.split("\n")[:30]))
+    print("\n...")
+    print("="*60)
 
 if __name__ == "__main__":
     main()

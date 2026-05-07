@@ -3,19 +3,18 @@ Dashboard 启动脚本
 
 用法：
     python -m dashboard.server --project-root /path/to/novel-project
-    python -m dashboard.server                   # 自动检测项目根目录
+    python -m dashboard.server                   # 自动从 .claude 指针读取
 """
 
 import argparse
 import os
-import subprocess
 import sys
 import webbrowser
 from pathlib import Path
 
 
 def _resolve_project_root(cli_root: str | None) -> Path:
-    """按优先级解析 PROJECT_ROOT：CLI > 环境变量 > .opencode 指针 > CWD。"""
+    """按优先级解析 PROJECT_ROOT：CLI > 环境变量 > .claude 指针 > CWD。"""
     if cli_root:
         return Path(cli_root).resolve()
 
@@ -23,9 +22,9 @@ def _resolve_project_root(cli_root: str | None) -> Path:
     if env:
         return Path(env).resolve()
 
-    # 尝试从 .opencode 指针读取
+    # 尝试从 .claude 指针读取
     cwd = Path.cwd()
-    pointer = cwd / ".opencode" / ".webnovel-current-project"
+    pointer = cwd / ".claude" / ".webnovel-current-project"
     if pointer.is_file():
         target = pointer.read_text(encoding="utf-8").strip()
         if target:
@@ -47,31 +46,10 @@ def main():
     parser.add_argument("--host", default="127.0.0.1", help="监听地址")
     parser.add_argument("--port", type=int, default=8765, help="监听端口")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
-    parser.add_argument("--rebuild", action="store_true", help="强制重建前端")
     args = parser.parse_args()
 
     project_root = _resolve_project_root(args.project_root)
     print(f"项目路径: {project_root}")
-
-    # 检查并自动构建前端
-    frontend_dir = Path(__file__).parent / "frontend"
-    dist_dir = frontend_dir / "dist"
-    index_html = dist_dir / "index.html"
-
-    if not index_html.exists() or args.rebuild:
-        print("前端未构建，正在构建...")
-        npm = "npm.cmd" if sys.platform == "win32" else "npm"
-        try:
-            subprocess.run([npm, "install"], cwd=frontend_dir, check=True, capture_output=True)
-            subprocess.run([npm, "run", "build"], cwd=frontend_dir, check=True, capture_output=True)
-            print("前端构建完成")
-        except subprocess.CalledProcessError as e:
-            print(f"前端构建失败: {e}", file=sys.stderr)
-            if e.stdout:
-                print(e.stdout.decode("utf-8", errors="replace"), file=sys.stderr)
-            if e.stderr:
-                print(e.stderr.decode("utf-8", errors="replace"), file=sys.stderr)
-            sys.exit(1)
 
     # 延迟导入，以便先处理路径
     import uvicorn
@@ -84,12 +62,7 @@ def main():
     print(f"API 文档: {url}/docs")
 
     if not args.no_browser:
-        import threading
-        def _open_browser():
-            import time
-            time.sleep(0.5)
-            webbrowser.open(url)
-        threading.Thread(target=_open_browser, daemon=True).start()
+        webbrowser.open(url)
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 

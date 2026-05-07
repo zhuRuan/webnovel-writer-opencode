@@ -38,6 +38,8 @@ nul
 .tmp_outline_check/
 
 # Local research / sibling projects (avoid accidental commit)
+webnovel-writer 原项目/
+示例作品/
 .sisyphus/
 De-AI-Prompt/
 MuMuAINovel/

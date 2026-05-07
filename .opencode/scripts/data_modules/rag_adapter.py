@@ -14,9 +14,8 @@ import asyncio
 import sqlite3
 import json
 import math
-from logger import get_logger
+import logging
 import shutil
-import hashlib
 from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
@@ -33,21 +32,12 @@ from .config import get_config
 from .api_client import get_client
 from .index_manager import IndexManager
 from .query_router import QueryRouter
-from .exceptions import StateManagerError
 from .observability import safe_append_perf_timing, safe_log_tool_call
-from .temporal_graph import TemporalGraphIndex
-from .rag_backend import (
-    BackendFactory,
-    VectorSearchBackend,
-    TemporalGraphBackendAdapter,
-    RAGBackend,
-    TemporalGraphBackend,
-)
 
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
-RAG_SCHEMA_VERSION = "3"
+RAG_SCHEMA_VERSION = "2"
 VECTOR_REQUIRED_COLUMNS = (
     "chunk_id",
     "chapter",
@@ -57,9 +47,7 @@ VECTOR_REQUIRED_COLUMNS = (
     "parent_chunk_id",
     "chunk_type",
     "source_file",
-    "content_hash",
     "created_at",
-    "updated_at",
 )
 
 
@@ -80,317 +68,13 @@ class SearchResult:
 class RAGAdapter:
     """RAG 检索适配器"""
 
-    _jieba_loaded: bool = False
-    _jieba_initialized: bool = False
-
     def __init__(self, config=None):
         self.config = config or get_config()
         self.api_client = get_client(config)
         self.index_manager = IndexManager(self.config)
         self.query_router = QueryRouter()
         self._degraded_mode_reason: Optional[str] = None
-        self._temporal_graph: Optional[TemporalGraphIndex] = None
-        self._last_dict_word_count: int = 0
-        self._rebuild_timer: Optional[Any] = None
-
-        self._backends: Dict[str, Any] = {}
-
         self._init_db()
-        self._init_jieba()
-        self._init_backends()
-
-    def _init_backends(self):
-        """初始化后端"""
-        self._init_temporal_graph()
-        BackendFactory.register("vector", VectorSearchBackend)
-        BackendFactory.register("temporal_graph", TemporalGraphBackendAdapter)
-        vec = BackendFactory.create("vector", config=self.config)
-        if vec:
-            vec._rag = self
-        tg = BackendFactory.create("temporal_graph", config=self.config)
-        if tg:
-            tg._graph = self._temporal_graph
-        self._backends["vector"] = vec or VectorSearchBackend(config=self.config, rag_adapter=self)
-        self._backends["temporal_graph"] = tg or TemporalGraphBackendAdapter(config=self.config, temporal_graph=self._temporal_graph)
-
-    def get_backend(self, backend_type: str) -> Optional[Any]:
-        """获取后端实例"""
-        return self._backends.get(backend_type)
-
-    def get_vector_backend(self) -> Optional[VectorSearchBackend]:
-        """获取向量检索后端"""
-        return self._backends.get("vector")
-
-    def get_temporal_graph_backend(self) -> Optional[TemporalGraphBackendAdapter]:
-        """获取时序图后端"""
-        return self._backends.get("temporal_graph")
-
-    def _init_jieba(self):
-        """初始化 jieba 分词器（懒加载单例 + 自动重建）"""
-        if RAGAdapter._jieba_initialized:
-            return
-        try:
-            import jieba
-            
-            dict_path = self.config.custom_dict_path
-            
-            # 自动重建（初始化时）
-            if self.config.tokenizer_auto_rebuild_on_init and not dict_path.exists():
-                word_count = self.rebuild_custom_dict()
-                if word_count > 0 and self.config.tokenizer_log_rebuild_summary:
-                    logger.info("[分词词典] 初始化重建完成: %d 词条", word_count)
-            
-            # 加载词典
-            if dict_path.exists():
-                jieba.load_userdict(str(dict_path))
-                logger.info("jieba 项目词典加载完成: %s", dict_path)
-            else:
-                framework_dict = self.config.framework_dict_path
-                if framework_dict.exists():
-                    jieba.load_userdict(str(framework_dict))
-                    logger.info("jieba 框架词典加载完成: %s", framework_dict)
-                else:
-                    logger.warning("jieba 词典不存在，跳过")
-            
-            RAGAdapter._jieba_loaded = True
-        except ImportError:
-            logger.warning("jieba 未安装，使用单字符分词降级")
-        except Exception as e:
-            logger.warning("jieba 初始化失败，使用单字符分词降级: %s", e)
-        finally:
-            RAGAdapter._jieba_initialized = True
-
-    def rebuild_custom_dict(self, reason: str = "manual") -> int:
-        """
-        从项目设定集和实体自动生成自定义词典
-        
-        Args:
-            reason: 触发原因 (init/entity_change/manual)
-        
-        Returns:
-            生成的词条数量
-        """
-        try:
-            import jieba
-            
-            words: set = set()
-            
-            words.update(self._extract_keywords_from_settings())
-            words.update(self._extract_keywords_from_entities())
-            words.update(self._extract_keywords_from_outline())
-            
-            if not words:
-                logger.info("未提取到任何关键词，跳过词典生成")
-                return 0
-            
-            dict_path = self.config.custom_dict_path
-            dict_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(dict_path, "w", encoding="utf-8") as f:
-                f.write(f"# 动态生成的 jieba 词典\n")
-                f.write(f"# 由 RAGAdapter.rebuild_custom_dict() 自动生成\n")
-                f.write(f"# 触发原因: {reason}\n")
-                for word in sorted(words):
-                    if word and len(word) >= 2:
-                        f.write(f"{word} 10 n\n")
-            
-            if RAGAdapter._jieba_loaded:
-                jieba.load_userdict(str(dict_path))
-            
-            # 记录词条数量，用于日志抑制
-            self._last_dict_word_count = len(words)
-            
-            if self.config.tokenizer_log_rebuild_summary:
-                logger.info("[分词词典] 重建完成: %d 词条, 原因: %s", len(words), reason)
-            
-            return len(words)
-        except ImportError:
-            logger.warning("jieba 未安装，无法生成词典")
-            return 0
-        except Exception as e:
-            logger.warning("词典生成失败: %s", e)
-            return 0
-
-    def _extract_keywords_from_settings(self) -> set:
-        """从设定集目录提取关键词"""
-        words: set = set()
-        settings_dir = self.config.settings_dir
-        
-        if not settings_dir.exists():
-            return words
-        
-        for file in settings_dir.glob("*.md"):
-            try:
-                content = file.read_text(encoding="utf-8")
-                words.update(self._extract_chinese_words(content))
-            except Exception as e:
-                logger.debug("读取设定集失败 %s: %s", file.name, e)
-        
-        return words
-
-    def _extract_keywords_from_entities(self) -> set:
-        """从索引实体提取关键词"""
-        words: set = set()
-        
-        try:
-            for entity in self.index_manager.get_core_entities():
-                name = entity.get("canonical_name", "")
-                if name:
-                    words.add(name)
-                
-                for alias in self.index_manager.get_entity_aliases(entity.get("id", "")):
-                    if alias:
-                        words.add(alias)
-        except Exception as e:
-            logger.debug("提取实体关键词失败: %s", e)
-        
-        return words
-
-    def _extract_keywords_from_outline(self) -> set:
-        """从大纲目录提取关键词"""
-        words: set = set()
-        outline_dir = self.config.outline_dir
-        
-        if not outline_dir.exists():
-            return words
-        
-        for file in outline_dir.glob("*.md"):
-            try:
-                content = file.read_text(encoding="utf-8")
-                words.update(self._extract_chinese_words(content))
-            except Exception as e:
-                logger.debug("读取大纲失败 %s: %s", file.name, e)
-        
-        return words
-
-    def _extract_chinese_words(self, text: str) -> set:
-        """从文本中提取可能的中文专有名词"""
-        import re
-        words: set = set()
-        
-        chinese_patterns = [
-            r'[\u4e00-\u9fff]{2,6}',  # 2-6个连续汉字
-        ]
-        
-        for pattern in chinese_patterns:
-            matches = re.findall(pattern, text)
-            words.update(matches)
-        
-        filter_words = {
-            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人",
-            "都", "一", "一个", "上", "也", "很", "到", "说", "要", "去",
-            "你", "会", "着", "没有", "看", "好", "自己", "这", "那",
-        }
-        
-        return {w for w in words if w not in filter_words and len(w) >= 2}
-
-    def _init_temporal_graph(self):
-        """初始化时序图索引（优先从 DB 加载，若无则重建）"""
-        self._temporal_graph = TemporalGraphIndex(decay_base=0.9)
-        
-        db_path = str(self.config.index_db)
-        loaded = self._temporal_graph.load_from_db(db_path)
-        
-        if loaded:
-            logger.info("时序图从 DB 加载: %s", self._temporal_graph.get_stats())
-        else:
-            logger.info("时序图 DB 无数据，执行全量重建...")
-            self._load_relationships_to_graph()
-            self._temporal_graph.save_to_db(db_path)
-            logger.info("时序图已保存到 DB")
-        
-        self._save_temporal_graph_timer()
-
-    def _save_temporal_graph_timer(self):
-        """定时保存时序图（避免频繁写入）"""
-        import threading
-        if self._temporal_graph and self._temporal_graph.edge_count > 0:
-            def delayed_save():
-                try:
-                    db_path = str(self.config.index_db)
-                    self._temporal_graph.save_to_db(db_path)
-                    logger.info("时序图定时保存完成")
-                except Exception as e:
-                    logger.warning("时序图定时保存失败: %s", e)
-            
-            timer = threading.Timer(300, delayed_save)  # 5分钟后保存
-            timer.daemon = True
-            timer.start()
-    
-    def _load_relationships_to_graph(self):
-        """从关系数据加载到时序图"""
-        if not self._temporal_graph:
-            return
-        
-        try:
-            relationships = self.index_manager.get_recent_relationships(limit=1000)
-            for rel in relationships:
-                self._temporal_graph.add_edge(
-                    src=rel.get("from_entity", ""),
-                    rel=rel.get("type", "相关"),
-                    tgt=rel.get("to_entity", ""),
-                    chapter=rel.get("chapter", 0),
-                    weight=1.0
-                )
-            logger.info("时序图加载完成: %s", self._temporal_graph.get_stats())
-        except Exception as e:
-            logger.warning("时序图加载失败: %s", e)
-    
-    def get_temporal_graph(self) -> Optional[TemporalGraphIndex]:
-        """获取时序图索引"""
-        return self._temporal_graph
-
-    @property
-    def _jieba_available(self) -> bool:
-        """检查 jieba 是否可用"""
-        return RAGAdapter._jieba_loaded
-
-    def _normalize_numbers(self, text: str) -> str:
-        """数字归一化：阿拉伯数字转中文"""
-        def _number_to_chinese(num_str: str) -> str:
-            if not num_str:
-                return num_str
-            digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
-            
-            try:
-                num = int(num_str)
-                if num == 0:
-                    return '零'
-                
-                if num < 10:
-                    return digits[num]
-                
-                if num < 20:
-                    return '十' if num == 10 else '十' + digits[num % 10]
-                
-                if num < 100:
-                    tens = num // 10
-                    ones = num % 10
-                    result = digits[tens] + '十'
-                    if ones > 0:
-                        result += digits[ones]
-                    return result
-                
-                if num < 1000:
-                    hundreds = num // 100
-                    remainder = num % 100
-                    result = digits[hundreds] + '百'
-                    if remainder > 0:
-                        if remainder < 10:
-                            result += '零' + digits[remainder]
-                        else:
-                            result += _number_to_chinese(str(remainder))
-                    return result
-                
-                return num_str
-            except ValueError:
-                return num_str
-
-        text = re.sub(r'(\d+)年', lambda m: _number_to_chinese(m.group(1)) + '年', text)
-        text = re.sub(r'第(\d+)章', lambda m: '第' + _number_to_chinese(m.group(1)) + '章', text)
-        text = re.sub(r'(\d+)段', lambda m: _number_to_chinese(m.group(1)) + '段', text)
-        text = re.sub(r'第(\d+)次', lambda m: '第' + _number_to_chinese(m.group(1)) + '次', text)
-        return text
 
     @property
     def degraded_mode_reason(self) -> Optional[str]:
@@ -418,12 +102,12 @@ class RAGAdapter:
                     "vectors 表结构已迁移（备份: %s）",
                     str(backup_path),
                 )
-            except Exception as migrate_err:
+            except Exception:
                 try:
                     self._restore_vector_db_from_backup(backup_path)
-                    logger.exception("vectors 表迁移失败，已从备份恢复")
+                    logger.error("vectors 表迁移失败，已从备份恢复: %s", str(backup_path))
                 except Exception as restore_exc:
-                    logger.exception("vectors 表迁移失败，且恢复备份失败")
+                    logger.exception("vectors 表迁移失败，且恢复备份失败: %s", restore_exc)
                 raise
 
         with self._get_conn() as conn:
@@ -455,7 +139,7 @@ class RAGAdapter:
     def _backup_vector_db(self, reason: str) -> Path:
         db_path = Path(self.config.vector_db)
         if not db_path.exists():
-            raise StateManagerError(f"vectors.db 不存在: {db_path}")
+            raise FileNotFoundError(f"vectors.db 不存在: {db_path}")
         backup_dir = self.config.webnovel_dir / "backups"
         backup_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -482,9 +166,7 @@ class RAGAdapter:
                 parent_chunk_id TEXT,
                 chunk_type TEXT DEFAULT 'scene',
                 source_file TEXT,
-                content_hash TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
@@ -533,9 +215,7 @@ class RAGAdapter:
                 parent_chunk_id TEXT,
                 chunk_type TEXT DEFAULT 'scene',
                 source_file TEXT,
-                content_hash TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
@@ -696,29 +376,9 @@ class RAGAdapter:
 
     # ==================== 向量存储 ====================
 
-    def _compute_content_hash(self, content: str) -> str:
-        """计算内容哈希（用于增量检测）"""
-        return hashlib.md5(content.encode("utf-8")).hexdigest()
-
-    def _get_chunk_hash(self, chunk_id: str) -> Optional[str]:
-        """获取已有 chunk 的哈希"""
-        with self._get_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT content_hash FROM vectors WHERE chunk_id = ?", (chunk_id,))
-            row = cursor.fetchone()
-            return row[0] if row else None
-
-    async def store_chunks(
-        self,
-        chunks: List[Dict],
-        incremental: bool = True,
-    ) -> int:
+    async def store_chunks(self, chunks: List[Dict]) -> int:
         """
         存储场景切片的向量
-
-        Args:
-            chunks: 切片列表
-            incremental: 是否启用增量检测（默认 True）
 
         chunks 格式:
         [
@@ -737,41 +397,38 @@ class RAGAdapter:
         if not chunks:
             return 0
 
-        filtered_chunks = []
-        if incremental:
-            for chunk in chunks:
-                chunk_type = chunk.get("chunk_type") or "scene"
-                chunk_id = chunk.get("chunk_id")
-                if not chunk_id:
-                    if chunk_type == "summary":
-                        chunk_id = f"ch{int(chunk['chapter']):04d}_summary"
-                    else:
-                        chunk_id = f"ch{int(chunk['chapter']):04d}_s{int(chunk['scene_index'])}"
-                content = chunk.get("content", "")
-                new_hash = self._compute_content_hash(content)
-                existing_hash = self._get_chunk_hash(chunk_id)
-                if existing_hash and existing_hash == new_hash:
-                    continue
-                filtered_chunks.append(chunk)
-        else:
-            filtered_chunks = chunks
+        # 提取内容用于嵌入
+        contents = [c.get("content", "") for c in chunks]
 
-        if not filtered_chunks:
-            return 0
-
-        contents = [c.get("content", "") for c in filtered_chunks]
+        # 调用 API 获取嵌入向量（可能包含 None 表示失败）
         embeddings = await self.api_client.embed_batch(contents)
 
         if not embeddings:
             return 0
 
+        # 存储到数据库（跳过嵌入失败的 chunk）
         stored = 0
         skipped = 0
         errors = []
         with self._get_conn() as conn:
             cursor = conn.cursor()
 
-            for chunk, embedding in zip(filtered_chunks, embeddings):
+            for chunk, embedding in zip(chunks, embeddings):
+                if embedding is None:
+                    # 嵌入失败，跳过该 chunk（仅存储 BM25 索引供关键词检索）
+                    skipped += 1
+                    chunk_id = chunk.get("chunk_id")
+                    if not chunk_id:
+                        if chunk.get("chunk_type") == "summary":
+                            chunk_id = f"ch{int(chunk['chapter']):04d}_summary"
+                        else:
+                            chunk_id = f"ch{int(chunk['chapter']):04d}_s{int(chunk['scene_index'])}"
+                    try:
+                        self._update_bm25_index(cursor, chunk_id, chunk.get("content", ""))
+                    except Exception as e:
+                        errors.append(f"BM25 index failed for {chunk_id}: {e}")
+                    continue
+
                 chunk_type = chunk.get("chunk_type") or "scene"
                 chunk_id = chunk.get("chunk_id")
                 if not chunk_id:
@@ -780,37 +437,27 @@ class RAGAdapter:
                     else:
                         chunk_id = f"ch{int(chunk['chapter']):04d}_s{int(chunk['scene_index'])}"
 
-                content = chunk.get("content", "")
-                content_hash = self._compute_content_hash(content)
-
-                if embedding is None:
-                    skipped += 1
-                    try:
-                        self._update_bm25_index(cursor, chunk_id, content)
-                    except Exception as e:
-                        errors.append(f"BM25 index failed for {chunk_id}: {e}")
-                    continue
-
+                # 将向量序列化为 bytes
                 embedding_bytes = self._serialize_embedding(embedding)
 
                 cursor.execute("""
                     INSERT OR REPLACE INTO vectors
-                    (chunk_id, chapter, scene_index, content, embedding, parent_chunk_id, chunk_type, source_file, content_hash, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    (chunk_id, chapter, scene_index, content, embedding, parent_chunk_id, chunk_type, source_file)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     chunk_id,
                     chunk["chapter"],
                     chunk.get("scene_index", 0) if chunk_type == "scene" else 0,
-                    content,
+                    chunk.get("content", ""),
                     embedding_bytes,
                     chunk.get("parent_chunk_id"),
                     chunk_type,
                     chunk.get("source_file"),
-                    content_hash,
                 ))
 
+                # 同时更新 BM25 索引
                 try:
-                    self._update_bm25_index(cursor, chunk_id, content)
+                    self._update_bm25_index(cursor, chunk_id, chunk.get("content", ""))
                 except Exception as e:
                     errors.append(f"BM25 index failed for {chunk_id}: {e}")
 
@@ -822,6 +469,7 @@ class RAGAdapter:
                 logger.error("SQLite commit failed: %s", e)
                 errors.append(f"SQLite commit failed: {e}")
 
+        # 输出警告日志
         if skipped > 0:
             logger.warning(
                 "Vector embedding: %s stored, %s skipped (embedding failed)",
@@ -829,7 +477,8 @@ class RAGAdapter:
                 skipped,
             )
         if errors:
-            for err in errors[:5]:
+
+            for err in errors[:5]:  # 最多显示5条
                 logger.warning("%s", err)
 
         return stored
@@ -869,20 +518,15 @@ class RAGAdapter:
     # ==================== BM25 索引 ====================
 
     def _tokenize(self, text: str) -> List[str]:
-        """智能分词（中文 jieba + 数字归一化 + 英文单词）"""
-        text = self._normalize_numbers(text)
+        """简单分词（中文按字符，英文按单词）"""
+        # 中文字符
+        chinese = re.findall(r'[\u4e00-\u9fff]+', text)
+        chinese_chars = list("".join(chinese))
 
-        if self._jieba_available:
-            try:
-                import jieba
-                chinese = list(jieba.cut(text))
-            except Exception:
-                chinese = list(text)
-        else:
-            chinese = list(text)
-
+        # 英文单词
         english = re.findall(r'[a-zA-Z]+', text.lower())
-        return [w for w in chinese + english if w.strip() and not w.isspace()]
+
+        return chinese_chars + english
 
     def _update_bm25_index(self, cursor, chunk_id: str, content: str):
         """更新 BM25 索引"""
@@ -1204,60 +848,6 @@ class RAGAdapter:
                 break
         return expanded[:max_entities]
 
-    def _expand_related_entities_temporal(
-        self,
-        seed_entities: List[str],
-        current_chapter: int | None = None,
-        hops: int | None = None,
-    ) -> List[str]:
-        """
-        使用时序图扩展相关实体（增强版）
-        
-        Args:
-            seed_entities: 种子实体列表
-            current_chapter: 当前章节
-            hops: 跳数
-        
-        Returns:
-            扩展后的实体列表（按时序权重排序）
-        """
-        if not self._temporal_graph:
-            return self._expand_related_entities(seed_entities, hops)
-        
-        max_entities = int(self.config.graph_rag_max_expanded_entities)
-        hops = max(1, int(hops or self.config.graph_rag_expand_hops))
-        
-        if current_chapter is None:
-            try:
-                current_chapter = int(self.get_stats().get("max_chapter") or 1)
-            except Exception:
-                current_chapter = 1
-        
-        expanded: List[str] = []
-        for seed in seed_entities:
-            if seed not in expanded:
-                expanded.append(seed)
-            if len(expanded) >= max_entities:
-                break
-            
-            results = self._temporal_graph.query_expand(
-                entity=seed,
-                current_chapter=current_chapter,
-                max_hops=hops,
-                max_entities=max_entities
-            )
-            
-            for r in results:
-                if r.entity and r.entity not in expanded:
-                    expanded.append(r.entity)
-                if len(expanded) >= max_entities:
-                    break
-            
-            if len(expanded) >= max_entities:
-                break
-        
-        return expanded[:max_entities]
-
     def _collect_graph_candidate_chunk_ids(
         self,
         entity_ids: List[str],
@@ -1419,14 +1009,7 @@ class RAGAdapter:
                 self._log_query(query, "graph_hybrid_no_seed", final, latency_ms, chapter=chapter)
             return final
 
-        if self._temporal_graph:
-            expanded_entities = self._expand_related_entities_temporal(
-                seed_entities=seeds,
-                current_chapter=chapter,
-            )
-        else:
-            expanded_entities = self._expand_related_entities(seeds)
-        
+        expanded_entities = self._expand_related_entities(seeds)
         candidate_chunk_ids = self._collect_graph_candidate_chunk_ids(
             expanded_entities,
             chapter=chapter,
@@ -1824,19 +1407,6 @@ def main():
     index_parser.add_argument("--chapter", type=int, required=True)
     index_parser.add_argument("--scenes", required=True, help="JSON 格式的场景列表")
     index_parser.add_argument("--summary", required=False, help="章节摘要文本")
-    index_parser.add_argument(
-        "--incremental",
-        dest="incremental",
-        action="store_true",
-        default=True,
-        help="启用增量索引（默认开启）",
-    )
-    index_parser.add_argument(
-        "--no-incremental",
-        dest="incremental",
-        action="store_false",
-        help="禁用增量索引（全量重建）",
-    )
 
     # 搜索
     search_parser = subparsers.add_parser("search")
@@ -1853,9 +1423,6 @@ def main():
         required=False,
         help="中心实体列表（JSON 数组或逗号分隔）",
     )
-
-    # 重建词典
-    subparsers.add_parser("rebuild-dict")
 
     argv = normalize_global_project_root(sys.argv[1:])
     args = parser.parse_args(argv)
@@ -1946,9 +1513,9 @@ def main():
                 }
             )
 
-        stored = asyncio.run(adapter.store_chunks(chunks, incremental=args.incremental))
+        stored = asyncio.run(adapter.store_chunks(chunks))
         skipped = len(chunks) - stored
-        result = {"stored": stored, "skipped": skipped, "total": len(chunks), "incremental": args.incremental}
+        result = {"stored": stored, "skipped": skipped, "total": len(chunks)}
         if skipped > 0:
             emit_success(result, message="indexed_with_warnings", chapter=args.chapter)
         else:
@@ -2003,10 +1570,6 @@ def main():
             _append_timing(True)
         else:
             emit_success(payload, message="search_results")
-
-    elif args.command == "rebuild-dict":
-        count = adapter.rebuild_custom_dict()
-        emit_success({"words_count": count}, message="dict_rebuilt")
 
     else:
         emit_error("UNKNOWN_COMMAND", "未指定有效命令", suggestion="请查看 --help")

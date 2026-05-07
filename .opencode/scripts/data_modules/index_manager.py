@@ -50,6 +50,7 @@ from .index_debt_mixin import IndexDebtMixin
 from .index_reading_mixin import IndexReadingMixin
 from .index_observability_mixin import IndexObservabilityMixin
 from .observability import safe_append_perf_timing, safe_log_tool_call
+from .override_ledger_service import ensure_override_ledger_columns
 
 
 @dataclass
@@ -163,6 +164,19 @@ class ChaseDebtMeta:
 
 
 @dataclass
+class DebtEventMeta:
+    """债务事件日志 (v5.3 引入)"""
+
+    debt_id: int
+    event_type: (
+        str  # created / interest_accrued / partial_payment / full_payment / overdue
+    )
+    amount: float
+    chapter: int
+    note: str = ""
+
+
+@dataclass
 class ChapterReadingPowerMeta:
     """章节追读力元数据 (v5.3 引入)"""
 
@@ -192,6 +206,8 @@ class ReviewMetrics:
     notes: str = ""
 
 
+
+
 @dataclass
 class WritingChecklistScoreMeta:
     """写作清单评分记录（Context Contract v2 Phase F）"""
@@ -213,22 +229,11 @@ class WritingChecklistScoreMeta:
 
 
 class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexReadingMixin, IndexObservabilityMixin):
-    """索引管理器（v5.4 过渡版，内部服务化）"""
+    """索引管理器"""
 
     def __init__(self, config=None):
         self.config = config or get_config()
         self._init_db()
-        self._services = {
-            "chapter": self,
-            "entity": self,
-            "debt": self,
-            "reading": self,
-            "observability": self,
-        }
-
-    def get_service(self, name: str):
-        """获取内部服务（过渡用，未来替换 mixin）"""
-        return self._services.get(name, self)
 
     def _init_db(self):
         """初始化数据库表"""
@@ -246,9 +251,7 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                     word_count INTEGER,
                     characters TEXT,
                     summary TEXT,
-                    content_hash TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
@@ -460,7 +463,7 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                     chapter INTEGER NOT NULL,
                     note TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (debt_id) REFERENCES chase_debt(id)
+                    FOREIGN KEY (debt_id) REFERENCES chase_debt(id) ON DELETE CASCADE
                 )
             """)
 
@@ -492,6 +495,7 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_override_contracts_due ON override_contracts(due_chapter)"
             )
+            ensure_override_ledger_columns(conn)
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_chase_debt_status ON chase_debt(status)"
             )
@@ -617,38 +621,6 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                 "CREATE INDEX IF NOT EXISTS idx_checklist_score_value ON writing_checklist_scores(score)"
             )
 
-            # 章节规划节点表（CBN/CPN/CEN from outline parsing）
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS chapter_nodes (
-                    chapter INTEGER NOT NULL,
-                    node_type TEXT NOT NULL,
-                    goal TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    seq INTEGER NOT NULL,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (chapter, node_type, seq)
-                )
-            """)
-
-            conn.commit()
-
-        self._migrate_schema()
-
-    def _migrate_schema(self):
-        """迁移 schema（添加新字段到已有表）"""
-        with self._get_conn() as conn:
-            cursor = conn.cursor()
-
-            cursor.execute("PRAGMA table_info(chapters)")
-            chapters_cols = {row[1] for row in cursor.fetchall()}
-
-            if "content_hash" not in chapters_cols:
-                cursor.execute("ALTER TABLE chapters ADD COLUMN content_hash TEXT")
-
-            if "updated_at" not in chapters_cols:
-                cursor.execute("ALTER TABLE chapters ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-
             conn.commit()
 
     @contextmanager
@@ -661,87 +633,89 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
         finally:
             conn.close()
 
+    def apply_entity_delta(self, delta: Dict[str, Any]) -> bool:
+        """将 commit/entity 提取产物映射为实体或关系索引更新。"""
+        if not isinstance(delta, dict):
+            return False
+
+        from_entity = str(delta.get("from_entity") or delta.get("from") or "").strip()
+        to_entity = str(delta.get("to_entity") or delta.get("to") or "").strip()
+        rel_type = str(delta.get("relation_type") or delta.get("relationship_type") or delta.get("type") or "").strip()
+        chapter = int(delta.get("chapter") or 0)
+        if from_entity and to_entity and rel_type:
+            self.upsert_relationship(
+                RelationshipMeta(
+                    from_entity=from_entity,
+                    to_entity=to_entity,
+                    type=rel_type,
+                    description=str(delta.get("description") or "").strip(),
+                    chapter=chapter,
+                )
+            )
+            return True
+
+        entity_id = str(delta.get("entity_id") or delta.get("id") or "").strip()
+        if not entity_id:
+            return False
+
+        current = dict(delta.get("current") or {})
+        field = str(delta.get("field") or delta.get("field_path") or "").strip()
+        if field:
+            new_value = (
+                delta.get("new")
+                if "new" in delta
+                else delta.get("new_value")
+                if "new_value" in delta
+                else None
+            )
+            if new_value is not None and field not in current:
+                current[field] = new_value
+
+        payload = delta.get("payload") or {}
+        canonical_name = str(
+            delta.get("canonical_name")
+            or delta.get("name")
+            or payload.get("name")
+            or entity_id
+        ).strip()
+
+        tier = str(delta.get("tier") or "装饰").strip() or "装饰"
+        is_protagonist = bool(delta.get("is_protagonist"))
+        # tier='主角' 视同 is_protagonist=True（LLM 实际输出常用 tier 标注）
+        if not is_protagonist and tier == "主角":
+            is_protagonist = True
+        if "is_protagonist" not in delta and tier != "主角":
+            existing = self.get_entity(entity_id)
+            if existing:
+                is_protagonist = bool(existing.get("is_protagonist"))
+
+        entity_type = str(
+            delta.get("type")
+            or delta.get("entity_type")
+            or "角色"
+        ).strip() or "角色"
+
+        entity = EntityMeta(
+            id=entity_id,
+            type=entity_type,
+            canonical_name=canonical_name,
+            tier=tier,
+            desc=str(delta.get("desc") or delta.get("description") or "").strip(),
+            current=current,
+            first_appearance=chapter,
+            last_appearance=chapter,
+            is_protagonist=is_protagonist,
+            is_archived=bool(delta.get("is_archived")),
+        )
+        self.upsert_entity(entity, update_metadata=True)
+        return True
+
     # ==================== 章节操作 ====================
 
-    # ==================== 章节规划节点 ====================
-
-    def save_chapter_nodes(self, chapter: int, nodes: list) -> int:
-        """Persist chapter planning nodes (CBN/CPN/CEN) from outline parsing.
-
-        Args:
-            chapter: Chapter number.
-            nodes: List of dicts with keys: node_type, goal, seq.
-
-        Returns:
-            Number of nodes inserted.
-        """
-        with self._get_conn() as conn:
-            cursor = conn.cursor()
-            inserted = 0
-            for node in nodes:
-                try:
-                    cursor.execute(
-                        """INSERT OR REPLACE INTO chapter_nodes
-                           (chapter, node_type, goal, status, seq, updated_at)
-                           VALUES (?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP)""",
-                        (
-                            chapter,
-                            str(node.get("node_type", "")),
-                            str(node.get("goal", "")),
-                            int(node.get("seq", 0)),
-                        ),
-                    )
-                    inserted += 1
-                except Exception:
-                    pass
-            conn.commit()
-            return inserted
-
-    def get_chapter_nodes(self, chapter: int) -> list:
-        """Get planning nodes for a chapter.
-
-        Returns:
-            List of dicts with keys: chapter, node_type, goal, status, seq.
-        """
-        with self._get_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """SELECT chapter, node_type, goal, status, seq
-                   FROM chapter_nodes
-                   WHERE chapter = ?
-                   ORDER BY seq""",
-                (chapter,),
-            )
-            rows = cursor.fetchall()
-            return [
-                {
-                    "chapter": r[0],
-                    "node_type": r[1],
-                    "goal": r[2],
-                    "status": r[3],
-                    "seq": r[4],
-                }
-                for r in rows
-            ]
-
-    def mark_chapter_nodes_fulfilled(self, chapter: int) -> int:
-        """Mark all pending nodes for a chapter as fulfilled.
-
-        Returns:
-            Number of nodes updated.
-        """
-        with self._get_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """UPDATE chapter_nodes
-                   SET status = 'fulfilled', updated_at = CURRENT_TIMESTAMP
-                   WHERE chapter = ? AND status = 'pending'""",
-                (chapter,),
-            )
-            conn.commit()
-            return cursor.rowcount
-
 # ==================== CLI 接口 ====================
+
+
+
 
 
 def main():
@@ -784,33 +758,6 @@ def main():
     process_parser.add_argument("--word-count", type=int, required=True)
     process_parser.add_argument("--entities", required=True, help="JSON 格式的实体列表")
     process_parser.add_argument("--scenes", required=True, help="JSON 格式的场景列表")
-    process_parser.add_argument(
-        "--incremental",
-        dest="incremental",
-        action="store_true",
-        default=True,
-        help="启用增量索引（默认开启）",
-    )
-    process_parser.add_argument(
-        "--no-incremental",
-        dest="incremental",
-        action="store_false",
-        help="禁用增量索引（全量重建）",
-    )
-
-    # 更新索引（增量/全量）
-    update_index_parser = subparsers.add_parser("update-index")
-    update_index_parser.add_argument("--chapter", type=int, help="指定章节号")
-    update_index_parser.add_argument(
-        "--recent",
-        type=int,
-        help="更新最近 N 章",
-    )
-    update_index_parser.add_argument(
-        "--full",
-        action="store_true",
-        help="全量重建（忽略增量优化）",
-    )
 
     # ==================== v5.1 引入命令 ====================
 
@@ -958,6 +905,11 @@ def main():
     hook_stats_parser = subparsers.add_parser("get-hook-type-stats")
     hook_stats_parser.add_argument("--last-n", type=int, default=20)
 
+    # 合并查询：追读力 + 模式统计 + 钩子统计（减少工具调用次数）
+    reader_signals_parser = subparsers.add_parser("get-reader-signals")
+    reader_signals_parser.add_argument("--limit", type=int, default=5)
+    reader_signals_parser.add_argument("--last-n", type=int, default=20)
+
     # 获取待偿还Override
     pending_override_parser = subparsers.add_parser("get-pending-overrides")
     pending_override_parser.add_argument("--before-chapter", type=int, default=None)
@@ -999,7 +951,6 @@ def main():
 
     # 保存章节追读力元数据
     save_rp_parser = subparsers.add_parser("save-chapter-reading-power")
-    save_rp_parser.add_argument("--chapter", type=int, required=True, help="章节号")
     save_rp_parser.add_argument(
         "--data", required=True, help="JSON 格式的章节追读力元数据"
     )
@@ -1088,75 +1039,8 @@ def main():
             word_count=args.word_count,
             entities=entities,
             scenes=scenes,
-            incremental=args.incremental,
         )
         emit_success(stats, message="chapter_processed", chapter=args.chapter)
-
-    elif args.command == "update-index":
-        from .rag_adapter import RAGAdapter
-
-        rag_adapter = RAGAdapter(config)
-        chapters_to_update = []
-
-        if args.chapter:
-            chapters_to_update = [args.chapter]
-        elif args.recent:
-            max_ch = manager.get_max_chapter()
-            chapters_to_update = list(range(max(args.recent, 1), max_ch + 1))
-        else:
-            emit_error("NO_TARGET", "请指定 --chapter 或 --recent")
-            return
-
-        incremental = not args.full
-
-        updated = 0
-        skipped = 0
-        for ch in chapters_to_update:
-            chapter_meta = manager.get_chapter(ch)
-            if not chapter_meta:
-                skipped += 1
-                continue
-
-            scenes = manager.get_scenes_by_chapter(ch)
-            if not scenes:
-                skipped += 1
-                continue
-
-            chunks = []
-            if chapter_meta.get("summary"):
-                chunks.append({
-                    "chapter": ch,
-                    "scene_index": 0,
-                    "content": chapter_meta["summary"],
-                    "chunk_type": "summary",
-                    "chunk_id": f"ch{ch:04d}_summary",
-                    "source_file": f"summaries/ch{ch:04d}.md",
-                })
-
-            for sc in scenes:
-                scene_index = sc.get("scene_index", 0)
-                chunks.append({
-                    "chapter": ch,
-                    "scene_index": scene_index,
-                    "content": sc.get("summary", ""),
-                    "chunk_type": "scene",
-                    "chunk_id": f"ch{ch:04d}_s{scene_index}",
-                    "parent_chunk_id": f"ch{ch:04d}_summary",
-                    "source_file": f"正文/第{ch:04d}章.md#scene_{scene_index}",
-                })
-
-            import asyncio
-            stored = asyncio.run(rag_adapter.store_chunks(chunks, incremental=incremental))
-            if stored > 0:
-                updated += 1
-
-        result = {
-            "updated": updated,
-            "skipped": skipped,
-            "total": len(chapters_to_update),
-            "incremental": incremental,
-        }
-        emit_success(result, message="index_updated")
 
     # ==================== v5.1 引入命令处理 ====================
 
@@ -1426,6 +1310,14 @@ def main():
         stats = manager.get_hook_type_stats(args.last_n)
         emit_success(stats, message="hook_type_stats")
 
+    elif args.command == "get-reader-signals":
+        signals = {
+            "recent_reading_power": manager.get_recent_reading_power(args.limit),
+            "pattern_usage_stats": manager.get_pattern_usage_stats(args.last_n),
+            "hook_type_stats": manager.get_hook_type_stats(args.last_n),
+        }
+        emit_success(signals, message="reader_signals")
+
     elif args.command == "get-pending-overrides":
         overrides = manager.get_pending_overrides(args.before_chapter)
         emit_success(overrides, message="pending_overrides")
@@ -1493,7 +1385,7 @@ def main():
     elif args.command == "save-chapter-reading-power":
         data = load_json_arg(args.data)
         meta = ChapterReadingPowerMeta(
-            chapter=args.chapter,
+            chapter=data["chapter"],
             hook_type=data.get("hook_type", ""),
             hook_strength=data.get("hook_strength", "medium"),
             coolpoint_patterns=data.get("coolpoint_patterns", []),
@@ -1505,7 +1397,7 @@ def main():
             debt_balance=data.get("debt_balance", 0.0),
         )
         manager.save_chapter_reading_power(meta)
-        emit_success({"chapter": args.chapter}, message="reading_power_saved")
+        emit_success({"chapter": meta.chapter}, message="reading_power_saved")
 
     else:
         emit_error("UNKNOWN_COMMAND", "未指定有效命令", suggestion="请查看 --help")

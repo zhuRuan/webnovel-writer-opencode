@@ -2,6 +2,10 @@
 
 > **定位**：本文档定义"追读力"相关的统一分类标准，供 Step 1.5 / Context Agent / Checkers 共享使用。
 >
+> **主服务 skill**: `webnovel-write` Step 1
+> **次服务 skill**: `webnovel-plan` Step 7（按需）、`webnovel-review` Step 4
+> **内容层级**: 提醒层 / 知识补充层
+>
 > **原则**：所有分类用于"指导性建议"，不做硬性评分裁决。
 >
 ---
@@ -338,16 +342,13 @@
 
 ## 五、兼容性说明
 
-### 5.1 与现有审查器的对接
+### 5.1 与现有 checker 的对接
 
-> 审查器列表和配置现已迁移至 `../../checkers/registry.yaml`
-
-| 审查器 | 使用的 Taxonomy |
-|--------|----------------|
-| `reader-pull-checker` | 钩子类型、钩子强度、Hard-002 |
-| `high-point-checker` | 爽点模式、微兑现 |
-| `pacing-checker` | Hard-003 (节奏灾难) |
-| `continuity-checker` | Hard-001 (可读性底线) |
+| 审查维度 (reviewer) | 使用的 Taxonomy |
+|---------------------|----------------|
+| continuity | Hard-001 (可读性底线)、Hard-002 (结构完整) |
+| pacing | Hard-003 (节奏灾难)、爽点模式、微兑现 |
+| ai_flavor | 钩子类型、钩子强度 |
 
 ### 5.2 输出字段映射
 

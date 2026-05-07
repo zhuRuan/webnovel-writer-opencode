@@ -17,24 +17,14 @@ from runtime_compat import normalize_windows_path
 
 from .context_weights import TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT
 
-
-def _load_dotenv() -> None:
-    """加载 .env 文件"""
-    pass
-
-
 def _get_user_claude_root() -> Path:
-    raw = (
-        os.environ.get("WEBNOVEL_CLAUDE_HOME")
-        or os.environ.get("CLAUDE_HOME")
-        or os.environ.get("OPENCODE_HOME")
-    )
+    raw = os.environ.get("WEBNOVEL_CLAUDE_HOME") or os.environ.get("CLAUDE_HOME")
     if raw:
         try:
             return normalize_windows_path(raw).expanduser().resolve()
         except Exception:
             return normalize_windows_path(raw).expanduser()
-    return (Path.home() / ".opencode").resolve()
+    return (Path.home() / ".claude").resolve()
 
 
 def _load_dotenv_file(env_path: Path, *, override: bool = False) -> bool:
@@ -64,7 +54,7 @@ def _load_dotenv():
 
     约定：
     - 项目级 `.env`（当前工作目录下）优先；
-    - 全局 `.env` 作为兜底：`~/.opencode/webnovel-writer/.env`
+    - 全局 `.env` 作为兜底：`~/.claude/webnovel-writer/.env`
     """
     # 1) 当前目录（常见：用户从项目根目录执行）
     _load_dotenv_file(Path.cwd() / ".env", override=False)
@@ -84,16 +74,17 @@ def _load_project_dotenv(project_root: Path) -> None:
     except Exception:
         return
 
-
-def _default_context_template_weights_dynamic() -> dict:
-    import copy
-    return copy.deepcopy(TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT)
+_load_dotenv()
 
 
-try:
-    from .config_presets import WORLD_PRESETS
-except ImportError:
-    WORLD_PRESETS = {}
+def _default_context_template_weights_dynamic() -> dict[str, dict[str, dict[str, float]]]:
+    return {
+        stage: {
+            template: dict(weights)
+            for template, weights in templates.items()
+        }
+        for stage, templates in TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT.items()
+    }
 
 
 @dataclass
@@ -110,6 +101,10 @@ class DataModulesConfig:
     @property
     def state_file(self) -> Path:
         return self.webnovel_dir / "state.json"
+
+    @property
+    def scratchpad_file(self) -> Path:
+        return self.webnovel_dir / "memory_scratchpad.json"
 
     @property
     def index_db(self) -> Path:
@@ -130,26 +125,12 @@ class DataModulesConfig:
         return self.project_root / "大纲"
 
     @property
-    def dict_dir(self) -> Path:
-        return self.project_root / ".opencode" / "dicts"
-
-    @property
-    def custom_dict_path(self) -> Path:
-        return self.dict_dir / "webnovel_dict.txt"
-
-    @property
-    def framework_dict_path(self) -> Path:
-        """框架级词典路径（不依赖项目）"""
-        return Path(__file__).parent.parent.parent / "dicts" / "webnovel_dict.txt"
-
-    @property
-    def scratchpad_file(self) -> Path:
-        return self.webnovel_dir / "scratchpad.json"
-
-    # ================= Story System 路径 =================
-    @property
     def story_system_dir(self) -> Path:
         return self.project_root / ".story-system"
+
+    @property
+    def story_system_chapters_dir(self) -> Path:
+        return self.story_system_dir / "chapters"
 
     @property
     def story_system_master_json(self) -> Path:
@@ -157,19 +138,8 @@ class DataModulesConfig:
 
     @property
     def story_system_anti_patterns_json(self) -> Path:
-        return self.story_system_dir / "anti-patterns.json"
+        return self.story_system_dir / "anti_patterns.json"
 
-    # ================= CSV Reference 路径 =================
-    @property
-    def csv_reference_dir(self) -> Path:
-        return self.project_root / ".opencode" / "references" / "csv"
-
-    def resolve_world_preset(self) -> dict:
-        """解析世界观预设配置"""
-        preset_name = getattr(self, "world_preset", "xianxia")
-        if preset_name in WORLD_PRESETS:
-            return WORLD_PRESETS[preset_name]
-        return WORLD_PRESETS.get("xianxia", {})
 
     # ================= Embedding API 配置 =================
     embed_api_type: str = "openai"
@@ -177,22 +147,19 @@ class DataModulesConfig:
     embed_model: str = field(default_factory=lambda: os.getenv("EMBED_MODEL", "Qwen/Qwen3-Embedding-8B"))
     embed_api_key: str = field(default_factory=lambda: os.getenv("EMBED_API_KEY", ""))
 
+    @property
+    def embed_url(self) -> str:
+        return self.embed_base_url
+
     # ================= Rerank API 配置 =================
     rerank_api_type: str = "openai"
     rerank_base_url: str = field(default_factory=lambda: os.getenv("RERANK_BASE_URL", "https://api.jina.ai/v1"))
     rerank_model: str = field(default_factory=lambda: os.getenv("RERANK_MODEL", "jina-reranker-v3"))
     rerank_api_key: str = field(default_factory=lambda: os.getenv("RERANK_API_KEY", ""))
 
-    # ================= Image Generation API 配置 =================
-    image_base_url: str = field(default_factory=lambda: os.getenv("IMAGE_BASE_URL", "https://api-inference.modelscope.cn/"))
-    image_model: str = field(default_factory=lambda: os.getenv("IMAGE_MODEL", "Qwen/Qwen-Image"))
-    image_api_key: str = field(default_factory=lambda: os.getenv("IMAGE_API_KEY", ""))
-    image_size: str = field(default_factory=lambda: os.getenv("IMAGE_SIZE", "3:4"))
-    
-    # ================= 图片生成轮询配置 =================
-    image_poll_timeout: int = field(default_factory=lambda: int(os.getenv("IMAGE_POLL_TIMEOUT", "300")))
-    image_poll_interval: int = field(default_factory=lambda: int(os.getenv("IMAGE_POLL_INTERVAL", "5")))
-    image_max_polls: int = field(default_factory=lambda: int(os.getenv("IMAGE_MAX_POLLS", "120")))
+    @property
+    def rerank_url(self) -> str:
+        return self.rerank_base_url
 
     # ================= 并发配置 =================
     embed_concurrency: int = 64
@@ -218,62 +185,13 @@ class DataModulesConfig:
     vector_prefilter_recent_candidates: int = 200
 
     # ================= Graph-RAG 配置 =================
-    # 环境变量覆盖：GRAPH_RAG_ENABLED, GRAPH_RAG_HOPS, GRAPH_RAG_MAX_ENTITIES
-    graph_rag_enabled: bool = field(
-        default_factory=lambda: os.getenv("GRAPH_RAG_ENABLED", "false").lower() == "true"
-    )
-    graph_rag_expand_hops: int = field(
-        default_factory=lambda: int(os.getenv("GRAPH_RAG_HOPS", "1"))
-    )
-    graph_rag_max_expanded_entities: int = field(
-        default_factory=lambda: int(os.getenv("GRAPH_RAG_MAX_ENTITIES", "30"))
-    )
+    graph_rag_enabled: bool = False
+    graph_rag_expand_hops: int = 1
+    graph_rag_max_expanded_entities: int = 30
     graph_rag_candidate_limit: int = 150
     graph_rag_boost_same_entity: float = 0.2
     graph_rag_boost_related_entity: float = 0.1
     graph_rag_boost_recency: float = 0.05
-    
-    # ================= 分词配置 =================
-    tokenizer_chinese_jieba: bool = field(
-        default_factory=lambda: os.getenv("TOKENIZER_JIEBA_ENABLED", "true").lower() == "true"
-    )
-    tokenizer_number_normalization: bool = field(
-        default_factory=lambda: os.getenv("TOKENIZER_NUMBER_NORM", "true").lower() == "true"
-    )
-    tokenizer_auto_rebuild_on_init: bool = field(
-        default_factory=lambda: os.getenv("TOKENIZER_AUTO_REBUILD", "true").lower() == "true"
-    )
-    tokenizer_auto_rebuild_on_entity: bool = field(
-        default_factory=lambda: os.getenv("TOKENIZER_REBUILD_ON_ENTITY", "true").lower() == "true"
-    )
-    tokenizer_rebuild_debounce_seconds: int = 30
-    tokenizer_log_rebuild_summary: bool = True
-    
-    # ================= 世界观一致性配置 =================
-    world_consistency_check_enabled: bool = True
-    world_consistency_check_interval: int = 10
-    power_jump_threshold: int = 3
-    relationship_jump_threshold: float = 0.5
-    faction_change_threshold: float = 0.2
-    
-    # 战力等级配置（可配置化，支持不同题材）
-    world_power_levels: dict[str, int] = field(default_factory=lambda: {
-        # 仙侠体系
-        "筑基": 1, "金丹": 2, "元婴": 3, "化神": 4, "炼虚": 5,
-        "合体": 6, "大乘": 7, "渡劫": 8,
-        # 玄幻体系
-        "斗者": 1, "斗师": 2, "大斗师": 3, "斗灵": 4, "斗王": 5,
-        "斗皇": 6, "斗宗": 7, "斗尊": 8, "斗帝": 9,
-    })
-    world_power_keywords: list[str] = field(default_factory=lambda: [
-        "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫",
-        "斗者", "斗师", "大斗师", "斗灵", "斗王", "斗皇", "斗宗", "斗尊", "斗帝",
-    ])
-    world_item_destroy_keywords: list[str] = field(default_factory=lambda: [
-        "碎裂", "报废", "毁灭", "消散", "化为灰烬", "彻底损毁",
-        "失去光泽", "暗淡无光", "裂纹", "破碎",
-    ])
-    world_preset: str = "xianxia"  # xianxia / fantasy / urban / scifi / wuxia
 
     relationship_graph_from_index_enabled: bool = True
 
@@ -285,9 +203,6 @@ class DataModulesConfig:
     max_disambiguation_warnings: int = 500
     max_disambiguation_pending: int = 1000
     max_state_changes: int = 2000
-
-    # ================= 伏笔管理配置 (v5.5 引入) =================
-    foreshadowing_stale_threshold: int = 10
 
     context_recent_summaries_window: int = 3
     context_recent_meta_window: int = 3
@@ -348,9 +263,6 @@ class DataModulesConfig:
     context_dynamic_budget_early_scene_bonus: float = 0.04
     context_dynamic_budget_late_global_bonus: float = 0.08
     context_dynamic_budget_late_scene_penalty: float = 0.06
-    context_debt_aware_budget_enabled: bool = True
-    context_debt_aware_threshold: int = 2
-    context_debt_aware_foreshadow_weight: float = 0.15
     context_template_weights_dynamic: dict[str, dict[str, dict[str, float]]] = field(
         default_factory=_default_context_template_weights_dynamic
     )
@@ -364,6 +276,12 @@ class DataModulesConfig:
         "，",
         "、",
     )
+    context_use_memory_orchestrator: bool = False
+    memory_orchestrator_max_items: int = 30
+    memory_orchestrator_recent_changes_limit: int = 10
+    memory_orchestrator_source_window: int = 20
+    memory_compactor_enabled: bool = True
+    memory_compactor_threshold: int = 500
 
     export_recent_changes_slice: int = 20
     export_disambiguation_slice: int = 20

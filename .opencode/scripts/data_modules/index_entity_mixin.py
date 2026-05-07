@@ -7,17 +7,54 @@ IndexEntityMixin extracted from IndexManager.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import sqlite3
-from logger import get_logger
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class IndexEntityMixin:
+    def _register_alias_with_cursor(
+        self, cursor: sqlite3.Cursor, alias: str, entity_id: str, entity_type: str
+    ) -> bool:
+        alias = str(alias).strip() if alias is not None else ""
+        if not alias or not entity_id:
+            return False
+
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO aliases (alias, entity_id, entity_type)
+            VALUES (?, ?, ?)
+        """,
+            (alias, entity_id, entity_type),
+        )
+        return cursor.rowcount > 0
+
+    def _register_canonical_alias(
+        self, cursor: sqlite3.Cursor, entity: EntityMeta
+    ) -> None:
+        canonical_name = str(entity.canonical_name).strip() if entity.canonical_name else ""
+        if canonical_name and canonical_name != entity.id:
+            self._register_alias_with_cursor(
+                cursor, canonical_name, entity.id, entity.type
+            )
+        if entity.is_protagonist:
+            for alias in self._protagonist_aliases(entity, canonical_name):
+                self._register_alias_with_cursor(cursor, alias, entity.id, entity.type)
+
+    def _protagonist_aliases(self, entity: EntityMeta, canonical_name: str) -> List[str]:
+        aliases = ["protagonist", "主角"]
+        compact_id = str(entity.id or "").replace("_", "").replace("-", "").strip()
+        if compact_id and compact_id != entity.id:
+            aliases.append(compact_id)
+        if canonical_name:
+            aliases.append(canonical_name)
+        return list(dict.fromkeys(alias for alias in aliases if alias and alias != entity.id))
+
     def upsert_entity(self, entity: EntityMeta, update_metadata: bool = False) -> bool:
         """
         插入或更新实体 (智能合并)
@@ -57,6 +94,7 @@ class IndexEntityMixin:
                     cursor.execute(
                         """
                         UPDATE entities SET
+                            type = ?,
                             canonical_name = ?,
                             tier = ?,
                             desc = ?,
@@ -68,6 +106,7 @@ class IndexEntityMixin:
                         WHERE id = ?
                     """,
                         (
+                            entity.type,
                             entity.canonical_name,
                             entity.tier,
                             entity.desc,
@@ -94,6 +133,7 @@ class IndexEntityMixin:
                             entity.id,
                         ),
                     )
+                self._register_canonical_alias(cursor, entity)
                 conn.commit()
                 return False
             else:
@@ -118,39 +158,38 @@ class IndexEntityMixin:
                         1 if entity.is_archived else 0,
                     ),
                 )
+                self._register_canonical_alias(cursor, entity)
                 conn.commit()
                 return True
 
-    def apply_entity_delta(self, delta: dict) -> bool:
-        """Apply an entity delta from a projection writer commit payload."""
-        from .index_manager import EntityMeta
-
-        entity_id = str(delta.get("entity_id") or delta.get("id") or "").strip()
-        if not entity_id:
-            return False
-        chapter = int(delta.get("chapter") or 0)
-        entity = EntityMeta(
-            id=entity_id,
-            type=str(delta.get("type") or "角色").strip() or "角色",
-            canonical_name=str(delta.get("canonical_name") or delta.get("name") or entity_id).strip(),
-            tier=str(delta.get("tier") or "装饰").strip() or "装饰",
-            desc=str(delta.get("desc") or "").strip(),
-            current=dict(delta.get("current") or {}),
-            first_appearance=chapter,
-            last_appearance=chapter,
-            is_protagonist=bool(delta.get("is_protagonist", False)),
-        )
-        return self.upsert_entity(entity, update_metadata=True)
-
     def get_entity(self, entity_id: str) -> Optional[Dict]:
-        """获取单个实体"""
+        """获取单个实体；ID 查不到时回退到别名查找。"""
         with self._get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM entities WHERE id = ?", (entity_id,))
             row = cursor.fetchone()
             if row:
                 return self._row_to_dict(row, parse_json=["current_json"])
-            return None
+
+        alias_matches = self.get_entities_by_alias(entity_id)
+        if alias_matches:
+            return alias_matches[0]
+
+        # ID 命名风格兜底：调用方传 'lu_ming' 但实体登记为 'luming' 时，
+        # 把分隔符（下划线/连字符）剥掉再试一次直接 ID 查询。
+        compact = str(entity_id or "").replace("_", "").replace("-", "").strip()
+        if compact and compact != entity_id:
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM entities WHERE id = ?", (compact,))
+                row = cursor.fetchone()
+                if row:
+                    return self._row_to_dict(row, parse_json=["current_json"])
+            alias_matches = self.get_entities_by_alias(compact)
+            if alias_matches:
+                return alias_matches[0]
+
+        return None
 
     def get_entities_by_type(
         self, entity_type: str, include_archived: bool = False
@@ -281,18 +320,18 @@ class IndexEntityMixin:
 
         同一别名可映射多个实体 (如 "天云宗" → 地点 + 势力)
         """
+        alias = str(alias).strip() if alias is not None else ""
+        if not alias or not entity_id:
+            return False
+
         with self._get_conn() as conn:
             cursor = conn.cursor()
             try:
-                cursor.execute(
-                    """
-                    INSERT OR IGNORE INTO aliases (alias, entity_id, entity_type)
-                    VALUES (?, ?, ?)
-                """,
-                    (alias, entity_id, entity_type),
+                inserted = self._register_alias_with_cursor(
+                    cursor, alias, entity_id, entity_type
                 )
                 conn.commit()
-                return cursor.rowcount > 0
+                return inserted
             except sqlite3.IntegrityError:
                 return False
 
@@ -302,6 +341,10 @@ class IndexEntityMixin:
 
         返回所有匹配的实体 (可能有多个不同类型)
         """
+        alias = str(alias).strip() if alias is not None else ""
+        if not alias:
+            return []
+
         with self._get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -310,6 +353,17 @@ class IndexEntityMixin:
                 FROM entities e
                 JOIN aliases a ON e.id = a.entity_id
                 WHERE a.alias = ?
+                ORDER BY
+                    e.is_archived ASC,
+                    e.is_protagonist DESC,
+                    CASE e.tier
+                        WHEN '核心' THEN 0
+                        WHEN '重要' THEN 1
+                        WHEN '次要' THEN 2
+                        ELSE 3
+                    END,
+                    e.last_appearance DESC,
+                    e.id ASC
             """,
                 (alias,),
             )
@@ -696,88 +750,6 @@ class IndexEntityMixin:
                 (*params, int(limit)),
             )
             return [dict(row) for row in cursor.fetchall()]
-
-    def get_relationship_at_chapter(
-        self, entity_a: str, entity_b: str, chapter: int
-    ) -> dict | None:
-        """Get the relationship state between two entities at a given chapter.
-
-        Looks at relationship_events up to and including the given chapter,
-        returning the most recent event's state.
-
-        Returns:
-            dict with keys: from_entity, to_entity, type, action, polarity,
-            strength, description, chapter, or None if no relationship exists.
-        """
-        with self._get_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """SELECT from_entity, to_entity, type, action, polarity,
-                          strength, description, chapter
-                   FROM relationship_events
-                   WHERE chapter <= ?
-                     AND ((from_entity = ? AND to_entity = ?)
-                          OR (from_entity = ? AND to_entity = ?))
-                   ORDER BY chapter DESC, rowid DESC
-                   LIMIT 1""",
-                (chapter, entity_a, entity_b, entity_b, entity_a),
-            )
-            row = cursor.fetchone()
-            if row is None:
-                return None
-            return {
-                "from_entity": row[0],
-                "to_entity": row[1],
-                "type": row[2],
-                "action": row[3],
-                "polarity": row[4],
-                "strength": row[5],
-                "description": row[6],
-                "chapter": row[7],
-            }
-
-    def get_entity_relationships_at_chapter(
-        self, entity_id: str, chapter: int
-    ) -> list:
-        """Get all relationships for an entity at a given chapter.
-
-        Returns list of unique relationship states (latest per pair).
-        """
-        with self._get_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """SELECT from_entity, to_entity, type, action, polarity,
-                          strength, description, chapter
-                   FROM relationship_events AS re
-                   WHERE chapter <= ?
-                     AND (from_entity = ? OR to_entity = ?)
-                     AND rowid = (
-                         SELECT MAX(rowid)
-                         FROM relationship_events AS re2
-                         WHERE re2.chapter <= ?
-                           AND (
-                               (re2.from_entity = re.from_entity AND re2.to_entity = re.to_entity)
-                               OR
-                               (re2.from_entity = re.to_entity AND re2.to_entity = re.from_entity)
-                           )
-                     )
-                   ORDER BY chapter DESC""",
-                (chapter, entity_id, entity_id, chapter),
-            )
-            rows = cursor.fetchall()
-            return [
-                {
-                    "from_entity": r[0],
-                    "to_entity": r[1],
-                    "type": r[2],
-                    "action": r[3],
-                    "polarity": r[4],
-                    "strength": r[5],
-                    "description": r[6],
-                    "chapter": r[7],
-                }
-                for r in rows
-            ]
 
     def _load_effective_relationship_edges(
         self,

@@ -1,20 +1,111 @@
 # CLAUDE.md
 
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+## Project
 
-## 1. Think Before Coding
+Webnovel Writer for OpenCode — a long-form Chinese web novel AI writing system built on the OpenCode framework. Combats AI "forgetting" and "hallucination" in serialized fiction through layered RAG, story contracts, and structured quality review.
+
+## Commands
+
+### Testing
+
+```bash
+# Full test suite (from repo root)
+python -m pytest .opencode/scripts/data_modules/tests -q --no-cov
+
+# Smoke tests (rapid pre-commit check, 2 critical test files)
+pwsh .opencode/scripts/run_tests.ps1 -Mode smoke
+
+# Full tests via PowerShell (creates isolated temp dir)
+pwsh .opencode/scripts/run_tests.ps1 -Mode full
+
+# Single test file
+python -m pytest .opencode/scripts/data_modules/tests/test_config.py -q --no-cov
+
+# Single test function
+python -m pytest .opencode/scripts/data_modules/tests/test_config.py::test_load_env -q --no-cov
+```
+
+Tests live in `.opencode/scripts/data_modules/tests/` (59 test files). The PowerShell runner creates isolated temp dirs under `.tmp/pytest/` to avoid Windows permission issues. `conftest.py` patches `tempfile.mkdtemp` and sets `sqlite3` journal mode for test safety.
+
+### CLI
+
+```bash
+# Unified entry point for all commands
+python .opencode/scripts/webnovel.py <command> [args]
+
+# Common subcommands
+python .opencode/scripts/webnovel.py preflight     # validate runtime environment
+python .opencode/scripts/webnovel.py status        # project health report
+python .opencode/scripts/webnovel.py story-system  # story contract management
+python .opencode/scripts/webnovel.py checkers list # list review checkers
+python .opencode/scripts/webnovel.py dashboard     # start dashboard
+python .opencode/scripts/webnovel.py export        # export novel
+```
+
+### Dashboard
+
+```bash
+# Backend (FastAPI on port 8080)
+python -m .opencode.dashboard
+
+# Frontend dev server (React + Vite, separate terminal)
+cd .opencode/dashboard/frontend && npm run dev
+```
+
+## Architecture
+
+### Six-Layer Data Flow
+
+Code is organized as a pipeline — each layer feeds the next:
+
+| Layer | What | Where |
+|-------|------|-------|
+| Knowledge | CSV tables + MD references + BM25 retrieval | `.opencode/references/` |
+| Reasoning | Genre routing + anti-pattern ranking | `.opencode/genres/` |
+| Contract | MASTER_SETTING + volume/chapter briefs + review contracts | `.story-system/` (per-project) |
+| Context | JSON assembly of what the writer needs | `data_modules/context_manager.py` |
+| Commit | Fact extraction + event sourcing + projection routing | `data_modules/chapter_commit_service.py`, `data_modules/event_log_store.py` |
+| Projection | 5 writers: state, index, summary, memory, vector | `data_modules/` various `*_writer.py` |
+
+### Key Subsystems
+
+**Story Contract Engine** — MASTER_SETTING.json is the source of truth. Runtime contracts derive from it per chapter. Event sourcing records all mutations; projections materialize state/index/summary/memory/vector views. Core files: `story_system_engine.py`, `story_contracts.py`, `event_log_store.py`, `event_projection_router.py`, `chapter_commit_service.py`.
+
+**Memory System** — Three tiers: working (short-term), plot (mid-term), semantic (long-term). Modules in `data_modules/memory/`: orchestrator, compactor, store, writer, schema, bootstrap, budget.
+
+**DebtTracker** — Foreshadowing tracking with hard constraint blocking. Active debts > 2 triggers debt-aware context budget (auto-allocate 15% tokens to foreshadowing list). Located in `data_modules/debt_tracker.py`.
+
+**Review Pipeline** — Two layers: Code Checkers (deterministic, run before LLM, block critical issues) → 6 parallel LLM reviewers (consistency, continuity, OOC, high-point, pacing, reader-pull). Managed via `data_modules/checkers_manager.py`.
+
+**Graph-RAG** — Entity relationship graph with SQLite persistence. Located in `data_modules/` entity linking and index modules.
+
+**Dashboard** — FastAPI backend (read-only GET endpoints serving project state) + React 19 frontend with ECharts visualization. Backend: `.opencode/dashboard/app.py`. Frontend: `.opencode/dashboard/frontend/`.
+
+### OpenCode Integration
+
+12 skills (slash commands like `/webnovel-write`) and 10+ agents (context-agent, data-agent, 6 reviewer agents) defined in `.opencode/skills/` and `.opencode/agents/`. The OpenCode runtime invokes these; this repo defines their behavior.
+
+### Key Convention: Unified CLI
+
+All Python functionality routes through a single entry point: `.opencode/scripts/webnovel.py` → `data_modules/webnovel.py` → `COMMAND_REGISTRY` dict mapping subcommand names to handler functions. New features should register here.
+
+## Guidelines
+
+These behavioral guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+### 1. Think Before Coding
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
 Before implementing:
 - State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
+- If multiple interpretations exist, present them — don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
-## 2. Simplicity First
+### 2. Simplicity First
 
 **Minimum code that solves the problem. Nothing speculative.**
 
@@ -22,44 +113,25 @@ Before implementing:
 - No abstractions for single-use code.
 - No "flexibility" or "configurability" that wasn't requested.
 - No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
 
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
+### 3. Surgical Changes
 
 **Touch only what you must. Clean up only your own mess.**
 
-When editing existing code:
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
 - Remove imports/variables/functions that YOUR changes made unused.
 - Don't remove pre-existing dead code unless asked.
 
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
+### 4. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**
 
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
+For multi-step tasks, state a brief plan with verification per step. Strong success criteria enable independent iteration.
 
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
+## 外置
 
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+**实际写小说的目录。**
 
----
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+D:\workspace\凡尘之舞

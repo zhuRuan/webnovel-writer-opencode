@@ -22,17 +22,14 @@ from runtime_compat import normalize_windows_path
 
 
 DEFAULT_PROJECT_DIR_NAMES: tuple[str, ...] = ("webnovel-project",)
-CURRENT_PROJECT_POINTER_REL: Path = Path(".opencode") / ".webnovel-current-project"
-CURRENT_PROJECT_POINTER_REL_CLAUDE: Path = Path(".claude") / ".webnovel-current-project"
+CURRENT_PROJECT_POINTER_REL: Path = Path(".claude") / ".webnovel-current-project"
 
-# 用户级全局映射（当 skills/agents 安装在 ~/.opencode 时，项目目录可能在任意盘符）
-# 该文件用于在"空上下文 + CWD 不在项目内"的情况下仍能定位到正确 project_root。
+# 用户级全局映射（当 skills/agents 安装在 ~/.claude 时，项目目录可能在任意盘符）
+# 该文件用于在“空上下文 + CWD 不在项目内”的情况下仍能定位到正确 project_root。
 GLOBAL_REGISTRY_REL: Path = Path("webnovel-writer") / "workspaces.json"
 
-# OpenCode/Claude Code 常见环境变量（存在时优先作为"工作区根目录"提示）
+# Claude Code 常见环境变量（存在时优先作为“工作区根目录”提示）
 ENV_CLAUDE_PROJECT_DIR = "CLAUDE_PROJECT_DIR"
-ENV_OPENCODE_PROJECT_DIR = "OPENCODE_PROJECT_DIR"
-ENV_OPENCODE_HOME = "OPENCODE_HOME"
 ENV_CLAUDE_HOME = "CLAUDE_HOME"
 ENV_WEBNOVEL_CLAUDE_HOME = "WEBNOVEL_CLAUDE_HOME"
 
@@ -63,17 +60,13 @@ def _normcase_path_key(p: Path) -> str:
 
 
 def _get_user_claude_root() -> Path:
-    raw = (
-        os.environ.get(ENV_WEBNOVEL_CLAUDE_HOME)
-        or os.environ.get(ENV_OPENCODE_HOME)
-        or os.environ.get(ENV_CLAUDE_HOME)
-    )
+    raw = os.environ.get(ENV_WEBNOVEL_CLAUDE_HOME) or os.environ.get(ENV_CLAUDE_HOME)
     if raw:
         try:
             return normalize_windows_path(raw).expanduser().resolve()
         except Exception:
             return normalize_windows_path(raw).expanduser()
-    return (Path.home() / ".opencode").resolve()
+    return (Path.home() / ".claude").resolve()
 
 
 def _global_registry_path() -> Path:
@@ -264,7 +257,6 @@ def _pointer_candidates(cwd: Path, *, stop_at: Optional[Path] = None) -> Iterabl
     """Yield candidate pointer files from cwd up to parents (bounded by stop_at when provided)."""
     for candidate in (cwd, *cwd.parents):
         yield candidate / CURRENT_PROJECT_POINTER_REL
-        yield candidate / CURRENT_PROJECT_POINTER_REL_CLAUDE
         if stop_at is not None and candidate == stop_at:
             break
 
@@ -291,11 +283,25 @@ def _resolve_project_root_from_pointer(cwd: Path, *, stop_at: Optional[Path] = N
     return None
 
 
-def _find_workspace_root_with_opencode(start: Path) -> Optional[Path]:
-    """Find nearest ancestor containing `.opencode/` or `.claude/`."""
+def _resolve_unique_child_project_root(root: Path) -> Optional[Path]:
+    """
+    Resolve a workspace root that contains exactly one direct child book project.
+
+    This supports commands invoked with a parent workspace path while keeping
+    ambiguous multi-book workspaces explicit.
+    """
+    try:
+        children = [child.resolve() for child in root.iterdir() if child.is_dir() and _is_project_root(child)]
+    except OSError:
+        return None
+    if len(children) == 1:
+        return children[0]
+    return None
+
+
+def _find_workspace_root_with_claude(start: Path) -> Optional[Path]:
+    """Find nearest ancestor containing `.claude/`."""
     for candidate in (start, *start.parents):
-        if (candidate / ".opencode").is_dir():
-            return candidate
         if (candidate / ".claude").is_dir():
             return candidate
     return None
@@ -305,29 +311,28 @@ def write_current_project_pointer(project_root: Path, *, workspace_root: Optiona
     """
     Write workspace-level current project pointer and return pointer file path.
 
-    If no workspace root with `.opencode/` or `.claude/` can be found, returns None (non-fatal).
+    If no workspace root with `.claude/` can be found, returns None (non-fatal).
     """
     root = normalize_windows_path(project_root).expanduser().resolve()
     if not _is_project_root(root):
         raise FileNotFoundError(f"Not a webnovel project root (missing .webnovel/state.json): {root}")
 
-    ws_root = Path(workspace_root).expanduser().resolve() if workspace_root else _find_workspace_root_with_opencode(root)
+    ws_root = Path(workspace_root).expanduser().resolve() if workspace_root else _find_workspace_root_with_claude(root)
     if ws_root is None:
-        ws_root = _find_workspace_root_with_opencode(Path.cwd().resolve())
+        ws_root = _find_workspace_root_with_claude(Path.cwd().resolve())
     if ws_root is None:
-        # 兜底：若无法找到 `.opencode/` 或 `.claude/`，将项目父目录视为"工作区"候选，
-        # 仅用于写入用户级 registry（不创建目录，不写 pointer 文件）。
+        # 兜底：若无法找到 `.claude/`，将项目父目录视为“工作区”候选，
+        # 仅用于写入用户级 registry（不创建 `.claude/` 目录，不写 pointer 文件）。
         ws_root = root.parent if root.parent != root else None
+    # 注意：ws_root 可能为 None（例如全局安装的 skills/agents，工作区内没有 `.claude/`）。
+    # 这类情况仍然需要写入用户级 registry，以支持后续“空上下文”定位。
 
     pointer_file: Optional[Path] = None
     if ws_root is not None:
-        # 仅当工作区内已经存在 `.opencode/` 或 `.claude/` 时才写入指针
-        opencode_dir = ws_root / ".opencode"
-        claude_dir = ws_root / ".claude"
-        config_dir = opencode_dir if opencode_dir.is_dir() else claude_dir if claude_dir.is_dir() else None
-        if config_dir is not None:
+        # 仅当工作区内已经存在 `.claude/` 时才写入指针，避免在任意目录下“凭空创建 .claude/”。
+        if (ws_root / ".claude").is_dir():
             try:
-                pointer_file = config_dir / ".webnovel-current-project"
+                pointer_file = ws_root / CURRENT_PROJECT_POINTER_REL
                 pointer_file.write_text(str(root), encoding="utf-8")
             except Exception:
                 pointer_file = None
@@ -367,6 +372,10 @@ def resolve_project_root(explicit_project_root: Optional[str] = None, *, cwd: Op
         pointer_root = _resolve_project_root_from_pointer(root, stop_at=_find_git_root(root))
         if pointer_root is not None:
             return pointer_root
+
+        child_root = _resolve_unique_child_project_root(root)
+        if child_root is not None:
+            return child_root
 
         # 兼容：显式传入“工作区根目录”但其 `.claude/` 在用户目录（全局安装）时，
         # workspace 内部可能没有指针文件。此时从用户级 registry 查找。

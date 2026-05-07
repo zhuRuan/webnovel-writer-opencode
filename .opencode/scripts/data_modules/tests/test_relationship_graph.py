@@ -23,7 +23,8 @@ from data_modules.index_manager import (
 def temp_project(tmp_path):
     cfg = DataModulesConfig.from_project_root(tmp_path)
     cfg.ensure_dirs()
-    (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+    if not cfg.state_file.exists():
+        cfg.state_file.write_text("{}", encoding="utf-8")
     return cfg
 
 

@@ -14,10 +14,10 @@ v5.1 变更（v5.4 沿用）:
 """
 
 import json
+import logging
 import sys
 import time
 from copy import deepcopy
-from logger import get_logger
 from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
@@ -28,9 +28,10 @@ import filelock
 
 from .config import get_config
 from .observability import safe_append_perf_timing, safe_log_tool_call
-from .exceptions import StateManagerError
 
-logger = get_logger(__name__)
+
+logger = logging.getLogger(__name__)
+
 
 try:
     # 当 scripts 目录在 sys.path 中（常见：从 scripts/ 运行）
@@ -76,31 +77,6 @@ class StateChange:
 
 
 @dataclass
-class _ForeshadowingAdd:
-    """待添加的伏笔记录"""
-    content: str
-    tier: str = "支线"
-    target_offset: int = 50
-    planted_chapter: int = 0
-    added_at: str = ""
-
-
-@dataclass
-class _ForeshadowingResolve:
-    """待解决的伏笔记录"""
-    content: str
-    resolved_chapter: int
-    resolved_at: str = ""
-
-
-@dataclass
-class _ForeshadowingMention:
-    """待更新的伏笔提及记录"""
-    content: str
-    mentioned_chapter: int
-
-
-@dataclass
 class _EntityPatch:
     """待写入的实体增量补丁（用于锁内合并）"""
     entity_type: str
@@ -112,11 +88,29 @@ class _EntityPatch:
     appearance_chapter: Optional[int] = None
 
 
+def _unique_aliases(*groups: Any) -> List[str]:
+    result = []
+    seen = set()
+    for group in groups:
+        if not group:
+            continue
+        values = [group] if isinstance(group, str) else group
+        for value in values:
+            alias = str(value).strip() if value is not None else ""
+            if alias and alias not in seen:
+                seen.add(alias)
+                result.append(alias)
+    return result
+
+
 class StateManager:
     """状态管理器（v5.1 entities_v3 格式 + SQLite 同步，v5.4 沿用）"""
 
     # v5.0 引入的实体类型
     ENTITY_TYPES = ["角色", "地点", "物品", "势力", "招式"]
+
+    # 章节状态机（单调递进）
+    CHAPTER_STATUS_ORDER = ["chapter_drafted", "chapter_reviewed", "chapter_committed"]
 
     def __init__(self, config=None, enable_sqlite_sync: bool = True):
         """
@@ -148,9 +142,6 @@ class StateManager:
         self._pending_structured_relationships: List[Dict[str, Any]] = []
         self._pending_disambiguation_warnings: List[Dict[str, Any]] = []
         self._pending_disambiguation_pending: List[Dict[str, Any]] = []
-        self._pending_foreshadowing_adds: List[_ForeshadowingAdd] = []
-        self._pending_foreshadowing_resolves: List[_ForeshadowingResolve] = []
-        self._pending_foreshadowing_mentions: List[_ForeshadowingMention] = []
         self._pending_progress_chapter: Optional[int] = None
         self._pending_progress_words_delta: int = 0
         self._pending_chapter_meta: Dict[str, Any] = {}
@@ -252,9 +243,6 @@ class StateManager:
                 self._pending_structured_relationships,
                 self._pending_disambiguation_warnings,
                 self._pending_disambiguation_pending,
-                self._pending_foreshadowing_adds,
-                self._pending_foreshadowing_resolves,
-                self._pending_foreshadowing_mentions,
                 self._pending_chapter_meta,
                 self._pending_progress_chapter is not None,
                 self._pending_progress_words_delta != 0,
@@ -266,18 +254,8 @@ class StateManager:
         self.config.ensure_dirs()
 
         lock = filelock.FileLock(str(self._lock_path), timeout=10)
-        lock_wait_time = 0.0
-        lock_acquired = False
-        merge_time = 0.0
-        write_time = 0.0
-        sqlite_time = 0.0
-
         try:
-            lock_start = time.perf_counter()
             with lock:
-                lock_wait_time = time.perf_counter() - lock_start
-                lock_acquired = True
-                merge_start = time.perf_counter()
                 disk_state = read_json_safe(self.config.state_file, default={})
                 disk_state = self._ensure_state_schema(disk_state)
 
@@ -379,63 +357,12 @@ class StateManager:
                         disk_state["chapter_meta"] = chapter_meta
                     chapter_meta.update(self._pending_chapter_meta)
 
-                # 伏笔合并（v5.5 引入）
-                plot_threads = disk_state.setdefault("plot_threads", {"active_threads": [], "foreshadowing": []})
-                if not isinstance(plot_threads, dict):
-                    plot_threads = {"active_threads": [], "foreshadowing": []}
-                    disk_state["plot_threads"] = plot_threads
-                foreshadowing_list = plot_threads.setdefault("foreshadowing", [])
-                if not isinstance(foreshadowing_list, list):
-                    foreshadowing_list = []
-                    plot_threads["foreshadowing"] = foreshadowing_list
-
-                # 1) 添加新伏笔
-                for add in self._pending_foreshadowing_adds:
-                    foreshadowing_list.append({
-                        "content": add.content,
-                        "status": "未回收",
-                        "tier": add.tier,
-                        "planted_chapter": add.planted_chapter,
-                        "target_chapter": add.planted_chapter + add.target_offset,
-                        "resolved_chapter": None,
-                        "last_mentioned_chapter": add.planted_chapter,
-                        "added_at": add.added_at or self._now_progress_timestamp(),
-                        "resolved_at": None,
-                    })
-
-                # 2) 解决伏笔
-                for resolve in self._pending_foreshadowing_resolves:
-                    for item in foreshadowing_list:
-                        if isinstance(item, dict) and item.get("content") == resolve.content:
-                            item["status"] = "已回收"
-                            item["resolved_chapter"] = resolve.resolved_chapter
-                            item["resolved_at"] = resolve.resolved_at or self._now_progress_timestamp()
-                            break
-
-                # 3) 更新提及章节
-                for mention in self._pending_foreshadowing_mentions:
-                    for item in foreshadowing_list:
-                        if isinstance(item, dict) and item.get("content") == mention.content:
-                            current_last = item.get("last_mentioned_chapter") or 0
-                            item["last_mentioned_chapter"] = max(current_last, mention.mentioned_chapter)
-                            break
-
-                merge_time = time.perf_counter() - merge_start
-
-                write_start = time.perf_counter()
                 # 原子写入（锁已持有，不再二次加锁）
                 atomic_write_json(self.config.state_file, disk_state, use_lock=False, backup=True)
-                write_time = time.perf_counter() - write_start
 
-                sqlite_start = time.perf_counter()
                 # v5.1 引入: 同步到 SQLite（失败时保留 pending 以便重试）
                 sqlite_pending_snapshot = self._snapshot_sqlite_pending()
-                try:
-                    sqlite_sync_ok = self._sync_to_sqlite()
-                except Exception as e:
-                    logger.warning("SQLite sync exception: %s", e)
-                    sqlite_sync_ok = False
-                sqlite_time = time.perf_counter() - sqlite_start
+                sqlite_sync_ok = self._sync_to_sqlite()
 
                 # 同步内存为磁盘最新快照
                 self._state = disk_state
@@ -443,9 +370,6 @@ class StateManager:
                 # state.json 侧 pending 已写盘，直接清空
                 self._pending_disambiguation_warnings.clear()
                 self._pending_disambiguation_pending.clear()
-                self._pending_foreshadowing_adds.clear()
-                self._pending_foreshadowing_resolves.clear()
-                self._pending_foreshadowing_mentions.clear()
                 self._pending_chapter_meta.clear()
                 self._pending_progress_chapter = None
                 self._pending_progress_words_delta = 0
@@ -460,26 +384,8 @@ class StateManager:
                 else:
                     self._restore_sqlite_pending(sqlite_pending_snapshot)
 
-                total_time = lock_wait_time + merge_time + write_time + sqlite_time
-                save_failure = 0 if sqlite_sync_ok else 1
-
-                if hasattr(self.config, 'project_root'):
-                    safe_append_perf_timing(
-                        self.config.project_root,
-                        tool_name="state_manager.save_state",
-                        success=sqlite_sync_ok,
-                        elapsed_ms=int(total_time * 1000),
-                        meta={
-                            "lock_wait_ms": int(lock_wait_time * 1000),
-                            "merge_ms": int(merge_time * 1000),
-                            "write_ms": int(write_time * 1000),
-                            "sqlite_ms": int(sqlite_time * 1000),
-                            "save_failure": save_failure,
-                        },
-                    )
-
         except filelock.Timeout:
-            raise StateManagerError("无法获取 state.json 文件锁，请稍后重试")
+            raise RuntimeError("无法获取 state.json 文件锁，请稍后重试")
 
     def _sync_to_sqlite(self) -> bool:
         """同步待处理数据到 SQLite（v5.1 引入，v5.4 沿用）"""
@@ -549,7 +455,7 @@ class StateManager:
                         tier=patch.base_entity.get("tier", "装饰"),
                         desc=patch.base_entity.get("desc", ""),
                         current=patch.base_entity.get("current", {}),
-                        aliases=[],
+                        aliases=patch.base_entity.get("aliases", []),
                         first_appearance=patch.base_entity.get("first_appearance", 0),
                         last_appearance=patch.base_entity.get("last_appearance", 0),
                         is_protagonist=patch.base_entity.get("is_protagonist", False)
@@ -667,7 +573,8 @@ class StateManager:
             return True
 
         except Exception as e:
-            logger.exception("SQLite sync failed")
+            # SQLite 同步失败时记录警告（不中断主流程）
+            logger.warning("SQLite sync failed: %s", e)
             return False
 
     def _snapshot_sqlite_pending(self) -> Dict[str, Any]:
@@ -727,13 +634,46 @@ class StateManager:
         if words > 0:
             self._pending_progress_words_delta += int(words)
 
+    # ==================== 章节状态管理 ====================
+
+    def get_chapter_status(self, chapter: int) -> Optional[str]:
+        """查询章节状态。"""
+        statuses = self._state.get("progress", {}).get("chapter_status", {})
+        return statuses.get(str(chapter))
+
+    def set_chapter_status(self, chapter: int, status: str) -> None:
+        """设置章节状态（单调递进，不可回退）。"""
+        if status not in self.CHAPTER_STATUS_ORDER:
+            raise ValueError(f"无效状态: {status}，有效值: {self.CHAPTER_STATUS_ORDER}")
+
+        current = self.get_chapter_status(chapter)
+        if current is not None:
+            current_idx = self.CHAPTER_STATUS_ORDER.index(current)
+            new_idx = self.CHAPTER_STATUS_ORDER.index(status)
+            if new_idx < current_idx:
+                raise ValueError(
+                    f"章节 {chapter} 状态不可回退: {current} -> {status}"
+                )
+            if new_idx == current_idx:
+                return  # 幂等
+
+        progress = self._state.setdefault("progress", {})
+        chapter_status = progress.setdefault("chapter_status", {})
+        chapter_status[str(chapter)] = status
+        self._save_state()
+
+    def _save_state(self) -> None:
+        """直接持久化当前内存状态到 state.json（轻量写入，不走 pending 合并）。"""
+        self.config.ensure_dirs()
+        atomic_write_json(self.config.state_file, self._state, backup=False)
+
     # ==================== 实体管理 (v5.1 SQLite-first) ====================
 
     def get_entity(self, entity_id: str, entity_type: str = None) -> Optional[Dict]:
         """获取实体（v5.1 引入：优先从 SQLite 读取）"""
         # v5.1 引入: 优先从 SQLite 读取
         if self._sql_state_manager:
-            entity = self._sql_state_manager._index_manager.get_entity(entity_id)
+            entity = self._sql_state_manager.get_entity(entity_id)
             if entity:
                 return entity
 
@@ -838,6 +778,7 @@ class StateManager:
             "tier": entity.tier,
             "desc": "",
             "current": entity.attributes,
+            "aliases": list(entity.aliases),
             "first_appearance": entity.first_appearance,
             "last_appearance": entity.last_appearance,
             "history": []
@@ -1028,187 +969,6 @@ class StateManager:
             ]
         return rels
 
-    # ==================== 伏笔管理 (v5.5 引入) ====================
-
-    def _ensure_foreshadowing_schema(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        """确保伏笔记录包含 last_mentioned_chapter 字段（历史兼容）"""
-        if "last_mentioned_chapter" not in item or item.get("last_mentioned_chapter") is None:
-            item["last_mentioned_chapter"] = item.get("planted_chapter", 0)
-        return item
-
-    def add_foreshadowing(
-        self,
-        content: str,
-        tier: str = "支线",
-        target_offset: int = 50,
-    ) -> Dict[str, Any]:
-        """
-        添加新伏笔。
-
-        参数:
-        - content: 伏笔内容描述
-        - tier: 优先级层级（核心/支线/装饰）
-        - target_offset: 目标回收偏移（默认 50 章）
-
-        返回:
-            完整的伏笔记录字典
-        """
-        current_chapter = self.get_current_chapter()
-        now = self._now_progress_timestamp()
-
-        record = {
-            "content": content,
-            "status": "未回收",
-            "tier": tier,
-            "planted_chapter": current_chapter,
-            "target_chapter": current_chapter + target_offset,
-            "resolved_chapter": None,
-            "last_mentioned_chapter": current_chapter,
-            "added_at": now,
-            "resolved_at": None,
-        }
-
-        # 同步写入内存
-        foreshadowing = self._state.setdefault("plot_threads", {}).setdefault("foreshadowing", [])
-        foreshadowing.append(record)
-
-        # 记录 pending 用于 save_state() 持久化
-        self._pending_foreshadowing_adds.append(_ForeshadowingAdd(
-            content=content,
-            tier=tier,
-            target_offset=target_offset,
-            planted_chapter=current_chapter,
-            added_at=now,
-        ))
-
-        return record
-
-    def resolve_foreshadowing(self, content: str, chapter: Optional[int] = None) -> bool:
-        """
-        标记伏笔已回收。
-
-        参数:
-        - content: 伏笔内容描述
-        - chapter: 回收章节号（默认取当前进度）
-
-        返回:
-            True 表示找到并标记，False 表示未找到
-        """
-        if chapter is None:
-            chapter = self.get_current_chapter()
-        now = self._now_progress_timestamp()
-
-        foreshadowing = self._state.get("plot_threads", {}).get("foreshadowing", [])
-        found = False
-        for item in foreshadowing:
-            if isinstance(item, dict) and item.get("content") == content:
-                item["status"] = "已回收"
-                item["resolved_chapter"] = chapter
-                item["resolved_at"] = now
-                found = True
-                break
-
-        if found:
-            self._pending_foreshadowing_resolves.append(_ForeshadowingResolve(
-                content=content,
-                resolved_chapter=chapter,
-                resolved_at=now,
-            ))
-
-        return found
-
-    def update_foreshadowing_mention(self, content: str, chapter: int) -> bool:
-        """
-        更新伏笔最后被提及的章节。
-
-        参数:
-        - content: 伏笔内容描述
-        - chapter: 提及章节号
-
-        返回:
-            True 表示找到并更新，False 表示未找到
-        """
-        foreshadowing = self._state.get("plot_threads", {}).get("foreshadowing", [])
-        found = False
-        for item in foreshadowing:
-            if isinstance(item, dict) and item.get("content") == content:
-                self._ensure_foreshadowing_schema(item)
-                current_last = item.get("last_mentioned_chapter", 0) or 0
-                item["last_mentioned_chapter"] = max(current_last, chapter)
-                found = True
-                break
-
-        if found:
-            self._pending_foreshadowing_mentions.append(_ForeshadowingMention(
-                content=content,
-                mentioned_chapter=chapter,
-            ))
-
-        return found
-
-    def get_foreshadowing(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        获取伏笔列表。
-
-        参数:
-        - status: 过滤状态（"未回收"/"已回收"），None 返回全部
-        """
-        foreshadowing = self._state.get("plot_threads", {}).get("foreshadowing", [])
-        result = []
-        for item in foreshadowing:
-            if not isinstance(item, dict):
-                continue
-            self._ensure_foreshadowing_schema(item)
-            if status is None or item.get("status") == status:
-                result.append(item)
-        return result
-
-    def get_overdue_foreshadowing(
-        self,
-        current_chapter: Optional[int] = None,
-        threshold: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
-        """
-        获取超期未回收的伏笔。
-
-        超期判定：current_chapter - last_mentioned_chapter > threshold
-
-        参数:
-        - current_chapter: 当前章节号（默认取进度）
-        - threshold: 超期阈值（默认使用 config.foreshadowing_stale_threshold）
-
-        返回:
-            超期伏笔列表，按 urgency 降序排列
-        """
-        if current_chapter is None:
-            current_chapter = self.get_current_chapter()
-        if threshold is None:
-            threshold = getattr(self.config, "foreshadowing_stale_threshold", 10)
-
-        tier_weights = {"核心": 3.0, "重要": 2.5, "支线": 2.0, "装饰": 1.0}
-
-        result = []
-        for item in self.get_foreshadowing(status="未回收"):
-            last_ch = item.get("last_mentioned_chapter") or item.get("planted_chapter", 0)
-            elapsed = current_chapter - last_ch
-            if elapsed > threshold:
-                target_ch = item.get("target_chapter", 0) or 0
-                remaining = target_ch - current_chapter
-                tier = item.get("tier", "支线")
-                tier_weight = tier_weights.get(tier, 1.0)
-                urgency = (elapsed / max(threshold, 1)) * tier_weight
-
-                result.append({
-                    **item,
-                    "elapsed_chapters": elapsed,
-                    "remaining_chapters": remaining,
-                    "urgency": round(urgency, 2),
-                    "is_overdue": remaining < 0,
-                })
-
-        result.sort(key=lambda x: x["urgency"], reverse=True)
-        return result
-
     # ==================== 批量操作 ====================
 
     def _record_disambiguation(self, chapter: int, uncertain_items: Any) -> List[str]:
@@ -1323,6 +1083,12 @@ class StateManager:
             entity_type = entity.get("type")
             if entity_id:
                 self.update_entity_appearance(entity_id, chapter, entity_type)
+                resolved_type = entity_type or self.get_entity_type(entity_id) or "角色"
+                for alias in _unique_aliases(entity.get("mentions", [])):
+                    entries = self._pending_alias_entries.setdefault(alias, [])
+                    alias_entry = {"type": resolved_type, "id": entity_id}
+                    if alias_entry not in entries:
+                        entries.append(alias_entry)
                 # v5.1 引入: 缓存用于 SQLite 同步
                 self._pending_sqlite_data["entities_appeared"].append(entity)
 
@@ -1335,7 +1101,9 @@ class StateManager:
                     name=entity.get("name", ""),
                     type=entity.get("type", "角色"),
                     tier=entity.get("tier", "装饰"),
-                    aliases=entity.get("mentions", []),
+                    aliases=_unique_aliases(
+                        entity.get("mentions", []), entity.get("aliases", [])
+                    ),
                     first_appearance=chapter,
                     last_appearance=chapter
                 )
@@ -1372,6 +1140,7 @@ class StateManager:
         # 处理消歧不确定项（不影响实体写入，但必须对 Writer 可见）
         warnings.extend(self._record_disambiguation(chapter, result.get("uncertain", [])))
 
+
         # 写入 chapter_meta（钩子/模式/结束状态）
         chapter_meta = result.get("chapter_meta")
         if isinstance(chapter_meta, dict):
@@ -1379,12 +1148,21 @@ class StateManager:
             self._state.setdefault("chapter_meta", {})
             self._state["chapter_meta"][meta_key] = chapter_meta
             self._pending_chapter_meta[meta_key] = chapter_meta
-
         # 更新进度
         self.update_progress(chapter)
 
         # 同步主角状态（entities_v3 → protagonist_state）
         self.sync_protagonist_from_entity()
+
+        # 长期记忆写入（best-effort，不阻断主流程）
+        try:
+            from .memory.writer import MemoryWriter
+
+            writer = MemoryWriter(self.config)
+            mem_result = writer.update_from_chapter_result(chapter, result)
+            logger.info("memory_write: %s", mem_result)
+        except Exception as exc:
+            logger.warning("memory_write_failed: %s", exc)
 
         return warnings
 
@@ -1542,22 +1320,15 @@ def main():
     process_parser.add_argument("--chapter", type=int, required=True, help="章节号")
     process_parser.add_argument("--data", required=True, help="JSON 格式的处理结果")
 
-    # 伏笔管理 (v5.5 引入)
-    foreshadowing_add_parser = subparsers.add_parser("foreshadowing-add")
-    foreshadowing_add_parser.add_argument("--content", required=True, help="伏笔内容描述")
-    foreshadowing_add_parser.add_argument("--tier", default="支线", help="优先级层级（核心/支线/装饰）")
-    foreshadowing_add_parser.add_argument("--target-offset", type=int, default=50, help="目标回收偏移章数（默认 50）")
+    # 查询章节状态
+    status_get_parser = subparsers.add_parser("get-chapter-status")
+    status_get_parser.add_argument("--chapter", type=int, required=True)
 
-    foreshadowing_resolve_parser = subparsers.add_parser("foreshadowing-resolve")
-    foreshadowing_resolve_parser.add_argument("--content", required=True, help="伏笔内容描述")
-    foreshadowing_resolve_parser.add_argument("--chapter", type=int, help="回收章节号（默认当前进度）")
-
-    foreshadowing_list_parser = subparsers.add_parser("foreshadowing-list")
-    foreshadowing_list_parser.add_argument("--status", help="过滤状态（未回收/已回收）")
-
-    foreshadowing_overdue_parser = subparsers.add_parser("foreshadowing-overdue")
-    foreshadowing_overdue_parser.add_argument("--threshold", type=int, help="超期阈值（默认 10 章）")
-    foreshadowing_overdue_parser.add_argument("--chapter", type=int, help="当前章节号（默认取进度）")
+    # 设置章节状态
+    status_set_parser = subparsers.add_parser("set-chapter-status")
+    status_set_parser.add_argument("--chapter", type=int, required=True)
+    status_set_parser.add_argument("--status", required=True,
+        choices=["chapter_drafted", "chapter_reviewed", "chapter_committed"])
 
     argv = normalize_global_project_root(sys.argv[1:])
     args = parser.parse_args(argv)
@@ -1570,13 +1341,19 @@ def main():
         from project_locator import resolve_project_root
         from .config import DataModulesConfig
 
-        resolved_root = resolve_project_root(args.project_root)
+        try:
+            resolved_root = resolve_project_root(args.project_root)
+        except FileNotFoundError as exc:
+            print_error(
+                "INVALID_PROJECT_ROOT",
+                str(exc),
+                suggestion="请传入包含 .webnovel/state.json 的书项目根目录，或先通过 webnovel.py 解析 project_root。",
+            )
+            raise SystemExit(1) from exc
         config = DataModulesConfig.from_project_root(resolved_root)
 
-    from logger import get_logger as _getLogger
     manager = StateManager(config)
-    _state_mgr_logger = _getLogger(__name__)
-    index_manager_for_log = IndexManager(config)
+    logger = IndexManager(config)
     tool_name = f"state_manager:{args.command or 'unknown'}"
 
     def _append_timing(success: bool, *, error_code: str | None = None, error_message: str | None = None, chapter: int | None = None):
@@ -1593,13 +1370,13 @@ def main():
 
     def emit_success(data=None, message: str = "ok", chapter: int | None = None):
         print_success(data, message=message)
-        safe_log_tool_call(index_manager_for_log, tool_name=tool_name, success=True)
+        safe_log_tool_call(logger, tool_name=tool_name, success=True)
         _append_timing(True, chapter=chapter)
 
     def emit_error(code: str, message: str, suggestion: str | None = None, chapter: int | None = None):
         print_error(code, message, suggestion=suggestion)
         safe_log_tool_call(
-            index_manager_for_log,
+            logger,
             tool_name=tool_name,
             success=False,
             error_code=code,
@@ -1653,46 +1430,17 @@ def main():
         manager.save_state()
         emit_success({"chapter": args.chapter, "warnings": warnings}, message="chapter_processed", chapter=args.chapter)
 
-    elif args.command == "foreshadowing-add":
-        content = getattr(args, "content", None)
-        if not content:
-            emit_error("MISSING_ARG", "缺少 --content 参数")
-            return
-        tier = getattr(args, "tier", "支线") or "支线"
-        target_offset = getattr(args, "target_offset", 50) or 50
-        record = manager.add_foreshadowing(content=content, tier=tier, target_offset=int(target_offset))
-        manager.save_state()
-        emit_success(record, message="foreshadowing_added")
+    elif args.command == "get-chapter-status":
+        manager._load_state()
+        status = manager.get_chapter_status(args.chapter)
+        emit_success({"chapter": args.chapter, "status": status},
+                     message="chapter_status")
 
-    elif args.command == "foreshadowing-resolve":
-        content = getattr(args, "content", None)
-        if not content:
-            emit_error("MISSING_ARG", "缺少 --content 参数")
-            return
-        chapter = getattr(args, "chapter", None)
-        if chapter:
-            chapter = int(chapter)
-        found = manager.resolve_foreshadowing(content=content, chapter=chapter)
-        manager.save_state()
-        if found:
-            emit_success({"content": content}, message="foreshadowing_resolved")
-        else:
-            emit_error("NOT_FOUND", f"未找到伏笔: {content}")
-
-    elif args.command == "foreshadowing-list":
-        status = getattr(args, "status", None)
-        result = manager.get_foreshadowing(status=status)
-        emit_success(result, message="foreshadowing_list")
-
-    elif args.command == "foreshadowing-overdue":
-        threshold = getattr(args, "threshold", None)
-        if threshold:
-            threshold = int(threshold)
-        current_chapter = getattr(args, "chapter", None)
-        if current_chapter:
-            current_chapter = int(current_chapter)
-        result = manager.get_overdue_foreshadowing(current_chapter=current_chapter, threshold=threshold)
-        emit_success(result, message="foreshadowing_overdue")
+    elif args.command == "set-chapter-status":
+        manager._load_state()
+        manager.set_chapter_status(args.chapter, args.status)
+        emit_success({"chapter": args.chapter, "status": args.status},
+                     message="chapter_status_set")
 
     else:
         emit_error("UNKNOWN_COMMAND", "未指定有效命令", suggestion="请查看 --help")

@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
-from .exceptions import ConfigError
-
 from chapter_outline_loader import volume_num_for_chapter_from_state
 
 try:
@@ -123,7 +121,7 @@ def read_json_if_exists(path: Path) -> Any | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise ConfigError(f"Bad JSON in {path}") from exc
+        raise ValueError(f"Bad JSON in {path}") from exc
 
 
 def write_json(path: Path, payload: Any) -> None:
@@ -136,7 +134,7 @@ def write_marked_markdown(path: Path, generated_block: str) -> None:
     if path.exists():
         current = path.read_text(encoding="utf-8")
         if current.count(MARKER_BEGIN) > 1 or current.count(MARKER_END) > 1:
-            raise ConfigError(f"{path} contains multiple STORY-SYSTEM markers")
+            raise ValueError(f"{path} contains multiple STORY-SYSTEM markers")
         if MARKER_BEGIN in current and MARKER_END in current:
             before, _, rest = current.partition(MARKER_BEGIN)
             _, _, after = rest.partition(MARKER_END)

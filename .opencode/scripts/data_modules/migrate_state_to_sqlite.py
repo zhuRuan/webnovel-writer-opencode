@@ -34,9 +34,6 @@ from typing import Dict, Any, List
 
 from .config import get_config, DataModulesConfig
 from .sql_state_manager import SQLStateManager, EntityData
-from logger import get_logger, setup_logging
-
-logger = get_logger(__name__)
 
 
 def migrate_state_to_sqlite(
@@ -69,7 +66,7 @@ def migrate_state_to_sqlite(
     state_file = config.state_file
     if not state_file.exists():
         if verbose:
-            logger.error("state.json 不存在: %s", state_file)
+            print(f"❌ state.json 不存在: {state_file}")
         return stats
 
     with open(state_file, 'r', encoding='utf-8') as f:
@@ -77,14 +74,14 @@ def migrate_state_to_sqlite(
 
     if verbose:
         file_size = state_file.stat().st_size / 1024
-        logger.info("读取 state.json (%.1f KB)", file_size)
+        print(f"📄 读取 state.json ({file_size:.1f} KB)")
 
     # 备份
     if backup and not dry_run:
         backup_file = state_file.with_suffix(f".json.backup-{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         shutil.copy(state_file, backup_file)
         if verbose:
-            logger.info("已备份到: %s", backup_file)
+            print(f"💾 已备份到: {backup_file}")
 
     # 初始化 SQLStateManager
     sql_manager = SQLStateManager(config)
@@ -345,7 +342,7 @@ def main():
     resolved_root = resolve_project_root(args.project_root)
     config = DataModulesConfig.from_project_root(resolved_root)
     backup = not args.no_backup
-    migrate_logger = IndexManager(config)
+    logger = IndexManager(config)
     tool_name = "migrate_state_to_sqlite"
 
     try:
@@ -358,7 +355,7 @@ def main():
     except Exception as exc:
         print_error("MIGRATE_FAILED", str(exc), suggestion="检查 state.json 与 index.db 权限")
         try:
-            migrate_logger.log_tool_call(tool_name, False, error_code="MIGRATE_FAILED", error_message=str(exc))
+            logger.log_tool_call(tool_name, False, error_code="MIGRATE_FAILED", error_message=str(exc))
         except Exception:
             pass
         raise SystemExit(1)
@@ -366,14 +363,14 @@ def main():
     if stats.get("errors", 0) > 0:
         print_error("MIGRATE_ERRORS", "迁移出现错误", details=stats)
         try:
-            migrate_logger.log_tool_call(tool_name, False, error_code="MIGRATE_ERRORS", error_message="迁移出现错误")
+            logger.log_tool_call(tool_name, False, error_code="MIGRATE_ERRORS", error_message="迁移出现错误")
         except Exception:
             pass
         raise SystemExit(1)
 
     print_success({"project": str(config.project_root), **stats}, message="migrated")
     try:
-        migrate_logger.log_tool_call(tool_name, True)
+        logger.log_tool_call(tool_name, True)
     except Exception:
         pass
 

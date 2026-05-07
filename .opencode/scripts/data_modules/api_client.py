@@ -23,15 +23,12 @@ Data Modules - API 客户端 (v5.4，v5.0 OpenAI 兼容接口沿用)
 
 import asyncio
 import aiohttp
-import random
+import json
 import time
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 from .config import get_config
-from logger import get_logger
-
-logger = get_logger(__name__)
 
 
 @dataclass
@@ -124,6 +121,7 @@ class EmbeddingAPIClient:
         if not texts:
             return []
 
+        # 某些 embedding 端点（如 Gemini）拒绝空字符串，用单空格占位保持索引对齐
         texts = [t if t else " " for t in texts]
 
         timeout = self.config.cold_start_timeout if not self._warmed_up else self.config.normal_timeout
@@ -148,8 +146,7 @@ class EmbeddingAPIClient:
                     ) as resp:
                         if resp.status == 200:
                             text = await resp.text()
-                            import json as json_module
-                            data = json_module.loads(text)
+                            data = json.loads(text)
                             embeddings = self._parse_response(data)
 
                             if embeddings:
@@ -162,8 +159,8 @@ class EmbeddingAPIClient:
 
                         # 可重试的状态码: 429 (限流), 500, 502, 503, 504
                         if resp.status in (429, 500, 502, 503, 504) and attempt < max_retries - 1:
-                            delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)  # 指数退避
-                            logger.warning(f"Embed %s, retrying in %.1fs (%d/%d)", resp.status, delay, attempt + 1, max_retries)
+                            delay = base_delay * (2 ** attempt)  # 指数退避
+                            print(f"[WARN] Embed {resp.status}, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                             await asyncio.sleep(delay)
                             continue
 
@@ -171,31 +168,31 @@ class EmbeddingAPIClient:
                         err_text = await resp.text()
                         self.last_error_status = int(resp.status)
                         self.last_error_message = str(err_text[:200])
-                        logger.error("Embed %s: %s", resp.status, err_text[:200])
+                        print(f"[ERR] Embed {resp.status}: {err_text[:200]}")
                         return None
 
                 except asyncio.TimeoutError:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)
-                        logger.warning("Embed timeout, retrying in %.1fs (%d/%d)", delay, attempt + 1, max_retries)
+                        delay = base_delay * (2 ** attempt)
+                        print(f"[WARN] Embed timeout, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                         await asyncio.sleep(delay)
                         continue
                     self.stats.errors += 1
                     self.last_error_status = None
                     self.last_error_message = f"Timeout after {max_retries} attempts"
-                    logger.error("Embed: Timeout after %d attempts", max_retries)
+                    print(f"[ERR] Embed: Timeout after {max_retries} attempts")
                     return None
 
                 except Exception as e:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)
-                        logger.warning("Embed error: %s, retrying in %.1fs (%d/%d)", e, delay, attempt + 1, max_retries)
+                        delay = base_delay * (2 ** attempt)
+                        print(f"[WARN] Embed error: {e}, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                         await asyncio.sleep(delay)
                         continue
                     self.stats.errors += 1
                     self.last_error_status = None
                     self.last_error_message = str(e)
-                    logger.error("Embed: %s", e)
+                    print(f"[ERR] Embed: {e}")
                     return None
 
             return None
@@ -229,8 +226,9 @@ class EmbeddingAPIClient:
                 all_embeddings.extend(result)
             else:
                 if not skip_failures:
-                    logger.warning("Embed batch %d failed, aborting all", batch_idx)
+                    print(f"[WARN] Embed batch {batch_idx} failed, aborting all")
                     return []
+                print(f"[WARN] Embed batch {batch_idx} failed, marking {actual_batch_size} items as None")
                 all_embeddings.extend([None] * actual_batch_size)
 
         return all_embeddings[:len(texts)]
@@ -355,34 +353,34 @@ class RerankAPIClient:
 
                         # 可重试的状态码
                         if resp.status in (429, 500, 502, 503, 504) and attempt < max_retries - 1:
-                            delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)
-                            logger.warning("Rerank %s, retrying in %.1fs (%d/%d)", resp.status, delay, attempt + 1, max_retries)
+                            delay = base_delay * (2 ** attempt)
+                            print(f"[WARN] Rerank {resp.status}, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                             await asyncio.sleep(delay)
                             continue
 
                         self.stats.errors += 1
                         err_text = await resp.text()
-                        logger.error("Rerank %s: %s", resp.status, err_text[:200])
+                        print(f"[ERR] Rerank {resp.status}: {err_text[:200]}")
                         return None
 
                 except asyncio.TimeoutError:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)
-                        logger.warning("Rerank timeout, retrying in %.1fs (%d/%d)", delay, attempt + 1, max_retries)
+                        delay = base_delay * (2 ** attempt)
+                        print(f"[WARN] Rerank timeout, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                         await asyncio.sleep(delay)
                         continue
                     self.stats.errors += 1
-                    logger.error("Rerank: Timeout after %d attempts", max_retries)
+                    print(f"[ERR] Rerank: Timeout after {max_retries} attempts")
                     return None
 
                 except Exception as e:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt) * random.uniform(0.5, 1.5)
-                        logger.warning("Rerank error: %s, retrying in %.1fs (%d/%d)", e, delay, attempt + 1, max_retries)
+                        delay = base_delay * (2 ** attempt)
+                        print(f"[WARN] Rerank error: {e}, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                         await asyncio.sleep(delay)
                         continue
                     self.stats.errors += 1
-                    logger.error("Rerank: %s", e)
+                    print(f"[ERR] Rerank: {e}")
                     return None
 
             return None
@@ -427,17 +425,11 @@ class ModalAPIClient:
         await self._embed_client.close()
         await self._rerank_client.close()
 
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.close()
-
     # ==================== 预热 ====================
 
     async def warmup(self):
         """预热 Embedding 和 Rerank 服务"""
-        logger.info("Warming up Embed + Rerank...")
+        print("[WARMUP] Warming up Embed + Rerank...")
         start = time.time()
 
         tasks = [self._warmup_embed(), self._warmup_rerank()]
@@ -445,11 +437,11 @@ class ModalAPIClient:
 
         for name, result in zip(["Embed", "Rerank"], results):
             if isinstance(result, Exception):
-                logger.error("  [FAIL] %s: %s", name, result)
+                print(f"  [FAIL] {name}: {result}")
             else:
-                logger.info("  [OK] %s ready", name)
+                print(f"  [OK] {name} ready")
 
-        logger.info("Warmup done in %.1fs", time.time() - start)
+        print(f"[WARMUP] Done in {time.time() - start:.1f}s")
 
     async def _warmup_embed(self):
         await self._embed_client.warmup()
@@ -485,42 +477,22 @@ class ModalAPIClient:
     # ==================== 统计 ====================
 
     def print_stats(self):
-        logger.info("\n[API STATS]")
+        print("\n[API STATS]")
         for name, stats in self.stats.items():
             if stats.total_calls > 0:
                 avg_time = stats.total_time / stats.total_calls
-                logger.info("  %s: %d calls, %.1fs total, %.2fs avg, %d errors",
-                            name.upper(), stats.total_calls, stats.total_time, avg_time, stats.errors)
+                print(f"  {name.upper()}: {stats.total_calls} calls, "
+                      f"{stats.total_time:.1f}s total, "
+                      f"{avg_time:.2f}s avg, "
+                      f"{stats.errors} errors")
 
 
 # 全局客户端
 _client: Optional[ModalAPIClient] = None
-_cleanup_registered: bool = False
-
-
-def _async_run(coro):
-    """在同步上下文运行异步协程"""
-    try:
-        import asyncio
-        loop = asyncio.get_running_loop()
-        loop.create_task(coro)
-    except RuntimeError:
-        asyncio.run(coro)
-
-
-def _cleanup_client():
-    global _client
-    if _client is not None:
-        _async_run(_client.close())
-        _client = None
 
 
 def get_client(config=None) -> ModalAPIClient:
-    global _client, _cleanup_registered
+    global _client
     if _client is None or config is not None:
         _client = ModalAPIClient(config)
-        if not _cleanup_registered:
-            import atexit
-            atexit.register(_cleanup_client)
-            _cleanup_registered = True
     return _client

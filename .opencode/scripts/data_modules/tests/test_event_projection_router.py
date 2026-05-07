@@ -85,3 +85,30 @@ def test_required_writers_includes_vector_for_key_events():
     }
     writers = router.required_writers(payload)
     assert "vector" in writers
+
+
+def test_required_writers_includes_index_for_accepted_commit():
+    router = EventProjectionRouter()
+    writers = router.required_writers(
+        {
+            "meta": {"status": "accepted", "chapter": 5},
+            "accepted_events": [],
+            "entity_deltas": [],
+            "summary_text": "",
+        }
+    )
+    assert "index" in writers
+
+
+def test_router_ignores_unknown_and_non_dict_events():
+    router = EventProjectionRouter()
+    assert router.route({"event_type": "unknown"}) == []
+    writers = router.required_writers(
+        {
+            "meta": {"status": "rejected"},
+            "accepted_events": ["not-a-dict", {"event_type": "unknown"}],
+            "entity_deltas": [],
+            "summary_text": "   ",
+        }
+    )
+    assert writers == []

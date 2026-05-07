@@ -24,15 +24,53 @@ ANTI_PATTERN_SOURCE_FIELDS = {
 }
 
 _TEXT_TOKEN_RE = re.compile(r"[\s|,，、/；;：:（）()【】\[\]<>《》\"'!?！？。…]+")
+_PLACEHOLDER_QUERY_RE = re.compile(r"^\s*(\{[^{}]*章纲目标[^{}]*\}|第\s*\d+\s*章\s*章纲目标)\s*$")
+_ASCII_LETTER_RE = re.compile(r"[A-Za-z]")
+
+
+def is_placeholder_query(query: str) -> bool:
+    text = str(query or "").strip()
+    if not text:
+        return True
+    return bool(_PLACEHOLDER_QUERY_RE.match(text))
+
+
+class StorySystemRoutingError(ValueError):
+    """Raised when story-system cannot select a route row."""
+
+
+def _validate_explicit_genre_source(genre: Optional[str]) -> Optional[str]:
+    normalized = str(genre or "").strip()
+    if not normalized:
+        return None
+    if _ASCII_LETTER_RE.search(normalized):
+        raise StorySystemRoutingError(
+            "story-system 题材参数必须使用中文名称，不能使用英文 profile key "
+            f"'{normalized}'。不会生成 .story-system contracts。"
+            "例如：规则怪谈、悬疑、玄幻。"
+        )
+    return normalized
 
 
 class StorySystemEngine:
     def __init__(self, csv_dir: str | Path):
         self.csv_dir = Path(csv_dir)
 
-    def build(self, query: str, genre: Optional[str], chapter: Optional[int]) -> Dict[str, Any]:
+    def build(
+        self,
+        query: str,
+        genre: Optional[str],
+        chapter: Optional[int],
+        chapter_directive: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        chapter_directive = chapter_directive or {}
+        genre = _validate_explicit_genre_source(genre)
         route = self._route(query=query, genre=genre)
-        search_query = self._expand_query(query, route.get("default_query", ""))
+        search_query = self._expand_query(
+            query,
+            route.get("default_query", ""),
+            self._directive_query_text(chapter_directive),
+        )
         base_context = self._collect_tables(
             search_query,
             route["recommended_base_tables"],
@@ -53,7 +91,7 @@ class StorySystemEngine:
             fallback_genre = resolve_genre(genre) or genre
             if fallback_genre != canonical_genre:
                 reasoning = self._load_reasoning(fallback_genre)
-        ranked = self._apply_reasoning(reasoning, base_context, dynamic_context)
+        ranked = self._apply_reasoning(reasoning, base_context, dynamic_context, chapter_directive)
 
         source_trace = route["source_trace"] + self._build_source_trace_with_reasoning(ranked, reasoning)
 
@@ -95,8 +133,9 @@ class StorySystemEngine:
                         "chapter": chapter,
                     },
                     "override_allowed": {
-                        "chapter_focus": self._suggest_chapter_focus(query, dynamic_context),
+                        "chapter_focus": self._suggest_chapter_focus(query, chapter_directive),
                     },
+                    "chapter_directive": chapter_directive,
                     "dynamic_context": ranked,
                     "source_trace": source_trace,
                     "reasoning": (
@@ -122,7 +161,7 @@ class StorySystemEngine:
         inferred_canonical = "" if genre else self._infer_genre_from_text(query)
 
         matched = None
-        route_source = "empty_csv_fallback"
+        route_source = ""
         for row in route_rows:
             aliases = (
                 self._split_multi_value(row.get("关键词"))
@@ -141,11 +180,8 @@ class StorySystemEngine:
             matched = self._fallback_row_for_genre(route_rows, inferred_canonical)
             if matched is not None:
                 route_source = "inferred_genre_fallback"
-        if matched is None and route_rows:
-            matched = route_rows[0]
-            route_source = "default_seed_fallback"
         if matched is None:
-            return self._empty_route(query=query, genre=genre)
+            raise self._routing_error(query=query, genre=genre, route_rows=route_rows)
 
         primary_genre = str(matched.get("题材/流派") or genre or "").strip()
         explicit_canonical = resolve_genre(genre)
@@ -229,12 +265,15 @@ class StorySystemEngine:
                     )
         return extracted
 
-    def _suggest_chapter_focus(self, query: str, dynamic_rows: List[Dict[str, Any]]) -> str:
-        for row in dynamic_rows:
-            summary = str(row.get("核心摘要") or "").strip()
-            if summary:
-                return summary
-        return query
+    def _suggest_chapter_focus(self, query: str, chapter_directive: Optional[Dict[str, Any]] = None) -> str:
+        directive = chapter_directive or {}
+        goal = str(directive.get("goal") or "").strip()
+        if goal:
+            return goal
+        query_text = str(query or "").strip()
+        if query_text and not is_placeholder_query(query_text):
+            return query_text
+        return ""
 
     def _build_source_trace(self, *groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         trace: List[Dict[str, Any]] = []
@@ -262,13 +301,26 @@ class StorySystemEngine:
     def _split_multi_value(self, raw: Any) -> List[str]:
         return [item.strip() for item in re.split(r"[|；;]+", str(raw or "")) if item.strip()]
 
-    def _expand_query(self, query: str, default_query: str) -> str:
+    def _expand_query(self, query: str, default_query: str, chapter_query: str = "") -> str:
         items: List[str] = []
-        for candidate in [query, *self._split_multi_value(default_query)]:
+        for candidate in [query, chapter_query, *self._split_multi_value(default_query)]:
             text = str(candidate or "").strip()
             if text and text not in items:
                 items.append(text)
         return " ".join(items)
+
+    def _directive_query_text(self, chapter_directive: Dict[str, Any]) -> str:
+        parts: List[str] = []
+        for key in ("goal", "strand", "antagonist_tier"):
+            value = str(chapter_directive.get(key) or "").strip()
+            if value:
+                parts.append(value)
+        for key in ("key_entities", "must_cover_nodes"):
+            for value in chapter_directive.get(key) or []:
+                text = str(value or "").strip()
+                if text:
+                    parts.append(text)
+        return " ".join(parts)
 
     def _fallback_row_for_genre(self, rows: List[Dict[str, Any]], genre: str) -> Dict[str, Any] | None:
         genre_text = self._normalize_text(resolve_genre(genre) or genre)
@@ -329,10 +381,12 @@ class StorySystemEngine:
         reasoning: Dict[str, Any],
         base_context: List[Dict[str, Any]],
         dynamic_context: List[Dict[str, Any]],
+        chapter_directive: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """Rank *base_context* + *dynamic_context* rows using 冲突裁决 priority."""
         combined = [dict(r) for r in base_context] + [dict(r) for r in dynamic_context]
-        if not reasoning:
+        chapter_terms = self._chapter_keyword_terms(chapter_directive or {})
+        if not reasoning and not chapter_terms:
             return combined
 
         priority_order = [
@@ -343,13 +397,89 @@ class StorySystemEngine:
         priority_map = {name: idx for idx, name in enumerate(priority_order)}
 
         genre_label = reasoning.get("题材", "")
+        ranked_priorities = sorted(priority_map.values())
+        max_priority = max(ranked_priorities) if ranked_priorities else 0
+        max_chapter_score = 0
         for row in combined:
             table = str(row.get("_table") or "")
             row["_priority_rank"] = priority_map.get(table, 999)
             row["_reasoning_rule"] = genre_label
+            row["_chapter_keyword_score"] = self._chapter_keyword_score(row, chapter_terms)
+            max_chapter_score = max(max_chapter_score, int(row.get("_chapter_keyword_score") or 0))
 
-        combined.sort(key=lambda r: r["_priority_rank"])
+        for row in combined:
+            row["_combined_rank_score"] = self._combined_rank_score(
+                int(row.get("_priority_rank") or 999),
+                int(row.get("_chapter_keyword_score") or 0),
+                max_priority=max_priority,
+                max_chapter_score=max_chapter_score,
+                has_reasoning=bool(priority_map),
+                has_chapter_terms=bool(chapter_terms),
+            )
+
+        combined.sort(
+            key=lambda r: (
+                -float(r.get("_combined_rank_score") or 0.0),
+                r["_priority_rank"],
+                -int(r.get("_chapter_keyword_score") or 0),
+            )
+        )
         return combined
+
+    def _combined_rank_score(
+        self,
+        priority_rank: int,
+        chapter_score: int,
+        *,
+        max_priority: int,
+        max_chapter_score: int,
+        has_reasoning: bool,
+        has_chapter_terms: bool,
+    ) -> float:
+        priority_component = 0.0
+        if has_reasoning:
+            if priority_rank >= 999:
+                priority_component = 0.0
+            elif max_priority <= 0:
+                priority_component = 1.0
+            else:
+                priority_component = 1.0 - (priority_rank / float(max_priority + 1))
+
+        chapter_component = 0.0
+        if has_chapter_terms and max_chapter_score > 0:
+            chapter_component = chapter_score / float(max_chapter_score)
+
+        if has_reasoning and has_chapter_terms:
+            return round((priority_component * 0.4) + (chapter_component * 0.6), 6)
+        if has_chapter_terms:
+            return round(chapter_component, 6)
+        return round(priority_component, 6)
+
+    def _chapter_keyword_terms(self, chapter_directive: Dict[str, Any]) -> List[str]:
+        raw_items: List[str] = []
+        for key in ("goal", "strand", "antagonist_tier"):
+            value = str(chapter_directive.get(key) or "").strip()
+            if value:
+                raw_items.append(value)
+        for key in ("key_entities", "must_cover_nodes"):
+            raw_items.extend(str(item or "") for item in chapter_directive.get(key) or [])
+
+        terms: List[str] = []
+        for item in raw_items:
+            for token in _TEXT_TOKEN_RE.split(item):
+                token = token.strip().lower()
+                if len(token) >= 2 and token not in terms:
+                    terms.append(token)
+        return terms
+
+    def _chapter_keyword_score(self, row: Dict[str, Any], terms: List[str]) -> int:
+        if not terms:
+            return 0
+        haystack = " ".join(
+            str(row.get(field) or "")
+            for field in ("关键词", "意图与同义词", "适用场景", "核心摘要", "详细展开")
+        ).lower()
+        return sum(1 for term in terms if term and term in haystack)
 
     def _rank_anti_patterns(
         self,
@@ -402,6 +532,8 @@ class StorySystemEngine:
                     "summary": row.get("核心摘要", ""),
                     "reasoning_rule": row.get("_reasoning_rule", ""),
                     "priority_rank": row.get("_priority_rank", 999),
+                    "chapter_keyword_score": row.get("_chapter_keyword_score", 0),
+                    "combined_rank_score": row.get("_combined_rank_score", 0),
                     "inject_target": inject_target,
                 }
             )
@@ -415,26 +547,22 @@ class StorySystemEngine:
         cfg = CSV_CONFIG.get("裁决规则") or {}
         return str(cfg.get("contract_inject") or "")
 
-    def _empty_route(self, query: str, genre: Optional[str]) -> Dict[str, Any]:
-        fallback_genre = str(genre or "未命中题材").strip()
-        resolved_explicit = resolve_genre(genre)
-        canonical_genre = resolved_explicit if resolved_explicit not in (None, "全部") else ""
-        route_source = "explicit_genre_fallback" if genre else "empty_csv_fallback"
-        return {
-            "meta": {
-                "primary_genre": fallback_genre,
-                "canonical_genre": canonical_genre,
-                "route_source": route_source,
-                "genre_filter": canonical_genre,
-                "recommended_base_tables": ["命名规则", "人设与关系"],
-                "recommended_dynamic_tables": ["桥段套路", "爽点与节奏", "场景写法"],
-            },
-            "core_tone": "",
-            "pacing_strategy": "",
-            "route_anti_patterns": [],
-            "recommended_base_tables": ["命名规则", "人设与关系"],
-            "recommended_dynamic_tables": ["桥段套路", "爽点与节奏", "场景写法"],
-            "genre_filter": canonical_genre,
-            "default_query": "",
-            "source_trace": [{"table": "题材与调性推理", "id": "", "reason": f"{route_source}:{query}"}],
-        }
+    def _routing_error(
+        self,
+        *,
+        query: str,
+        genre: Optional[str],
+        route_rows: List[Dict[str, Any]],
+    ) -> StorySystemRoutingError:
+        query_text = str(query or "").strip()
+        genre_text = str(genre or "").strip()
+        if not route_rows:
+            detail = "题材与调性推理.csv 没有可用路由行"
+        else:
+            detail = f"query={query_text!r}, genre={genre_text!r} 未命中任何路由行"
+        return StorySystemRoutingError(
+            f"无法匹配 story-system 题材路由：{detail}。"
+            "不会生成 .story-system contracts。"
+            "请使用中文题材/流派（例如：规则怪谈、玄幻、仙侠），"
+            "或先在 题材与调性推理.csv 添加路由行。"
+        )

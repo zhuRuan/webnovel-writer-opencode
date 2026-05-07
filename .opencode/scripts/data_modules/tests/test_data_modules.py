@@ -28,7 +28,6 @@ from data_modules.index_manager import (
     EntityMeta,
     StateChangeMeta,
     RelationshipMeta,
-    RelationshipEventMeta,
     OverrideContractMeta,
     ChaseDebtMeta,
     ChapterReadingPowerMeta,
@@ -43,8 +42,17 @@ def temp_project():
     with tempfile.TemporaryDirectory() as tmpdir:
         config = DataModulesConfig.from_project_root(tmpdir)
         config.ensure_dirs()
-        (Path(tmpdir) / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+        _ensure_project_state(config)
         yield config
+
+
+
+
+def _ensure_project_state(config):
+    config.ensure_dirs()
+    state_path = config.webnovel_dir / "state.json"
+    if not state_path.exists():
+        state_path.write_text(json.dumps({}, ensure_ascii=False), encoding="utf-8")
 
 
 class TestEntityLinker:
@@ -64,8 +72,8 @@ class TestEntityLinker:
             )
         )
 
-        # 注册别名
-        assert linker.register_alias("xiaoyan", "萧炎")
+        # canonical_name 会在实体写入时自动注册为别名
+        assert linker.lookup_alias("萧炎") == "xiaoyan"
         assert linker.register_alias("xiaoyan", "小炎子")
 
         # 查找
@@ -99,9 +107,7 @@ class TestEntityLinker:
             )
         )
 
-        linker.register_alias("xiaoyan", "萧炎", "角色")
-        # v5.0: 同一别名可绑定不同实体（一对多）
-        assert linker.register_alias("other_person", "萧炎", "角色")
+        # canonical_name 会自动作为别名；同一别名可绑定不同实体（一对多）
 
         # 查找所有匹配
         entries = linker.lookup_alias_all("萧炎")
@@ -446,6 +452,25 @@ class TestIndexManager:
         assert stats["chapters"] == 1
         assert stats["scenes"] == 1
         assert stats["entities"] == 1
+
+    def test_entity_canonical_name_alias_fallback(self, temp_project):
+        manager = IndexManager(temp_project)
+
+        manager.upsert_entity(
+            EntityMeta(
+                id="chenfeng",
+                type="角色",
+                canonical_name="陈锋",
+                current={},
+                first_appearance=1,
+                last_appearance=1,
+            )
+        )
+
+        aliases = manager.get_entity_aliases("chenfeng")
+        assert "陈锋" in aliases
+        assert manager.get_entities_by_alias("陈锋")[0]["id"] == "chenfeng"
+        assert manager.get_entity("陈锋")["id"] == "chenfeng"
 
     def test_entity_alias_and_relationships(self, temp_project):
         manager = IndexManager(temp_project)
@@ -949,127 +974,6 @@ class TestIndexManager:
         assert trend["score_avg"] > 0
         assert trend["completion_avg"] > 0
 
-    def test_chapter_nodes_persistence(self, temp_project):
-        """Save and retrieve chapter planning nodes."""
-        manager = IndexManager(temp_project)
-        nodes = [
-            {"node_type": "cbn", "goal": "主角进入城主府", "seq": 0},
-            {"node_type": "cpn", "goal": "发现密道线索", "seq": 1},
-            {"node_type": "cpn", "goal": "触发陷阱机关", "seq": 2},
-            {"node_type": "cen", "goal": "拿到密室钥匙", "seq": 999},
-        ]
-        inserted = manager.save_chapter_nodes(42, nodes)
-        assert inserted == 4
-
-        retrieved = manager.get_chapter_nodes(42)
-        assert len(retrieved) == 4
-        assert retrieved[0]["node_type"] == "cbn"
-        assert retrieved[0]["goal"] == "主角进入城主府"
-        assert retrieved[0]["status"] == "pending"
-        assert retrieved[3]["node_type"] == "cen"
-
-    def test_chapter_nodes_fulfillment(self, temp_project):
-        """Mark chapter nodes as fulfilled."""
-        manager = IndexManager(temp_project)
-        nodes = [
-            {"node_type": "cbn", "goal": "开局", "seq": 0},
-            {"node_type": "cen", "goal": "收尾", "seq": 999},
-        ]
-        manager.save_chapter_nodes(7, nodes)
-
-        retrieved = manager.get_chapter_nodes(7)
-        assert all(n["status"] == "pending" for n in retrieved)
-
-        count = manager.mark_chapter_nodes_fulfilled(7)
-        assert count == 2
-
-        retrieved = manager.get_chapter_nodes(7)
-        assert all(n["status"] == "fulfilled" for n in retrieved)
-
-        count = manager.mark_chapter_nodes_fulfilled(7)
-        assert count == 0
-
-    def test_cpn_review_basic(self, temp_project):
-        manager = IndexManager(temp_project)
-        nodes = [
-            {"node_type": "cbn", "goal": "主角进入秘境", "seq": 0},
-            {"node_type": "cpn", "goal": "发现古老阵法", "seq": 1},
-            {"node_type": "cpn", "goal": "激活陷阱被围困", "seq": 2},
-            {"node_type": "cen", "goal": "逃出生天获得传承", "seq": 999},
-        ]
-        manager.save_chapter_nodes(10, nodes)
-
-        from data_modules.prewrite_validator import PrewriteValidator
-        validator = PrewriteValidator(temp_project.project_root)
-        result = validator._review_cpn_consistency(10, nodes, manager)
-
-        assert "reviewed_nodes" in result
-        assert len(result["reviewed_nodes"]) == 4
-        assert result["total"] == 4
-        assert isinstance(result["ok"], int)
-        assert isinstance(result["warning"], int)
-        cpn_reviewed = [r for r in result["reviewed_nodes"] if r["node_type"] == "cpn"]
-        assert len(cpn_reviewed) == 2
-
-    def test_cpn_review_empty_nodes(self, temp_project):
-        manager = IndexManager(temp_project)
-        from data_modules.prewrite_validator import PrewriteValidator
-        validator = PrewriteValidator(temp_project.project_root)
-        result = validator._review_cpn_consistency(1, [], manager)
-
-        assert result["total"] == 0
-        assert result["ok"] == 0
-        assert result["warning"] == 0
-        assert result["reviewed_nodes"] == []
-
-    def test_temporal_relationship_query(self, temp_project):
-        """Query relationship state at a specific chapter."""
-        manager = IndexManager(temp_project)
-
-        manager.record_relationship_event(
-            RelationshipEventMeta(
-                from_entity="Alice",
-                to_entity="Bob",
-                type="ally",
-                action="create",
-                polarity=1,
-                strength=0.8,
-                description="初次结盟",
-                chapter=1,
-            )
-        )
-        manager.record_relationship_event(
-            RelationshipEventMeta(
-                from_entity="Alice",
-                to_entity="Bob",
-                type="ally",
-                action="update",
-                polarity=1,
-                strength=0.9,
-                description="关系加深",
-                chapter=3,
-            )
-        )
-
-        rel = manager.get_relationship_at_chapter("Alice", "Bob", 1)
-        assert rel is not None
-        assert rel["type"] == "ally"
-        assert rel["polarity"] == 1
-
-        rel = manager.get_relationship_at_chapter("Alice", "Bob", 0)
-        assert rel is None
-
-        rel = manager.get_relationship_at_chapter("Bob", "Alice", 1)
-        assert rel is not None
-        assert rel["type"] == "ally"
-
-        rel = manager.get_relationship_at_chapter("Alice", "Bob", 3)
-        assert rel is not None
-        assert rel["strength"] == 0.9
-
-        rels = manager.get_entity_relationships_at_chapter("Alice", 3)
-        assert len(rels) >= 1
-
     def test_index_manager_cli(self, temp_project, monkeypatch, capsys):
         root = str(temp_project.project_root)
         manager = IndexManager(temp_project)
@@ -1356,8 +1260,6 @@ class TestIndexManager:
                 "--project-root",
                 root,
                 "save-chapter-reading-power",
-                "--chapter",
-                "3",
                 "--data",
                 json.dumps(
                     {
@@ -1529,7 +1431,8 @@ class TestRAGAdapter:
         adapter = RAGAdapter(temp_project)
 
         tokens = adapter._tokenize("萧炎hello世界world")
-        assert "萧炎" in tokens or ("萧" in tokens and "炎" in tokens)
+        assert "萧" in tokens
+        assert "炎" in tokens
         assert "hello" in tokens
         assert "world" in tokens
 

@@ -189,6 +189,13 @@ def main() -> None:
             encoding="utf-8",
         )
 
+    if args.report_file:
+        write_review_report(
+            project_root=project_root,
+            report_file=args.report_file,
+            payload=payload,
+        )
+
     if args.save_metrics:
         from data_modules.config import DataModulesConfig
         from data_modules.index_manager import IndexManager

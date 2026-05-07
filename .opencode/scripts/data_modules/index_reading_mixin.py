@@ -132,22 +132,6 @@ class IndexReadingMixin:
                 stats[hook] = stats.get(hook, 0) + 1
             return stats
 
-    def get_chapter_nodes(self, chapter: int) -> list:
-        """Get planning nodes (CBN/CPN/CEN) for a chapter."""
-        return self.get_chapter_nodes(chapter)
-
-    def get_relationship_at_chapter(
-        self, entity_a: str, entity_b: str, chapter: int
-    ) -> dict | None:
-        """Get relationship state between two entities at a given chapter."""
-        return self.get_relationship_at_chapter(entity_a, entity_b, chapter)
-
-    def get_entity_relationships_at_chapter(
-        self, entity_id: str, chapter: int
-    ) -> list:
-        """Get all relationships for an entity at a given chapter."""
-        return self.get_entity_relationships_at_chapter(entity_id, chapter)
-
     # ==================== v5.4 审查指标 ====================
 
     def save_review_metrics(self, metrics: ReviewMetrics) -> None:

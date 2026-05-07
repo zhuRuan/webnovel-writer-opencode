@@ -1,47 +1,93 @@
-/**
- * API 请求工具函数
- */
+const BASE = ''
 
-const BASE = '';  // 开发时由 vite proxy 代理到 FastAPI
-
-export async function fetchJSON(path, options = {}) {
-    const { method = 'GET', body, headers, ...queryParams } = options;
-    const url = new URL(path, window.location.origin);
-    Object.entries(queryParams).forEach(([k, v]) => {
-        if (v !== undefined && v !== null) url.searchParams.set(k, v);
-    });
-    const res = await fetch(url.toString(), {
-        method,
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
-    });
-    if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status} ${text}`);
+export async function fetchJSON(path, params = {}) {
+    const url = new URL(`${BASE}${path}`, window.location.origin)
+    for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, value)
+        }
     }
-    return res.json();
+
+    const response = await fetch(url.toString())
+    if (!response.ok) {
+        throw new Error(`${response.status} ${response.statusText}`)
+    }
+    return response.json()
 }
 
-/**
- * 订阅 SSE 实时事件流
- * @param {function} onMessage  收到 data 时回调
- * @param {{onOpen?: function, onError?: function}} handlers 连接状态回调
- * @returns {function} 取消订阅函数
- */
+export function fetchProjectInfo() {
+    return fetchJSON('/api/project/info')
+}
+
+export function fetchStoryRuntimeHealth() {
+    return fetchJSON('/api/story-runtime/health')
+}
+
+export function fetchChapterTrend(params = {}) {
+    return fetchJSON('/api/stats/chapter-trend', params)
+}
+
+export function fetchChapters() {
+    return fetchJSON('/api/chapters')
+}
+
+export function fetchEntities(params = {}) {
+    return fetchJSON('/api/entities', params)
+}
+
+export function fetchStateChanges(params = {}) {
+    return fetchJSON('/api/state-changes', params)
+}
+
+export function fetchRelationships(params = {}) {
+    return fetchJSON('/api/relationships', params)
+}
+
+export function fetchRelationshipEvents(params = {}) {
+    return fetchJSON('/api/relationship-events', params)
+}
+
+export function fetchCommits(params = {}) {
+    return fetchJSON('/api/commits', params)
+}
+
+export function fetchContractsSummary() {
+    return fetchJSON('/api/contracts/summary')
+}
+
+export function fetchEnvStatus() {
+    return fetchJSON('/api/env-status')
+}
+
+export function probeEnvStatus() {
+    return fetchJSON('/api/env-status/probe')
+}
+
+export function fetchFilesTree() {
+    return fetchJSON('/api/files/tree')
+}
+
+export function fetchFileContent(path) {
+    return fetchJSON('/api/files/read', { path })
+}
+
 export function subscribeSSE(onMessage, handlers = {}) {
     const { onOpen, onError } = handlers
-    const es = new EventSource(`${BASE}/api/events`);
-    es.onopen = () => {
+    const eventSource = new EventSource(`${BASE}/api/events`)
+
+    eventSource.onopen = () => {
         if (onOpen) onOpen()
-    };
-    es.onmessage = (e) => {
+    }
+
+    eventSource.onmessage = event => {
         try {
-            onMessage(JSON.parse(e.data));
-        } catch { /* ignore parse errors */ }
-    };
-    es.onerror = (e) => {
-        // EventSource 会自动重连，这里只更新连接状态
-        if (onError) onError(e)
-    };
-    return () => es.close();
+            onMessage(JSON.parse(event.data))
+        } catch { /* ignore non-JSON messages */ }
+    }
+
+    eventSource.onerror = error => {
+        if (onError) onError(error)
+    }
+
+    return () => eventSource.close()
 }

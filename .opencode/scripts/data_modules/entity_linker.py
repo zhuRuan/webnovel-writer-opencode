@@ -36,62 +36,9 @@ class DisambiguationResult:
 class EntityLinker:
     """实体链接器 - 辅助 Data Agent 进行实体消歧 (v5.1 SQLite，v5.4 沿用)"""
 
-    def __init__(self, config=None, rag_adapter=None):
+    def __init__(self, config=None):
         self.config = config or get_config()
         self._index_manager = IndexManager(self.config)
-        self._rag_adapter = rag_adapter
-        self._rebuild_pending = False
-        self._rebuild_timer = None
-        self._last_word_count = 0
-    
-    # ==================== 词典重建回调 ====================
-    
-    def on_entity_registered(self, entity_id: str, entity_type: str):
-        """
-        实体注册回调 - 触发词典重建（带防抖）
-        
-        Args:
-            entity_id: 实体 ID
-            entity_type: 实体类型 (角色/势力/物品)
-        """
-        if not self.config.tokenizer_auto_rebuild_on_entity:
-            return
-        if entity_type not in ["角色", "势力", "物品"]:
-            return
-        if not self._rag_adapter:
-            return
-        
-        self._schedule_rebuild()
-    
-    def _schedule_rebuild(self):
-        """调度词典重建（防抖）"""
-        if self._rebuild_pending:
-            return
-        
-        self._rebuild_pending = True
-        debounce = self.config.tokenizer_rebuild_debounce_seconds
-        
-        import threading
-        if self._rebuild_timer:
-            self._rebuild_timer.cancel()
-        self._rebuild_timer = threading.Timer(debounce, self._do_rebuild_dict)
-        self._rebuild_timer.start()
-    
-    def _do_rebuild_dict(self):
-        """执行词典重建（带日志抑制）"""
-        if not self._rag_adapter:
-            self._rebuild_pending = False
-            return
-        
-        word_count = self._rag_adapter.rebuild_custom_dict(reason="entity_change")
-        
-        if word_count > 0 and abs(word_count - self._last_word_count) / max(self._last_word_count, 1) > 0.1:
-            from logger import get_logger
-            logger = get_logger(__name__)
-            logger.info("[分词词典] 增量重建完成: %d 词条", word_count)
-            self._last_word_count = word_count
-        
-        self._rebuild_pending = False
 
     # ==================== 别名管理 (v5.1 SQLite，v5.4 沿用) ====================
 
