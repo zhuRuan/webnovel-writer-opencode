@@ -418,13 +418,23 @@ s['chapter_results'][str($N)] = {
 }
 p.write_text(json.dumps(s, ensure_ascii=False, indent=2))
 
-# 验证写入
-assert $N in s['completed_chapters'], '写入验证失败'
-print('✅ batch_state 已验证')
+# 重新读取验证（磁盘级校验）
+s2 = json.loads(p.read_text())
+assert $N in s2['completed_chapters'], '写入验证失败'
+
+# 跨章完整性校验：范围内所有已完成的章都必须在 completed_chapters 中
+expected = list(range($S, $N + 1))
+actual = sorted(s2['completed_chapters'])
+missing = [ch for ch in expected if ch not in actual]
+if missing:
+    raise AssertionError(f'batch_state 不完整！缺失章节: {missing}')
+print(f'✅ batch_state 已验证 ({len(actual)}/{len(expected)} 章已记录)')
 "
 ```
 
 更新失败→重试 3 次。仍失败→停止。
+
+> 若跨章校验发现缺失章节，说明前面某章的 Step 9 静默失败。必须补写缺失章到 completed_chapters 后再继续，不得忽略。
 
 ```
 ✅ 第{N}章完成 | 审查: {SCORE}/100 | 字数: {WORDS} | 进度: {N-S+1}/{E-S+1}

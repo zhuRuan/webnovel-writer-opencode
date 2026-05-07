@@ -96,6 +96,19 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" extr
 - 特定规则 → `query-rules --domain`
 - 时间跨度 → `get-timeline` 或 Read 时间线文件
 
+**情节线检查（必做）：** 从 load-context 返回的 `strand_tracker` 读取当前状态：
+
+```
+| 警告条件 | 含义 | 动作 |
+|----------|------|------|
+| chapters_since_switch >= 5 | 同一线连续超过 5 章 | 在任务书第 2 段中要求本章强制切换到 Fire 或 Constellation |
+| current - last_fire > 10 | 感情线超过 10 章未出现 | 在任务书第 3 段中要求本章安排感情互动（即使只是一段对话） |
+| current - last_constellation > 10 | 世界观线超过 10 章未出现 | 在任务书第 2 段中要求本章展开世界观：新势力/新地点/设定揭示/身世线索 |
+| last_constellation == 0 且 chapter > 10 | 世界观线从未激活 | 同上一行，最高优先级——必须在本章任务书中硬性要求世界观展开 |
+```
+
+三线定义：Quest（主线任务/战斗/升级）、Fire（感情关系/师徒/友情）、Constellation（世界观：新势力/新地点/设定揭示/身世线索/社交网络）。
+
 时间规则：跨夜须过渡，倒计时不跳跃，不回跳。
 
 ### C：补充（可选）
@@ -136,7 +149,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" extr
 书名、章号、标题、一句话目标。
 
 ### 2. 这章的故事
-综合：前文摘要、本章目标/阻力、情节节点（CBN/CPNs/CEN）、必须覆盖/禁区、跨章约束、RAG 线索。
+综合：前文摘要、本章目标/阻力、情节节点（CBN/CPNs/CEN）、必须覆盖/禁区、跨章约束、RAG 线索。**若情节线检查触发了警告，必须在此段明确指出本章应归属于哪个 strand（quest/fire/constellation）并给出具体内容方向。**
 
 ### 3. 这章的人物
 每人一段：状态、驱动力、本章作用、说话倾向。

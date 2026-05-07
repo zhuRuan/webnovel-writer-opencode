@@ -53,6 +53,8 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" chap
 - `disambiguation_result.json`：消歧状态
 - `extraction_result.json`：必须包含 `accepted_events`、`state_deltas`、`entity_deltas`、`entities_appeared`、`scenes`、`summary_text`；能判断主导情节线时写 `dominant_strand`
 
+**主角位置硬性要求**：无论位置是否变化，每章 state_deltas 必须包含 `{"entity_id": "主角ID", "field": "location.current", "new": "当前位置", "old": "上一章位置"}`。即使主角原地未动也要输出（new 和 old 相同），确保 state.json 中 `protagonist_state.location.last_chapter` 保持最新。
+
 **D 摘要**：100-150 字，含钩子类型。格式：
 
 ```markdown
