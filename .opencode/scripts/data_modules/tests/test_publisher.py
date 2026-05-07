@@ -258,3 +258,38 @@ class TestFanqieAdapter:
                             "create_book", "upload_chapter"]:
             method = getattr(adapter, method_name)
             assert callable(method)
+
+
+from publisher import REGISTRY
+
+
+class TestRegistry:
+    def test_fanqie_registered(self):
+        assert "fanqie" in REGISTRY
+        assert REGISTRY["fanqie"] is FanqieAdapter
+
+
+class TestCLIArgs:
+    def test_help(self, capsys):
+        test_argv = ["publisher", "--help"]
+        original = sys.argv
+        try:
+            import publisher
+            sys.argv = test_argv
+            with pytest.raises(SystemExit) as exc:
+                publisher.main()
+            assert exc.value.code == 0
+        finally:
+            sys.argv = original
+
+    def test_unknown_platform(self, capsys):
+        test_argv = ["publisher", "list-books", "--platform", "nonexistent"]
+        original = sys.argv
+        try:
+            import publisher
+            sys.argv = test_argv
+            with pytest.raises(SystemExit) as exc:
+                publisher.main()
+            assert exc.value.code != 0
+        finally:
+            sys.argv = original
