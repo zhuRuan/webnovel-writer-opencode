@@ -80,7 +80,7 @@ def install_playwright_browser(venv_path: Path = None) -> bool:
     info("Installing chromium browser...")
     try:
         subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "chromium"],
+            [pip[0], "-m", "playwright", "install", "chromium"],
             check=True, timeout=300
         )
         return True
