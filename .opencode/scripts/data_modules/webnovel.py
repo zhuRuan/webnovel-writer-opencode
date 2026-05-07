@@ -371,6 +371,9 @@ def main() -> None:
     p_export = sub.add_parser("export", help="导出正文为 Markdown/TXT/EPUB")
     p_export.add_argument("args", nargs=argparse.REMAINDER)
 
+    p_publish = sub.add_parser("publish", help="发布章节到小说平台")
+    p_publish.add_argument("args", nargs=argparse.REMAINDER)
+
     knowledge_parser = sub.add_parser("knowledge", help="时序知识查询")
     knowledge_sub = knowledge_parser.add_subparsers(dest="knowledge_action")
 
@@ -488,6 +491,9 @@ def main() -> None:
 
     if tool == "export":
         raise SystemExit(_run_script("export_manager/__init__.py", [*forward_args, *rest]))
+
+    if tool == "publish":
+        raise SystemExit(_run_script("publisher/__init__.py", [*forward_args, *rest]))
 
     if tool == "knowledge":
         from .knowledge_query import KnowledgeQuery
