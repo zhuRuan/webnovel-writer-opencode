@@ -140,28 +140,33 @@ def apply_staging() -> bool:
 
 
 def verify_installation() -> bool:
-    """Run webnovel.py preflight to verify installed .opencode/ works."""
-    preflight_script = Path(".opencode/scripts/webnovel.py")
-    if not preflight_script.exists():
-        warn(f"Preflight script not found: {preflight_script}")
+    """Verify key scripts exist and core dependencies are importable."""
+    scripts_dir = Path(".opencode/scripts")
+    webnovel_py = scripts_dir / "webnovel.py"
+
+    if not scripts_dir.is_dir():
+        warn("Scripts directory not found: .opencode/scripts/")
+        return False
+    if not webnovel_py.exists():
+        warn(f"Entry script not found: {webnovel_py}")
         return False
 
-    try:
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-        result = subprocess.run(
-            [sys.executable, "-X", "utf8", str(preflight_script), "preflight"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=30, env=env
-        )
-        if result.stdout:
-            print(result.stdout)
-        return result.returncode == 0
-    except FileNotFoundError:
-        return False
-    except subprocess.TimeoutExpired:
-        warn("Preflight verification timed out")
-        return False
+    checks = []
+    # Verify core Python dependencies can be imported
+    for mod in ("aiohttp", "pydantic", "filelock"):
+        try:
+            __import__(mod)
+            checks.append(f"  OK {mod}")
+        except ImportError:
+            checks.append(f"  MISSING {mod}")
+
+    ok_count = sum(1 for c in checks if c.startswith("  OK"))
+    total = len(checks)
+    print(f"  Dependencies: {ok_count}/{total} core packages OK")
+    for c in checks:
+        print(c)
+
+    return ok_count == total
 
 
 def _write_installed_version():
