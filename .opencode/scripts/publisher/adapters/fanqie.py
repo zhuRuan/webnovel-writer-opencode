@@ -178,9 +178,18 @@ class FanqieAdapter(BasePlatform):
             kw in url_lower for kw in ["writer", "main", "author"]
         )
 
+    # ── 页面上下文 ──────────────────────────────────────
+
+    async def _ensure_writer_context(self, page):
+        """确保页面在 fanqienovel.com 域名下。空白页上的 fetch 会因
+        origin/referer 限制失败，必须先导航到作家后台域名。"""
+        if page.url == "about:blank":
+            await page.goto(self.login_url, wait_until="commit", timeout=30_000)
+
     # ── 书单 ─────────────────────────────────────────────
 
     async def list_books(self, page) -> list[dict]:
+        await self._ensure_writer_context(page)
         data = await _page_fetch(
             page, "GET",
             "/api/author/homepage/book_list/v0/",
@@ -196,6 +205,7 @@ class FanqieAdapter(BasePlatform):
     # ── 创建书籍 ─────────────────────────────────────────
 
     async def create_book(self, page, meta: BookMeta) -> str:
+        await self._ensure_writer_context(page)
         # 判断 gender
         gender = 0 if any(
             g in meta.genre for g in _FEMALE_GENRES
@@ -288,6 +298,7 @@ class FanqieAdapter(BasePlatform):
         self, page, book_id: str, chapter: Chapter
     ) -> UploadResult:
         """上传单章到番茄。两步：new_article 分配 ID → cover_article 保存内容。"""
+        await self._ensure_writer_context(page)
         volume_id, volume_name = await self._get_first_volume(page, book_id)
 
         # Fanqie 标题格式: "第 X 章 标题" (5-30 chars)
