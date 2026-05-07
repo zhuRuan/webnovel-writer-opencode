@@ -13,29 +13,28 @@ allowed-tools: Bash
 
 ## 执行流程
 
-### 方式 1：curl 一键安装
+### 方式 1：命令行下载安装
 
+**macOS / Linux：**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/install.py | python3
 ```
 
-### 方式 2：下载后运行
+**Windows（PowerShell）：**
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/install.py -OutFile install.py
+python install.py
+```
+
+### 方式 2：浏览器下载后运行
+
+右键 [install.py](https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/install.py) → 「另存为」，然后在文件所在目录运行：
 
 ```bash
-# 下载安装脚本
-python -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/install.py', 'install.py')"
-
-# 全新安装
-python install.py
-
-# 更新到最新版本
-python install.py --update
-
-# 创建虚拟环境安装
-python install.py --venv
-
-# 跳过 playwright 浏览器（节省时间）
-python install.py --skip-playwright
+python install.py              # 全新安装
+python install.py --update     # 更新到最新版本
+python install.py --venv       # 创建虚拟环境安装
+python install.py --skip-playwright  # 跳过 playwright 浏览器
 ```
 
 ### 安装过程（4步）
