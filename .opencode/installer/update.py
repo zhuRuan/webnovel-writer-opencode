@@ -87,7 +87,7 @@ def needs_update(manifest_url: str = None) -> bool:
 
     try:
         with urllib.request.urlopen(manifest_url, timeout=10) as resp:
-            manifest = json.loads(resp.read().decode("utf-8"))
+            manifest = json.loads(resp.read())
     except Exception as e:
         warn(f"Cannot check for updates: {e}")
         return False

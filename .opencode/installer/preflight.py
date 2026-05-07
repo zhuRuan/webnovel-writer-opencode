@@ -175,7 +175,7 @@ def _write_installed_version():
     import urllib.request
     try:
         with urllib.request.urlopen(MANIFEST_URL, timeout=10) as resp:
-            manifest = json.loads(resp.read().decode("utf-8"))
+            manifest = json.loads(resp.read())
         version = manifest.get("version", "unknown")
     except Exception:
         version = "unknown"
