@@ -122,3 +122,9 @@ def run_preflight_checks():
         warn("Low disk space — installation may fail")
     else:
         info("Disk space OK")
+
+    info("Checking network...")
+    if not check_network():
+        warn("Cannot reach GitHub — download may fail. Use --mirror if needed.")
+    else:
+        info("Network OK")
