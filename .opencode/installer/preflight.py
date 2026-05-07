@@ -147,9 +147,12 @@ def verify_installation() -> bool:
         return False
 
     try:
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
         result = subprocess.run(
             [sys.executable, "-X", "utf8", str(preflight_script), "preflight"],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=30, env=env
         )
         if result.stdout:
             print(result.stdout)

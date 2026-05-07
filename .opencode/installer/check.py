@@ -73,17 +73,20 @@ def is_opencode_running(target_dir: str = ".opencode") -> str:
                 cmd = ["tasklist", "/FI", f"IMAGENAME eq {procs[0]}"]
                 for proc in procs[1:]:
                     cmd.extend(["/FI", f"IMAGENAME eq {proc}"])
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                result = subprocess.run(cmd, capture_output=True, text=True,
+                                        encoding="utf-8", errors="replace", timeout=5)
                 found = any(p.lower() in result.stdout.lower() for p in procs)
         elif pname == "linux":
             result = subprocess.run(
                 ["pgrep", "-f", "opencode"],
-                capture_output=True, text=True, timeout=5
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=5
             )
             found = result.returncode == 0
         elif pname == "darwin":
             result = subprocess.run(
-                ["ps", "aux"], capture_output=True, text=True, timeout=5
+                ["ps", "aux"], capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=5
             )
             found = any(
                 p.lower() in result.stdout.lower()

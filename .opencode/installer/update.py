@@ -47,7 +47,8 @@ def current_repo_version(project_root: Path = None) -> str:
     try:
         result = subprocess.run(
             ["git", "describe", "--tags", "--abbrev=0"],
-            capture_output=True, text=True, cwd=project_root, timeout=5
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            cwd=project_root, timeout=5
         )
         if result.returncode == 0:
             return result.stdout.strip()
