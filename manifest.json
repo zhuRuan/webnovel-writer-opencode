@@ -1,5 +1,5 @@
 {
-  "version": "v2.5.0",
+  "version": "v2.6.0",
   "files": {
     ".opencode/.gitignore": {
       "sha256": "91f3164a21c475225c3989dfc9f750f95c9b7ef6b3658ea543c27624003671f3",
@@ -418,8 +418,8 @@
       "size": 2765
     },
     ".opencode/installer/preflight.py": {
-      "sha256": "8f61baeb41404c62105a28d688fc89a361b959b8fbc1d811597b6e5eb07fc31d",
-      "size": 6408
+      "sha256": "778ac620767313744c4ee20bb6256cec858b953aa4053759afabb7a922998ac7",
+      "size": 6748
     },
     ".opencode/installer/ui.py": {
       "sha256": "ebfaa595135b01333ca42c53d2e513afe6a60f99bff3889e9d91411d23762d0a",
@@ -1198,8 +1198,8 @@
       "size": 2757
     },
     ".opencode/scripts/tests/installer/test_preflight.py": {
-      "sha256": "c13e031a59be842ed98182956e9bbb12ac896bada43c48011e3a37df94d3a376",
-      "size": 1753
+      "sha256": "b7da8362167b8883704562b8bee465ca7a3460dff3b1c8ada905d5b649a55533",
+      "size": 1368
     },
     ".opencode/scripts/tests/installer/test_ui.py": {
       "sha256": "1e327cfae7e8dc002c34cbedd79b7c78be21615cdd3bd2308054233b183bf91f",
