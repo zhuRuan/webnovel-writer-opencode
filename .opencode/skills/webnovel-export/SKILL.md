@@ -40,13 +40,22 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" exp
 
 ### Step 2：导出
 
-| 场景 | 命令 |
-|------|------|
-| 交互式导出（推荐） | `webnovel.py export export` |
-| 全部章节 Markdown | `webnovel.py export export --format md` |
-| 指定范围 | `webnovel.py export export --format md --range 1-50` |
-| 按卷导出 | `webnovel.py export export --format epub --volume 1 --author "作者名"` |
-| 指定输出路径 | `webnovel.py export export --format txt --output 导出/第一卷.txt` |
+```bash
+# 全部章节 Markdown
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export export --format md
+
+# 指定范围
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export export --format md --range 1-50
+
+# TXT 格式
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export export --format txt
+
+# EPUB 按卷导出
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export export --format epub --volume 1 --author "作者名"
+
+# 指定输出路径
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" export export --format txt --output "${PROJECT_ROOT}/导出/第一卷.txt"
+```
 
 **参数说明**：
 
@@ -65,8 +74,8 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" exp
 ### Step 3：验证
 
 ```bash
-# 检查文件存在且非空
-test -s "${PROJECT_ROOT}/导出/小说.md" && echo "导出成功"
+# 检查导出目录中最新的导出文件
+ls -la "${PROJECT_ROOT}/导出/" && echo "导出成功"
 ```
 
 ## 充分性闸门
