@@ -27,7 +27,7 @@ python -m pytest .opencode/scripts/data_modules/tests/test_config.py -q --no-cov
 python -m pytest .opencode/scripts/data_modules/tests/test_config.py::test_load_env -q --no-cov
 ```
 
-Tests live in `.opencode/scripts/data_modules/tests/` (59 test files). The PowerShell runner creates isolated temp dirs under `.tmp/pytest/` to avoid Windows permission issues. `conftest.py` patches `tempfile.mkdtemp` and sets `sqlite3` journal mode for test safety.
+Tests live in `.opencode/scripts/data_modules/tests/` (60 test files). The PowerShell runner creates isolated temp dirs under `.tmp/pytest/` to avoid Windows permission issues. `conftest.py` patches `tempfile.mkdtemp` and sets `sqlite3` journal mode for test safety.
 
 ### CLI
 
@@ -36,13 +36,18 @@ Tests live in `.opencode/scripts/data_modules/tests/` (59 test files). The Power
 python .opencode/scripts/webnovel.py <command> [args]
 
 # Common subcommands
-python .opencode/scripts/webnovel.py preflight     # validate runtime environment
-python .opencode/scripts/webnovel.py status        # project health report
-python .opencode/scripts/webnovel.py story-system  # story contract management
-python .opencode/scripts/webnovel.py checkers list # list review checkers
-python .opencode/scripts/webnovel.py dashboard     # start dashboard
-python .opencode/scripts/webnovel.py export        # export novel
+python .opencode/scripts/webnovel.py preflight       # validate runtime environment
+python .opencode/scripts/webnovel.py status          # project health report
+python .opencode/scripts/webnovel.py story-system    # story contract management
+python .opencode/scripts/webnovel.py review-pipeline # review pipeline management
+python .opencode/scripts/webnovel.py export          # export novel
+python .opencode/scripts/webnovel.py publish         # publish to platform
+python .opencode/scripts/webnovel.py memory          # memory system management
 ```
+
+Full command list (28 commands): `where`, `preflight`, `use`, `index`, `state`, `rag`, `style`, `entity`, `context`, `memory`, `migrate`, `status`, `update-state`, `backup`, `archive`, `init`, `extract-context`, `story-system`, `story-events`, `chapter-commit`, `memory-contract`, `project-memory`, `review-pipeline`, `placeholder-scan`, `master-outline-sync`, `export`, `publish`, `knowledge`.
+
+Most subcommands forward to `data_modules/<module>.py` via argparse dispatch. Writing tools (`--project-root` aware) use the `PASSTHROUGH_TOOLS` set; the entry point auto-resolves the book project root (directory containing `.webnovel/state.json`).
 
 ### Dashboard
 
@@ -75,9 +80,9 @@ Code is organized as a pipeline — each layer feeds the next:
 
 **Memory System** — Three tiers: working (short-term), plot (mid-term), semantic (long-term). Modules in `data_modules/memory/`: orchestrator, compactor, store, writer, schema, bootstrap, budget.
 
-**DebtTracker** — Foreshadowing tracking with hard constraint blocking. Active debts > 2 triggers debt-aware context budget (auto-allocate 15% tokens to foreshadowing list). Located in `data_modules/debt_tracker.py`.
+**DebtTracker** — Foreshadowing tracking with hard constraint blocking. Active debts > 2 triggers debt-aware context budget (auto-allocate 15% tokens to foreshadowing list). Implemented in `data_modules/index_debt_mixin.py` (mixed into `index_manager.py`).
 
-**Review Pipeline** — Two layers: Code Checkers (deterministic, run before LLM, block critical issues) → 6 parallel LLM reviewers (consistency, continuity, OOC, high-point, pacing, reader-pull). Managed via `data_modules/checkers_manager.py`.
+**Review Pipeline** — Two layers: Code Checkers (deterministic, run before LLM, block critical issues) → 6 parallel LLM reviewers (consistency, continuity, OOC, high-point, pacing, reader-pull). Reviewer output processed via `.opencode/scripts/review_pipeline.py` (CLI: `review-pipeline`), schema defined in `data_modules/review_schema.py`.
 
 **Graph-RAG** — Entity relationship graph with SQLite persistence. Located in `data_modules/` entity linking and index modules.
 
@@ -85,11 +90,11 @@ Code is organized as a pipeline — each layer feeds the next:
 
 ### OpenCode Integration
 
-12 skills (slash commands like `/webnovel-write`) and 10+ agents (context-agent, data-agent, 6 reviewer agents) defined in `.opencode/skills/` and `.opencode/agents/`. The OpenCode runtime invokes these; this repo defines their behavior.
+11 skills (slash commands like `/webnovel-write`) and 4 agents (context-agent, data-agent, reviewer, deconstruction-agent) defined in `.opencode/skills/` and `.opencode/agents/`. The reviewer agent is instantiated 6 times in parallel for different review dimensions. The OpenCode runtime invokes these; this repo defines their behavior.
 
 ### Key Convention: Unified CLI
 
-All Python functionality routes through a single entry point: `.opencode/scripts/webnovel.py` → `data_modules/webnovel.py` → `COMMAND_REGISTRY` dict mapping subcommand names to handler functions. New features should register here.
+All Python functionality routes through a single entry point: `.opencode/scripts/webnovel.py` → `data_modules/webnovel.py`. Subcommands are dispatched via argparse — most forward to `data_modules/<module>.py` via `_run_data_module()`. New subcommands should be added to the argparse subparser chain in `webnovel.py`.
 
 ## Guidelines
 
