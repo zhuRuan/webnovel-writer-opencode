@@ -235,3 +235,26 @@ class TestBrowserConfig:
         b = Browser(platform="test")
         args = b._get_launch_args()
         assert "--no-sandbox" not in args
+
+
+from publisher.adapters.fanqie import FanqieAdapter
+
+
+class TestFanqieAdapter:
+    def test_extends_base(self):
+        from publisher.base import BasePlatform
+        adapter = FanqieAdapter()
+        assert isinstance(adapter, BasePlatform)
+
+    def test_has_required_attrs(self):
+        adapter = FanqieAdapter()
+        assert adapter.name == "fanqie"
+        assert adapter.display_name == "番茄小说"
+        assert adapter.login_url.startswith("https://")
+
+    def test_implements_all_abstract_methods(self):
+        adapter = FanqieAdapter()
+        for method_name in ["setup_auth", "list_books",
+                            "create_book", "upload_chapter"]:
+            method = getattr(adapter, method_name)
+            assert callable(method)
