@@ -8,13 +8,13 @@ from publisher.base import BasePlatform, BookMeta, Chapter, UploadResult
 class FanqieAdapter(BasePlatform):
     name = "fanqie"
     display_name = "番茄小说"
-    login_url = "https://writer.kandian.com/"
+    login_url = "https://fanqienovel.com/main/writer/login?enter_from=author_zone"
 
     async def setup_auth(self, page) -> bool:
         await page.goto(self.login_url, wait_until="networkidle")
         try:
             await page.wait_for_url(
-                "**/writer.kandian.com/**",
+                "**/fanqienovel.com/writer/**",
                 timeout=180_000,
             )
             return True
@@ -23,7 +23,7 @@ class FanqieAdapter(BasePlatform):
 
     async def list_books(self, page) -> list[dict]:
         await page.goto(
-            "https://writer.kandian.com/book/list", wait_until="networkidle"
+            "https://fanqienovel.com/writer/book/list", wait_until="networkidle"
         )
         await page.wait_for_timeout(2000)
         books = await page.evaluate("""() => {
@@ -40,7 +40,7 @@ class FanqieAdapter(BasePlatform):
 
     async def create_book(self, page, meta: BookMeta) -> str:
         await page.goto(
-            "https://writer.kandian.com/book/create", wait_until="networkidle"
+            "https://fanqienovel.com/writer/book/create", wait_until="networkidle"
         )
         await page.fill(
             'input[name="title"], input[placeholder*="书名"]', meta.title
@@ -105,7 +105,7 @@ class FanqieAdapter(BasePlatform):
         self, page, book_id: str, chapter: Chapter
     ) -> UploadResult:
         await page.goto(
-            f"https://writer.kandian.com/book/{book_id}/chapter/create",
+            f"https://fanqienovel.com/writer/book/{book_id}/chapter/create",
             wait_until="networkidle",
         )
 
