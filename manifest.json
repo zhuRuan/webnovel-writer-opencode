@@ -1,0 +1,1629 @@
+{
+  "version": "v0.1.0",
+  "files": {
+    ".opencode/.gitignore": {
+      "sha256": "91f3164a21c475225c3989dfc9f750f95c9b7ef6b3658ea543c27624003671f3",
+      "size": 421
+    },
+    ".opencode/package-lock.json": {
+      "sha256": "9f95cf967187512dce2f7be3fd94cff4301aa2407f79751ec3b3291ec6a4235c",
+      "size": 13727
+    },
+    ".opencode/package.json": {
+      "sha256": "894b4b85c472d84f0fc7c8c880592cfd365280bc440cf852d6aa54b491f5874f",
+      "size": 61
+    },
+    ".opencode/agents/context-agent.md": {
+      "sha256": "3abf1933b0bf340cadb3336c48368a70fa7cc43a8cc86cf5e3c3f8a271cb6f36",
+      "size": 9391
+    },
+    ".opencode/agents/data-agent.md": {
+      "sha256": "fee8f3dceb324de0979daadcd4e51637107db683accc61f07c3fb259ba3e6a7e",
+      "size": 6836
+    },
+    ".opencode/agents/deconstruction-agent.md": {
+      "sha256": "5c6ff6a02ffd19635b5376be35ecc441592ea75ec3c779923c693d0ddb77bd69",
+      "size": 12142
+    },
+    ".opencode/agents/reviewer.md": {
+      "sha256": "257f32a6b4cd108393592604cbce57510b350bdf95fd93af4be11b434f59dbef",
+      "size": 6155
+    },
+    ".opencode/agents/evals/evals.json": {
+      "sha256": "60456a7d2424e07a77fd1a300d71c6a15095c3166916724dbcbbbbb99ec7cfd0",
+      "size": 3398
+    },
+    ".opencode/agents/evals/files/test-project/.webnovel/memory_scratchpad.json": {
+      "sha256": "ffba9a7c9afba5c998d3ccd692fcabb38dec54dbba4775f25fe2d8a3b50690d3",
+      "size": 1185
+    },
+    ".opencode/agents/evals/files/test-project/.webnovel/state.json": {
+      "sha256": "87a00fe7df5173e5ae2c09e53b9a74db2c366470cf3429987128a9c50852fd40",
+      "size": 2731
+    },
+    ".opencode/agents/evals/files/test-project/.webnovel/summaries/ch0003.md": {
+      "sha256": "f42ee3b60656cd7b0da74dab59d1b94c0e43947216f54a55e1a139a366cf54c0",
+      "size": 728
+    },
+    ".opencode/agents/evals/files/test-project/大纲/总纲.md": {
+      "sha256": "c84323fbb4af13c92e80500bc483cf58f7b34b444ad5a2a1807e1a55fc24ad64",
+      "size": 738
+    },
+    ".opencode/agents/evals/files/test-project/大纲/第1卷-时间线.md": {
+      "sha256": "9772373114fc7ac9bb3624f481837a64a9d2fb45474888ec9ae30173d0e32c98",
+      "size": 364
+    },
+    ".opencode/agents/evals/files/test-project/大纲/第1卷-详细大纲.md": {
+      "sha256": "cb5698af45f4bd4f76766bd8f03cd9c46c4748ebcd606ba2a556ee12121723ab",
+      "size": 761
+    },
+    ".opencode/agents/evals/files/test-project/正文/第0004章-迦南学院的考验.md": {
+      "sha256": "750cb8cbd268e95443423419a9c1a00dcde1cc233aefe913c897dfbbc77a7637",
+      "size": 2482
+    },
+    ".opencode/agents/evals/files/test-project/设定集/世界观.md": {
+      "sha256": "f5f03eba3a114324d1632deae69bbb22445320112c8490a6ce2564ec1482f27c",
+      "size": 558
+    },
+    ".opencode/dashboard/app.py": {
+      "sha256": "89b87b82ce0d91b8594913de2e2be487bdcdff7c051d91f9a4ef7d3dace788ca",
+      "size": 35126
+    },
+    ".opencode/dashboard/path_guard.py": {
+      "sha256": "ddc6e030dda99c97e4ec8e0333583e560b3d530d58ff5de3591ebeb0f1d8fbc3",
+      "size": 924
+    },
+    ".opencode/dashboard/requirements.txt": {
+      "sha256": "2401ae63cca26e285327c569e879dd4a9193600efa33518397af9a692400c42a",
+      "size": 77
+    },
+    ".opencode/dashboard/server.py": {
+      "sha256": "be73a8b8546731c0c9badc82ccd08dde489e87eb5a32ab73c78096269852e945",
+      "size": 2250
+    },
+    ".opencode/dashboard/watcher.py": {
+      "sha256": "d0e09ad2687b64c03b68ab6690afad563b0b234d7c66fdf385e7669812873dae",
+      "size": 4721
+    },
+    ".opencode/dashboard/__init__.py": {
+      "sha256": "a2f536b40ac6b12d8277f4e493dfd02978dd368246abf3669bba5aa458b4ce39",
+      "size": 52
+    },
+    ".opencode/dashboard/__main__.py": {
+      "sha256": "f13e7691d7d1efcaa2e413f8f74725bba67371eaa0a9d32d2f97b56cc1691396",
+      "size": 83
+    },
+    ".opencode/dashboard/frontend/design.md": {
+      "sha256": "591b2797d4352a6b12dd750e2cf09ff032978d4a01bb7caabdbd1ae3963d356b",
+      "size": 8814
+    },
+    ".opencode/dashboard/frontend/index.html": {
+      "sha256": "76e9f62bf255eaabbfd6027e985659379e621e0d0c75fb742de065dd6c9df3ee",
+      "size": 753
+    },
+    ".opencode/dashboard/frontend/package-lock.json": {
+      "sha256": "3cef2c84382ed0af7c40f860c5f184ce7bf06ad4015473715a138a0e832fd9b9",
+      "size": 66715
+    },
+    ".opencode/dashboard/frontend/package.json": {
+      "sha256": "9e1f45e37e5646883d4427754c878004b912de664ecb551da5e6dc64f31cc2b3",
+      "size": 539
+    },
+    ".opencode/dashboard/frontend/vite.config.js": {
+      "sha256": "22b329c2a942c5504ecc2f9dbc0c39ef92d83f58f23abb3ca89f68db06363f4a",
+      "size": 511
+    },
+    ".opencode/dashboard/frontend/dist/index.html": {
+      "sha256": "2be20a0280df53b344c5fe5c4589639a4c87f4505b49cfc9b110a584f844c1de",
+      "size": 934
+    },
+    ".opencode/dashboard/frontend/dist/assets/Badge-DcwOuuF4.js": {
+      "sha256": "685c088b87635a9eb60e906fd1842f751ed459df55b2e0892a66b988b948f19e",
+      "size": 374
+    },
+    ".opencode/dashboard/frontend/dist/assets/CharactersPage-n6sZAtwm.js": {
+      "sha256": "9e4ac223679eb590efd77ff108f71f5f848e8695f8036a57b92f097ff6f88a2b",
+      "size": 9328
+    },
+    ".opencode/dashboard/frontend/dist/assets/ChartWrapper-7BPAgK6F.js": {
+      "sha256": "518b5b316e75be5e306e280bd63549b6ba6229efd64190e3ef8c685d0d5f968e",
+      "size": 8162
+    },
+    ".opencode/dashboard/frontend/dist/assets/DataTable-DwExK2c6.js": {
+      "sha256": "844a99c2002c97d34f72c28ce1192c7918540466e39aab0ece33d8f75d5015f9",
+      "size": 1472
+    },
+    ".opencode/dashboard/frontend/dist/assets/echarts-vendor-DOu6vfXz.js": {
+      "sha256": "bed862c3590ab44994def5fc8c3690a1c9c08999dc9672c6a53ffac19974f861",
+      "size": 621738
+    },
+    ".opencode/dashboard/frontend/dist/assets/FilesPage-Czd1SC2y.js": {
+      "sha256": "e04549468879a4b6f94e13b2c6e68a1a404124cf19f693f46f7350d6b076f446",
+      "size": 3712
+    },
+    ".opencode/dashboard/frontend/dist/assets/foreshadowing-BP4NrzVI.js": {
+      "sha256": "644f942d2b39ffe5ab03b429edfce96569e2657d989a2bda37dbe0a20d479d49",
+      "size": 2239
+    },
+    ".opencode/dashboard/frontend/dist/assets/ForeshadowingPage-BeSmFV1Z.js": {
+      "sha256": "31c34a27f00ec58d0831f884ac8ef8c3eae7efc18f9dbe0f30a476116e847ede",
+      "size": 5476
+    },
+    ".opencode/dashboard/frontend/dist/assets/format-flB0hImb.js": {
+      "sha256": "94273f1378c2a0913573566b39862b2e2e68212833f4bf524fcf6fb662c70442",
+      "size": 1271
+    },
+    ".opencode/dashboard/frontend/dist/assets/index-Dyazi077.js": {
+      "sha256": "00b94d3f48feec6672c272fc24abc97dadfd02f8c5e79f0b6ecc8d9405258579",
+      "size": 190893
+    },
+    ".opencode/dashboard/frontend/dist/assets/index-R26PxixS.css": {
+      "sha256": "3f7ca1067f39a7b9b998e9e359babeaaacc720e3f3f2ba2ea22e8319d7da8b54",
+      "size": 10348
+    },
+    ".opencode/dashboard/frontend/dist/assets/OverviewPage-vgewJiV1.js": {
+      "sha256": "4f17a2c2558e94993bd7bd87c6fcfa19e13c9c1a25e0d2e912e1ed5c058ac347",
+      "size": 9547
+    },
+    ".opencode/dashboard/frontend/dist/assets/PacingPage-Dsdrtxb_.js": {
+      "sha256": "9a8f54cfa9db96fb6a1ff5be99bad08aedca979f6d69e8ae5ecf1ef79fe31252",
+      "size": 5326
+    },
+    ".opencode/dashboard/frontend/dist/assets/Pager-FJRhLwfC.js": {
+      "sha256": "2b04949b068ec93860fd25ab721e6e2b7f667a9b698a226128d53db3d10c7adb",
+      "size": 701
+    },
+    ".opencode/dashboard/frontend/dist/assets/react-vendor-CjpoAPrF.js": {
+      "sha256": "4c2766545878caeb3d6884f45d6a5f714599bfb4f12a0f2b6fedd05d35629890",
+      "size": 49802
+    },
+    ".opencode/dashboard/frontend/dist/assets/story-lVhSS0ka.js": {
+      "sha256": "c51643412e16b1c288224cc73e0a032c45fd0d6ac97ae88dbde0c2c957df43ee",
+      "size": 1100
+    },
+    ".opencode/dashboard/frontend/dist/assets/SystemPage-CRCMgVw-.js": {
+      "sha256": "90137d842aadfa4a0b49ad64720ab56967b9fc41b61bc570597d861ef4ff30ef",
+      "size": 7151
+    },
+    ".opencode/dashboard/frontend/src/api.js": {
+      "sha256": "c4d9a46c5fae509d8d24baabfef0b735c808e764543fff680fbc5f4b0a9e8189",
+      "size": 2398
+    },
+    ".opencode/dashboard/frontend/src/App.jsx": {
+      "sha256": "301e5a659afd918580e87c59f9b250e52e613584cafd93d4a3e7ac883bfef483",
+      "size": 3547
+    },
+    ".opencode/dashboard/frontend/src/icons.jsx": {
+      "sha256": "8417f67d6d4a97db1a35f0fb6ddb7f336b11501fd9f79c4e5e8d353e7ea6e25d",
+      "size": 4864
+    },
+    ".opencode/dashboard/frontend/src/index.css": {
+      "sha256": "88f9bcaec2ea31add483b83201b3ff5ef0e3e9637d9c9ffdf397a07d124f3b18",
+      "size": 13543
+    },
+    ".opencode/dashboard/frontend/src/main.jsx": {
+      "sha256": "7f01301e622bc1815974fa49411b08b8ab7269b86dbf9979a0cee45eabe45624",
+      "size": 1843
+    },
+    ".opencode/dashboard/frontend/src/components/Badge.jsx": {
+      "sha256": "37f17aa54b30a535f067daab081e7ca28ec04329502fc8ef0d3adea28550d87f",
+      "size": 517
+    },
+    ".opencode/dashboard/frontend/src/components/ChartWrapper.jsx": {
+      "sha256": "d0a6733d41bafc32b5fc9a6f86e7a20a70a9dde61cac1f5cf49c7a2cb4812d8b",
+      "size": 767
+    },
+    ".opencode/dashboard/frontend/src/components/DataTable.jsx": {
+      "sha256": "fc796302eb892313d913513df66e27e536a448586c9a1d4d2dae8eb4766bc2f7",
+      "size": 3355
+    },
+    ".opencode/dashboard/frontend/src/components/Pager.jsx": {
+      "sha256": "e4b65e99e06a4003fe3ec307405c8d6b5855002e5dac4c7bd5c76c4b797d0496",
+      "size": 1017
+    },
+    ".opencode/dashboard/frontend/src/lib/charts.js": {
+      "sha256": "12bf97c13927cb21d8f60593f545998c2506d25c07ba9aa788c0fc4bc8a510fa",
+      "size": 3495
+    },
+    ".opencode/dashboard/frontend/src/lib/files.js": {
+      "sha256": "0207e14edc6330d5f88ea13529bdb39b5a4359f03cfbc6495e7903c7b4cb690d",
+      "size": 580
+    },
+    ".opencode/dashboard/frontend/src/lib/foreshadowing.js": {
+      "sha256": "3486bed7ec6e2c9ab7e5ccb2b4e8d08899c91b170c9761a90196f2341831f3d2",
+      "size": 4838
+    },
+    ".opencode/dashboard/frontend/src/lib/format.js": {
+      "sha256": "1f225f6bfb07cc772334b67b1a47c231c077da2830805099fe7c6ecc92455cb6",
+      "size": 2381
+    },
+    ".opencode/dashboard/frontend/src/lib/story.js": {
+      "sha256": "82589a97c31069a2511920318cee330740cbcf8f15c45d5850b5f1c768033328",
+      "size": 2227
+    },
+    ".opencode/dashboard/frontend/src/pages/CharactersPage.jsx": {
+      "sha256": "48f590faf90ad7ddd829c14393760ff64669f80fc3297894bb3be02f193cf5ed",
+      "size": 20488
+    },
+    ".opencode/dashboard/frontend/src/pages/FilesPage.jsx": {
+      "sha256": "7563899ae7b81cc2c0f96172aa10bb8f05bc00d09f3b898d562621fae313b2fe",
+      "size": 7753
+    },
+    ".opencode/dashboard/frontend/src/pages/ForeshadowingPage.jsx": {
+      "sha256": "a8fe2abc193fe24c9364de0b624f8ab766e82d81a587c079872cf18e168d3e81",
+      "size": 11146
+    },
+    ".opencode/dashboard/frontend/src/pages/OverviewPage.jsx": {
+      "sha256": "a888d2a2f862b55ba3d7621bdc791cbda0318dcdcc0d822bbe4ffe3d1cfadf41",
+      "size": 20047
+    },
+    ".opencode/dashboard/frontend/src/pages/PacingPage.jsx": {
+      "sha256": "93b26bb21983f6fc2836853fbb7650fe8f80dd08b9bf4eb84cea6c4adeba7617",
+      "size": 11649
+    },
+    ".opencode/dashboard/frontend/src/pages/SystemPage.jsx": {
+      "sha256": "633ada63eb3779860ba13a613bb25ae0f0e2ffecbe7078feadfa6fa41aa0a50f",
+      "size": 12946
+    },
+    ".opencode/genres/dog-blood-romance/character-archetypes.md": {
+      "sha256": "4611ac2394ae4ad0d85b5ada4abb66080741bb2bec46021660c723ee3db76be8",
+      "size": 16047
+    },
+    ".opencode/genres/dog-blood-romance/emotional-tension.md": {
+      "sha256": "24223e7121b2ff8466f331d4d87262b316f06da98005a553dbe5e50a0bc309fd",
+      "size": 14242
+    },
+    ".opencode/genres/dog-blood-romance/plot-templates.md": {
+      "sha256": "30641316849d1fb0a8a1e35bc5bb88c9967b51853799b12d3a92a0f9696186b9",
+      "size": 7562
+    },
+    ".opencode/genres/dog-blood-romance/romance-pacing.md": {
+      "sha256": "5b6cd8345a36c5eedd54ba6bc7d65a01f698a7746d782641e0b0dbd2335e63f6",
+      "size": 13427
+    },
+    ".opencode/genres/dog-blood-romance/romance-tropes.md": {
+      "sha256": "294a09edf0d03f761db1624f981865477f971aeac329e75709c0b49dae314f4d",
+      "size": 13759
+    },
+    ".opencode/genres/dog-blood-romance/sweet-moments.md": {
+      "sha256": "a09339ef36017388b13d87ba9339583672fd14ad38181050dfc8ca38a9e9a3d0",
+      "size": 15674
+    },
+    ".opencode/genres/dog-blood-romance/torture-points.md": {
+      "sha256": "831a9f3be8b443c553117531a2ca76562329eb6929e15917f69b532d52ebb0dd",
+      "size": 16419
+    },
+    ".opencode/genres/period-drama/ancient-dialogue.md": {
+      "sha256": "a3ba8f459c31b87d10efb5bd5f835e2f4eed360077fcd3237e099a844419918e",
+      "size": 5939
+    },
+    ".opencode/genres/period-drama/character-design.md": {
+      "sha256": "10448a563e1dd0a27757bbf1b17b1eac6920d602d15857530e44b32c429b63a1",
+      "size": 4296
+    },
+    ".opencode/genres/period-drama/historical-setting.md": {
+      "sha256": "ba172a91a97418a782209f68b6d1891b909ccf937912a076d705e52265b47177",
+      "size": 5025
+    },
+    ".opencode/genres/period-drama/palace-intrigue.md": {
+      "sha256": "2fdb4b5ede3ba8333c1fcf8e0a21c9979091b5818b3f1f926f2db6f1d5cb32ac",
+      "size": 5767
+    },
+    ".opencode/genres/period-drama/plot-patterns.md": {
+      "sha256": "9add074b3aa958b38195fb4b98059be5cac8ec36f38d92dd8366fd4b7bfbb3df",
+      "size": 4757
+    },
+    ".opencode/genres/realistic/character-depth.md": {
+      "sha256": "ebab910fbfc3f926e4f94cb6491e8b057b09219b3c777697c01a3755b64fb571",
+      "size": 4849
+    },
+    ".opencode/genres/realistic/dialogue-authenticity.md": {
+      "sha256": "397bd1f25ba5b9b6d2a207de43b019b867a6726348590f09036a554ac9d0aeb7",
+      "size": 4759
+    },
+    ".opencode/genres/realistic/plot-logic.md": {
+      "sha256": "1bcd7edff5c5328653dbbeae4af5b57b5100e0449fa74b202e954a0116c29ee8",
+      "size": 5189
+    },
+    ".opencode/genres/realistic/reality-anchoring.md": {
+      "sha256": "924a2d94d7e5aa3cfd66f9ea52ea776a30b06ceb140cf5106b012c5b8792834c",
+      "size": 4922
+    },
+    ".opencode/genres/realistic/social-issues.md": {
+      "sha256": "980662b3822a0530f8e8df8685630fea9a2f84056a5c19f5a23989b5b058268e",
+      "size": 4763
+    },
+    ".opencode/genres/rules-mystery/clue-design.md": {
+      "sha256": "577ef340c87b18a56acbab5df6b15c5ac73e284c9bb0add0aaba58211c5c9ae5",
+      "size": 12476
+    },
+    ".opencode/genres/rules-mystery/core-elements.md": {
+      "sha256": "8b3999b82768393bac94447bc25416916e2dfdf56ff6f57db98ea0462ccc3b15",
+      "size": 11785
+    },
+    ".opencode/genres/rules-mystery/detective-design.md": {
+      "sha256": "c72eb5076e7ef72f035789f7af0b313cfd04484d6d50f5610c2e153fa6b7fd7c",
+      "size": 12714
+    },
+    ".opencode/genres/rules-mystery/revelation-design.md": {
+      "sha256": "5ff4cf5b002092a299180d5245995c971af0318b5459acb923c875223efd8de3",
+      "size": 12829
+    },
+    ".opencode/genres/rules-mystery/structure-pacing.md": {
+      "sha256": "d4a0661fc9bac58ec80d88535e25947ac316ef52c99f347e09915f928cf177d2",
+      "size": 14575
+    },
+    ".opencode/genres/rules-mystery/suspect-management.md": {
+      "sha256": "ccff0a6c64c5b2ebeabef247eb160cae42bd32e45661c5e97d1f2ccf10496144",
+      "size": 11939
+    },
+    ".opencode/genres/rules-mystery/trick-design.md": {
+      "sha256": "9854ba8f59667a24c44c3bcc2eb7e85850622420539783f60a954c1130afca71",
+      "size": 11712
+    },
+    ".opencode/genres/xuanhuan/cultivation-levels.md": {
+      "sha256": "29706dccc3a6b4f1e9c83b2957385ec08632265416dbb40fce23475110b2080e",
+      "size": 13799
+    },
+    ".opencode/genres/xuanhuan/power-systems.md": {
+      "sha256": "7038bd620d09e65df4469aa29f1cd52e0c952fd09a0551a924987ee98ac77eb7",
+      "size": 12610
+    },
+    ".opencode/genres/xuanhuan/xuanhuan-cool-points.md": {
+      "sha256": "526e4bd2eec3c7c8e3b786db88e3024fa0899af75ddc3e61df56bd66f6ae87f3",
+      "size": 12820
+    },
+    ".opencode/genres/xuanhuan/xuanhuan-plot-patterns.md": {
+      "sha256": "54939d4e1175a2a3119af28e89dc533c018fd4d4813e47a13e8a7ebe65fe3d4a",
+      "size": 12544
+    },
+    ".opencode/genres/zhihu-short/character-quick-build.md": {
+      "sha256": "b89d89456e4f0bb6e858ef10f9736bab143ac898b81fd3adf13b448b3347767d",
+      "size": 4383
+    },
+    ".opencode/genres/zhihu-short/emotional-peaks.md": {
+      "sha256": "29a7d0f66e6bf82b6a2d9164df5678e3f44ed3b3232b0fc808efecc46036e32a",
+      "size": 5351
+    },
+    ".opencode/genres/zhihu-short/ending-patterns.md": {
+      "sha256": "9bb93d79a9271914e67b3520f408ff0e6b7e788f0eb7860cfff396e41077faea",
+      "size": 5204
+    },
+    ".opencode/genres/zhihu-short/genre-templates.md": {
+      "sha256": "84e74cbf675238bdf8a39e9a720bfdc6ac01fa14462a2144194bb2adbfe3ee51",
+      "size": 5440
+    },
+    ".opencode/genres/zhihu-short/hook-techniques.md": {
+      "sha256": "bd199ced3176d36acee1244efe502836df8d22742999af27be3b5e22fc2b963b",
+      "size": 4352
+    },
+    ".opencode/genres/zhihu-short/pacing-rhythm.md": {
+      "sha256": "50e26b28f7ef49b2eb92a6036f4bae9e123a73e81a0a751703e5d554e3703caa",
+      "size": 4272
+    },
+    ".opencode/genres/zhihu-short/plot-compression.md": {
+      "sha256": "cfe86e12dddccea1cb9f7946f9308a8cbfe464c966e13630d93db7ef705ddb30",
+      "size": 4684
+    },
+    ".opencode/installer/check.py": {
+      "sha256": "81fcfd1fbd2b869aa1bce4b0de521dd8c056ff696c0b96f7212626d54d6dde27",
+      "size": 4159
+    },
+    ".opencode/installer/deps.py": {
+      "sha256": "4d6a4eab489f4b78aaf47a30549e09e0024ef7f689a7550117863ab8ffcb793f",
+      "size": 3182
+    },
+    ".opencode/installer/fetch.py": {
+      "sha256": "be546718374ce17a4117e915927e8612a696a950e566c28382321ec3cf0aac78",
+      "size": 2765
+    },
+    ".opencode/installer/preflight.py": {
+      "sha256": "a52fa86f057b730be69c1df5d17d4887d8fbca8d76d862ce780a0047e315e22d",
+      "size": 6122
+    },
+    ".opencode/installer/ui.py": {
+      "sha256": "ebfaa595135b01333ca42c53d2e513afe6a60f99bff3889e9d91411d23762d0a",
+      "size": 1909
+    },
+    ".opencode/installer/update.py": {
+      "sha256": "59724a347cdb0045d5c01b76959e728859d6ec9332a855dfbb33855468d3db49",
+      "size": 3250
+    },
+    ".opencode/installer/__init__.py": {
+      "sha256": "fca41afd97d96cf110768a2ec1275dea5ddacd5571c1cd2c0e14c72c2c1abfd0",
+      "size": 58
+    },
+    ".opencode/references/genre-profiles.md": {
+      "sha256": "007c1d2b913750f3835ddb37e802a50b88c51995b1e1142ebe6366ee30916465",
+      "size": 19259
+    },
+    ".opencode/references/reading-power-taxonomy.md": {
+      "sha256": "c2e4a5ad3d335279143ba343de9b05de2ae29a0bf54edc17e5df687df5e925b0",
+      "size": 13079
+    },
+    ".opencode/references/README.md": {
+      "sha256": "7956818e8c01d1ce4b4fa1ebfa5dbbeaa7200c9b5edc7681b91f6123a1d2b142",
+      "size": 1571
+    },
+    ".opencode/references/review-schema.md": {
+      "sha256": "84026089be607e9f656db02eb1decbcdf6789998ef6729a0bca3064376a1d122",
+      "size": 2256
+    },
+    ".opencode/references/csv/genre-canonical.md": {
+      "sha256": "5f27c3686206e84da8f84cd17b60015e54805131b2531e379ab0c1843723eb92",
+      "size": 14542
+    },
+    ".opencode/references/csv/README.md": {
+      "sha256": "89b5759d3c4e92af7bbe54a542797b81ad34679689770b2915bd3e0913370a88",
+      "size": 7877
+    },
+    ".opencode/references/csv/人设与关系.csv": {
+      "sha256": "3c76a12a060d4662dd69a2af36c70b2bcf3cd5fae863fe48a08661028228b6d0",
+      "size": 83620
+    },
+    ".opencode/references/csv/写作技法.csv": {
+      "sha256": "e34e77d412c201763a66fa40dc8b06f530859ffad409961d989e80604bc82317",
+      "size": 87379
+    },
+    ".opencode/references/csv/命名规则.csv": {
+      "sha256": "bc86d2a422eee806259cf85924ca86cef0efa10f5ab93504474284432089be6c",
+      "size": 56441
+    },
+    ".opencode/references/csv/场景写法.csv": {
+      "sha256": "ed266b1307dbdd3a89050c163e1187919368b13697064796f4b6ce77e8f39c5b",
+      "size": 78063
+    },
+    ".opencode/references/csv/桥段套路.csv": {
+      "sha256": "82437a8c80e40f80c5a3ce044763082f585a8a853186baf37b42cfcf4f570171",
+      "size": 94139
+    },
+    ".opencode/references/csv/爽点与节奏.csv": {
+      "sha256": "cbc41cbd6ce23ed7355b5ae8be7c5e9683dc33fbed8b06a57af5db77b5020742",
+      "size": 67471
+    },
+    ".opencode/references/csv/裁决规则.csv": {
+      "sha256": "80d741c74c7e3364bd5ebc6f0c6d466289f05f279f206c35199e1ac45bc3de66",
+      "size": 8821
+    },
+    ".opencode/references/csv/金手指与设定.csv": {
+      "sha256": "1fc0b11dd54cdb5295151650102efdf27a860d014ab89c27f4b28f5fb26b0880",
+      "size": 74257
+    },
+    ".opencode/references/csv/题材与调性推理.csv": {
+      "sha256": "4923d10f878cbf58257401d36178becfff64a2f415d13b35015ba6e48d3f4d22",
+      "size": 22747
+    },
+    ".opencode/references/index/reference-gap-register.md": {
+      "sha256": "375466fe22b60fee39b8c2ae8e6f306de4e9b706089a76b989d8042c4e971b53",
+      "size": 8939
+    },
+    ".opencode/references/index/reference-loading-map.md": {
+      "sha256": "982473131b0430bd84221361b18c6dbb36235c02f7fee2e7872b3feddf2a9f93",
+      "size": 8764
+    },
+    ".opencode/references/outlining/plot-signal-vs-spoiler.md": {
+      "sha256": "1e9ad8cb6302295bee1f71256095ba0b8b8ebd7c0280c6673b44c6da4ffbff7d",
+      "size": 2044
+    },
+    ".opencode/references/review/blocking-override-guidelines.md": {
+      "sha256": "3964f30544e77ce9a68ee633ced2a502499b11c0cf8d420b2479e5f04a829848",
+      "size": 1982
+    },
+    ".opencode/references/shared/cool-points-guide.md": {
+      "sha256": "3016cc390f7d738d9acd921da207715885acb55cb2e8d0fa5a4380e64c564ba7",
+      "size": 8657
+    },
+    ".opencode/references/shared/core-constraints.md": {
+      "sha256": "a68e44e9114a73134842ae0a1df5e409ad51e7c4e0af002ac225a6e1b98cbdd2",
+      "size": 4730
+    },
+    ".opencode/references/shared/naming-and-voice-gaps.md": {
+      "sha256": "122a5507664869d0eec0492e7ae12a5deadda80b61958885ecce676d74e306ec",
+      "size": 2940
+    },
+    ".opencode/references/shared/strand-weave-pattern.md": {
+      "sha256": "a0e1defbb456fe504edb0274b6c55df380c875692f417dc5102e7451af1dd28f",
+      "size": 3956
+    },
+    ".opencode/scripts/.coveragerc": {
+      "sha256": "756d8e31d190f1a762f4cadad5ff3c3b31179dffbce73b87e3f9ff2ff1cee970",
+      "size": 321
+    },
+    ".opencode/scripts/archive_manager.py": {
+      "sha256": "b0021dc61919f05e57200ad5ce2ae6e0c380bee1afad5bc83d5ee9d99706fc48",
+      "size": 23612
+    },
+    ".opencode/scripts/backup_manager.py": {
+      "sha256": "21418779861efbc240747df0ec3834629346779fa7db7dfbce8758cf1c9125c9",
+      "size": 16189
+    },
+    ".opencode/scripts/chapter_commit.py": {
+      "sha256": "11ebef01885ac88290657a00fb62422134758e04d9bf3a422312a52c80e75679",
+      "size": 1587
+    },
+    ".opencode/scripts/chapter_outline_loader.py": {
+      "sha256": "07e05f13d52c127f5ce6e1fa2020c0ee763d9a73d6902d82c771f3104eb8c8a2",
+      "size": 13067
+    },
+    ".opencode/scripts/chapter_paths.py": {
+      "sha256": "525f4158eedfb6dd138dcc3be869f05575ad8842097b72ea9ead9160fd5fb158",
+      "size": 5765
+    },
+    ".opencode/scripts/conftest.py": {
+      "sha256": "e3cabe62722530df3d2d5c0f08b32d2f3d09d1cd85202af140aa0b2c4a2e6e51",
+      "size": 2832
+    },
+    ".opencode/scripts/extract_chapter_context.py": {
+      "sha256": "8ecf347266cbe15b3c501be5f0a474311f9f64d2cf2cab24062387f2b2aa119a",
+      "size": 15202
+    },
+    ".opencode/scripts/gen_manifest.py": {
+      "sha256": "ec83385861d1e3f7fbbd3f6d0589978fd92d42902133d468b0b181f1f3f0a7b2",
+      "size": 2013
+    },
+    ".opencode/scripts/init_project.py": {
+      "sha256": "77ff4042b19528e42260a9290a098ec65e034fb0af62cd9de86b6d46b98a313b",
+      "size": 32071
+    },
+    ".opencode/scripts/memory_cli.py": {
+      "sha256": "6802caf94e251aac77709dec5c446db0fcbb95bd29172965f60c5d2d26c67ef8",
+      "size": 4094
+    },
+    ".opencode/scripts/project_locator.py": {
+      "sha256": "23b5a981c1064ad88e6f88fad2f899d490092f67ba53cc6c74fbf74231c08823",
+      "size": 16833
+    },
+    ".opencode/scripts/project_memory.py": {
+      "sha256": "613b0846a3eb4fc307a4795206a6c844a16d00e1653ddfff8ebc7b4009474067",
+      "size": 4584
+    },
+    ".opencode/scripts/quality_trend_report.py": {
+      "sha256": "c02f31bbbba965278a12da715f1d2c1b4c5385aaa903ab05cd07415b20cc04a4",
+      "size": 8952
+    },
+    ".opencode/scripts/reference_search.py": {
+      "sha256": "bc50817e6fd56a5c5a977b1d25155009b13078c54ddcc533f0bd687a9678b7cf",
+      "size": 21115
+    },
+    ".opencode/scripts/requirements.txt": {
+      "sha256": "74fd3aa2652b616ef6f861e150b3b0d0a8b1fdf72deaeae5941095ddb8c3a1e9",
+      "size": 471
+    },
+    ".opencode/scripts/review_pipeline.py": {
+      "sha256": "2de7b23384d95f1e6711a446f56ba3bc4dad6ba554be4737712714e460c3305d",
+      "size": 7694
+    },
+    ".opencode/scripts/runtime_compat.py": {
+      "sha256": "d7a61f8438c60b18c82f42b06ea0b1bb49fbd1047cf3e9839e539b76d291c5a1",
+      "size": 2183
+    },
+    ".opencode/scripts/run_tests.ps1": {
+      "sha256": "3ec1da94109e08e3242af918edb9ba923b2dcc711be905afd201011bf372e35d",
+      "size": 2306
+    },
+    ".opencode/scripts/security_utils.py": {
+      "sha256": "418d9540bc046b0ebaa75f81be5b06f58c4658188e64e7c1c32d6d05a753cdf5",
+      "size": 18916
+    },
+    ".opencode/scripts/status_reporter.py": {
+      "sha256": "a8ee635f115466d810f9daaf6e3e4a87981759a2cd340b11d359666d9a0aa752",
+      "size": 48471
+    },
+    ".opencode/scripts/story_events.py": {
+      "sha256": "c456d19f50f5caab613a814e32f7bec412609fd42291495e5eeffbc873909335",
+      "size": 1225
+    },
+    ".opencode/scripts/story_system.py": {
+      "sha256": "80bdbc4d73f074e35d00f3ee29990a14d49acaddd2be7c9f3da28ba22cf7fd6d",
+      "size": 4111
+    },
+    ".opencode/scripts/sync_plugin_version.py": {
+      "sha256": "27ba3bf93b9cfd3164a17dab7c65b94c3bd7edf72ccbd4f40ff75e6495d5e2fb",
+      "size": 8052
+    },
+    ".opencode/scripts/update_master_outline.py": {
+      "sha256": "7f1252397c78ec9befcaf2cd8cda6785488bc3b5921a03df39f1887a83f80781",
+      "size": 11539
+    },
+    ".opencode/scripts/update_state.py": {
+      "sha256": "2c7f0686c60d45ab064cd0e7904b1ad5ec3286eb31a4d5358fa9aadde0bdae1b",
+      "size": 22867
+    },
+    ".opencode/scripts/validate_csv.py": {
+      "sha256": "1405d122538b1d544ed1eda5ba8387e1a1f7e585d46dec45d6015e9f477359b2",
+      "size": 9205
+    },
+    ".opencode/scripts/webnovel.py": {
+      "sha256": "58fab795ff05d90b4f8bfa1d9ab3ede3b61b5a5113951ba812fa5d67a35edc80",
+      "size": 940
+    },
+    ".opencode/scripts/__init__.py": {
+      "sha256": "a2dee2606128aa0caf92732c9d13ed8d26012d0cf522a7010a58aac8d5f205af",
+      "size": 523
+    },
+    ".opencode/scripts/data_modules/amend_proposal_schema.py": {
+      "sha256": "b56069a9b37d928077c577d6b72950b494107bdb72b61f0a203bc7af7e15367b",
+      "size": 333
+    },
+    ".opencode/scripts/data_modules/api_client.py": {
+      "sha256": "6c04beea1b69f9d667229b78dcb3056b9e0b8c2e7167f861f41f6bac9360b6ab",
+      "size": 19256
+    },
+    ".opencode/scripts/data_modules/chapter_commit_service.py": {
+      "sha256": "d156a4eef0063b905b6c6240684f8fccf514460808e88521a1fdf422a03c6ac0",
+      "size": 5715
+    },
+    ".opencode/scripts/data_modules/cli_args.py": {
+      "sha256": "4255c80565d29e0b2c7bd286c9e2047ba949dfd9126462d5d7e93bec5a105669",
+      "size": 3174
+    },
+    ".opencode/scripts/data_modules/cli_output.py": {
+      "sha256": "d9fb81d4fa1db5a71f0a1baec3a2112cc4b5e2d88624680df28cc5a21253ecba",
+      "size": 1772
+    },
+    ".opencode/scripts/data_modules/config.py": {
+      "sha256": "2a0bab88edd0b448a588a67dfe97a94d5cf57c27194f7d402ef3b1ac3e43a9e6",
+      "size": 13891
+    },
+    ".opencode/scripts/data_modules/context_manager.py": {
+      "sha256": "25dff4f62a980bf057055cbf66c70057d2cef6c5eb2bb1712b58d5d52e7340e8",
+      "size": 35805
+    },
+    ".opencode/scripts/data_modules/context_ranker.py": {
+      "sha256": "177620b788b0db0dc507c22364d3349e45afe0567d9bee47af834c72cbfeaf42",
+      "size": 8668
+    },
+    ".opencode/scripts/data_modules/context_weights.py": {
+      "sha256": "b14ddcf82d425e40d6924b6c316a6a37a4e9101a154411064990349a800fca32",
+      "size": 1429
+    },
+    ".opencode/scripts/data_modules/entity_linker.py": {
+      "sha256": "c822f74ae3d0242d2969d8b09246e944b3a39170c3ebedfac29d9e904eb1c3af",
+      "size": 9858
+    },
+    ".opencode/scripts/data_modules/event_log_store.py": {
+      "sha256": "0f4c8663c78d50f3e6662dbe3514a4d256aad2431af05516fe782680c9b2f12a",
+      "size": 6040
+    },
+    ".opencode/scripts/data_modules/event_projection_router.py": {
+      "sha256": "28d86c1c8b7d317bff7edf4ebab2dc26e3ab0f2e300bf71ba1d0b8ae757228f2",
+      "size": 1481
+    },
+    ".opencode/scripts/data_modules/genre_aliases.py": {
+      "sha256": "b9a9f61e05a2a2625e650e5296d4c8b879eba49afe3b9c9ad068dc78268830be",
+      "size": 1767
+    },
+    ".opencode/scripts/data_modules/genre_profile_builder.py": {
+      "sha256": "494ad173ba99a672a26fdd9d38a94f9466b6a92c86ad60735b54eecdb71b7fdf",
+      "size": 3110
+    },
+    ".opencode/scripts/data_modules/index_chapter_mixin.py": {
+      "sha256": "5cacac44adcdf3a04ec778d883aec9c3e4a404769940a1d9d91cd6c733831543",
+      "size": 10041
+    },
+    ".opencode/scripts/data_modules/index_debt_mixin.py": {
+      "sha256": "363031e4439e4b07cf3f9212618532c8dbd441d1752cecc665994bdd09c996b5",
+      "size": 19029
+    },
+    ".opencode/scripts/data_modules/index_entity_mixin.py": {
+      "sha256": "994a8de0a84420a19acb2b427093ce64536253943f7342b798046fcf675ebf9a",
+      "size": 39625
+    },
+    ".opencode/scripts/data_modules/index_manager.py": {
+      "sha256": "904e104bc5cdcfd69d7ba6cc2f4a29d6a18ad136b67aa6fced10ecc81aaada59",
+      "size": 57332
+    },
+    ".opencode/scripts/data_modules/index_observability_mixin.py": {
+      "sha256": "7345d0a73b1c9c07b2db9079579f5eee2a8621319afa6800ac899d10d29bf2de",
+      "size": 8292
+    },
+    ".opencode/scripts/data_modules/index_projection_writer.py": {
+      "sha256": "3a606f5ee1113afd247946480bbffe59770dc12e0c405aa0ba0a99ea180bab95",
+      "size": 16279
+    },
+    ".opencode/scripts/data_modules/index_reading_mixin.py": {
+      "sha256": "10c4d6101b97b694819cb48136c98da99a54378137d04ab5815db44fdd6049c4",
+      "size": 15232
+    },
+    ".opencode/scripts/data_modules/knowledge_query.py": {
+      "sha256": "90f19b3a6fcad21fc330f35f0fb48a05b0fd6461c7fee969817fd6594a1d4635",
+      "size": 2925
+    },
+    ".opencode/scripts/data_modules/memory_contract.py": {
+      "sha256": "34c35f2601473137510a9596a8881dcd1911b58e6c783d1839b5a9c72bb00a2f",
+      "size": 4017
+    },
+    ".opencode/scripts/data_modules/memory_contract_adapter.py": {
+      "sha256": "0de28a4fd74170d8934c86654453616108c103389b8c3a3f32d1820fec4b6535",
+      "size": 14094
+    },
+    ".opencode/scripts/data_modules/memory_projection_writer.py": {
+      "sha256": "3430de07467c4193e39427c84244c6140a0052a335b3f6cc5d31ed1dbe913047",
+      "size": 873
+    },
+    ".opencode/scripts/data_modules/migrate_state_to_sqlite.py": {
+      "sha256": "eaaad6295bead708e5941d9e04f4d7d224ad30db0f3cfc506c3048513e8992d6",
+      "size": 13081
+    },
+    ".opencode/scripts/data_modules/observability.py": {
+      "sha256": "42018ddbf787e968716eff893dc4f272fe161b3ac0cf29c4b09d646df7d47de4",
+      "size": 2447
+    },
+    ".opencode/scripts/data_modules/override_ledger_service.py": {
+      "sha256": "a713bf3b017c9075d1c3d4eb3e8903c88ef590d51bf0bec93b7d850e93d46b3b",
+      "size": 4810
+    },
+    ".opencode/scripts/data_modules/placeholder_scanner.py": {
+      "sha256": "d2b84da2c9b9964d485615a7d282923fc3d39d7b96f065fc7caccd239336e652",
+      "size": 2443
+    },
+    ".opencode/scripts/data_modules/prewrite_validator.py": {
+      "sha256": "7bfdde22e12464f63369e7b8f30024b7e2dafed2864e333fc9230060a1552093",
+      "size": 3504
+    },
+    ".opencode/scripts/data_modules/query_router.py": {
+      "sha256": "22be9689008140e232421129a55acd11a8ba3198caa51c76653dba7db30b1b70",
+      "size": 5100
+    },
+    ".opencode/scripts/data_modules/rag_adapter.py": {
+      "sha256": "14d65f856de5d087c2832103c3c92da3091cb252b0025c81cc55fb787a3b2f7f",
+      "size": 60211
+    },
+    ".opencode/scripts/data_modules/review_schema.py": {
+      "sha256": "f7c4a280e03bec1072fb0bac710e09f1186c0f109826b54f3ae32fbaa7fd8587",
+      "size": 7519
+    },
+    ".opencode/scripts/data_modules/runtime_contract_builder.py": {
+      "sha256": "ce45e2f8593a8b5f94ab45c2aec8986d5c1052a00ad2513a49677c2bb62b1355",
+      "size": 3441
+    },
+    ".opencode/scripts/data_modules/schemas.py": {
+      "sha256": "741982faad0d2ddf1763676b868490a7e4f9e8c2858b98cc8a474b7756bda49d",
+      "size": 5210
+    },
+    ".opencode/scripts/data_modules/sql_state_manager.py": {
+      "sha256": "85c5f2d77618cff441cbf0b12f0520c9ef5586e04589cf5e4f8fc76fdd9f4ad6",
+      "size": 22474
+    },
+    ".opencode/scripts/data_modules/state_manager.py": {
+      "sha256": "1d89f49127c8080416c582f8440b71dfffbf93cf1b7409c308aa8b18fa33f788",
+      "size": 62839
+    },
+    ".opencode/scripts/data_modules/state_projection_writer.py": {
+      "sha256": "668493b7c7962885533ba77b82542410bb798a869417e3150eb68c2b04d92f67",
+      "size": 12727
+    },
+    ".opencode/scripts/data_modules/state_validator.py": {
+      "sha256": "b4e0bee9753e0f80ff709a833253add5564a44a2e5521137f8f760b7e2b0c3b8",
+      "size": 8962
+    },
+    ".opencode/scripts/data_modules/story_contracts.py": {
+      "sha256": "924e1dd4a14c6f7712cfa6991518a836c8e6fe69b05eef08610c42bcc9fedf6e",
+      "size": 7291
+    },
+    ".opencode/scripts/data_modules/story_contract_schema.py": {
+      "sha256": "72bcea2e0bbfccc5fccbbc6556c564a7cc89f9d572562556022c094150fcb07d",
+      "size": 2337
+    },
+    ".opencode/scripts/data_modules/story_event_schema.py": {
+      "sha256": "a9a41e9843dd756736c3b9a864e3c96c797c4fb86503994450da345cc649c4b3",
+      "size": 670
+    },
+    ".opencode/scripts/data_modules/story_runtime_health.py": {
+      "sha256": "d82e97bc80643c6dbb31f0004836a11c2663c035c670c79ddc2f669c064fcf1f",
+      "size": 2793
+    },
+    ".opencode/scripts/data_modules/story_runtime_sources.py": {
+      "sha256": "c63d9a4ad41df499ea9c28ac4e1f7ce1d02e018c8a61f6d9b531177fb2e2fab5",
+      "size": 2999
+    },
+    ".opencode/scripts/data_modules/story_system_engine.py": {
+      "sha256": "f9ea93018ca4897ff3e433dfa6ae53f1e1f1b4f6d7094c0d5d662e8ff219064f",
+      "size": 24520
+    },
+    ".opencode/scripts/data_modules/style_sampler.py": {
+      "sha256": "8a7e844dad7fc7d407bad177189e59f1278b8aeb222912754fea65e827ad1f6c",
+      "size": 14466
+    },
+    ".opencode/scripts/data_modules/summary_projection_writer.py": {
+      "sha256": "4f64b29e7eb44ba17ae998fdf394cea10a0b81fecbc2caf81521a2df8b18d126",
+      "size": 1256
+    },
+    ".opencode/scripts/data_modules/vector_projection_writer.py": {
+      "sha256": "69931599fe2fe699466c64cd0ab0796e7e215c2117054c24fac497de81f850fc",
+      "size": 7811
+    },
+    ".opencode/scripts/data_modules/webnovel.py": {
+      "sha256": "f295418a5a2305b5973c567d3f70e1271b13d4f78026004e0ee2fbf8da338f05",
+      "size": 22757
+    },
+    ".opencode/scripts/data_modules/writing_guidance_builder.py": {
+      "sha256": "8cad40418459629ca9120fb27b3d7bdc43c83b2b7cd1cab8aba35cf3e0059f29",
+      "size": 18922
+    },
+    ".opencode/scripts/data_modules/__init__.py": {
+      "sha256": "12ea96eb41e907e58286f7091f4ef8ed56376745bbf892204249141f9047925a",
+      "size": 3797
+    },
+    ".opencode/scripts/data_modules/memory/bootstrap.py": {
+      "sha256": "13ef638c5399a44435966ebdd6880163b59b43894236619836346e771423e66f",
+      "size": 7024
+    },
+    ".opencode/scripts/data_modules/memory/budget.py": {
+      "sha256": "640a8f0fcd9c69573fc11f00d602fc7b5cb625ca8cf9a6913759cdd05d309ed9",
+      "size": 1679
+    },
+    ".opencode/scripts/data_modules/memory/compactor.py": {
+      "sha256": "0ce89e2617b69f5442973f7a9e06b0868a5e65b05bd07aa3407e2a2ebb5b92e2",
+      "size": 4467
+    },
+    ".opencode/scripts/data_modules/memory/orchestrator.py": {
+      "sha256": "dbd2e0823f88f644a96b41c7782bc74a422ece0ed2d9230bd4fdea3bf797d73b",
+      "size": 8826
+    },
+    ".opencode/scripts/data_modules/memory/schema.py": {
+      "sha256": "e103ef47496b39b751d898b560cf3f9ea544d3b849ec04f54cc00e8d338e45ba",
+      "size": 5866
+    },
+    ".opencode/scripts/data_modules/memory/store.py": {
+      "sha256": "af8e4b211e636f65715be0a1f9ea569311d258566548aa717bf31c53cc2aa124",
+      "size": 9336
+    },
+    ".opencode/scripts/data_modules/memory/writer.py": {
+      "sha256": "db0112467a5aa38ba57cb0e8b6d77a57c236646a410ed6fc0284028f18c40c29",
+      "size": 16283
+    },
+    ".opencode/scripts/data_modules/memory/__init__.py": {
+      "sha256": "055ce8dc6757fbb0fd213a77cf70bc9709a850ccbf5727ca5c35f8e29b370c22",
+      "size": 561
+    },
+    ".opencode/scripts/data_modules/tests/mock_demo.py": {
+      "sha256": "058202fe6bbb5cca7d69b0572dbe18317a9acf84b794203b9ba41df444588ae3",
+      "size": 28169
+    },
+    ".opencode/scripts/data_modules/tests/test_api_client.py": {
+      "sha256": "4282f30dac18e11b7b330b9923cf43c5e664679d501bdf0ba1fae538e0109bdb",
+      "size": 15076
+    },
+    ".opencode/scripts/data_modules/tests/test_archive_manager.py": {
+      "sha256": "eea43fe4cff4c45c6130631ae9642917bc87139499d38b9121cd1003327c158e",
+      "size": 2224
+    },
+    ".opencode/scripts/data_modules/tests/test_chapter_commit_service.py": {
+      "sha256": "0d3fe73896fced73f458c7da9be7a4cb8378087b228fa33c015436dc1c5f7bce",
+      "size": 5710
+    },
+    ".opencode/scripts/data_modules/tests/test_chapter_outline_directive.py": {
+      "sha256": "eef7226b99596163bcbcfbb4aac97b89fdacfd3175952f5f80957e480d409a97",
+      "size": 2329
+    },
+    ".opencode/scripts/data_modules/tests/test_chapter_paths.py": {
+      "sha256": "621d16f0e916103fa80f856f0292d4752e642b05d235f72da74776a04883bd20",
+      "size": 1592
+    },
+    ".opencode/scripts/data_modules/tests/test_chapter_status.py": {
+      "sha256": "0125eaa81b6f35125da354623684a8276277fd16e53eb282f65b28c9043b2c2f",
+      "size": 2724
+    },
+    ".opencode/scripts/data_modules/tests/test_config.py": {
+      "sha256": "29b0f2253a640f7a86b96689996d512b7d4c221b8722a9d009e16a53f392c0d2",
+      "size": 2018
+    },
+    ".opencode/scripts/data_modules/tests/test_context_manager.py": {
+      "sha256": "2157a2180d4480f987f35cded2ced509ac241cff74dde50d8610c6064d2688aa",
+      "size": 33181
+    },
+    ".opencode/scripts/data_modules/tests/test_context_ranker.py": {
+      "sha256": "9aabf7178674cd2cda765790edf252297ff6f2d668ef6331eadda5c3d8ee7cb2",
+      "size": 1852
+    },
+    ".opencode/scripts/data_modules/tests/test_coverage_boost.py": {
+      "sha256": "3a5a1d355c4ccd6ce4c07fea59fa6c5f5cbdd5a5f47b7502c2f9ee89f9255ed6",
+      "size": 23895
+    },
+    ".opencode/scripts/data_modules/tests/test_csv_config.py": {
+      "sha256": "d6f694814a84cc882ef0754f5d68d619b800fd53f4491dd75e0cd5def7c83466",
+      "size": 2784
+    },
+    ".opencode/scripts/data_modules/tests/test_dashboard_app.py": {
+      "sha256": "52c69eff228a905aee33a359acaa81827b9e7e0a89772dbeede30f7ef45aca19",
+      "size": 14922
+    },
+    ".opencode/scripts/data_modules/tests/test_dashboard_watcher.py": {
+      "sha256": "ad858c5c1cef444c0f037ae2027ffa3d219203c6a913c566ab289fdbb833c2e7",
+      "size": 791
+    },
+    ".opencode/scripts/data_modules/tests/test_data_modules.py": {
+      "sha256": "45ef441d2c018c7ddee0e9c610d65dcb688d15e1dbe35cdc0dfb3332502716af",
+      "size": 53208
+    },
+    ".opencode/scripts/data_modules/tests/test_entity_linker_cli.py": {
+      "sha256": "b7ce9d27ee37bb99fc9b7189200f516ed65e2a6cb814a270051897e46f33abbf",
+      "size": 2839
+    },
+    ".opencode/scripts/data_modules/tests/test_event_log_store.py": {
+      "sha256": "bbedbb382ec2b5f527013a0c96356655a1bacf7e3ccd301e23f07c23cdebae4d",
+      "size": 4132
+    },
+    ".opencode/scripts/data_modules/tests/test_event_projection_router.py": {
+      "sha256": "5ded9bb0d9e99ecd49e1f48203f25196b5f2e9b2982e64a330e94dfbae32eca7",
+      "size": 3561
+    },
+    ".opencode/scripts/data_modules/tests/test_export_manager.py": {
+      "sha256": "adb1e212b0904f5335bc099212987db9e6307c1cdfd8be27272b183ea78a30a8",
+      "size": 6383
+    },
+    ".opencode/scripts/data_modules/tests/test_extract_chapter_context.py": {
+      "sha256": "b4a81e5c614475388961e9858b7869dbe7f6096b1a1c9ff59dc99dc849fa7de7",
+      "size": 21813
+    },
+    ".opencode/scripts/data_modules/tests/test_init_project_pruning.py": {
+      "sha256": "453407cf0433acc498c4e8bf1740dd255a70f3596191f106dd48d82728833813",
+      "size": 3351
+    },
+    ".opencode/scripts/data_modules/tests/test_knowledge_query.py": {
+      "sha256": "14aa6a856422ff6115a4f20f5595740ec5f6e39e80f6cd4971ce32ef800890f9",
+      "size": 3938
+    },
+    ".opencode/scripts/data_modules/tests/test_memory_bootstrap.py": {
+      "sha256": "f44a255c4255fff8344a6d993aaafa3c7943359616921f948a37b2d0804242a3",
+      "size": 2631
+    },
+    ".opencode/scripts/data_modules/tests/test_memory_cli.py": {
+      "sha256": "c1cccf490e40faf3cb847bedf30f689634c8dd097acb38a0448a839cb549df75",
+      "size": 4781
+    },
+    ".opencode/scripts/data_modules/tests/test_memory_contract.py": {
+      "sha256": "07c66d611d4d0174601b41e873461ed17fc51d4c47c23eeb196ed1e98ad5f26a",
+      "size": 4011
+    },
+    ".opencode/scripts/data_modules/tests/test_memory_contract_adapter.py": {
+      "sha256": "1c79e639741d7d15aa0b0d03c06657a14489fe2d44da4e8081812b764c1a2c92",
+      "size": 15346
+    },
+    ".opencode/scripts/data_modules/tests/test_memory_orchestrator.py": {
+      "sha256": "cd01fbc895225f59d869ddc474f7841e8cbf1a0320cee1fa19095d683b08660d",
+      "size": 2102
+    },
+    ".opencode/scripts/data_modules/tests/test_memory_schema.py": {
+      "sha256": "3ebdf678ed560c1c31eb95729dd69349a1d8f07d5ff880163da708ea000048f8",
+      "size": 1238
+    },
+    ".opencode/scripts/data_modules/tests/test_memory_schema_compat.py": {
+      "sha256": "58f9e92fb83d91a5932f69ffa97f0500e25b1defca5ff93340e04846156b429e",
+      "size": 1331
+    },
+    ".opencode/scripts/data_modules/tests/test_memory_store.py": {
+      "sha256": "a454fbe608bbb1b4023eb0a540f99ae0d0f118d5f81e2cfe13cd213d007dd4ba",
+      "size": 5856
+    },
+    ".opencode/scripts/data_modules/tests/test_memory_writer.py": {
+      "sha256": "460c09f4a42dab4f41358cf9e1f2a1dffe27fa6690becfa88f87ce2ed7537476",
+      "size": 2371
+    },
+    ".opencode/scripts/data_modules/tests/test_migrate_state_to_sqlite.py": {
+      "sha256": "724bbebe03be7082f70af5f3a28888a753b915dc0a8b86e3735a52158b81bf83",
+      "size": 7404
+    },
+    ".opencode/scripts/data_modules/tests/test_override_ledger_service.py": {
+      "sha256": "7e372f170ec98133a053da60892c508367948f1c89e502dabf661a68710acefc",
+      "size": 2922
+    },
+    ".opencode/scripts/data_modules/tests/test_placeholder_scanner.py": {
+      "sha256": "539cf979fc67d556b240e4a31115ea5f8cba67abffd2ec79ca34106a3b56c641",
+      "size": 1751
+    },
+    ".opencode/scripts/data_modules/tests/test_prewrite_validator.py": {
+      "sha256": "f6f4df80f7de3a8139d927eba6b40ec676975bd42a761b6a3214ad668c884107",
+      "size": 3629
+    },
+    ".opencode/scripts/data_modules/tests/test_projection_schema_compat.py": {
+      "sha256": "f9089e222bd05e41cfd83672af445f40b83091de3bf90e536159ee38d63c22ee",
+      "size": 22886
+    },
+    ".opencode/scripts/data_modules/tests/test_projection_writers.py": {
+      "sha256": "56ec7473187f92f9004c3b66dd4993aac10f7c9e1e1241eaf05f885e9da2dbf3",
+      "size": 18923
+    },
+    ".opencode/scripts/data_modules/tests/test_project_locator.py": {
+      "sha256": "54bcb251d2878abdd25305b39061bcef90e4ed3cbd2266e1b72ad115c234a08c",
+      "size": 4706
+    },
+    ".opencode/scripts/data_modules/tests/test_prompt_integrity.py": {
+      "sha256": "c1d336ebe5e696a34421f0bac8307cf0147e6943f3ae31936cbd94cc11ac059e",
+      "size": 19310
+    },
+    ".opencode/scripts/data_modules/tests/test_publisher.py": {
+      "sha256": "005700879d011e66a7e6f3c2856f96279713c6a8d1a040ee9ed38e1b777302db",
+      "size": 8756
+    },
+    ".opencode/scripts/data_modules/tests/test_rag_adapter.py": {
+      "sha256": "1d5eb6a164ed9f08ed3ad8789e093e3dd5cc5410be2e9cc8567c50f8394ffaa9",
+      "size": 17732
+    },
+    ".opencode/scripts/data_modules/tests/test_reasoning_engine.py": {
+      "sha256": "212ab1cb1b723f3f81683b6b03522edceb6e3a91a70be5074dea360f2c2c2dd4",
+      "size": 7580
+    },
+    ".opencode/scripts/data_modules/tests/test_relationship_graph.py": {
+      "sha256": "655f10894619d6dd0cc08543f61d96652adc51c813d4108ca06a021c3c759268",
+      "size": 9091
+    },
+    ".opencode/scripts/data_modules/tests/test_review_schema.py": {
+      "sha256": "c6a0a10f0b3f181b11b2de3e806f50ad845bd0fbf365755f991e44df6d3c271b",
+      "size": 5858
+    },
+    ".opencode/scripts/data_modules/tests/test_runtime_contract_builder.py": {
+      "sha256": "d45ac7da78e1c57dcb76dab9e0916fd9192eb737c57347f2ff59f6395e48cc61",
+      "size": 4108
+    },
+    ".opencode/scripts/data_modules/tests/test_sql_state_manager.py": {
+      "sha256": "b1df1d1148f90ad57e631e765af1efae973465398b4edb4ff0d0dd0cf8b235fb",
+      "size": 7931
+    },
+    ".opencode/scripts/data_modules/tests/test_state_manager_extra.py": {
+      "sha256": "5d262d7b8d38efe4445a36db8dfba941f6cf63dc7e83235ff31b01ce4029a329",
+      "size": 22811
+    },
+    ".opencode/scripts/data_modules/tests/test_state_validator.py": {
+      "sha256": "8a866fed89cfdc1613a0852b61cbeeb482a0b849ffece67daa1e5582787f7349",
+      "size": 3948
+    },
+    ".opencode/scripts/data_modules/tests/test_status_reporter.py": {
+      "sha256": "78e9ce694fdf17dea532f0d2977f2b3441a0834b9dcb84480995e50a6bde09ed",
+      "size": 8632
+    },
+    ".opencode/scripts/data_modules/tests/test_story_contracts.py": {
+      "sha256": "4a7c8d2a9beee7c35abf33a1a969ade57781fdacd8455190850bb1afbcaa428c",
+      "size": 2709
+    },
+    ".opencode/scripts/data_modules/tests/test_story_contract_schema.py": {
+      "sha256": "7a31a4b55faaabbda7becc67f1ec4b6a1548c69544f8f68ce2878da199f78bc1",
+      "size": 2584
+    },
+    ".opencode/scripts/data_modules/tests/test_story_event_schema.py": {
+      "sha256": "59a33699cfb0fbfe5de713ba1679648f791e55b95f634b3ff4a265eaf68c21bc",
+      "size": 879
+    },
+    ".opencode/scripts/data_modules/tests/test_story_runtime_health.py": {
+      "sha256": "5f0d7c9610bdcbb3176d64b4a74ce4ce4c39a2d16450ba51a792cd7f50836dca",
+      "size": 2118
+    },
+    ".opencode/scripts/data_modules/tests/test_story_runtime_sources.py": {
+      "sha256": "f2157aecdf785e7e1654fa44e42aa83048c723b7746ceced64f260191f7509de",
+      "size": 2061
+    },
+    ".opencode/scripts/data_modules/tests/test_story_system_cli.py": {
+      "sha256": "445748e0b3414eb1c92537434937f20f9d007d1070dbc759efc0815bd035d5ff",
+      "size": 8170
+    },
+    ".opencode/scripts/data_modules/tests/test_story_system_engine.py": {
+      "sha256": "da1df7e50dfbef76ea03d744dba9595671880ee76fe1d573a5acffd81b59e1e8",
+      "size": 29825
+    },
+    ".opencode/scripts/data_modules/tests/test_style_sampler_cli.py": {
+      "sha256": "426b7e708610a644f364320db5e7f62df602360dd52eb33f94c757b3428d337b",
+      "size": 2745
+    },
+    ".opencode/scripts/data_modules/tests/test_update_master_outline.py": {
+      "sha256": "562cdd98edb3f42af7fcaca6954ff8416432d098c5390c0e3496220ad2ee26b4",
+      "size": 6813
+    },
+    ".opencode/scripts/data_modules/tests/test_update_state_add_review_cli.py": {
+      "sha256": "c3df21037ceba8859a0ca88bb89799bf2a879e134307818d13ba34fd0eb98972",
+      "size": 1499
+    },
+    ".opencode/scripts/data_modules/tests/test_vector_projection_writer.py": {
+      "sha256": "deb4da172775bc0d1bc226cae4cff6a0fd8c8593cc52f99ee71dc0fa365e2052",
+      "size": 4252
+    },
+    ".opencode/scripts/data_modules/tests/test_webnovel_unified_cli.py": {
+      "sha256": "26b738dcfa27bd28a7a3170aecb925e4b7262e15d92e0c64755ac5199bba1962",
+      "size": 29116
+    },
+    ".opencode/scripts/data_modules/tests/__init__.py": {
+      "sha256": "9fdc18d731e157288f24c005ef9554e1bf5a9a41b20bd856e8582fb790ac5639",
+      "size": 30
+    },
+    ".opencode/scripts/export_manager/epub.py": {
+      "sha256": "49e6dcdf6ac8642144a4bc7ccb8bbc96c69c03c9f83e5b3ac785f57b482fba87",
+      "size": 5996
+    },
+    ".opencode/scripts/export_manager/markdown.py": {
+      "sha256": "f6ef1406d7a0db090b93513e42b5f28278554635e13cabe9d303e026d9573f60",
+      "size": 648
+    },
+    ".opencode/scripts/export_manager/txt.py": {
+      "sha256": "6b8ed885ee05c7c92462760873bf29708e9d94ec7fc3f91c790658686a5bd3b2",
+      "size": 1226
+    },
+    ".opencode/scripts/export_manager/__init__.py": {
+      "sha256": "3a96b2bcdfd34c5ef10c2329ff7d3674fd4a4eee9d9b2eb3583a19b3c73e18c9",
+      "size": 6856
+    },
+    ".opencode/scripts/publisher/base.py": {
+      "sha256": "09ae17c5fe922273698e476cf89d128735c0633a40ceb7ebc928551cd984116a",
+      "size": 1031
+    },
+    ".opencode/scripts/publisher/browser.py": {
+      "sha256": "18f3e065a0c1f298d31d8a5249afa3ec0d62ed6efa296f74a2f302fb2767bc97",
+      "size": 2393
+    },
+    ".opencode/scripts/publisher/config.py": {
+      "sha256": "dbfecd778aac924e4185a87c73b2bf71e3c7dbbb3783deccf18d7a3c10e1f844",
+      "size": 1433
+    },
+    ".opencode/scripts/publisher/formatter.py": {
+      "sha256": "8e78ef4a85df89783f0f25d7185b1e007b3054ca5c1dcc4d15066c9b4c5d7f23",
+      "size": 3238
+    },
+    ".opencode/scripts/publisher/__init__.py": {
+      "sha256": "f0d196335dd43d5e8c2bbbdbf4b36fd4138d122ff425e9949b25d3355a56e683",
+      "size": 8391
+    },
+    ".opencode/scripts/publisher/adapters/fanqie.py": {
+      "sha256": "d881bbe5edd69f31411fb3c7e69922d43f22215743c4138986bf436f26694d39",
+      "size": 13062
+    },
+    ".opencode/scripts/publisher/adapters/__init__.py": {
+      "sha256": "e25f75807445d6e7961ff57d24ae44cd51d169e56ea8e30fcc55587618f59e64",
+      "size": 82
+    },
+    ".opencode/scripts/tests/test_reference_search.py": {
+      "sha256": "3e140f56555ebc76de1f0a55a833554712f4468c9cd11593f5ab01b556e7f338",
+      "size": 14753
+    },
+    ".opencode/scripts/tests/test_validate_csv.py": {
+      "sha256": "79970ea2849c5a13bb56dfca4f6900943d71782e4fdfa1c2da60515c155ba411",
+      "size": 3893
+    },
+    ".opencode/scripts/tests/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    ".opencode/scripts/tests/installer/test_check.py": {
+      "sha256": "e52d2b5fcaaef49837e89b5b178692cc71a5ea954a44a73a32b1a9e5ccf94c6d",
+      "size": 2104
+    },
+    ".opencode/scripts/tests/installer/test_deps.py": {
+      "sha256": "11f49f52d81b0bf35557a035c17ecb5c63af2a0d70883674778490818851753a",
+      "size": 1055
+    },
+    ".opencode/scripts/tests/installer/test_fetch.py": {
+      "sha256": "a0e9beafbcaa4ad985ae03c5fc5bd0ddd872e7c3dd276c08243a04129a89d22e",
+      "size": 1905
+    },
+    ".opencode/scripts/tests/installer/test_preflight.py": {
+      "sha256": "c13e031a59be842ed98182956e9bbb12ac896bada43c48011e3a37df94d3a376",
+      "size": 1753
+    },
+    ".opencode/scripts/tests/installer/test_ui.py": {
+      "sha256": "1e327cfae7e8dc002c34cbedd79b7c78be21615cdd3bd2308054233b183bf91f",
+      "size": 1446
+    },
+    ".opencode/scripts/tests/installer/test_update.py": {
+      "sha256": "a66242289a94fdd932b9e75ec6c39ce5a31f3b6133980aff58766ceafc1fe5f5",
+      "size": 2411
+    },
+    ".opencode/scripts/tests/installer/__init__.py": {
+      "sha256": "a8da9be7a8c61b69713efe7a704aacde5afdb2d328c61fa0d5ecfcfb705d40a5",
+      "size": 39
+    },
+    ".opencode/skills/webnovel-dashboard/SKILL.md": {
+      "sha256": "e1e2b0c3a80b7d83f20d48830d05cd5a51f7f4ed93bab2d09afee8d6c09e36da",
+      "size": 2776
+    },
+    ".opencode/skills/webnovel-export/SKILL.md": {
+      "sha256": "1d1dea8b3d31f306ac939a967ce1b46652a011828cd10f5dc54a7c770f076214",
+      "size": 4411
+    },
+    ".opencode/skills/webnovel-image-gen/SKILL.md": {
+      "sha256": "1568a8553cdbfc0e27c4d6eca79f64d76e3a0f115c7a7be23e279224483a8a06",
+      "size": 5264
+    },
+    ".opencode/skills/webnovel-init/SKILL.md": {
+      "sha256": "47bb3944a355b9678610dd2487c9ee967bfc2fb0b2521b8ce3b7b6eb972e07d0",
+      "size": 18956
+    },
+    ".opencode/skills/webnovel-init/references/genre-tropes.md": {
+      "sha256": "d051fd70a61543064c81ae2c2cb6d8b697ca9f1b7f5b328b65fe288f97bed974",
+      "size": 6570
+    },
+    ".opencode/skills/webnovel-init/references/system-data-flow.md": {
+      "sha256": "d90a2b0cd545b23210f796547bf28d4438f0b621a3393dd03b1044fd2260d305",
+      "size": 1223
+    },
+    ".opencode/skills/webnovel-init/references/creativity/anti-trope-game.md": {
+      "sha256": "58c0cfb3d1a83cb2214400a637de18dd82e1fbf9807176f846c144864a2ed884",
+      "size": 8818
+    },
+    ".opencode/skills/webnovel-init/references/creativity/anti-trope-rules-mystery.md": {
+      "sha256": "b21a7d90d97a69c332e61f2f019ccfac20e5272f869b3a2cd010ca77540dfe24",
+      "size": 8704
+    },
+    ".opencode/skills/webnovel-init/references/creativity/anti-trope-urban.md": {
+      "sha256": "c3505f68f2f1d8ae4429f2dcde97f46afbf236acf9cc4b5cf37b8c89ca2e51af",
+      "size": 9196
+    },
+    ".opencode/skills/webnovel-init/references/creativity/anti-trope-xianxia.md": {
+      "sha256": "819cd10f7bc188db6d5e81828e76a78878ebf33ab36cd5eaf1bef4eb245a60cd",
+      "size": 6885
+    },
+    ".opencode/skills/webnovel-init/references/creativity/category-constraint-packs.md": {
+      "sha256": "be2677b3b7d4f3387360a3d81928e053273d52a94a49a9cb8f0d3ce078cf6812",
+      "size": 12659
+    },
+    ".opencode/skills/webnovel-init/references/creativity/creative-combination.md": {
+      "sha256": "57977f1bacd61f37e8abd6e6202b9113c0e4e5227d26f73990d845836674353e",
+      "size": 15399
+    },
+    ".opencode/skills/webnovel-init/references/creativity/creativity-constraints.md": {
+      "sha256": "79e75d43e1dcda58a11ea2b4576a73f8a58af96364e4f4cc69fbe93bfec6e641",
+      "size": 10429
+    },
+    ".opencode/skills/webnovel-init/references/creativity/inspiration-collection.md": {
+      "sha256": "b2728e15df041a7d15aebcd162fd0014fd8469d7d0f6d32e49bab45394d3f08c",
+      "size": 8098
+    },
+    ".opencode/skills/webnovel-init/references/creativity/market-positioning.md": {
+      "sha256": "531f02203856f2193fc9e366cca3b7d14dfaa1a598e3e97360b0939605253f15",
+      "size": 13540
+    },
+    ".opencode/skills/webnovel-init/references/creativity/market-trends-2026.md": {
+      "sha256": "5db0a222144085f2d8dcc6686819e6e52c1c03a788f9d573e312915d9c14fac7",
+      "size": 1581
+    },
+    ".opencode/skills/webnovel-init/references/creativity/selling-points.md": {
+      "sha256": "8fc065b7458d7e87748257df8b5d85711e060a1f9a106376befc0cdd0434c282",
+      "size": 22164
+    },
+    ".opencode/skills/webnovel-init/references/worldbuilding/character-design.md": {
+      "sha256": "5771c2115c5e24a63b6424484e2a392c70bb8e65c033af413ecf6e73c4a12f43",
+      "size": 4936
+    },
+    ".opencode/skills/webnovel-init/references/worldbuilding/faction-systems.md": {
+      "sha256": "6aa8c7b04bf2a43ad10c6ec1efc93300320186824577e44fbd526189d8ef06ea",
+      "size": 6119
+    },
+    ".opencode/skills/webnovel-init/references/worldbuilding/power-systems.md": {
+      "sha256": "c76c5aa958c12eeb94eb39d89dea2b7525e110bd5b32062c1181284d288869a1",
+      "size": 5223
+    },
+    ".opencode/skills/webnovel-init/references/worldbuilding/setting-consistency.md": {
+      "sha256": "d2cb80c6148d05757643914f4cd5336428592354981e36e3ff6d99e0c1aa8d61",
+      "size": 8854
+    },
+    ".opencode/skills/webnovel-init/references/worldbuilding/world-rules.md": {
+      "sha256": "9048bdd23a286cece68238c3c7fac3956ebc40dc30c67a23ad795e5f924c0c4c",
+      "size": 3517
+    },
+    ".opencode/skills/webnovel-learn/SKILL.md": {
+      "sha256": "1a8ca64ed7e63e04700e8bf564f93f51463d25b18628e69213b270aa6e609d11",
+      "size": 2837
+    },
+    ".opencode/skills/webnovel-plan/SKILL.md": {
+      "sha256": "6a227bb10d009071fd1a206d30c7505a0ea2c73fccc20401ae66ee5eb3fa709c",
+      "size": 14281
+    },
+    ".opencode/skills/webnovel-plan/references/outlining/chapter-planning.md": {
+      "sha256": "0525cc351c20b196345b8fea59d0ee9ae96c89243a11c0dcf2b6e546133b1034",
+      "size": 9339
+    },
+    ".opencode/skills/webnovel-plan/references/outlining/conflict-design.md": {
+      "sha256": "90b7be79ee171ce9dfb16601cd9be90f53fcadcf18e6803f914c61b660ae6d32",
+      "size": 8972
+    },
+    ".opencode/skills/webnovel-plan/references/outlining/genre-volume-pacing.md": {
+      "sha256": "94924c339824305561ea1b43a8278acc8fd23233fdeb2e7df58e5f434b5a317c",
+      "size": 3091
+    },
+    ".opencode/skills/webnovel-plan/references/outlining/outline-structure.md": {
+      "sha256": "1a6636d3886e3f6b37d054dd17bf27b38502d82989685f80fafe8ca69d82e451",
+      "size": 8344
+    },
+    ".opencode/skills/webnovel-plan/references/outlining/plot-frameworks.md": {
+      "sha256": "75960d479d13b87a737e3258d70890ca4818d853842d456536caa3c8763bd41d",
+      "size": 7933
+    },
+    ".opencode/skills/webnovel-publish/SKILL.md": {
+      "sha256": "082baae44bb45c5bbf83a25e7a8255fcecbf60436643f9d2393f5f850e47c21a",
+      "size": 2884
+    },
+    ".opencode/skills/webnovel-query/SKILL.md": {
+      "sha256": "b040723a731feb829c9fe94a284d7af164853d8c25e417b016a7a3983cab8d1d",
+      "size": 4972
+    },
+    ".opencode/skills/webnovel-query/references/system-data-flow.md": {
+      "sha256": "b9f3eb357278b8469dba767ca3503081aae29c5dad08de168fa658c43c1cc46c",
+      "size": 11320
+    },
+    ".opencode/skills/webnovel-query/references/tag-specification.md": {
+      "sha256": "24a7916c8a1a514d28bd0c19dd681da3961331a6c15432d53eaa39b99c5d88bd",
+      "size": 5545
+    },
+    ".opencode/skills/webnovel-query/references/advanced/foreshadowing.md": {
+      "sha256": "ea00c15991043c509bcfd7089c12d40e024c70b40627e2e26de2a5f896f01f0d",
+      "size": 3772
+    },
+    ".opencode/skills/webnovel-review/SKILL.md": {
+      "sha256": "9461ec376a2e5b12bdfae867f141770d0d413c22a2b26837efd572a8aaba46c5",
+      "size": 6502
+    },
+    ".opencode/skills/webnovel-review/evals/evals.json": {
+      "sha256": "21c6e5d9385300065eb30937cd0385bfcb603052e0c4a45cd728780fcb3cbf3b",
+      "size": 970
+    },
+    ".opencode/skills/webnovel-review/references/common-mistakes.md": {
+      "sha256": "5c8f590cb58907ae98d69ae53b68bfc4db64f8ff3e30fd1f80975f43a12163e2",
+      "size": 2795
+    },
+    ".opencode/skills/webnovel-review/references/pacing-control.md": {
+      "sha256": "535070365349c7b6a8b619d44700df77dc1e0fca577f5dab614fda2186f871c8",
+      "size": 4310
+    },
+    ".opencode/skills/webnovel-write/SKILL.md": {
+      "sha256": "16ac251ded00f728b9a69755b47bc803cc04c828edd378fdfc0d395e0ab21c82",
+      "size": 8238
+    },
+    ".opencode/skills/webnovel-write/evals/evals.json": {
+      "sha256": "4e3a05a9d8be0359e356226f88a19fdfb62340a4464f5c18999e7dedb0016be5",
+      "size": 3170
+    },
+    ".opencode/skills/webnovel-write/references/anti-ai-guide.md": {
+      "sha256": "ebc458fc501cc33b3fb6c784ec5988c1b9e1ec6c87040736a1ed72d3334c184e",
+      "size": 4151
+    },
+    ".opencode/skills/webnovel-write/references/polish-guide.md": {
+      "sha256": "f0922725ac159600548b92fa0b68ad20657b0873c6a4677af0ad4e28d7593b78",
+      "size": 17049
+    },
+    ".opencode/skills/webnovel-write/references/style-adapter.md": {
+      "sha256": "82e9c591d2366c5722f0cebed4fd6cf7f6819ae1a0d06c769be087c633f07a7e",
+      "size": 3730
+    },
+    ".opencode/skills/webnovel-write/references/style-variants.md": {
+      "sha256": "518cfe39b2fe8d93b4ad1f79b4b23e289f6ca8bfe8dbac2a574c919d211bcc55",
+      "size": 1814
+    },
+    ".opencode/skills/webnovel-write/references/writing/combat-scenes.md": {
+      "sha256": "a0e4b3c5065678811cb8fd22ab59c2def2498a0a44ca441642817e7f39a9b63f",
+      "size": 6786
+    },
+    ".opencode/skills/webnovel-write/references/writing/desire-description.md": {
+      "sha256": "4cd5e5f0534564f9654c2e14bd797243c03a42081f6049ea0480a704ac85239b",
+      "size": 7439
+    },
+    ".opencode/skills/webnovel-write/references/writing/dialogue-writing.md": {
+      "sha256": "670740948628669bee681da28a02e89a60bee9e6ed4fcc00f8aada645cbec506",
+      "size": 6015
+    },
+    ".opencode/skills/webnovel-write/references/writing/emotion-psychology.md": {
+      "sha256": "8ccd3ee44b144c7b2d9903c6d938a8c0cc323fa28c8e8aba7b1583fbb48fa708",
+      "size": 7870
+    },
+    ".opencode/skills/webnovel-write/references/writing/genre-hook-payoff-library.md": {
+      "sha256": "e2f4bdca92a408b2d74e6866279d32c359b558e5ea07f4de760975ffaaa456c7",
+      "size": 3239
+    },
+    ".opencode/skills/webnovel-write/references/writing/scene-description.md": {
+      "sha256": "69ddce66503e6ad0cf115e26c98e3616623046da8296d74a90c24a9d608f1732",
+      "size": 7601
+    },
+    ".opencode/skills/webnovel-write/references/writing/typesetting.md": {
+      "sha256": "1c6cc55d2575b56921addd72b3510c9bcef463b0bf969b33a89fdf93de538c6c",
+      "size": 2826
+    },
+    ".opencode/skills/webnovel-write-batch/SKILL.md": {
+      "sha256": "f66325d5c6a10a78f9f6f79a73a69a9c6e6f37c23f488bc327ea10595c2b2ba0",
+      "size": 15509
+    },
+    ".opencode/skills/webnovel-write-batch/references/batch-protocol.md": {
+      "sha256": "71a4a57263a69267bb80857d734eea64f3d79322bfe8c6a3331a96540c3167d2",
+      "size": 10711
+    },
+    ".opencode/templates/golden-finger-templates.md": {
+      "sha256": "b7772976d9ef982c4e845cf2a1d84bf5d9660d898c27bf5eae44dcd932ece39c",
+      "size": 17241
+    },
+    ".opencode/templates/genres/修仙.md": {
+      "sha256": "9c8485cb019beb0f3b250f86df5061d1af764a70944962670c50b4267ee75758",
+      "size": 4292
+    },
+    ".opencode/templates/genres/克苏鲁.md": {
+      "sha256": "8768148ba6b886dd7e315a28aa5651838c0c2e262d9fe020d480dff3e06f8ab7",
+      "size": 3804
+    },
+    ".opencode/templates/genres/历史古代.md": {
+      "sha256": "01dd55c439733aae451ceff0114cf2aaecb1433b8cdefaf46f27f661b5d7e3e5",
+      "size": 6273
+    },
+    ".opencode/templates/genres/历史脑洞.md": {
+      "sha256": "20a728f39403ffc4096cd925fcddbb704d3ffb7c9751ac8f402c15768e2e6fdd",
+      "size": 6611
+    },
+    ".opencode/templates/genres/古言.md": {
+      "sha256": "ff78bad8d96392d5aee2a69276457379d68d5a4404286a7c512124383bb83792",
+      "size": 6511
+    },
+    ".opencode/templates/genres/多子多福.md": {
+      "sha256": "deaec1c6bfecb67cbce02ba664cc6f956ea5da6493977c0ba31a957369d361b3",
+      "size": 5356
+    },
+    ".opencode/templates/genres/女频悬疑.md": {
+      "sha256": "deb75be9fd662af89ef39830bfea9ec1ce6df556655af483f2ab303f55072848",
+      "size": 6535
+    },
+    ".opencode/templates/genres/宫斗宅斗.md": {
+      "sha256": "13b7b2028d1ba212fa9fa4067fc017d51c1df1ef6dd9006b42b36ef6967e4f58",
+      "size": 6064
+    },
+    ".opencode/templates/genres/年代.md": {
+      "sha256": "e12eab5e2a99e9e1d094ae0375ddd84df35781781bd2344a29b75bbc0c7e5180",
+      "size": 5952
+    },
+    ".opencode/templates/genres/幻想言情.md": {
+      "sha256": "6e79a2fe101f4773f0f82ca79d17cd7aea8542053713e33016dd55e0190e1aa2",
+      "size": 6220
+    },
+    ".opencode/templates/genres/悬疑灵异.md": {
+      "sha256": "87959deb22c1873c82bfda4a2c91b1db021b4e01c9f933198fb2fa61dcd8b72a",
+      "size": 5696
+    },
+    ".opencode/templates/genres/悬疑脑洞.md": {
+      "sha256": "be1fa7922587f3e17264f68f528cb3d5f64e2c881e09ca1de02c6303c53866c1",
+      "size": 6475
+    },
+    ".opencode/templates/genres/抗战谍战.md": {
+      "sha256": "b1b17b393fa7fb4003309594c9f385a602ec0261c860992c1c806b292dd3018e",
+      "size": 6069
+    },
+    ".opencode/templates/genres/无限流.md": {
+      "sha256": "f3385543ca1e243c04bb1bac5da9f93651ad869c509e5e12c5c6f52c818b4665",
+      "size": 6963
+    },
+    ".opencode/templates/genres/替身文.md": {
+      "sha256": "c6828a4de8aae0be577a9d5453537c41dbc0bbb7d15b8c2f0f56d9a0a910ed89",
+      "size": 3722
+    },
+    ".opencode/templates/genres/末世.md": {
+      "sha256": "4953debe35c43f708beb0746d915a0c30d47e6216c96568601520220f308b24c",
+      "size": 6931
+    },
+    ".opencode/templates/genres/民国言情.md": {
+      "sha256": "7bd4ebe82209ba81463fac852bbddb0e83b1272efe3e22a24ee4aa5477472cda",
+      "size": 6208
+    },
+    ".opencode/templates/genres/游戏体育.md": {
+      "sha256": "ae37f3f2f4f0818c48c7747c38017506a716a7b0f33b86c55a6f57351fa20812",
+      "size": 6052
+    },
+    ".opencode/templates/genres/狗血言情.md": {
+      "sha256": "7d5be41502376e90249f8d981530ecac1b615fb9de32c7e9130a5899a7a88784",
+      "size": 5388
+    },
+    ".opencode/templates/genres/现实题材.md": {
+      "sha256": "f24c7edfd6a94024a3e4f1607094e22b0d32d431fb55f1002d37916e3ebbc5d7",
+      "size": 6430
+    },
+    ".opencode/templates/genres/现言脑洞.md": {
+      "sha256": "f1f02665d12825c37f01c119fea3c916ed67ae1ae83d1131d8e71749ca191054",
+      "size": 6570
+    },
+    ".opencode/templates/genres/电竞.md": {
+      "sha256": "d8f267e1be630afc42672e329271b723580a962813bc70bceda281f8a06b8dc6",
+      "size": 4034
+    },
+    ".opencode/templates/genres/直播文.md": {
+      "sha256": "f6821570aa2ff99a8f34158d571720983217aaeade16463d38877ad2c1c91af7",
+      "size": 4010
+    },
+    ".opencode/templates/genres/知乎短篇.md": {
+      "sha256": "fb9446b2203f175c745ef737f9ad98b5231c403c277689051c0794d8bb9772e3",
+      "size": 6268
+    },
+    ".opencode/templates/genres/种田.md": {
+      "sha256": "668273209f9accf9c44c382b098a38d26485160c1a9b00a41d9a8ae29114a180",
+      "size": 8635
+    },
+    ".opencode/templates/genres/科幻.md": {
+      "sha256": "b976a7013dacadd357a7377f751949254ec039da808c6be6be2f94ebeef1b94a",
+      "size": 6724
+    },
+    ".opencode/templates/genres/系统流.md": {
+      "sha256": "575ff0ffba8256eda7877e8639eff1603b2d73dcc828e49a15dc6ecd3f9d19c5",
+      "size": 4099
+    },
+    ".opencode/templates/genres/职场婚恋.md": {
+      "sha256": "9aabc0f64414fac722bdf44972d8f466d1cca8cbf2649d74a61fb2d5df57e845",
+      "size": 6407
+    },
+    ".opencode/templates/genres/西幻.md": {
+      "sha256": "4f8af22ccbd3dd6c62a255426f1e1dc3c283a90100a4360be9380d61a4016a6e",
+      "size": 6964
+    },
+    ".opencode/templates/genres/规则怪谈.md": {
+      "sha256": "740543600272dc3c990df8d556e76b9d0e02161fdf7c44c88b779bd44ac9e83d",
+      "size": 7913
+    },
+    ".opencode/templates/genres/豪门总裁.md": {
+      "sha256": "664433a663d29521f976c0dfcf4d99834df626277f219750a0a936f6d08fdbcb",
+      "size": 5840
+    },
+    ".opencode/templates/genres/都市异能.md": {
+      "sha256": "1b427160d19c91a3ce1f17fd0ead37a8b57c17bc7b95028d8235461efc55438d",
+      "size": 4159
+    },
+    ".opencode/templates/genres/都市日常.md": {
+      "sha256": "7f1e09a47c88eee8942f8f4f2bac444ce1d27ccab34524a044c00d756bf700c2",
+      "size": 5718
+    },
+    ".opencode/templates/genres/都市脑洞.md": {
+      "sha256": "ed7159641f3bf5ce19f4152810a39daf4e38896805c1baad30f13d2c94f18510",
+      "size": 6650
+    },
+    ".opencode/templates/genres/青春甜宠.md": {
+      "sha256": "41356a86f3348e7183d5da74a1cff068580f86f513c6bb9853ae42e01dba584f",
+      "size": 6128
+    },
+    ".opencode/templates/genres/高武.md": {
+      "sha256": "a9fd10c4537e59ca9cb7aab2b674989a718162b519a5b834561ef5eee594b40d",
+      "size": 6138
+    },
+    ".opencode/templates/genres/黑暗题材.md": {
+      "sha256": "b4ee5f7532a10964e0c7c7754d3db83c69f0557cd858cdf23dbdae1eb0aeeb66",
+      "size": 5258
+    },
+    ".opencode/templates/output/index-schema.md": {
+      "sha256": "27ddc93697dd747613e0b8f9de4c948f1fd8322cc2746dba2e29bcc0c217e591",
+      "size": 1609
+    },
+    ".opencode/templates/output/state-schema.md": {
+      "sha256": "fc7c6ad51ef0cbce4a43b5e1680c5ad91fadbec2c0f8f00cda92a25e12097c1a",
+      "size": 1827
+    },
+    ".opencode/templates/output/复合题材-融合逻辑.md": {
+      "sha256": "2f478447cdc3dd5cc728297eb0297277ade04cb52f747a850b2254846dbd7f85",
+      "size": 716
+    },
+    ".opencode/templates/output/大纲-卷时间线.md": {
+      "sha256": "50c45f6ee288cf8c13df623aa6909b1ecfddd9f8494e6d6ce20f0e8c12216261",
+      "size": 2042
+    },
+    ".opencode/templates/output/大纲-卷节拍表.md": {
+      "sha256": "a7b2c12cc9be1f6e2c2b9b75e68b075f552805d9d03309e99bd63d6e3401bc87",
+      "size": 1313
+    },
+    ".opencode/templates/output/大纲-总纲.md": {
+      "sha256": "1d2f33f64958cf473aa0ed60e04937e83a74d7d24d01750995b7de67c11bbb32",
+      "size": 1114
+    },
+    ".opencode/templates/output/设定集-世界观.md": {
+      "sha256": "2fb7db61666c4b8c5ef8908cb2be4ba1492a3892b43cccfd423d61f66c24619e",
+      "size": 1747
+    },
+    ".opencode/templates/output/设定集-主角卡.md": {
+      "sha256": "78e31c36cab912ef4d2bb5dd40ad218e6cd9d8d0cbc36ef796ccddc3d8a6aa5e",
+      "size": 1114
+    },
+    ".opencode/templates/output/设定集-主角组.md": {
+      "sha256": "4b4e4bbc4de007ac084d9fb86a0546efe36900ae5d7eefe7c3b7ed95643184ac",
+      "size": 736
+    },
+    ".opencode/templates/output/设定集-力量体系.md": {
+      "sha256": "7d2d6bb58a9c1a617c8234970ad90ff6e33bfbb61c0eab271526f4ef7467883a",
+      "size": 1473
+    },
+    ".opencode/templates/output/设定集-反派设计.md": {
+      "sha256": "9ca4c6df8176b149f5ec7e5d25cf44b5fbb915695e373647893fad76c2424561",
+      "size": 988
+    },
+    ".opencode/templates/output/设定集-女主卡.md": {
+      "sha256": "662c4410832099371490e1c2690e824990b62f855456cf5d2d26a286f30b07e9",
+      "size": 927
+    },
+    ".opencode/templates/output/设定集-金手指.md": {
+      "sha256": "a51866008e99b4c5ceeb45ce3f3d8df5d5f85ba3f03621e87dd2aa18cf17d9ef",
+      "size": 1059
+    }
+  }
+}
