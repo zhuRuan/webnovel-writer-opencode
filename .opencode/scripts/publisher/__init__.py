@@ -2,10 +2,10 @@
 """小说自动发布 — CLI 入口。
 
 用法:
-  python publisher/__init__.py setup-auth --platform fanqie
-  python publisher/__init__.py list-books --platform fanqie
-  python publisher/__init__.py create-book --platform fanqie --project-root <path>
-  python publisher/__init__.py upload --platform fanqie --book-id <id> --range 1-50
+  python publisher/__init__.py --project-root <path> setup-auth --platform fanqie
+  python publisher/__init__.py --project-root <path> list-books --platform fanqie
+  python publisher/__init__.py --project-root <path> create-book --platform fanqie
+  python publisher/__init__.py --project-root <path> upload --platform fanqie --book-id <id>
 """
 from __future__ import annotations
 
@@ -14,7 +14,12 @@ import asyncio
 import sys
 from pathlib import Path
 
-from .adapters.fanqie import FanqieAdapter
+# subprocess 运行时 scripts/ 不在 Python path 中，确保绝对导入可用
+_scripts_root = Path(__file__).resolve().parent.parent
+if str(_scripts_root) not in sys.path:
+    sys.path.insert(0, str(_scripts_root))
+
+from publisher.adapters.fanqie import FanqieAdapter
 
 REGISTRY: dict[str, type] = {
     "fanqie": FanqieAdapter,
@@ -30,7 +35,7 @@ def _get_adapter(platform: str):
 
 
 async def _cmd_setup_auth(args: argparse.Namespace):
-    from .browser import Browser
+    from publisher.browser import Browser
     adapter = _get_adapter(args.platform)
     browser = Browser(headless=False, platform=args.platform)
     page = await browser.start()
@@ -47,7 +52,7 @@ async def _cmd_setup_auth(args: argparse.Namespace):
 
 
 async def _cmd_list_books(args: argparse.Namespace):
-    from .browser import Browser
+    from publisher.browser import Browser
     adapter = _get_adapter(args.platform)
     browser = Browser(platform=args.platform)
     page = await browser.start()
@@ -63,8 +68,8 @@ async def _cmd_list_books(args: argparse.Namespace):
 
 
 async def _cmd_create_book(args: argparse.Namespace):
-    from .browser import Browser
-    from .base import BookMeta
+    from publisher.browser import Browser
+    from publisher.base import BookMeta
     adapter = _get_adapter(args.platform)
     project_root = Path(args.project_root).expanduser().resolve()
     meta = _read_book_meta(project_root)
@@ -82,10 +87,10 @@ async def _cmd_create_book(args: argparse.Namespace):
 
 
 async def _cmd_upload(args: argparse.Namespace):
-    from .browser import Browser
-    from .base import Chapter
-    from .config import PublishConfig, load_upload_log, save_upload_log
-    from .formatter import format_for_platform
+    from publisher.browser import Browser
+    from publisher.base import Chapter
+    from publisher.config import PublishConfig, load_upload_log, save_upload_log
+    from publisher.formatter import format_for_platform
 
     adapter = _get_adapter(args.platform)
     cfg = PublishConfig(mode=args.mode)
@@ -140,7 +145,7 @@ async def _cmd_upload(args: argparse.Namespace):
 
 
 def _read_book_meta(project_root: Path):
-    from .base import BookMeta
+    from publisher.base import BookMeta
     import json
     state_file = project_root / ".webnovel" / "state.json"
     meta = BookMeta(title="", genre="", synopsis="", protagonist="")
@@ -202,6 +207,8 @@ def _find_chapter_file(project_root: Path, index: int) -> Path | None:
 
 def main():
     parser = argparse.ArgumentParser(description="小说自动发布")
+    parser.add_argument("--project-root", type=Path, default=Path("."),
+                        help="书项目根目录")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_setup = sub.add_parser("setup-auth", help="引导登录指定平台")
@@ -213,8 +220,6 @@ def main():
 
     p_create = sub.add_parser("create-book", help="创建新书")
     p_create.add_argument("--platform", required=True, help="平台名称")
-    p_create.add_argument("--project-root", default=".",
-                          help="书项目目录")
 
     p_upload = sub.add_parser("upload", help="上传章节")
     p_upload.add_argument("--platform", required=True, help="平台名称")
@@ -222,8 +227,6 @@ def main():
     p_upload.add_argument("--range", default="all", help="章节范围")
     p_upload.add_argument("--mode", default="draft",
                           help="发布模式 (draft|publish)")
-    p_upload.add_argument("--project-root", default=".",
-                          help="书项目目录")
 
     args = parser.parse_args()
 
