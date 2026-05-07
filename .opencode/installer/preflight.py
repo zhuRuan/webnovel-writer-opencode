@@ -175,9 +175,11 @@ def _write_installed_version():
     import urllib.request
     try:
         with urllib.request.urlopen(MANIFEST_URL, timeout=10) as resp:
-            manifest = json.loads(resp.read())
+            text = resp.read().decode("utf-8", errors="replace")
+            manifest = json.loads(text)
         version = manifest.get("version", "unknown")
-    except Exception:
+    except Exception as e:
+        warn(f"Could not determine version: {e}")
         version = "unknown"
 
     vf = Path(".opencode") / "version.json"
