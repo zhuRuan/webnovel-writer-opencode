@@ -95,6 +95,16 @@ fi
 
 ---
 
+## 批前一次性验证
+
+在进入逐章循环前执行一次 preflight，后续各章不再重复。
+
+```bash
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" preflight
+```
+
+---
+
 ## 逐章循环
 
 > **每章 = webnovel-write 完整流程。不简化、不跳步、不合步。**
@@ -102,11 +112,9 @@ fi
 ### Step 0: 环境变量验证（每章开始前强制）
 
 ```bash
-# 验证关键变量已设置且目录存在
 test -n "$PROJECT_ROOT" || { echo "❌ PROJECT_ROOT 未设置"; exit 1; }
 test -n "$SCRIPTS_DIR" || { echo "❌ SCRIPTS_DIR 未设置"; exit 1; }
 test -d "$PROJECT_ROOT" || { echo "❌ PROJECT_ROOT 目录不存在: $PROJECT_ROOT"; exit 1; }
-# 确认 .webnovel 在 PROJECT_ROOT 内（防止写到父目录）
 test -d "${PROJECT_ROOT}/.webnovel" || { echo "❌ ${PROJECT_ROOT}/.webnovel 不存在，PROJECT_ROOT 可能不正确"; exit 1; }
 echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 ```
@@ -115,7 +123,7 @@ echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 > ```
 > □ 0. 环境变量验证
 > □ A. 上章完整性检查（N > S 时）
-> □ 1. 预检 + 刷新合同树
+> □ 1. 刷新合同树
 > □ 2. context-agent → 写作任务书
 > □ 3. 起草正文（2000-2500字）
 > □ 4. 审查（reviewer Agent + review-pipeline）
@@ -152,11 +160,9 @@ fi
 
 ---
 
-### Step 1: 预检 + 刷新合同树
+### Step 1: 刷新合同树
 
 ```bash
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" preflight
-
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" placeholder-scan --format text
 ```
 
@@ -165,7 +171,7 @@ genre 从 `.webnovel/state.json` 的初始化配置快照读取。调用 story-s
 ```bash
 GENRE="$(python -X utf8 -c "import json,sys; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json',encoding='utf-8')); print(s.get('project',{}).get('genre',''))")"
 
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" \
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
   story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --chapter {N} --persist --emit-runtime-contracts --format both
 ```
 
@@ -350,25 +356,30 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" bac
 ### Step B: 更新 batch_state
 
 ```bash
-SCORE=$(python -c "import json; print(json.load(open('${PROJECT_ROOT}/.webnovel/tmp/review_results.json')).get('score',0))")
-
 python -c "
-import json, pathlib, datetime
+import json, pathlib, datetime, os
+
+# 1) 读取审查得分
+review_path = os.path.join('${PROJECT_ROOT}', '.webnovel', 'tmp', 'review_results.json')
+score = json.load(open(review_path)).get('score', 0)
+
+# 2) 更新 batch_state
 p = pathlib.Path('$BATCH_STATE')
 s = json.loads(p.read_text())
 s['completed_chapters'].append($N)
 s['current_chapter'] = $N + 1
 s['chapter_results'][str($N)] = {
     'status': 'success',
-    'score': $SCORE,
+    'score': score,
     'words': $WORDS,
     'completed_at': datetime.datetime.utcnow().isoformat() + 'Z'
 }
 p.write_text(json.dumps(s, ensure_ascii=False, indent=2))
-"
 
-# 验证写入
-python -c "import json; s=json.load(open('$BATCH_STATE')); assert $N in s['completed_chapters'], '写入验证失败'; print('✅ batch_state 已验证')"
+# 3) 验证写入
+assert $N in s['completed_chapters'], '写入验证失败'
+print('✅ batch_state 已验证')
+"
 ```
 
 更新失败→重试 3 次。仍失败→停止。
@@ -442,7 +453,8 @@ python -c "import json; s=json.load(open('$BATCH_STATE')); assert $N in s['compl
 |------|------|------|
 | 环境变量未设置/PROJECT_ROOT 错误 | 立即停止 | 阻断 |
 | 上章完整性失败 | 立即停止 | 阻断 |
-| preflight/合同树失败 | 检查缺失文件→修复→重试1次→停止 | 阻断 |
+| preflight 失败（批前） | 修复环境→重试1次→停止 | 阻断 |
+| 合同树刷新失败 | 检查缺失文件→修复→重试1次→停止 | 阻断 |
 | context-agent 失败 | 重试1次→停止 | 阻断 |
 | 字数不足 | 补充→重检 | 章内 |
 | reviewer blocking(1-2轮) | 修→审（Agent + pipeline） | 章内 |

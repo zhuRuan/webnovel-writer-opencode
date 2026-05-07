@@ -48,15 +48,12 @@ export WORKSPACE_ROOT="${PWD}"
 export SCRIPTS_DIR="${PWD}/.opencode/scripts"
 export SKILL_ROOT="${PWD}/.opencode/skills/webnovel-write"
 
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" preflight
+# 先解析 PROJECT_ROOT（避免 preflight 内部重复解析）
 export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
-
-# 验证 PROJECT_ROOT 解析正确（防止写到错误位置）
-test -n "$PROJECT_ROOT" || { echo "❌ PROJECT_ROOT 为空，where 命令可能失败"; exit 1; }
-test -d "$PROJECT_ROOT" || { echo "❌ PROJECT_ROOT 目录不存在: $PROJECT_ROOT"; exit 1; }
-test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "❌ ${PROJECT_ROOT}/.webnovel/state.json 不存在，PROJECT_ROOT 解析错误"; exit 1; }
+test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "❌ PROJECT_ROOT 解析失败"; exit 1; }
 echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" preflight
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" placeholder-scan --format text
 ```
 
