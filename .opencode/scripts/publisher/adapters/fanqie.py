@@ -1,128 +1,332 @@
 # .opencode/scripts/publisher/adapters/fanqie.py
 """番茄小说平台适配器。
 
-番茄没有公开的 Writer API，所有操作（登录、创建书、上传章节）均通过
-浏览器自动化完成。CSS 选择器和页面 URL 需在能访问番茄后台时实地验证。
+通过 page.evaluate(fetch) 调用番茄作家后台内部 API。所有请求在浏览器
+JS 上下文中执行，自动携带 Cookie 和浏览器指纹。
+
+API 逆向自 fanqienovel.com JS bundle, 2026-02。
 """
 from __future__ import annotations
 
+import json
+import logging
+import re
+from typing import Optional
+
 from publisher.base import BasePlatform, BookMeta, Chapter, UploadResult
+
+logger = logging.getLogger(__name__)
+
+BASE_URL = "https://fanqienovel.com"
+_COMMON_PARAMS = "aid=2503&app_name=muye_novel"
+
+# 女频 genres (gender=0)，其余为男频 (gender=1)
+_FEMALE_GENRES = {"言情", "女频", "现代言情", "古代言情", "仙侠言情", "豪门", "穿越", "宫斗"}
+
+
+def _text_to_html(text: str) -> str:
+    """将纯文本转为 HTML 段落，每段包裹在 <p> 标签中。"""
+    paragraphs = [line.strip() for line in text.splitlines() if line.strip()]
+    return "".join(f"<p>{p}</p>" for p in paragraphs)
+
+
+def _clean_protagonist_name(name: str) -> str:
+    """去除主角名中的注释和斜杠别名，截断到 20 字。"""
+    name = re.sub(r"[（(][^)）]*[)）]", "", name)
+    name = name.split("/")[0].strip()
+    return name[:20]
+
+
+async def _page_fetch(
+    page,
+    method: str,
+    path: str,
+    form: Optional[dict] = None,
+    params: Optional[dict] = None,
+) -> object:
+    """通过 page.evaluate 在浏览器内执行 fetch，返回 JSON 的 data 字段。"""
+    url = f"{BASE_URL}{path}?{_COMMON_PARAMS}"
+    if params:
+        for k, v in params.items():
+            url += f"&{k}={v}"
+
+    form_json = json.dumps(form, ensure_ascii=False) if form else ""
+
+    result = await page.evaluate(
+        """async ([url, method, formJson]) => {
+            try {
+                const opts = { method, credentials: 'include' };
+                if (formJson) {
+                    const obj = JSON.parse(formJson);
+                    opts.body = new URLSearchParams(obj).toString();
+                    opts.headers = {
+                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                    };
+                }
+                const resp = await fetch(url, opts);
+                const text = await resp.text();
+                return { ok: true, status: resp.status, body: text };
+            } catch (e) {
+                return { ok: false, error: String(e) };
+            }
+        }""",
+        [url, method, form_json],
+    )
+
+    if not result.get("ok"):
+        raise RuntimeError(f"fetch error: {result.get('error')}")
+
+    raw = result.get("body", "")
+    if not raw:
+        raise RuntimeError(f"API {path} returned empty response")
+
+    try:
+        body = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"API {path} returned non-JSON: {raw[:200]}") from exc
+
+    if body.get("code") != 0:
+        raise RuntimeError(
+            f"API {path} failed: {body.get('message', 'unknown')}"
+        )
+
+    data = body.get("data")
+    return data if data is not None else {}
+
+
+def _find_category_id(categories: list[dict], genre: str) -> int:
+    """在分类列表中匹配最佳 category_id。"""
+    for cat in categories:
+        name = cat.get("name") or cat.get("category_name", "")
+        if name == genre:
+            return int(cat["category_id"])
+    for cat in categories:
+        name = cat.get("name") or cat.get("category_name", "")
+        if genre in name or name in genre:
+            return int(cat["category_id"])
+    if categories:
+        logger.warning("No category match for '%s', fallback to %s", genre, categories[0])
+        return int(categories[0]["category_id"])
+    return 0
+
+
+def _find_label_ids(labels: list[dict], genre: str, max_count: int = 4) -> list[str]:
+    """在标签列表中匹配 genre 相关的 label_id。"""
+    def get_name(lb: dict) -> str:
+        return lb.get("label_name") or lb.get("name", "")
+    def get_id(lb: dict) -> str:
+        v = lb.get("label_id") or lb.get("id") or lb.get("category_id")
+        return str(v) if v else ""
+
+    selected: list[str] = []
+    genre_chars = set(genre.replace(" ", ""))
+    for label in labels:
+        name = get_name(label)
+        lid = get_id(label)
+        if not name or not lid:
+            continue
+        if any(ch in name for ch in genre_chars) or name in genre:
+            selected.append(lid)
+        if len(selected) >= max_count:
+            break
+
+    if not selected and labels:
+        selected = [get_id(l) for l in labels[:2] if get_id(l)]
+    return selected
 
 
 class FanqieAdapter(BasePlatform):
     name = "fanqie"
     display_name = "番茄小说"
-    login_url = "https://fanqienovel.com/main/writer/login?enter_from=author_zone"
+    login_url = "https://fanqienovel.com/main/writer/?enter_from=author_zone"
 
     # ── 认证 ─────────────────────────────────────────────
 
     async def setup_auth(self, page) -> bool:
-        """打开登录页，等待用户扫码。超时 3 分钟。"""
-        await page.goto(self.login_url, wait_until="networkidle")
+        """打开作家后台，等待用户登录完成。"""
+        await page.goto(self.login_url, wait_until="commit", timeout=60_000)
         try:
-            await page.wait_for_url(
-                "**/fanqienovel.com/writer/**",
-                timeout=180_000,
-            )
-            return True
+            await page.wait_for_load_state("networkidle", timeout=15_000)
         except Exception:
+            pass
+
+        if self._is_writer_url(page.url):
+            logger.info("Already logged in: %s", page.url)
+            return True
+
+        logger.info("Login required, current URL: %s", page.url)
+        import asyncio
+        timeout_ms = 180_000
+        elapsed = 0
+        while elapsed < timeout_ms:
+            await asyncio.sleep(2)
+            elapsed += 2000
+            if self._is_writer_url(page.url):
+                logger.info("Login successful: %s", page.url)
+                await asyncio.sleep(3)
+                return True
+
+        logger.error("Login timed out")
+        return False
+
+    @staticmethod
+    def _is_writer_url(url: str) -> bool:
+        url_lower = url.lower()
+        if any(kw in url_lower for kw in ["login", "passport", "sso", "sign"]):
             return False
+        return "fanqienovel.com" in url_lower and any(
+            kw in url_lower for kw in ["writer", "main", "author"]
+        )
 
     # ── 书单 ─────────────────────────────────────────────
 
     async def list_books(self, page) -> list[dict]:
-        """打开作家后台书单页，抓取已有书籍列表。"""
-        await page.goto(
-            "https://fanqienovel.com/writer/book/list",
-            wait_until="networkidle",
+        data = await _page_fetch(
+            page, "GET",
+            "/api/author/homepage/book_list/v0/",
+            params={"page_count": "50", "page_index": "0"},
         )
-        await page.wait_for_timeout(2000)
-        books = await page.evaluate("""() => {
-            const rows = document.querySelectorAll(
-                '.book-item, [class*="book"], tr[class*="row"]'
-            );
-            return Array.from(rows).map(row => {
-                const titleEl = row.querySelector(
-                    '.title, [class*="title"], h3, a'
-                );
-                return {
-                    title: titleEl?.textContent?.trim() || '',
-                    url: titleEl?.href || '',
-                };
-            });
-        }""")
-        return books
+        if isinstance(data, dict):
+            books = data.get("book_list", [])
+            return books if isinstance(books, list) else []
+        if isinstance(data, list):
+            return data
+        return []
 
     # ── 创建书籍 ─────────────────────────────────────────
 
     async def create_book(self, page, meta: BookMeta) -> str:
-        """创建新书并返回 book_id。"""
-        await page.goto(
-            "https://fanqienovel.com/writer/book/create",
-            wait_until="networkidle",
-        )
-        await page.fill(
-            'input[name="title"], input[placeholder*="书名"]', meta.title
-        )
-        # 题材选择
-        try:
-            await page.click(f"text={meta.genre}")
-        except Exception:
-            pass
-        await page.fill(
-            'textarea[name="synopsis"], textarea[placeholder*="简介"]',
-            meta.synopsis,
-        )
-        await page.click(
-            'button:has-text("创建"), button:has-text("提交")'
-        )
-        await page.wait_for_timeout(3000)
+        # 判断 gender
+        gender = 0 if any(
+            g in meta.genre for g in _FEMALE_GENRES
+        ) and not any(
+            m in meta.genre for m in ["仙侠", "玄幻", "武侠", "男频", "都市", "科幻"]
+        ) else 1
 
-        import re
-        m = re.search(r"book/(\d+)", page.url)
-        return m.group(1) if m else ""
+        # 获取分类和标签
+        categories = await self._get_category_list(page, gender)
+        category_id = _find_category_id(categories, meta.genre)
+        labels = await self._get_label_list(page, gender)
+        label_ids = _find_label_ids(labels, meta.genre)
+
+        # abstract: 单行, 50+ chars
+        abstract = " ".join(
+            line.strip() for line in meta.synopsis.splitlines() if line.strip()
+        )
+        if len(abstract) < 50:
+            abstract = abstract + "。" * (50 - len(abstract))
+
+        p1 = _clean_protagonist_name(meta.protagonist)[:5]
+
+        data = await _page_fetch(page, "POST", "/api/author/book/create/v0/", form={
+            "aid": "2503",
+            "app_name": "muye_novel",
+            "book_name": meta.title,
+            "gender": str(gender),
+            "abstract": abstract,
+            "category_id": str(category_id),
+            "original_type": "1",
+            "label_id_list": ",".join(label_ids),
+            "protagonist_name_1": p1,
+            "protagonist_name_2": "",
+        })
+
+        book_id = str(data.get("book_id", "")) if isinstance(data, dict) else ""
+        if not book_id:
+            raise RuntimeError("create_book: no book_id in response")
+        logger.info("Book created: id=%s, title=%s", book_id, meta.title)
+        return book_id
+
+    async def _get_category_list(self, page, gender: int) -> list[dict]:
+        data = await _page_fetch(
+            page, "GET",
+            "/api/author/book/category_list/v0/",
+            params={"gender": gender},
+        )
+        if isinstance(data, list):
+            return data
+        return data.get("category_list", []) if isinstance(data, dict) else []
+
+    async def _get_label_list(self, page, gender: int) -> list[dict]:
+        data = await _page_fetch(
+            page, "GET",
+            "/api/author/book/group_category_list/v0/",
+            params={"gender": gender},
+        )
+        labels: list[dict] = []
+        if isinstance(data, list):
+            labels = data
+        elif isinstance(data, dict):
+            for group in data.get("group_list", data.get("label_list", [])):
+                if isinstance(group, dict):
+                    labels.extend(
+                        group.get("label_list", group.get("labels", []))
+                    )
+        return labels
+
+    # ── 卷管理 ─────────────────────────────────────────
+
+    async def _get_first_volume(self, page, book_id: str) -> tuple[str, str]:
+        data = await _page_fetch(
+            page, "GET",
+            "/api/author/volume/volume_list/v1/",
+            params={"book_id": book_id},
+        )
+        volumes: list[dict] = []
+        if isinstance(data, list):
+            volumes = data
+        elif isinstance(data, dict):
+            volumes = data.get("volume_list", [])
+        if not volumes:
+            raise RuntimeError(f"No volumes found for book {book_id}")
+        vol = volumes[0]
+        return str(vol["volume_id"]), vol.get("volume_name", "第一卷：默认")
 
     # ── 上传章节 ─────────────────────────────────────────
 
     async def upload_chapter(
         self, page, book_id: str, chapter: Chapter
     ) -> UploadResult:
-        """浏览器模拟上传单章。"""
-        await page.goto(
-            f"https://fanqienovel.com/writer/book/{book_id}/chapter/create",
-            wait_until="networkidle",
-        )
+        """上传单章到番茄。两步：new_article 分配 ID → cover_article 保存内容。"""
+        volume_id, volume_name = await self._get_first_volume(page, book_id)
 
-        # 填写标题
-        await page.fill(
-            'input[name="title"], [placeholder*="章节标题"]',
-            chapter.title,
-        )
+        # Fanqie 标题格式: "第 X 章 标题" (5-30 chars)
+        full_title = f"第 {chapter.index} 章 {chapter.title}"
+        if len(full_title) > 30:
+            full_title = full_title[:30]
 
-        # 填写正文
-        content_editor = page.locator(
-            'textarea[name="content"], [class*="editor"], .content-area, '
-            '[contenteditable="true"]'
-        )
-        await content_editor.click()
-        await content_editor.fill(chapter.content)
+        html_content = _text_to_html(chapter.content)
 
-        await page.wait_for_timeout(1000)
+        # Step 1: 分配章节槽位
+        create_data = await _page_fetch(page, "POST",
+            "/api/author/article/new_article/v0/", form={
+                "book_id": book_id,
+                "title": full_title,
+                "content": html_content,
+                "volume_id": volume_id,
+                "volume_name": volume_name,
+            })
 
-        # 提交（先找"保存草稿"，再找"发布"）
-        try:
-            await page.click(
-                'button:has-text("保存草稿")'
-            )
-        except Exception:
-            await page.click(
-                'button:has-text("发布"), button[type="submit"]'
+        item_id = str(create_data.get("item_id", "")) if isinstance(create_data, dict) else ""
+        if not item_id:
+            return UploadResult(
+                success=False, chapter_index=chapter.index,
+                message="new_article 未返回 item_id",
             )
 
-        await page.wait_for_timeout(2000)
+        # Step 2: 写入内容
+        await _page_fetch(page, "POST",
+            "/api/author/article/cover_article/v0/", form={
+                "book_id": book_id,
+                "item_id": item_id,
+                "title": full_title,
+                "content": html_content,
+                "volume_id": volume_id,
+                "volume_name": volume_name,
+            })
 
+        logger.info("Chapter saved: item_id=%s, title=%s", item_id, full_title)
         return UploadResult(
-            success=True,
-            chapter_index=chapter.index,
-            message="浏览器模拟上传",
+            success=True, chapter_index=chapter.index,
+            message=f"草稿已保存: {full_title}",
         )
