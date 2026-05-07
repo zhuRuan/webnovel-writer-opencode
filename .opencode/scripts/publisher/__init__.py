@@ -42,8 +42,7 @@ async def _cmd_setup_auth(args: argparse.Namespace):
     try:
         ok = await adapter.setup_auth(page)
         if ok:
-            await browser.save_auth_state()
-            print(f"✅ {adapter.display_name} 登录成功，认证状态已保存")
+            print(f"✅ {adapter.display_name} 登录成功，认证状态已自动保存")
         else:
             print(f"❌ {adapter.display_name} 登录超时")
             sys.exit(1)

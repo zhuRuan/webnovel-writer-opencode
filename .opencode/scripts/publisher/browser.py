@@ -13,30 +13,24 @@ _STEALTH_ARGS = [
 ]
 
 
-def get_auth_dir() -> Path:
-    return Path.home() / ".webnovel-publish" / "auth"
+def get_user_data_dir(platform: str) -> Path:
+    return Path.home() / ".webnovel-publish" / "browser_data" / platform
 
 
 class Browser:
     """管理 Playwright 浏览器会话。
 
-    两种模式：
-    - 持久化模式（setup-auth / 登录）：使用 persistent context，用户可交互。
-    - 短暂模式（publish / 上传）：加载已保存的 storage_state.json。
+    始终使用 launch_persistent_context。番茄小说的认证需要完整的浏览器
+    数据目录（cookies + localStorage + IndexedDB 等），Playwright 的
+    storage_state 只保存 cookies/origins，不足以维持登录态。
     """
 
     def __init__(self, headless: bool = True, platform: str = ""):
         self.headless = headless
         self.platform = platform
         self._playwright = None
-        self._browser = None
         self._context = None
         self._page = None
-
-    def _auth_state_path(self) -> Path:
-        d = get_auth_dir()
-        d.mkdir(parents=True, exist_ok=True)
-        return d / f"{self.platform}.json"
 
     def _get_launch_args(self) -> list[str]:
         args = [*_STEALTH_ARGS]
@@ -49,39 +43,23 @@ class Browser:
         return args
 
     async def start(self):
-        """启动浏览器。优先加载已保存的认证状态。"""
+        """启动持久化浏览器上下文。登录态由 user_data_dir 自动维护。"""
         from playwright.async_api import async_playwright
 
         self._playwright = await async_playwright().start()
 
-        auth_state_file = self._auth_state_path()
-        use_storage = auth_state_file.is_file()
+        user_data_dir = get_user_data_dir(self.platform)
+        user_data_dir.mkdir(parents=True, exist_ok=True)
 
-        if use_storage:
-            # 短暂模式：加载已保存的认证状态
-            self._browser = await self._playwright.chromium.launch(
-                headless=self.headless, args=self._get_launch_args()
-            )
-            self._context = await self._browser.new_context(
-                storage_state=str(auth_state_file),
+        self._context = (
+            await self._playwright.chromium.launch_persistent_context(
+                user_data_dir=str(user_data_dir),
+                headless=self.headless,
                 viewport={"width": 1280, "height": 800},
                 locale="zh-CN",
+                args=self._get_launch_args(),
             )
-        else:
-            # 持久化模式：用户需手动登录
-            user_data_dir = (
-                Path.home() / ".webnovel-publish" / "browser_data" / self.platform
-            )
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            self._context = (
-                await self._playwright.chromium.launch_persistent_context(
-                    user_data_dir=str(user_data_dir),
-                    headless=self.headless,
-                    viewport={"width": 1280, "height": 800},
-                    locale="zh-CN",
-                    args=self._get_launch_args(),
-                )
-            )
+        )
 
         self._page = (
             self._context.pages[0]
@@ -90,20 +68,11 @@ class Browser:
         )
         return self._page
 
-    async def save_auth_state(self):
-        """保存浏览器认证状态到磁盘。"""
-        if self._context:
-            path = self._auth_state_path()
-            await self._context.storage_state(path=str(path))
-
     async def close(self):
         if self._context:
             await self._context.close()
             self._context = None
             self._page = None
-        if self._browser:
-            await self._browser.close()
-            self._browser = None
         if self._playwright:
             await self._playwright.stop()
             self._playwright = None

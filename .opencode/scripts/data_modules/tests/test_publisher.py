@@ -191,13 +191,13 @@ class TestUploadResult:
         assert "超时" in r.message
 
 
-from publisher.browser import Browser, get_auth_dir
+from publisher.browser import Browser, get_user_data_dir
 
 
-class TestGetAuthDir:
+class TestGetUserDataDir:
     def test_returns_path(self):
-        path = get_auth_dir()
-        assert path.name == "auth"
+        path = get_user_data_dir("fanqie")
+        assert path.name == "fanqie"
         assert ".webnovel-publish" in str(path)
 
 
@@ -209,15 +209,6 @@ class TestBrowserConfig:
     def test_headed_mode(self):
         b = Browser(headless=False, platform="test")
         assert b.headless is False
-
-    def test_auth_state_path(self, monkeypatch, tmp_path):
-        auth_dir = tmp_path / "auth"
-        auth_dir.mkdir(parents=True)
-        b = Browser(platform="fanqie")
-        monkeypatch.setattr(
-            "publisher.browser.get_auth_dir", lambda: auth_dir)
-        p = b._auth_state_path()
-        assert p.name == "fanqie.json"
 
     def test_linux_root_no_sandbox(self, monkeypatch):
         monkeypatch.setattr(sys, "platform", "linux")
