@@ -16,6 +16,7 @@ from publisher.config import (
     save_upload_log,
     get_upload_log_dir,
 )
+from publisher.formatter import to_plain_text, to_html, format_for_platform
 
 
 class TestPublishConfig:
@@ -77,3 +78,55 @@ class TestUploadLog:
             assert loaded == {1, 2, 3, 4}
         finally:
             mod.get_upload_log_dir = original
+
+
+class TestToPlainText:
+    def test_strips_bold(self):
+        assert to_plain_text("这是**重点**内容") == "这是重点内容"
+
+    def test_strips_italic(self):
+        assert to_plain_text("这是*斜体*文字") == "这是斜体文字"
+
+    def test_strips_headers(self):
+        assert to_plain_text("# 标题\n\n正文") == "标题\n\n正文"
+
+    def test_strips_separator(self):
+        assert to_plain_text("段落一\n\n---\n\n段落二") == "段落一\n\n***\n\n段落二"
+
+    def test_preserves_paragraphs(self):
+        md = "段落一\n\n段落二"
+        result = to_plain_text(md)
+        assert "段落一" in result
+        assert "段落二" in result
+
+    def test_removes_links(self):
+        assert to_plain_text("看[这里](http://example.com)") == "看这里"
+
+
+class TestToHTML:
+    def test_bold(self):
+        assert to_html("**重点**") == "<p><b>重点</b></p>"
+
+    def test_paragraphs(self):
+        assert to_html("段一\n\n段二") == "<p>段一</p>\n<p>段二</p>"
+
+    def test_italic(self):
+        assert to_html("*斜体*") == "<p><i>斜体</i></p>"
+
+
+class TestFormatForPlatform:
+    def test_default_indent(self):
+        md = "这是测试段落"
+        result = format_for_platform(md, "fanqie")
+        assert "　　这是测试段落" in result
+
+    def test_custom_indent_hint(self):
+        md = "测试"
+        result = format_for_platform(md, "fanqie", hints={"indent": "  "})
+        assert "  测试" in result and "　　" not in result
+
+    def test_chapter_title_preserved(self):
+        md = "# 第5章 出发\n\n正文内容"
+        result = format_for_platform(md, "fanqie")
+        assert "第5章 出发" in result
+        assert "正文内容" in result
