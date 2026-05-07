@@ -12,7 +12,6 @@ Usage:
   python install.py --mirror URL  # Use custom GitHub mirror
 """
 import argparse
-import os
 import shutil
 import sys
 import tempfile
@@ -132,7 +131,7 @@ def main():
     if args.update:
         run_update(args)
     else:
-        run_install(args)
+        run_install(args, skip_download=True)
 
 
 if __name__ == "__main__":

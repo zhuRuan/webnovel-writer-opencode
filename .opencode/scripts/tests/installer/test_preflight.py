@@ -3,7 +3,7 @@ import sys
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from installer.preflight import apply_staging, verify_installation
@@ -11,7 +11,6 @@ from installer.preflight import apply_staging, verify_installation
 
 class TestApplyStaging:
     def test_no_staging_directory(self):
-        """apply_staging without .opencode_staging should return False."""
         with tempfile.TemporaryDirectory() as d:
             cwd = os.getcwd()
             os.chdir(d)
@@ -22,7 +21,6 @@ class TestApplyStaging:
                 os.chdir(cwd)
 
     def test_staging_replaces_opencode(self):
-        """With staging dir and no existing .opencode, apply succeeds."""
         d = tempfile.mkdtemp()
         cwd = os.getcwd()
         os.chdir(d)
@@ -40,13 +38,6 @@ class TestApplyStaging:
 
 
 class TestVerifyInstallation:
-    @patch("subprocess.run")
-    def test_verify_runs_preflight(self, mock_run):
-        mock_run.return_value.returncode = 0
+    def test_verify_scripts_exist(self):
+        """In the dev repo, .opencode/scripts/ exists so verify passes."""
         assert verify_installation() == True
-        mock_run.assert_called_once()
-
-    @patch("subprocess.run")
-    def test_verify_fails_on_error(self, mock_run):
-        mock_run.side_effect = FileNotFoundError
-        assert verify_installation() == False

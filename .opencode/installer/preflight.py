@@ -1,8 +1,5 @@
 """Install orchestration: main install flow, update flow, and staging/apply. Pure stdlib."""
-import os
 import shutil
-import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
@@ -26,55 +23,61 @@ def _download_and_extract(target_dir_name: str):
     zip_dest.unlink(missing_ok=True)
 
 
-def run_install(args):
+def run_install(args, skip_download=False):
     """Main install flow: fresh install or update."""
-    total = 4
+    total = 3 if skip_download else 4
+    step = 1
 
     # Step 1: preflight checks
-    step_header(1, total, "Running system checks")
+    step_header(step, total, "Running system checks")
     run_preflight_checks()
-    step_done(1, total, "System checks passed")
+    step_done(step, total, "System checks passed")
+    step += 1
 
-    # Step 2: download
-    step_header(2, total, "Downloading latest version")
-
-    existing = Path(".opencode").is_dir()
-    is_running = is_opencode_running(".opencode") if existing else "not_running"
-
-    if existing and is_running == "running":
-        info("OpenCode detected — using staging mode")
-        _download_and_extract(".opencode_staging")
-        step_done(2, total, "Downloaded to .opencode_staging/")
-        print()
-        warn("OpenCode is running. New version saved to .opencode_staging/")
-        print("  To apply the update:")
-        print("  1. Close all OpenCode windows")
-        print("  2. Run: python install.py --apply")
-        return
-    elif existing and is_running == "locked":
-        error("Cannot check if OpenCode is running. Close OpenCode and try again.")
-    elif existing:
-        info("Replacing existing .opencode/")
-        _download_and_extract(".opencode_staging")
-        if not apply_staging():
-            error("Failed to replace .opencode/. Check permissions.")
-        step_done(2, total, "Downloaded and applied")
+    # Step 2: download (skip if caller already extracted .opencode/)
+    if skip_download:
+        info(".opencode/ up to date from bootstrap, skipping download")
     else:
-        _download_and_extract(".opencode")
-        step_done(2, total, "Downloaded .opencode/")
+        step_header(step, total, "Downloading latest version")
+        existing = Path(".opencode").is_dir()
+        is_running = is_opencode_running(".opencode") if existing else "not_running"
+
+        if existing and is_running == "running":
+            info("OpenCode detected — using staging mode")
+            _download_and_extract(".opencode_staging")
+            step_done(step, total, "Downloaded to .opencode_staging/")
+            print()
+            warn("OpenCode is running. New version saved to .opencode_staging/")
+            print("  To apply the update:")
+            print("  1. Close all OpenCode windows")
+            print("  2. Run: python install.py --apply")
+            return
+        elif existing and is_running == "locked":
+            error("Cannot check if OpenCode is running. Close OpenCode and try again.")
+        elif existing:
+            info("Replacing existing .opencode/")
+            _download_and_extract(".opencode_staging")
+            if not apply_staging():
+                error("Failed to replace .opencode/. Check permissions.")
+            step_done(step, total, "Downloaded and applied")
+        else:
+            _download_and_extract(".opencode")
+            step_done(step, total, "Downloaded .opencode/")
+        step += 1
 
     # Step 3: install dependencies
-    step_header(3, total, "Installing dependencies")
+    step_header(step, total, "Installing dependencies")
     install_core_deps(
         venv_path=Path(args.venv) if getattr(args, 'venv', None) else None,
         skip_playwright=getattr(args, 'skip_playwright', False)
     )
-    step_done(3, total, "Dependencies installed")
+    step_done(step, total, "Dependencies installed")
+    step += 1
 
     # Step 4: verify
-    step_header(4, total, "Verifying installation")
+    step_header(step, total, "Verifying installation")
     if verify_installation():
-        step_done(4, total, "Installation verified")
+        step_done(step, total, "Installation verified")
         _write_installed_version()
         success_box("Installation complete!", [
             "Next steps:",
