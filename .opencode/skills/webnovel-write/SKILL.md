@@ -105,6 +105,44 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 4. 风格指引：reasoning、主角卡 OOC 警戒、anti_patterns
 5. 场景写法补充：`dynamic_context`，仅作风格参考，不能覆盖章纲约束
 
+### 准备：结构自检
+
+```bash
+CHECK_RESULT=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" checkers structural --chapter {chapter_num} --format json)
+
+# 提取检查结果摘要
+echo "$CHECK_RESULT" | python -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'结构自检: {\"✅ 通过\" if d[\"passed\"] else \"❌ 存在阻断问题\"}')
+for c in d['checks']:
+    mark = '✅' if c['passed'] else '❌'
+    print(f'  {mark} [{c[\"severity\"]}] {c[\"name\"]}')
+    if not c['passed']:
+        print(f'      {c[\"detail\"]}')
+"
+
+# 检查是否有 blocking 失败
+BLOCKING=$(echo "$CHECK_RESULT" | python -c "
+import json,sys
+d=json.load(sys.stdin)
+count=sum(1 for c in d['checks'] if c['severity']=='blocking' and not c['passed'])
+print(count)
+")
+
+if [ "$BLOCKING" -gt 0 ]; then
+  echo "❌ 结构自检存在阻断问题，请先修复再继续。"
+  echo "$CHECK_RESULT" | python -c "
+import json,sys
+d=json.load(sys.stdin)
+for c in d['checks']:
+    if c['severity']=='blocking' and not c['passed']:
+        print(f'  → {c[\"fix\"]}')
+  "
+  exit 1
+fi
+```
+
 ### Step 1：context-agent 生成写作任务书
 
 必须使用 `Agent` 工具调用 `context-agent`，不得由主流程自行整理任务书。
@@ -129,7 +167,23 @@ Agent(
 ```text
 Agent(
   subagent_type: "reviewer",
-  prompt: "chapter={chapter_num}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
+  prompt: "chapter={chapter_num}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。
+
+【自检系统状态 - 审查时需额外关注】
+{从 CHECK_RESULT 中提取 passed=false 的 warning 条目，转为自然语言提醒。blocking 已被阻断，只会出现 warning。用 python -c 提取：}
+
+$(echo "$CHECK_RESULT" | python -c "
+import json,sys
+d=json.load(sys.stdin)
+warnings=[c for c in d['checks'] if c['severity']=='warning' and not c['passed']]
+if warnings:
+    for w in warnings:
+        print(f'- {w[\"name\"]}: {w[\"detail\"]}')
+else:
+    print('（无异常）')
+")
+
+严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
 )
 ```
 
