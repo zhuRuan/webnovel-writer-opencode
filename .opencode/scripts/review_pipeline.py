@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -26,6 +27,32 @@ def _ensure_scripts_path() -> None:
 _ensure_scripts_path()
 
 from data_modules.review_schema import append_ai_flavor_anti_patterns, parse_review_output
+
+
+def clean_reviewer_output(raw: str) -> str:
+    """Extract pure JSON from reviewer agent output.
+
+    Handles:
+    1. Markdown code block: ```json ... ```
+    2. Prefix text: \"Here is the review: {...}\"
+    3. Suffix text: \"{...} That's the review\"
+    4. Pure JSON: \"{...}\"
+    """
+    if not raw or not raw.strip():
+        raise ValueError("reviewer output is empty")
+
+    # Try markdown code block first
+    m = re.search(r'```(?:json)?\s*\n?([\s\S]*?)```', raw)
+    if m:
+        return m.group(1).strip()
+
+    # Find first { and last }
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start >= 0 and end > start:
+        return raw[start:end+1]
+
+    raise ValueError("no valid JSON found in reviewer output")
 
 
 def _resolve_report_path(project_root: Path, report_file: str) -> Path:
@@ -147,7 +174,8 @@ def build_review_artifacts(
     review_results_path: Path,
     report_file: str = "",
 ) -> Dict[str, Any]:
-    raw = json.loads(review_results_path.read_text(encoding="utf-8"))
+    raw_text = review_results_path.read_text(encoding="utf-8")
+    raw = json.loads(clean_reviewer_output(raw_text))
     result = parse_review_output(chapter=chapter, raw=raw)
     anti_patterns_added = append_ai_flavor_anti_patterns(project_root, result)
     metrics = result.to_metrics_dict(report_file=report_file)
