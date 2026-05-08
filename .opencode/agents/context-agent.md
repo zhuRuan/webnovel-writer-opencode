@@ -15,7 +15,10 @@ tools:
 执行任何 bash 命令前，先确保变量已设置：
 
 ```bash
-export SCRIPTS_DIR="${SCRIPTS_DIR:-${PWD}/.opencode/scripts}"
+if [ -z "$SCRIPTS_DIR" ] || [ ! -d "$SCRIPTS_DIR" ]; then
+  echo "❌ SCRIPTS_DIR 未正确设置，请检查调用方 prompt。当前值: ${SCRIPTS_DIR:-空}"
+  exit 1
+fi
 ```
 
 `{project_root}` 由调用方在 prompt 中传入，直接使用该值。
