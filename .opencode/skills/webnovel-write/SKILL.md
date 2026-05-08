@@ -80,7 +80,7 @@ test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { e
 echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" preflight
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" placeholder-scan --format text
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" placeholder-scan --format text | sort -u
 ```
 
 ### 准备：刷新合同树
@@ -88,20 +88,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pla
 genre 从 `.webnovel/state.json` 的初始化配置快照读取，用于刷新合同树；写前主链真源仍是 `.story-system/` 合同。调用 story-system 前必须先从详细大纲解析真实本章目标，禁止传 `{章纲目标}`、`第N章章纲目标` 等占位 query。
 
 ```bash
-# 用 Python subprocess 直接传参，避免 CJK 文本经 shell 变量时编码损坏
-python -X utf8 -c "
-import json, subprocess, sys
-from pathlib import Path
-root = Path('${PROJECT_ROOT}')
-s = json.loads((root / '.webnovel' / 'state.json').read_text('utf-8'))
-genre = s.get('project_info', {}).get('genre', '')
-subprocess.run([
-    sys.executable, '-X', 'utf8',
-    '${SCRIPTS_DIR}/webnovel.py', '--project-root', str(root),
-    'story-system', '${CHAPTER_GOAL}', '--genre', genre,
-    '--chapter', '{chapter_num}', '--persist', '--emit-runtime-contracts', '--format', 'both'
-], check=True)
-"
+# 用 skill_runner 传递 CJK，genre 自动从 state.json 读取，goal 从 stdin 传入
+echo "${CHAPTER_GOAL}" | python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" story-system \
+  --project-root "${PROJECT_ROOT}" --chapter {chapter_num}
 ```
 
 必备文件：`MASTER_SETTING.json`（调性/禁忌）、`volume_{NNN}.json`（卷级节奏）、`chapter_{NNN}.review.json`（必须节点/禁区）。缺失则阻断。
@@ -118,39 +107,8 @@ subprocess.run([
 ### 准备：结构自检
 
 ```bash
-CHECK_RESULT=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" checkers structural --chapter {chapter_num} --format json)
-
-# 提取检查结果摘要
-echo "$CHECK_RESULT" | python -c "
-import json,sys
-d=json.load(sys.stdin)
-print(f'结构自检: {\"✅ 通过\" if d[\"passed\"] else \"❌ 存在阻断问题\"}')
-for c in d['checks']:
-    mark = '✅' if c['passed'] else '❌'
-    print(f'  {mark} [{c[\"severity\"]}] {c[\"name\"]}')
-    if not c['passed']:
-        print(f'      {c[\"detail\"]}')
-"
-
-# 检查是否有 blocking 失败
-BLOCKING=$(echo "$CHECK_RESULT" | python -c "
-import json,sys
-d=json.load(sys.stdin)
-count=sum(1 for c in d['checks'] if c['severity']=='blocking' and not c['passed'])
-print(count)
-")
-
-if [ "$BLOCKING" -gt 0 ]; then
-  echo "❌ 结构自检存在阻断问题，请先修复再继续。"
-  echo "$CHECK_RESULT" | python -c "
-import json,sys
-d=json.load(sys.stdin)
-for c in d['checks']:
-    if c['severity']=='blocking' and not c['passed']:
-        print(f'  → {c[\"fix\"]}')
-  "
-  exit 1
-fi
+python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-structural \
+  --project-root "${PROJECT_ROOT}" --chapter {chapter_num} --format json
 ```
 
 ### Step 1：context-agent 生成写作任务书
@@ -204,6 +162,10 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" rev
   --metrics-out "${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json" \
   --report-file "审查报告/第{chapter_num}章审查报告.md" \
   --save-metrics
+```
+
+```bash
+rm -f "${PROJECT_ROOT}/.webnovel/tmp/review_results.json"
 ```
 
 blocking=true → 修复后重审，不进 Step 4。`--fast` 只检查 setting/timeline/continuity。`--minimal` 跳过。
