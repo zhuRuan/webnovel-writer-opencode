@@ -332,6 +332,21 @@ class StorySystemEngine:
             )
             if any(self._normalize_text(candidate) == genre_text for candidate in candidates):
                 return row
+        # 复合题材拆解: "末世+异能" -> ["末世", "异能"] -> try each component
+        if "+" in genre:
+            components = [g.strip() for g in genre.split("+")]
+            for component in components:
+                if not component:
+                    continue
+                component_text = self._normalize_text(resolve_genre(component) or component)
+                for row in rows:
+                    candidates = (
+                        self._split_multi_value(row.get("适用题材"))
+                        + self._split_multi_value(row.get("题材/流派"))
+                        + self._split_multi_value(row.get("canonical_genre"))
+                    )
+                    if any(self._normalize_text(candidate) == component_text for candidate in candidates):
+                        return row
         return None
 
     def _infer_genre_from_text(self, text: str) -> str:
