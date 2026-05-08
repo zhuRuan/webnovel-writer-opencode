@@ -134,6 +134,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pre
 □ 0. 环境变量验证
 □ A. 上章完整性检查（N > S 时）
 □ 1. 刷新合同树
+□ 1b. 结构自检
 □ 2. Agent(context-agent) → 写作任务书
 □ 3. Agent(chapter-writer-agent) → 起草+润色
 □ 4. Agent(reviewer) → 审查结果
@@ -200,6 +201,46 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 必备文件：`MASTER_SETTING.json`、`volume_{NNN}.json`、`chapter_{NNN}.review.json`。缺失则阻断。
 
 `chapter_{NNN}.json` 必须优先检查顶层 `chapter_directive`。`chapter_focus` 只能来自 `chapter_directive.goal` 或真实 query，不得从 `dynamic_context` 的参考摘要继承。
+
+---
+
+### 准备：结构自检
+
+```bash
+CHECK_RESULT=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" checkers structural --chapter {N} --format json)
+
+# 提取检查结果摘要
+echo "$CHECK_RESULT" | python -c "
+import json,sys
+d=json.load(sys.stdin)
+print(f'结构自检: {\"✅ 通过\" if d[\"passed\"] else \"❌ 存在阻断问题\"}')
+for c in d['checks']:
+    mark = '✅' if c['passed'] else '❌'
+    print(f'  {mark} [{c[\"severity\"]}] {c[\"name\"]}')
+    if not c['passed']:
+        print(f'      {c[\"detail\"]}')
+"
+
+# 检查是否有 blocking 失败
+BLOCKING=$(echo "$CHECK_RESULT" | python -c "
+import json,sys
+d=json.load(sys.stdin)
+count=sum(1 for c in d['checks'] if c['severity']=='blocking' and not c['passed'])
+print(count)
+")
+
+if [ "$BLOCKING" -gt 0 ]; then
+  echo "❌ 结构自检存在阻断问题，请先修复再继续。"
+  echo "$CHECK_RESULT" | python -c "
+import json,sys
+d=json.load(sys.stdin)
+for c in d['checks']:
+    if c['severity']=='blocking' and not c['passed']:
+        print(f'  → {c[\"fix\"]}')
+  "
+  exit 1
+fi
+```
 
 ---
 
@@ -279,7 +320,21 @@ fi
 ```text
 Agent(
   subagent_type: "reviewer",
-  prompt: "chapter={N}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
+  prompt: "chapter={N}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。
+
+【自检系统状态 - 审查时需额外关注】
+$(echo "$CHECK_RESULT" | python -c "
+import json,sys
+d=json.load(sys.stdin)
+warnings=[c for c in d['checks'] if c['severity']=='warning' and not c['passed']]
+if warnings:
+    for w in warnings:
+        print(f'- {w[\"name\"]}: {w[\"detail\"]}')
+else:
+    print('（无异常）')
+")
+
+严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
 )
 ```
 
@@ -384,6 +439,39 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" cha
 验证投影：projection_status 五项（state/index/summary/memory/vector）全部 done 或 skipped。
 
 失败隔离：commit 未生成→重跑 2 次。projection 失败→只补跑失败项。不回退 Step 1-7。
+
+#### 写后校验
+
+```bash
+# 1. 验证本章 commit 已生成
+COMMIT_FILE="${PROJECT_ROOT}/.story-system/commits/chapter_$(printf '%04d' ${N}).commit.json"
+if [ ! -s "$COMMIT_FILE" ]; then
+  echo "❌ commit 缺失: $COMMIT_FILE"
+else
+  echo "✅ commit 已生成"
+fi
+
+# 2. 验证 projection 已提交
+python -c "
+import json
+state = json.load(open('${PROJECT_ROOT}/.webnovel/state.json'))
+status = state.get('progress', {}).get('chapter_status', {}).get(str($N))
+if status != 'chapter_committed':
+    raise SystemExit(f'chapter_status={status}, 期望 committed')
+print('✅ projection 已提交')
+"
+
+# 3. 验证 index.db 覆盖
+python -c "
+import sqlite3
+db = sqlite3.connect('${PROJECT_ROOT}/.webnovel/index.db')
+row = db.execute('SELECT COUNT(*) FROM chapters WHERE chapter_num=?', ($N,)).fetchone()
+if row[0] == 0:
+    print(f'⚠️ 第${N}章未在 index.db 中')
+else:
+    print('✅ index.db 已覆盖')
+"
+```
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" backup \
