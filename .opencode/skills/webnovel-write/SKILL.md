@@ -88,10 +88,20 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pla
 genre 从 `.webnovel/state.json` 的初始化配置快照读取，用于刷新合同树；写前主链真源仍是 `.story-system/` 合同。调用 story-system 前必须先从详细大纲解析真实本章目标，禁止传 `{章纲目标}`、`第N章章纲目标` 等占位 query。
 
 ```bash
-GENRE="$(python -X utf8 -c "import json,sys; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json',encoding='utf-8')); print(s.get('project',{}).get('genre',''))")"
-
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
-  story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --chapter {chapter_num} --persist --emit-runtime-contracts --format both
+# 用 Python subprocess 直接传参，避免 CJK 文本经 shell 变量时编码损坏
+python -X utf8 -c "
+import json, subprocess, sys
+from pathlib import Path
+root = Path('${PROJECT_ROOT}')
+s = json.loads((root / '.webnovel' / 'state.json').read_text('utf-8'))
+genre = s.get('project_info', {}).get('genre', '')
+subprocess.run([
+    sys.executable, '-X', 'utf8',
+    '${SCRIPTS_DIR}/webnovel.py', '--project-root', str(root),
+    'story-system', '${CHAPTER_GOAL}', '--genre', genre,
+    '--chapter', '{chapter_num}', '--persist', '--emit-runtime-contracts', '--format', 'both'
+], check=True)
+"
 ```
 
 必备文件：`MASTER_SETTING.json`（调性/禁忌）、`volume_{NNN}.json`（卷级节奏）、`chapter_{NNN}.review.json`（必须节点/禁区）。缺失则阻断。

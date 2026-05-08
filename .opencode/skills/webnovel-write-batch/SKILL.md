@@ -98,14 +98,14 @@ if [ ! -f "$BATCH_STATE" ] || [ "$STATUS" != "running" ]; then
   python -c "
 import json, datetime
 s = {
-  'task_id': f'batch_{datetime.datetime.utcnow().strftime(\"%Y%m%d_%H%M%S\")}',
+  'task_id': f'batch_{datetime.datetime.now(datetime.timezone.utc).strftime(\"%Y%m%d_%H%M%S\")}',
   'range': {'start': $S, 'end': $E},
   'status': 'running',
   'current_chapter': $S,
   'completed_chapters': [],
   'failed_chapters': [],
   'chapter_results': {},
-  'created_at': datetime.datetime.utcnow().isoformat() + 'Z'
+  'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
 }
 open('$BATCH_STATE', 'w').write(json.dumps(s, ensure_ascii=False, indent=2))
 "
@@ -192,10 +192,20 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pla
 genre 从 `.webnovel/state.json` 的初始化配置快照读取。调用 story-system 前必须先从详细大纲解析真实本章目标，禁止传 `{章纲目标}`、`第N章章纲目标` 等占位 query。
 
 ```bash
-GENRE="$(python -X utf8 -c "import json,sys; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json',encoding='utf-8')); print(s.get('project',{}).get('genre',''))")"
-
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
-  story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --chapter {N} --persist --emit-runtime-contracts --format both
+# 用 Python subprocess 直接传参，避免 CJK 文本经 shell 变量时编码损坏
+python -X utf8 -c "
+import json, subprocess, sys
+from pathlib import Path
+root = Path('${PROJECT_ROOT}')
+s = json.loads((root / '.webnovel' / 'state.json').read_text('utf-8'))
+genre = s.get('project_info', {}).get('genre', '')
+subprocess.run([
+    sys.executable, '-X', 'utf8',
+    '${SCRIPTS_DIR}/webnovel.py', '--project-root', str(root),
+    'story-system', '${CHAPTER_GOAL}', '--genre', genre,
+    '--chapter', '{N}', '--persist', '--emit-runtime-contracts', '--format', 'both'
+], check=True)
+"
 ```
 
 必备文件：`MASTER_SETTING.json`、`volume_{NNN}.json`、`chapter_{NNN}.review.json`。缺失则阻断。
@@ -443,13 +453,15 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" cha
 #### 写后校验
 
 ```bash
-# 1. 验证本章 commit 已生成
-COMMIT_FILE="${PROJECT_ROOT}/.story-system/commits/chapter_$(printf '%04d' ${N}).commit.json"
-if [ ! -s "$COMMIT_FILE" ]; then
-  echo "❌ commit 缺失: $COMMIT_FILE"
-else
-  echo "✅ commit 已生成"
-fi
+# 1. 验证本章 commit 已生成（用 python 构建路径，避免 shell printf 引入不可见字符）
+python -c "
+import os
+p = os.path.join('${PROJECT_ROOT}', '.story-system', 'commits', f'chapter_{$N:04d}.commit.json')
+if os.path.isfile(p) and os.path.getsize(p) > 0:
+    print('✅ commit 已生成')
+else:
+    print(f'❌ commit 缺失: {p}')
+"
 
 # 2. 验证 projection 已提交
 python -c "
@@ -461,11 +473,11 @@ if status != 'chapter_committed':
 print('✅ projection 已提交')
 "
 
-# 3. 验证 index.db 覆盖
+# 3. 验证 index.db 覆盖（schema: chapters(chapter INTEGER PRIMARY KEY)）
 python -c "
 import sqlite3
 db = sqlite3.connect('${PROJECT_ROOT}/.webnovel/index.db')
-row = db.execute('SELECT COUNT(*) FROM chapters WHERE chapter_num=?', ($N,)).fetchone()
+row = db.execute('SELECT COUNT(*) FROM chapters WHERE chapter=?', ($N,)).fetchone()
 if row[0] == 0:
     print(f'⚠️ 第${N}章未在 index.db 中')
 else:
@@ -502,7 +514,7 @@ s['chapter_results'][str($N)] = {
     'status': 'success',
     'score': score,
     'words': $WORDS,
-    'completed_at': datetime.datetime.utcnow().isoformat() + 'Z'
+    'completed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
 }
 p.write_text(json.dumps(s, ensure_ascii=False, indent=2))
 

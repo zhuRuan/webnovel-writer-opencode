@@ -147,7 +147,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" ind
 
 ## 8. 输出格式
 
-严格按以下 JSON 格式输出（无其他文本）：
+**硬性输出约束**：你只能输出一段有效的 JSON。不得在 JSON 前后附加任何解释、对话、分析或其他文本。如果没有什么可说的，就输出 `{"issues": [], "summary": "无问题"}`。
 
 ```json
 {
