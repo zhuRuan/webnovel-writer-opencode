@@ -389,6 +389,14 @@ def main() -> None:
     qr_parser.add_argument("--entity", required=True, help="实体 ID")
     qr_parser.add_argument("--at-chapter", type=int, required=True, help="目标章节号")
 
+    # structural checker (写前自检)
+    checkers_parser = sub.add_parser("checkers", help="结构自检（写前阻断）")
+    checkers_sub = checkers_parser.add_subparsers(dest="checkers_action")
+
+    p_structural = checkers_sub.add_parser("structural", help="运行五项结构检查")
+    p_structural.add_argument("--chapter", type=int, required=True, help="目标章节号")
+    p_structural.add_argument("--format", choices=["json", "text"], default="json", help="输出格式")
+
     # 兼容：允许 `--project-root` 出现在任意位置（减少 agents/skills 拼命令的出错率）
     from .cli_args import normalize_global_project_root
 
@@ -511,6 +519,13 @@ def main() -> None:
             result = kq.entity_relationships_at_chapter(args.entity, args.at_chapter)
             print_success(result, message="entity_relationships_at_chapter")
             raise SystemExit(0)
+
+    if tool == "checkers":
+        if args.checkers_action == "structural":
+            return_args = [*forward_args, "--chapter", str(args.chapter)]
+            if args.format:
+                return_args.extend(["--format", args.format])
+            raise SystemExit(_run_data_module("structural_checker", return_args))
 
     raise SystemExit(2)
 
