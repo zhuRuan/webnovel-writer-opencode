@@ -42,16 +42,17 @@ fi
 
 ## 执行流程
 
-### Step A: 理解任务
+### Step A: 确认硬性约束
 
-阅读任务书和章纲约束，确认：
-1. 本章硬性约束（goal / time_anchor / countdown / chapter_end_open_question）
-2. CBN / CPNs / CEN 与 must_cover_nodes
-3. 本章禁区（forbidden_zones）
-4. 风格指引 + OOC 警戒
-5. 字数目标
+**起草前逐条确认，全部通过才进 Step B：**
 
-修复轮时额外确认：审查反馈中每条 issue 的具体位置和修改方向。
+□ 过渡承接: 本章开篇必须衔接上章结尾的 open_question
+□ 必须覆盖: 任务书第 2 段中标注的 must_cover_nodes 全部覆盖
+□ 禁区: 任务书第 3 段中标注的 forbidden_zones 绝不违反
+□ 字数: 2000-2500 字
+
+**修复轮额外约束:**
+□ 逐条对照【审查反馈】中的每条 issue，只修改指出的位置，不改无关段落
 
 ### Step B: 起草正文
 
@@ -66,13 +67,17 @@ CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PRO
 CHAPTER_FILE="${PROJECT_ROOT}/${CHAPTER_PATH}"
 ```
 
-### Step C: 自检
+### Step C: 硬性约束验证
 
-对照任务书硬性约束逐项确认：
-- 所有 must_cover_nodes 已覆盖
-- 无禁区违反
-- 时间锚点 / 倒计时一致
-- 章节结尾符合 open_question 方向
+起草完成后，逐条回填确认：
+
+□ 过渡承接 ← 正文第__段已实现（写具体段号，不能留空）
+□ must_cover_nodes ← 已全部覆盖
+□ 禁区 ← 未违反
+□ 字数 ← ≥1500 字
+□ 修复轮 issue ← 全部已修改（如有）
+
+**任一条无法填具体段号 → 回到 Step B 补充该条，不得跳过。全部可填才进 Step D。**
 
 ### Step D: 润色
 
