@@ -60,7 +60,7 @@ def _check_strand_balance(state: dict, chapter: int) -> dict:
 
     # constellation check
     last_const = _safe_int(tracker.get("last_constellation_chapter"))
-    if last_const == 0 and chapter > 10:
+    if last_const == 0 and chapter > 15:
         result["passed"] = False
         result["detail"] = f"constellation 从未激活（当前第{chapter}章），最高容忍 15 章"
         result["fix"] = "本章或下一章必须安排世界观展开：新势力/新地点/设定揭示/身世线索"
