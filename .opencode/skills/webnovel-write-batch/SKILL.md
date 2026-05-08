@@ -100,7 +100,7 @@ import json, datetime
 s = {
   'task_id': f'batch_{datetime.datetime.now(datetime.timezone.utc).strftime(\"%Y%m%d_%H%M%S\")}',
   'range': {'start': $S, 'end': $E},
-  'status': 'running',
+  'status': 'paused',
   'current_chapter': $S,
   'completed_chapters': [],
   'failed_chapters': [],
@@ -157,6 +157,8 @@ test -d "${PROJECT_ROOT}/.webnovel" || { echo "❌ ${PROJECT_ROOT}/.webnovel 不
 echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 ```
 
+**状态门**: 若 batch_state.status 为 "paused"，输出进度摘要并等待用户输入 "继续" 才将 status 改为 "running"。
+
 ---
 
 ### Step A: 上章完整性检查（N > S 时强制）
@@ -192,20 +194,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pla
 genre 从 `.webnovel/state.json` 的初始化配置快照读取。调用 story-system 前必须先从详细大纲解析真实本章目标，禁止传 `{章纲目标}`、`第N章章纲目标` 等占位 query。
 
 ```bash
-# 用 Python subprocess 直接传参，避免 CJK 文本经 shell 变量时编码损坏
-python -X utf8 -c "
-import json, subprocess, sys
-from pathlib import Path
-root = Path('${PROJECT_ROOT}')
-s = json.loads((root / '.webnovel' / 'state.json').read_text('utf-8'))
-genre = s.get('project_info', {}).get('genre', '')
-subprocess.run([
-    sys.executable, '-X', 'utf8',
-    '${SCRIPTS_DIR}/webnovel.py', '--project-root', str(root),
-    'story-system', '${CHAPTER_GOAL}', '--genre', genre,
-    '--chapter', '{N}', '--persist', '--emit-runtime-contracts', '--format', 'both'
-], check=True)
-"
+# 用 skill_runner 传递 CJK，genre 自动从 state.json 读取，goal 从 stdin 传入
+echo "${CHAPTER_GOAL}" | python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" story-system \
+  --project-root "${PROJECT_ROOT}" --chapter {N}
 ```
 
 必备文件：`MASTER_SETTING.json`、`volume_{NNN}.json`、`chapter_{NNN}.review.json`。缺失则阻断。
@@ -217,39 +208,8 @@ subprocess.run([
 ### 准备：结构自检
 
 ```bash
-CHECK_RESULT=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" checkers structural --chapter {N} --format json)
-
-# 提取检查结果摘要
-echo "$CHECK_RESULT" | python -c "
-import json,sys
-d=json.load(sys.stdin)
-print(f'结构自检: {\"✅ 通过\" if d[\"passed\"] else \"❌ 存在阻断问题\"}')
-for c in d['checks']:
-    mark = '✅' if c['passed'] else '❌'
-    print(f'  {mark} [{c[\"severity\"]}] {c[\"name\"]}')
-    if not c['passed']:
-        print(f'      {c[\"detail\"]}')
-"
-
-# 检查是否有 blocking 失败
-BLOCKING=$(echo "$CHECK_RESULT" | python -c "
-import json,sys
-d=json.load(sys.stdin)
-count=sum(1 for c in d['checks'] if c['severity']=='blocking' and not c['passed'])
-print(count)
-")
-
-if [ "$BLOCKING" -gt 0 ]; then
-  echo "❌ 结构自检存在阻断问题，请先修复再继续。"
-  echo "$CHECK_RESULT" | python -c "
-import json,sys
-d=json.load(sys.stdin)
-for c in d['checks']:
-    if c['severity']=='blocking' and not c['passed']:
-        print(f'  → {c[\"fix\"]}')
-  "
-  exit 1
-fi
+python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-structural \
+  --project-root "${PROJECT_ROOT}" --chapter {N} --format json
 ```
 
 ---
@@ -390,6 +350,8 @@ blocking_count > 0 → 进入修复轮（最多 2 轮）
        将提取的 issue 列表填入 prompt 的【审查反馈】部分
        prompt 明确指出："修复模式：只修改上述审查反馈指出的具体问题，不大面积重写。保留未涉及部分的原文。"
 
+    rm -f "${PROJECT_ROOT}/.webnovel/tmp/review_results.json"
+
     3. Agent(reviewer) 重新审查
        → 覆盖更新 review_results.json
 
@@ -453,36 +415,27 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" cha
 #### 写后校验
 
 ```bash
-# 1. 验证本章 commit 已生成（用 python 构建路径，避免 shell printf 引入不可见字符）
-python -c "
-import os
-p = os.path.join('${PROJECT_ROOT}', '.story-system', 'commits', f'chapter_{$N:04d}.commit.json')
-if os.path.isfile(p) and os.path.getsize(p) > 0:
-    print('✅ commit 已生成')
-else:
-    print(f'❌ commit 缺失: {p}')
-"
+# 1. commit 验证
+python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-commit \
+  --project-root "${PROJECT_ROOT}" --chapter {N}
 
-# 2. 验证 projection 已提交
+# 2. projection 验证
 python -c "
 import json
 state = json.load(open('${PROJECT_ROOT}/.webnovel/state.json'))
 status = state.get('progress', {}).get('chapter_status', {}).get(str($N))
 if status != 'chapter_committed':
-    raise SystemExit(f'chapter_status={status}, 期望 committed')
-print('✅ projection 已提交')
+    raise SystemExit(f'chapter_status={status}, expected committed')
+print('OK: projection committed')
 "
 
-# 3. 验证 index.db 覆盖（schema: chapters(chapter INTEGER PRIMARY KEY)）
-python -c "
-import sqlite3
-db = sqlite3.connect('${PROJECT_ROOT}/.webnovel/index.db')
-row = db.execute('SELECT COUNT(*) FROM chapters WHERE chapter=?', ($N,)).fetchone()
-if row[0] == 0:
-    print(f'⚠️ 第${N}章未在 index.db 中')
-else:
-    print('✅ index.db 已覆盖')
-"
+# 3. index.db 验证
+python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-index \
+  --project-root "${PROJECT_ROOT}" --chapter {N}
+
+# 4. batch_state 跨章完整性
+python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-batch-integrity \
+  --project-root "${PROJECT_ROOT}" --start {S} --end {N}
 ```
 
 ```bash
