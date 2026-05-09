@@ -113,6 +113,24 @@ def cmd_check_index(project_root: str, chapter: int) -> int:
         conn.close()
 
 
+def cmd_compact_memory(args: argparse.Namespace) -> int:
+    from data_modules.memory.store import ScratchpadManager
+    from data_modules.memory.compactor import collect_garbage
+    from data_modules.config import get_config
+
+    config = get_config()
+    config.project_root = args.project_root
+    store = ScratchpadManager(config)
+    data = store.load()
+    before = data.count_items()
+    data = collect_garbage(data)
+    after = data.count_items()
+    store.save(data)
+    removed = before - after
+    print(f"OK: removed {removed} outdated items ({before} -> {after})")
+    return 0
+
+
 def cmd_check_batch_integrity(project_root: str, start: int, end: int) -> int:
     state_path = Path(project_root) / ".webnovel" / "batch_state.json"
     if not state_path.is_file():
@@ -165,6 +183,10 @@ def main() -> None:
     p_cbi.add_argument("--start", type=int, required=True)
     p_cbi.add_argument("--end", type=int, required=True)
     p_cbi.set_defaults(func=lambda args: cmd_check_batch_integrity(args.project_root, args.start, args.end))
+
+    p_cm = sub.add_parser("compact-memory")
+    p_cm.add_argument("--project-root", required=True)
+    p_cm.set_defaults(func=cmd_compact_memory)
 
     args = parser.parse_args()
     raise SystemExit(args.func(args))

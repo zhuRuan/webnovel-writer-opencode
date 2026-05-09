@@ -21,30 +21,26 @@ def _is_resolved_open_loop(item: MemoryItem) -> bool:
     return state in {"resolved", "closed", "done", "paid_off", "payoff"}
 
 
-def compact_scratchpad(data: ScratchpadData, max_items: int = 500) -> ScratchpadData:
+def collect_garbage(data: ScratchpadData) -> ScratchpadData:
+    """清理 outdated 条目和已回收伏笔。每章写后调用，无容量门槛。"""
+    # 1) 删除所有 outdated 条目
+    for bucket in CATEGORY_TO_BUCKET.values():
+        rows: List[MemoryItem] = list(getattr(data, bucket))
+        cleaned = [row for row in rows if row.status != "outdated"]
+        setattr(data, bucket, cleaned)
+
+    # 2) 清理已回收伏笔
+    data.open_loops = [row for row in data.open_loops if not _is_resolved_open_loop(row)]
+
+    return data
+
+
+def enforce_capacity(data: ScratchpadData, max_items: int = 500) -> ScratchpadData:
+    """仅当条目数超过 max_items 时压缩 timeline + 全局截断。"""
     if data.count_items() <= max_items:
         return data
 
-    # 1) 同 key 的 outdated 只保留最新，避免历史膨胀。
-    for bucket in CATEGORY_TO_BUCKET.values():
-        rows: List[MemoryItem] = list(getattr(data, bucket))
-        latest_outdated: Dict[Tuple, MemoryItem] = {}
-        keep: List[MemoryItem] = []
-        for row in rows:
-            if row.status != "outdated":
-                keep.append(row)
-                continue
-            key = _key_for(row)
-            prev = latest_outdated.get(key)
-            if prev is None or (row.updated_at or "") >= (prev.updated_at or ""):
-                latest_outdated[key] = row
-        keep.extend(latest_outdated.values())
-        setattr(data, bucket, keep)
-
-    # 2) 清理已回收伏笔。
-    data.open_loops = [row for row in data.open_loops if not _is_resolved_open_loop(row)]
-
-    # 3) 压缩过旧 timeline（与当前最新章节相距 50 章以上）。
+    # 3) 压缩过旧 timeline（与当前最新章节相距 50 章以上）
     timeline = sorted(data.timeline, key=lambda x: x.source_chapter)
     if timeline:
         latest_chapter = max(x.source_chapter for x in timeline)
@@ -59,8 +55,7 @@ def compact_scratchpad(data: ScratchpadData, max_items: int = 500) -> Scratchpad
             summary_text = "；".join(samples) if samples else "早期关键事件"
             summary_item = MemoryItem(
                 id=f"timeline-summary-upto-{old[-1].source_chapter}",
-                layer="semantic",
-                category="story_fact",
+                layer="semantic", category="story_fact",
                 subject="timeline_summary",
                 field=f"<=ch{old[-1].source_chapter}",
                 value=f"早期事件摘要：{summary_text}",
@@ -84,13 +79,12 @@ def compact_scratchpad(data: ScratchpadData, max_items: int = 500) -> Scratchpad
                 data.story_facts.append(summary_item)
         data.timeline = fresh
 
-    # 4) 若仍超限，按状态和新鲜度做全局截断，保证总量不超过 max_items。
+    # 4) 若仍超限，全局截断
     if data.count_items() > max_items:
         ranked: List[Tuple[str, MemoryItem]] = []
         for bucket in CATEGORY_TO_BUCKET.values():
             for row in list(getattr(data, bucket)):
                 ranked.append((bucket, row))
-
         ranked.sort(
             key=lambda item: (
                 0 if item[1].status == "active" else 1,
@@ -106,3 +100,9 @@ def compact_scratchpad(data: ScratchpadData, max_items: int = 500) -> Scratchpad
 
     data.meta = {**dict(data.meta or {}), "last_updated": now_iso(), "total_items": data.count_items()}
     return data
+
+
+def compact_scratchpad(data: ScratchpadData, max_items: int = 500) -> ScratchpadData:
+    """兼容旧调用：先 GC 再容量控制。"""
+    data = collect_garbage(data)
+    return enforce_capacity(data, max_items)
