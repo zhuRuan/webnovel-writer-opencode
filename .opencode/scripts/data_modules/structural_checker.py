@@ -16,7 +16,7 @@ def run_checks(project_root: Path, chapter: int) -> dict[str, Any]:
     checks.append(_check_strand_balance(state, chapter))
     checks.append(_check_entity_freshness(state, chapter))
     checks.append(_check_memory_bloat(project_root))
-    checks.append(_check_debt_burden(state))
+    checks.append(_check_debt_burden(state, project_root, chapter))
     checks.append(_check_contract_coverage(project_root, chapter))
 
     passed = not any(c["severity"] == "blocking" and not c["passed"] for c in checks)
@@ -136,7 +136,7 @@ def _check_memory_bloat(project_root: Path) -> dict:
     return result
 
 
-def _check_debt_burden(state: dict) -> dict:
+def _check_debt_burden(state: dict, project_root=None, chapter=0):
     result = {
         "name": "debt_burden",
         "passed": True,
@@ -144,12 +144,38 @@ def _check_debt_burden(state: dict) -> dict:
         "detail": "",
         "fix": "",
     }
+    # Prefer index.db if available
+    if project_root:
+        db_path = Path(project_root) / ".webnovel" / "index.db"
+        if db_path.is_file():
+            import sqlite3
+            conn = sqlite3.connect(str(db_path))
+            try:
+                total = conn.execute(
+                    "SELECT COUNT(*) FROM chase_debt WHERE status='active'"
+                ).fetchone()[0]
+                overdue = conn.execute(
+                    "SELECT COUNT(*) FROM chase_debt WHERE status='active' AND due_chapter < ?",
+                    (chapter,)
+                ).fetchone()[0]
+                if total > 5:
+                    result["passed"] = False
+                    result["detail"] = f"active debts {total} (threshold 5), {overdue} overdue"
+                    result["fix"] = "resolve overdue foreshadowing in upcoming chapters"
+                elif overdue > 0:
+                    result["passed"] = False
+                    result["detail"] = f"{overdue} debts overdue"
+                    result["fix"] = "check overdue foreshadowing, repay in upcoming chapters"
+                return result
+            finally:
+                conn.close()
+    # Fallback: read from state.json
     foreshadowing = (state.get("plot_threads") or {}).get("foreshadowing") or []
     unresolved = [f for f in foreshadowing if f.get("status") == "未回收"]
     if len(unresolved) > 5:
         result["passed"] = False
-        result["detail"] = f"未回收伏笔 {len(unresolved)} 条（阈值 5 条）"
-        result["fix"] = "检查逾期伏笔，近期章节安排偿还或标记废弃"
+        result["detail"] = f"unresolved foreshadowing {len(unresolved)} (threshold 5)"
+        result["fix"] = "resolve or mark abandoned for overdue foreshadowing"
     return result
 
 

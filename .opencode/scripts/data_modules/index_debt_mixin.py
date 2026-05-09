@@ -500,5 +500,53 @@ class IndexDebtMixin:
                 "total_balance": active["total"] + overdue["total"],
             }
 
+    # ==================== 简单债务操作（供 _sync_foreshadowing 使用） ====================
+
+    def create_simple_debt(
+        self, debt_type: str, source_chapter: int,
+        due_chapter: int, note: str = "",
+        subject: str = "",
+    ) -> int:
+        """创建简单债务记录（无需 ChaseDebtMeta）。返回 debt id。
+
+        与 create_debt(debt: ChaseDebtMeta) 不同，此方法接受标量参数，
+        主要用于从 _sync_foreshadowing 等应用层代码中快速创建债务。
+        """
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO chase_debt
+                   (debt_type, source_chapter, due_chapter)
+                   VALUES (?, ?, ?)""",
+                (debt_type, source_chapter, due_chapter),
+            )
+            debt_id = cursor.lastrowid
+            if note:
+                cursor.execute(
+                    """INSERT INTO debt_events
+                       (debt_id, event_type, amount, chapter, note)
+                       VALUES (?, 'created', 1.0, ?, ?)""",
+                    (debt_id, source_chapter, note),
+                )
+            conn.commit()
+            return debt_id or 0
+
+    def resolve_debt_by_subject(self, subject: str, chapter: int = 0) -> bool:
+        """通过 note 匹配解决活跃债务。"""
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """UPDATE chase_debt SET status='resolved',
+                   updated_at=CURRENT_TIMESTAMP
+                   WHERE status='active' AND id IN
+                   (SELECT d.id FROM chase_debt d
+                    JOIN debt_events e ON e.debt_id = d.id
+                    WHERE e.note LIKE ?)""",
+                (f"%{subject}%",),
+            )
+            resolved = cursor.rowcount > 0
+            conn.commit()
+            return resolved
+
     # ==================== 批量操作 ====================
 

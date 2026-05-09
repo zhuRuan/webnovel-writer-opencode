@@ -86,6 +86,35 @@ class ChapterCommitService:
         write_json(path, payload)
         return path
 
+    def _sync_foreshadowing(self, commit_payload: dict) -> None:
+        """Sync foreshadowing events from commit payload to debt tracker."""
+        events = commit_payload.get("accepted_events", [])
+        if not events:
+            return
+        chapter = int(commit_payload.get("meta", {}).get("chapter", 0))
+        if chapter <= 0:
+            return
+        idx = IndexManager()
+        for evt in events:
+            if not isinstance(evt, dict):
+                continue
+            etype = evt.get("event_type", "")
+            payload = evt.get("payload") or {}
+            subject = evt.get("subject", payload.get("subject", ""))
+            content = payload.get("content", "")
+            if etype == "open_loop_created":
+                due = chapter + 10
+                note = content or subject or f"ch{chapter} foreshadowing"
+                idx.create_simple_debt(
+                    debt_type="foreshadowing",
+                    source_chapter=chapter,
+                    due_chapter=due,
+                    note=note,
+                    subject=subject,
+                )
+            elif etype in ("open_loop_closed", "promise_paid_off"):
+                idx.resolve_debt_by_subject(subject=subject, chapter=chapter)
+
     def apply_projections(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         if payload["meta"]["status"] != "accepted":
             return payload
@@ -125,4 +154,5 @@ class ChapterCommitService:
             except Exception as exc:
                 payload["projection_status"][name] = f"failed:{exc}"
         self.persist_commit(payload)
+        self._sync_foreshadowing(payload)
         return payload
