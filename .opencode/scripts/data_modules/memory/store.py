@@ -76,11 +76,10 @@ class ScratchpadManager:
             for row in rows:
                 row_key = self._key_for(row)
                 if row_key == target_key and row.id != normalized.id:
-                    # 同 key 旧值降级为 outdated，保留审计轨迹
-                    if row.status != "outdated":
-                        row = MemoryItem(**{**asdict(row), "status": "outdated", "updated_at": now_iso()})
-                        outdated += 1
+                    # 同 key 旧值直接丢弃
+                    outdated += 1
                     replaced_existing = True
+                    continue  # skip old row entirely
                 elif row.id == normalized.id:
                     replaced_existing = True
                     continue

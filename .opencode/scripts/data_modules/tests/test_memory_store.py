@@ -18,7 +18,8 @@ def test_load_empty_file(tmp_path):
     assert data.count_items() == 0
 
 
-def test_upsert_character_state_marks_old_outdated(tmp_path):
+def test_upsert_character_state_deletes_old(tmp_path):
+    """旧值在同 key upsert 时被直接删除，而非标记 outdated。"""
     manager = ScratchpadManager(_cfg(tmp_path))
     item1 = MemoryItem(
         id="a1",
@@ -44,7 +45,7 @@ def test_upsert_character_state_marks_old_outdated(tmp_path):
     outdated = manager.query(category="character_state", subject="xiaoyan", status="outdated")
     assert len(active) == 1
     assert active[0].value == "斗师"
-    assert len(outdated) == 1
+    assert len(outdated) == 0  # 旧值已被删除
 
 
 def test_upsert_world_rule_with_subject_field_key(tmp_path):
