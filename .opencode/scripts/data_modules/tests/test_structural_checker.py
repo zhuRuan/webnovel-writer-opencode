@@ -82,7 +82,7 @@ def _write_memory_scratchpad(tmpdir, entries):
 def _write_contract(tmpdir, chapter):
     chapters = tmpdir / ".story-system" / "chapters"
     chapters.mkdir(parents=True)
-    (chapters / f"chapter_{chapter:04d}.json").write_text("{}", encoding="utf-8")
+    (chapters / f"chapter_{chapter:03d}.json").write_text("{}", encoding="utf-8")
 
 
 def test_strand_quest_too_long():

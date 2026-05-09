@@ -337,8 +337,8 @@ class StorySystemEngine:
                     parts.append(text)
         return " ".join(parts)
 
-    def _fallback_row_for_genre(self, rows: List[Dict[str, Any]], genre: str) -> Dict[str, Any] | None:
-        genre_text = self._normalize_text(resolve_genre(genre) or genre)
+    def _match_row_by_genre_text(self, rows: List[Dict[str, Any]], genre_text: str) -> Dict[str, Any] | None:
+        """Find a row whose 适用题材/题材/流派/canonical_genre matches genre_text."""
         for row in rows:
             candidates = (
                 self._split_multi_value(row.get("适用题材"))
@@ -347,21 +347,23 @@ class StorySystemEngine:
             )
             if any(self._normalize_text(candidate) == genre_text for candidate in candidates):
                 return row
+        return None
+
+    def _fallback_row_for_genre(self, rows: List[Dict[str, Any]], genre: str) -> Dict[str, Any] | None:
+        genre_text = self._normalize_text(resolve_genre(genre) or genre)
+        row = self._match_row_by_genre_text(rows, genre_text)
+        if row:
+            return row
         # 复合题材拆解: "末世+异能" -> ["末世", "异能"] -> try each component
         if "+" in genre:
-            components = [g.strip() for g in genre.split("+")]
-            for component in components:
+            for component in genre.split("+"):
+                component = component.strip()
                 if not component:
                     continue
                 component_text = self._normalize_text(resolve_genre(component) or component)
-                for row in rows:
-                    candidates = (
-                        self._split_multi_value(row.get("适用题材"))
-                        + self._split_multi_value(row.get("题材/流派"))
-                        + self._split_multi_value(row.get("canonical_genre"))
-                    )
-                    if any(self._normalize_text(candidate) == component_text for candidate in candidates):
-                        return row
+                row = self._match_row_by_genre_text(rows, component_text)
+                if row:
+                    return row
         return None
 
     def _infer_genre_from_text(self, text: str) -> str:

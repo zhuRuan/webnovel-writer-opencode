@@ -151,10 +151,10 @@ def _check_contract_coverage(project_root: Path, chapter: int) -> dict:
         "detail": "",
         "fix": "",
     }
-    contract = project_root / ".story-system" / "chapters" / f"chapter_{chapter:04d}.json"
+    contract = project_root / ".story-system" / "chapters" / f"chapter_{chapter:03d}.json"
     if not contract.is_file():
         result["passed"] = False
-        result["detail"] = f"缺少 chapter_{chapter:04d}.json 合同"
+        result["detail"] = f"缺少 chapter_{chapter:03d}.json 合同"
         result["fix"] = "运行 story-system 生成本章合同"
     return result
 

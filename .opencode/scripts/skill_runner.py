@@ -90,7 +90,7 @@ def cmd_check_file(path: str) -> int:
 
 
 def cmd_check_commit(project_root: str, chapter: int) -> int:
-    p = Path(project_root) / ".story-system" / "commits" / f"chapter_{chapter:04d}.commit.json"
+    p = Path(project_root) / ".story-system" / "commits" / f"chapter_{chapter:03d}.commit.json"
     return cmd_check_file(str(p))
 
 
@@ -138,41 +138,36 @@ def main() -> None:
     p_ss = sub.add_parser("story-system")
     p_ss.add_argument("--project-root", required=True)
     p_ss.add_argument("--chapter", type=int, required=True)
+    p_ss.set_defaults(func=cmd_story_system)
 
     p_cs = sub.add_parser("check-structural")
     p_cs.add_argument("--project-root", required=True)
     p_cs.add_argument("--chapter", type=int, required=True)
     p_cs.add_argument("--format", choices=["json", "text"], default="json")
+    p_cs.set_defaults(func=cmd_check_structural)
 
     p_cc = sub.add_parser("check-commit")
     p_cc.add_argument("--project-root", required=True)
     p_cc.add_argument("--chapter", type=int, required=True)
+    p_cc.set_defaults(func=lambda args: cmd_check_commit(args.project_root, args.chapter))
 
     p_ci = sub.add_parser("check-index")
     p_ci.add_argument("--project-root", required=True)
     p_ci.add_argument("--chapter", type=int, required=True)
+    p_ci.set_defaults(func=lambda args: cmd_check_index(args.project_root, args.chapter))
 
     p_cf = sub.add_parser("check-file")
     p_cf.add_argument("--path", required=True)
+    p_cf.set_defaults(func=lambda args: cmd_check_file(args.path))
 
     p_cbi = sub.add_parser("check-batch-integrity")
     p_cbi.add_argument("--project-root", required=True)
     p_cbi.add_argument("--start", type=int, required=True)
     p_cbi.add_argument("--end", type=int, required=True)
+    p_cbi.set_defaults(func=lambda args: cmd_check_batch_integrity(args.project_root, args.start, args.end))
 
     args = parser.parse_args()
-
-    action_map = {
-        "story-system": lambda: cmd_story_system(args),
-        "check-structural": lambda: cmd_check_structural(args),
-        "check-commit": lambda: cmd_check_commit(args.project_root, args.chapter),
-        "check-index": lambda: cmd_check_index(args.project_root, args.chapter),
-        "check-file": lambda: cmd_check_file(args.path),
-        "check-batch-integrity": lambda: cmd_check_batch_integrity(args.project_root, args.start, args.end),
-    }
-
-    code = action_map[args.action]()
-    raise SystemExit(code)
+    raise SystemExit(args.func(args))
 
 
 if __name__ == "__main__":

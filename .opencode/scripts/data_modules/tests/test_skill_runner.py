@@ -42,7 +42,7 @@ def test_check_commit_exists():
         root = Path(td)
         commits = root / ".story-system" / "commits"
         commits.mkdir(parents=True)
-        (commits / "chapter_0020.commit.json").write_text('{"status":"ok"}', encoding="utf-8")
+        (commits / "chapter_020.commit.json").write_text('{"status":"ok"}', encoding="utf-8")
         assert cmd_check_commit(str(root), 20) == 0
 
 
