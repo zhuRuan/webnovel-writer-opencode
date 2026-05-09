@@ -109,6 +109,8 @@ def _run_data_module(module: str, argv: list[str]) -> int:
     """
     Import `data_modules.<module>` and call its main(), while isolating sys.argv.
     """
+    from runtime_compat import enable_windows_utf8_stdio
+    enable_windows_utf8_stdio()
     mod = importlib.import_module(f"data_modules.{module}")
     main = getattr(mod, "main", None)
     if not callable(main):

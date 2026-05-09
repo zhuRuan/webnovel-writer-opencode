@@ -445,7 +445,10 @@ def main():
 
     # 执行操作
     if args.chapter:
-        manager.backup(args.chapter, args.chapter_title or "")
+        ok = manager.backup(args.chapter, args.chapter_title or "")
+        if not ok:
+            print("❌ 备份失败", file=sys.stderr)
+            sys.exit(1)
 
     elif args.rollback:
         manager.rollback(args.rollback)

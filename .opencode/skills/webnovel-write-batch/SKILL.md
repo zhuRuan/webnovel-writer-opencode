@@ -371,6 +371,13 @@ blocking_count > 0 → 进入修复轮（最多 2 轮）
 
 **必须使用 Agent 工具调用 data-agent，不得跳过或手动模拟。**
 
+```bash
+# 清空旧 tmp 文件，防止 data-agent 失败时下游读到上一章数据
+rm -f "${PROJECT_ROOT}/.webnovel/tmp/fulfillment_result.json"
+rm -f "${PROJECT_ROOT}/.webnovel/tmp/disambiguation_result.json"
+rm -f "${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json"
+```
+
 ```text
 Agent(
   subagent_type: "data-agent",
@@ -461,7 +468,8 @@ score = json.load(open(review_path)).get('score', 0)
 # 更新 batch_state
 p = pathlib.Path('$BATCH_STATE')
 s = json.loads(p.read_text())
-s['completed_chapters'].append($N)
+if $N not in s['completed_chapters']:
+    s['completed_chapters'].append($N)
 s['current_chapter'] = $N + 1
 s['chapter_results'][str($N)] = {
     'status': 'success',

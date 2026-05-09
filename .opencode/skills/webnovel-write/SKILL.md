@@ -184,6 +184,13 @@ blocking=true → 修复后重审，不进 Step 4。`--fast` 只检查 setting/t
 
 必须使用 `Agent` 工具调用 `data-agent`，产出 fulfillment_result / disambiguation_result / extraction_result 三份 JSON，并复用 Step 3 的 review_results。
 
+```bash
+# 清空旧 tmp 文件，防止 data-agent 失败时下游读到上一章数据
+rm -f "${PROJECT_ROOT}/.webnovel/tmp/fulfillment_result.json"
+rm -f "${PROJECT_ROOT}/.webnovel/tmp/disambiguation_result.json"
+rm -f "${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json"
+```
+
 ```text
 Agent(
   subagent_type: "data-agent",

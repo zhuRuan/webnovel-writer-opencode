@@ -27,13 +27,18 @@ def main() -> None:
     args = parser.parse_args()
 
     service = ChapterCommitService(Path(args.project_root))
-    payload = service.build_commit(
-        chapter=args.chapter,
-        review_result=_read_json(args.review_result),
-        fulfillment_result=_read_json(args.fulfillment_result),
-        disambiguation_result=_read_json(args.disambiguation_result),
-        extraction_result=_read_json(args.extraction_result),
-    )
+    try:
+        payload = service.build_commit(
+            chapter=args.chapter,
+            review_result=_read_json(args.review_result),
+            fulfillment_result=_read_json(args.fulfillment_result),
+            disambiguation_result=_read_json(args.disambiguation_result),
+            extraction_result=_read_json(args.extraction_result),
+        )
+    except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
+        print(json.dumps({"status": "failed", "reason": f"读取输入文件失败: {e}"},
+                         ensure_ascii=False), file=sys.stderr)
+        sys.exit(1)
     service.persist_commit(payload)
     if payload["meta"]["status"] == "accepted":
         payload = service.apply_projections(payload)

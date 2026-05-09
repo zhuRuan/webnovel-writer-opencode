@@ -97,7 +97,7 @@ class ChapterCommitService:
         chapter = int(commit_payload.get("meta", {}).get("chapter", 0))
         if chapter <= 0:
             return
-        idx = IndexManager()
+        idx = IndexManager(DataModulesConfig.from_project_root(str(self.project_root)))
         for evt in events:
             if not isinstance(evt, dict):
                 continue

@@ -109,22 +109,18 @@ def test_is_resolved_open_loop_various_statuses():
     assert _is_resolved_open_loop(non_loop) is False
 
 
-def test_compactor_dedup_outdated_keeps_latest():
-    """步骤1: 同key的outdated只保留最新一条。"""
+def test_collect_garbage_removes_all_outdated():
+    """collect_garbage 删除所有 outdated 条目，不保留任何历史值。"""
     data = ScratchpadData.empty()
-    # 3 items: 2 outdated (同key) + 1 active → dedup后变2 items, <= max_items=3
     data.character_state = [
         _make_item("a1", subject="x", field="realm", value="v1", status="outdated", updated_at="2026-01-01T00:00:00"),
         _make_item("a2", subject="x", field="realm", value="v2", status="outdated", updated_at="2026-02-01T00:00:00"),
         _make_item("a3", subject="x", field="realm", value="v3", status="active"),
     ]
-    # 需1个额外item让总数=4 > max_items=3，触发压缩入口
     data.world_rules.append(_make_item("wr0", category="world_rule", subject="r0", field="f0", value="v0", chapter=1))
     result = compact_scratchpad(data, max_items=3)
     outdated = [r for r in result.character_state if r.status == "outdated"]
-    # dedup去掉a1，保留a2（更新），压缩后总数=3（a2+a3+wr0）刚好 <= max_items
-    assert len(outdated) == 1
-    assert outdated[0].value == "v2"
+    assert len(outdated) == 0  # collect_garbage 清除了所有 outdated
 
 
 def test_compactor_cleans_resolved_open_loops():
