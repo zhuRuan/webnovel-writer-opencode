@@ -60,7 +60,7 @@ def _write_state(tmpdir, state):
 def _write_memory_scratchpad(tmpdir, entries):
     webnovel = tmpdir / ".webnovel"
     webnovel.mkdir(exist_ok=True)
-    data = []
+    items = []
     for i, entry in enumerate(entries):
         item = {
             "id": f"mem-{i}",
@@ -75,7 +75,11 @@ def _write_memory_scratchpad(tmpdir, entries):
             "updated_at": "2026-05-01",
         }
         item.update(entry)
-        data.append(item)
+        items.append(item)
+    # Match real format: dict of buckets
+    data = {"character_state": items, "story_facts": [], "world_rules": [],
+            "timeline": [], "open_loops": [], "reader_promises": [],
+            "relationships": [], "meta": {}}
     (webnovel / "memory_scratchpad.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
 

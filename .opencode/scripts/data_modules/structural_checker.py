@@ -110,8 +110,18 @@ def _check_memory_bloat(project_root: Path) -> dict:
 
     try:
         data = json.loads(mem_file.read_text(encoding="utf-8"))
-        entries = data if isinstance(data, list) else []
     except (json.JSONDecodeError, OSError):
+        return result
+
+    # Support both flat list (legacy) and dict-of-buckets format
+    if isinstance(data, dict):
+        entries = []
+        for v in data.values():
+            if isinstance(v, list):
+                entries.extend(v)
+    elif isinstance(data, list):
+        entries = data
+    else:
         return result
 
     if not entries:
