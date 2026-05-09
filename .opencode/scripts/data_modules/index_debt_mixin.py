@@ -533,6 +533,8 @@ class IndexDebtMixin:
 
     def resolve_debt_by_subject(self, subject: str, chapter: int = 0) -> bool:
         """通过 note 匹配解决活跃债务。"""
+        # 转义 LIKE 通配符，防止 subject 中的 % 或 _ 导致误匹配
+        safe_subject = subject.replace("%", r"\%").replace("_", r"\_")
         with self._get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -541,8 +543,8 @@ class IndexDebtMixin:
                    WHERE status='active' AND id IN
                    (SELECT d.id FROM chase_debt d
                     JOIN debt_events e ON e.debt_id = d.id
-                    WHERE e.note LIKE ?)""",
-                (f"%{subject}%",),
+                    WHERE e.note LIKE ? ESCAPE '\\')""",
+                (f"%{safe_subject}%",),
             )
             resolved = cursor.rowcount > 0
             conn.commit()

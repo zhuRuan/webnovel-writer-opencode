@@ -18,6 +18,9 @@ from .override_ledger_service import (
     persist_amend_proposals,
 )
 
+# 伏笔默认偿还章数：创建债务时默认要求 10 章内偿还
+_FORESHADOW_DUE_OFFSET = 10
+
 
 class ChapterCommitService:
     def __init__(self, project_root: Path):
@@ -103,7 +106,7 @@ class ChapterCommitService:
             subject = evt.get("subject", payload.get("subject", ""))
             content = payload.get("content", "")
             if etype == "open_loop_created":
-                due = chapter + 10
+                due = chapter + _FORESHADOW_DUE_OFFSET
                 note = content or subject or f"ch{chapter} foreshadowing"
                 idx.create_simple_debt(
                     debt_type="foreshadowing",
