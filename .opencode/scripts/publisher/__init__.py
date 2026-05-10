@@ -95,6 +95,7 @@ async def _cmd_upload(args: argparse.Namespace):
     from publisher.formatter import format_for_platform
 
     adapter = _get_adapter(args.platform)
+    adapter.set_mode(args.mode)
     cfg = PublishConfig(mode=args.mode)
     uploaded = load_upload_log(args.platform, args.book_id)
 

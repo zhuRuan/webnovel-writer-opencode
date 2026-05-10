@@ -144,6 +144,12 @@ class FanqieAdapter(BasePlatform):
     display_name = "番茄小说"
     login_url = "https://fanqienovel.com/main/writer/?enter_from=author_zone"
 
+    def __init__(self):
+        self._mode = "draft"
+
+    def set_mode(self, mode: str):
+        self._mode = mode
+
     # ── 认证 ─────────────────────────────────────────────
 
     async def setup_auth(self, page) -> bool:
@@ -297,11 +303,33 @@ class FanqieAdapter(BasePlatform):
 
     # ── 上传章节 ─────────────────────────────────────────
 
+    async def _post_with_retry(self, page, path, form, max_retries=2):
+        """POST with retry on empty response. Refreshes writer context between attempts."""
+        last_exc = None
+        for attempt in range(max_retries + 1):
+            try:
+                result = await _page_fetch(page, "POST", path, form=form)
+                return result
+            except RuntimeError as e:
+                last_exc = e
+                if attempt < max_retries:
+                    delay = 2 ** attempt  # 1s, 2s exponential backoff
+                    await asyncio.sleep(delay)
+                    await self._ensure_writer_context(page)
+        raise last_exc
+
     async def upload_chapter(
         self, page, book_id: str, chapter: Chapter
     ) -> UploadResult:
         """上传单章到番茄。两步：new_article 分配 ID → cover_article 保存内容。"""
         await self._ensure_writer_context(page)
+
+        # 预热：验证登录态并确保在 writer 域名下
+        await page.goto(f"https://writer.fanqienovel.com?aid=2503&app_name=muye_novel",
+                        wait_until="networkidle", timeout=30_000)
+        if "fanqienovel.com" not in page.url:
+            raise RuntimeError("登录态失效: 未跳转到 writer 域名，请重新 setup-auth")
+
         volume_id, volume_name = await self._get_first_volume(page, book_id)
 
         # Fanqie 标题格式: "第 X 章 标题" (5-30 chars)
@@ -314,7 +342,7 @@ class FanqieAdapter(BasePlatform):
         html_content = _text_to_html(chapter.content)
 
         # Step 1: 分配章节槽位
-        create_data = await _page_fetch(page, "POST",
+        create_data = await self._post_with_retry(page,
             "/api/author/article/new_article/v0/", form={
                 **_COMMON_FORM,
                 "book_id": book_id,
@@ -332,7 +360,7 @@ class FanqieAdapter(BasePlatform):
             )
 
         # Step 2: 写入内容
-        await _page_fetch(page, "POST",
+        await self._post_with_retry(page,
             "/api/author/article/cover_article/v0/", form={
                 **_COMMON_FORM,
                 "book_id": book_id,
@@ -344,6 +372,10 @@ class FanqieAdapter(BasePlatform):
             })
 
         logger.info("Chapter saved: item_id=%s, title=%s", item_id, full_title)
+
+        if getattr(self, '_mode', 'draft') == "publish":
+            print("  ⚠️ 注意: 当前仅支持草稿保存，章节未正式发布。发布请前往番茄作者后台手动操作。")
+
         return UploadResult(
             success=True, chapter_index=chapter.index,
             message=f"草稿已保存: {full_title}",
