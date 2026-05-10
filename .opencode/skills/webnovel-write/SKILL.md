@@ -26,6 +26,7 @@ allowed-tools: Read Write Edit Grep Bash Agent
 - blocking issue 未解决不进 Step 4/5
 - 失败只补跑失败步骤，不回退
 - 参考资料按步骤按需加载
+- 所有文件存在性验证必须用 Python（`python -c "..."` 或 skill_runner），不得用 PowerShell 原生命令。中文路径在 PowerShell `Test-Path` 和 Python `os.path.isfile` 之间编码不一致。
 
 ## 优先级
 
