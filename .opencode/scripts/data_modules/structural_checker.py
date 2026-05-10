@@ -60,15 +60,15 @@ def _check_strand_balance(state: dict, chapter: int) -> dict:
 
     # constellation check
     last_const = _safe_int(tracker.get("last_constellation_chapter"))
-    if last_const == 0 and chapter > 15:
+    if last_const == 0 and chapter > 8:
         result["passed"] = False
-        result["detail"] = f"constellation 从未激活（当前第{chapter}章），最高容忍 15 章"
+        result["detail"] = f"constellation 从未激活（当前第{chapter}章），最高容忍 8 章"
         result["fix"] = "本章或下一章必须安排世界观展开：新势力/新地点/设定揭示/身世线索"
     elif last_const > 0:
         gap = chapter - last_const
-        if gap > 10:
+        if gap > 8:
             result["passed"] = False
-            result["detail"] = f"constellation 已 {gap} 章未出现（上限 10 章）"
+            result["detail"] = f"constellation 已 {gap} 章未出现（上限 8 章）"
             result["fix"] = "安排世界观展示内容"
 
     return result
@@ -89,7 +89,7 @@ def _check_entity_freshness(state: dict, chapter: int) -> dict:
         return result
 
     gap = chapter - last_chapter
-    if gap >= 3:
+    if gap >= 5:
         result["passed"] = False
         result["detail"] = f"主角位置 {gap} 章未更新（最后: 第{last_chapter}章）"
         result["fix"] = "data-agent 需输出 location.current state_delta（即使位置未变）"

@@ -21,7 +21,7 @@ def _make_state(overrides=None):
         "strand_tracker": {
             "last_quest_chapter": 20,
             "last_fire_chapter": 15,
-            "last_constellation_chapter": 12,
+            "last_constellation_chapter": 18,
             "current_dominant": "quest",
             "chapters_since_switch": 3,
             "history": [
@@ -115,7 +115,7 @@ def test_strand_quest_too_long():
 
 
 def test_strand_constellation_absent():
-    """constellation 从未激活且超过 10 章应 blocking"""
+    """constellation 从未激活且超过 8 章应 blocking"""
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         state = _make_state({
@@ -125,8 +125,8 @@ def test_strand_constellation_absent():
             }
         })
         _write_state(root, state)
-        _write_contract(root, 22)
-        result = run_checks(root, 22)
+        _write_contract(root, 10)
+        result = run_checks(root, 10)
         check = _find_check(result, "strand_balance")
         assert check["passed"] is False
         assert "从未激活" in check["detail"]
@@ -145,12 +145,12 @@ def test_strand_ok():
 
 
 def test_entity_freshness_stale():
-    """主角位置落后 >= 3 章应 blocking"""
+    """主角位置落后 >= 5 章应 blocking"""
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         state = _make_state({
             "protagonist_state": {
-                "location": {"current": "废弃工厂", "last_chapter": 17},
+                "location": {"current": "废弃工厂", "last_chapter": 16},
             }
         })
         _write_state(root, state)
@@ -168,6 +168,22 @@ def test_entity_freshness_ok():
         state = _make_state({
             "protagonist_state": {
                 "location": {"current": "废弃工厂", "last_chapter": 21},
+            }
+        })
+        _write_state(root, state)
+        _write_contract(root, 22)
+        result = run_checks(root, 22)
+        check = _find_check(result, "entity_freshness")
+        assert check["passed"] is True
+
+
+def test_entity_freshness_gap2_ok():
+    """位置 2 章未更新在新阈值下应通过"""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        state = _make_state({
+            "protagonist_state": {
+                "location": {"current": "废弃工厂", "last_chapter": 20},
             }
         })
         _write_state(root, state)

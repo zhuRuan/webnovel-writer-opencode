@@ -210,7 +210,22 @@ echo "${CHAPTER_GOAL}" | python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" story-s
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-structural \
-  --project-root "${PROJECT_ROOT}" --chapter {N} --format json
+  --project-root "${PROJECT_ROOT}" --chapter {N} --format json \
+  > "${PROJECT_ROOT}/.webnovel/tmp/structural_check.json"
+```
+
+```bash
+python -c "
+import json, sys
+d = json.load(open('${PROJECT_ROOT}/.webnovel/tmp/structural_check.json'))
+if not d.get('passed'):
+    print('❌ 结构自检未通过，停止流程')
+    for c in d['checks']:
+        if c['severity'] == 'blocking' and not c['passed']:
+            print(f'  BLOCKING: {c[\"name\"]}: {c[\"detail\"]}')
+            print(f'  FIX: {c[\"fix\"]}')
+    sys.exit(1)
+" || exit 1
 ```
 
 ---
