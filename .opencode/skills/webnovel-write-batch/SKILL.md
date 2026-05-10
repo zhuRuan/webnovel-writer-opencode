@@ -132,6 +132,8 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pre
 
 ### 逐章检查清单（每章开始前重现）
 
+**步骤映射：** 0=环境变量验证, A=上章完整性, 1=刷新合同, 1b=结构自检, 2=context-agent, 3=写作, 4=审查, 5=review-pipeline, 6=修复轮, 7=data-agent, 8=commit+验证, 9=更新状态
+
 ```
 □ 0. 环境变量验证
 □ A. 上章完整性检查（N > S 时）
@@ -145,6 +147,12 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pre
 □ 7. Agent(data-agent) → 事实提取
 □ 8. chapter-commit + 验证投影 + Git 备份
 □ 9. 更新 batch_state + 进度反馈
+```
+
+每步执行前打印进度标识：
+
+```bash
+echo "[Ch{N} Step {M}/9] {step_name}..."
 ```
 
 ---
