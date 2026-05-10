@@ -170,6 +170,48 @@ def _project_root_diagnostic(
     )
 
 
+def _build_fs_state_sync(project_root: Path) -> dict:
+    import re
+    fs_nums = set()
+    text_dir = project_root / "正文"
+    if text_dir.is_dir():
+        for f in text_dir.rglob("第*章*.md"):
+            m = re.match(r"第0*(\d+)章", f.name)
+            if m:
+                fs_nums.add(int(m.group(1)))
+
+    state_path = project_root / ".webnovel" / "state.json"
+    state_nums = set()
+    if state_path.is_file():
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            chapter_status = (state.get("progress") or {}).get("chapter_status") or {}
+            state_nums = set(int(k) for k in chapter_status.keys())
+        except (json.JSONDecodeError, OSError, ValueError):
+            pass
+
+    orphans = sorted(fs_nums - state_nums)
+    ghosts = sorted(state_nums - fs_nums)
+    if orphans or ghosts:
+        detail_parts = []
+        if orphans:
+            detail_parts.append(f"孤文件(有正文无状态): {orphans}")
+        if ghosts:
+            detail_parts.append(f"幽灵章(有状态无正文): {ghosts}")
+        return {
+            "name": "fs_state_sync",
+            "ok": True,
+            "severity": "warning",
+            "detail": "; ".join(detail_parts),
+        }
+    return {
+        "name": "fs_state_sync",
+        "ok": True,
+        "severity": "info",
+        "detail": f"fs={len(fs_nums)} chapters, state={len(state_nums)} records, in sync",
+    }
+
+
 def _build_preflight_report(explicit_project_root: Optional[str]) -> dict:
     scripts_dir = _scripts_dir().resolve()
     plugin_root = scripts_dir.parent
@@ -192,6 +234,8 @@ def _build_preflight_report(explicit_project_root: Optional[str]) -> dict:
         project_root = str(resolved_root)
         checks.append({"name": "project_root", "ok": True, "path": project_root})
         story_runtime = build_story_runtime_health(resolved_root)
+        fs_state_check = _build_fs_state_sync(resolved_root)
+        checks.append(fs_state_check)
     except FileNotFoundError as exc:
         project_root_error = _project_root_diagnostic(explicit_project_root, exc)
         checks.append(
