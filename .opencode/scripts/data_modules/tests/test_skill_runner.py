@@ -156,3 +156,23 @@ def test_verify_chapter_files_missing_chapter(tmp_path):
     ns = argparse.Namespace(project_root=str(tmp_path), chapter=1)
     rc = cmd_verify_chapter_files(ns)
     assert rc == 1
+
+
+def test_pause_batch_running_to_paused(tmp_path):
+    _ensure_scripts_on_path()
+    from skill_runner import cmd_pause_batch
+    import argparse
+
+    webnovel = tmp_path / ".webnovel"
+    webnovel.mkdir()
+    state = {"status": "running", "current_chapter": 5, "completed_chapters": [3, 4]}
+    (webnovel / "batch_state.json").write_text(
+        json.dumps(state, ensure_ascii=False), encoding="utf-8"
+    )
+
+    ns = argparse.Namespace(project_root=str(tmp_path))
+    rc = cmd_pause_batch(ns)
+    assert rc == 0
+
+    updated = json.loads((webnovel / "batch_state.json").read_text("utf-8"))
+    assert updated["status"] == "paused"

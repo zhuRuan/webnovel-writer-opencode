@@ -143,6 +143,24 @@ def cmd_verify_chapter_files(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pause_batch(args: argparse.Namespace) -> int:
+    state_path = Path(args.project_root) / ".webnovel" / "batch_state.json"
+    if not state_path.is_file():
+        print("NO_BATCH")
+        return 0
+    s = json.loads(state_path.read_text("utf-8"))
+    prev = s.get("status", "")
+    if prev == "running":
+        s["status"] = "paused"
+        state_path.write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"PAUSED at chapter={s.get('current_chapter', '?')}")
+    elif prev == "paused":
+        print("ALREADY PAUSED")
+    else:
+        print(f"status={prev}, no action taken")
+    return 0
+
+
 def cmd_compact_memory(args: argparse.Namespace) -> int:
     from data_modules.memory.store import ScratchpadManager
     from data_modules.memory.compactor import collect_garbage
@@ -218,6 +236,10 @@ def main() -> None:
     p_vcf.add_argument("--project-root", required=True)
     p_vcf.add_argument("--chapter", type=int, required=True)
     p_vcf.set_defaults(func=cmd_verify_chapter_files)
+
+    p_pb = sub.add_parser("pause-batch")
+    p_pb.add_argument("--project-root", required=True)
+    p_pb.set_defaults(func=cmd_pause_batch)
 
     p_cm = sub.add_parser("compact-memory")
     p_cm.add_argument("--project-root", required=True)
