@@ -33,6 +33,9 @@ SCORE_CATEGORIES = (
     "pacing",
     "other",
 )
+CONTENT_DIMENSIONS = {"continuity", "setting", "character", "timeline", "ai_flavor", "logic", "pacing"}
+SYSTEM_DIMENSIONS = {"other"}
+
 SEVERITY_PENALTIES = {
     "critical": 35.0,
     "high": 15.0,
@@ -127,10 +130,11 @@ class ReviewResult:
         return " | ".join(parts)
 
     def _calculate_overall_score(self) -> float:
-        score = 100.0
-        for issue in self.issues:
-            score -= _issue_penalty(issue)
-        return _clamp_score(score)
+        dim_scores = self._build_dimension_scores()
+        content_scores = {d: s for d, s in dim_scores.items() if d in CONTENT_DIMENSIONS}
+        if not content_scores:
+            return 0.0
+        return float(round(sum(content_scores.values()) / len(content_scores)))
 
     def to_dict(self) -> Dict[str, Any]:
         return {

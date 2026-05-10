@@ -28,6 +28,9 @@ _ensure_scripts_path()
 
 from data_modules.review_schema import append_ai_flavor_anti_patterns, parse_review_output
 
+CONTENT_DIMENSIONS = {"continuity", "setting", "character", "timeline", "ai_flavor", "logic", "pacing"}
+SYSTEM_DIMENSIONS = {"other"}
+
 
 def _sanitize_json_text(raw: str) -> str:
     """Replace bare ASCII double quotes inside CJK text values with Chinese quotes."""
@@ -202,10 +205,16 @@ def build_review_artifacts(
     anti_patterns_added = append_ai_flavor_anti_patterns(project_root, result)
     metrics = result.to_metrics_dict(report_file=report_file)
 
+    dim_scores = metrics.get("dimension_scores", {})
+    system_health = {d: dim_scores.get(d, 0) for d in SYSTEM_DIMENSIONS}
+
     return {
         "chapter": chapter,
         "review_result": result.to_dict(),
         "metrics": metrics,
+        "score": metrics["overall_score"],      # alias for batch_state compatibility
+        "overall_score": metrics["overall_score"],
+        "system_health": system_health,
         "anti_patterns_added": anti_patterns_added,
     }
 
