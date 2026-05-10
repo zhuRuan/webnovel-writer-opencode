@@ -154,6 +154,25 @@ def cmd_where(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_chapter_path(args: argparse.Namespace) -> int:
+    """查找章节文件的相对路径（相对于 project_root）。"""
+    import re
+    root = Path(args.project_root).expanduser().resolve()
+    text_dir = root / "正文"
+    if not text_dir.is_dir():
+        print("ERROR: 正文目录不存在", file=sys.stderr)
+        return 1
+
+    pattern = re.compile(rf"第0*{args.chapter}章")
+    for f in text_dir.rglob("*.md"):
+        if pattern.search(f.name):
+            print(str(f.relative_to(root)))
+            return 0
+
+    print(f"ERROR: 未找到第{args.chapter}章的章节文件", file=sys.stderr)
+    return 1
+
+
 def _project_root_diagnostic(
     explicit_project_root: Optional[str], exc: FileNotFoundError
 ) -> str:
@@ -329,6 +348,10 @@ def main() -> None:
 
     p_where = sub.add_parser("where", help="打印解析出的 project_root")
     p_where.set_defaults(func=cmd_where)
+
+    p_chapter_path = sub.add_parser("chapter-path", help="查找章节文件相对路径（正文目录）")
+    p_chapter_path.add_argument("--chapter", type=int, required=True)
+    p_chapter_path.set_defaults(func=cmd_chapter_path)
 
     p_preflight = sub.add_parser("preflight", help="校验统一 CLI 运行环境与 project_root")
     p_preflight.add_argument("--format", choices=["text", "json"], default="text", help="输出格式")

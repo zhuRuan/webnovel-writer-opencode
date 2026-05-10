@@ -369,6 +369,27 @@ def test_preflight_reports_empty_workspace_without_traceback(monkeypatch, tmp_pa
     assert "Traceback" not in captured.err
 
 
+def test_chapter_path_subcommand(tmp_path):
+    """chapter-path 子命令应返回章节文件相对路径"""
+    import subprocess, sys
+    from pathlib import Path
+
+    root = tmp_path
+    text_dir = root / "正文"
+    text_dir.mkdir(parents=True)
+    (text_dir / "第0028章-测试章节.md").write_text("test content", encoding="utf-8")
+
+    webnovel_py = Path(__file__).resolve().parents[2] / "webnovel.py"
+    result = subprocess.run(
+        [sys.executable, "-X", "utf8", str(webnovel_py),
+         "--project-root", str(root),
+         "chapter-path", "--chapter", "28"],
+        capture_output=True, encoding="utf-8"
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert "第0028章" in result.stdout
+
+
 def test_quality_trend_report_writes_to_book_root_when_input_is_workspace_root(tmp_path, monkeypatch):
     _ensure_scripts_on_path()
     import quality_trend_report as quality_trend_report_module
