@@ -241,6 +241,14 @@ def _candidate_roots(cwd: Path, *, stop_at: Optional[Path] = None) -> Iterable[P
     for name in DEFAULT_PROJECT_DIR_NAMES:
         yield cwd / name
 
+    # Scan immediate children for nested project directories
+    try:
+        for child in sorted(cwd.iterdir()):
+            if child.is_dir() and _is_project_root(child):
+                yield child
+    except OSError:
+        pass
+
     for parent in cwd.parents:
         yield parent
         for name in DEFAULT_PROJECT_DIR_NAMES:

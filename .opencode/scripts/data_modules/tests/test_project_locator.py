@@ -130,3 +130,19 @@ def test_resolve_project_root_ignores_stale_pointer_and_fallbacks(tmp_path):
     resolved = resolve_project_root(cwd=workspace)
     assert resolved == default_project.resolve()
 
+
+def test_resolve_project_root_finds_nested_child_project(tmp_path):
+    _ensure_scripts_on_path()
+    from project_locator import resolve_project_root
+
+    repo_root = tmp_path / "repo"
+    (repo_root / ".git").mkdir(parents=True, exist_ok=True)
+
+    nested_project = repo_root / "my-novel"
+    (nested_project / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (nested_project / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+
+    # CWD is repo root (no .webnovel), child has project
+    resolved = resolve_project_root(cwd=repo_root)
+    assert resolved == nested_project.resolve()
+
