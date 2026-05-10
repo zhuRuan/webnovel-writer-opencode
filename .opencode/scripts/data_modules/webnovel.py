@@ -322,6 +322,8 @@ def cmd_use(args: argparse.Namespace) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description="webnovel unified CLI")
     parser.add_argument("--project-root", help="书项目根目录或工作区根目录（可选，默认自动检测）")
+    parser.add_argument("--mode", choices=["default", "fast", "minimal"], default="default",
+                       help="写作模式（暂未调度，预留参数）")
 
     sub = parser.add_subparsers(dest="tool", required=True)
 
