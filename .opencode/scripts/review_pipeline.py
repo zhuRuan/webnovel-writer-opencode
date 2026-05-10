@@ -29,14 +29,26 @@ _ensure_scripts_path()
 from data_modules.review_schema import append_ai_flavor_anti_patterns, parse_review_output
 
 
-def clean_reviewer_output(raw: str) -> str:
-    """Extract pure JSON from reviewer agent output.
+def _sanitize_json_text(raw: str) -> str:
+    """Replace bare ASCII double quotes inside CJK text values with Chinese quotes."""
+    sanitized = re.sub(
+        r'(?<=[一-鿿　-〿＀-￯])"'
+        r'(?=[一-鿿　-〿＀-￯])',
+        "「",  # 「
+        raw,
+    )
+    return sanitized
+
+
+def clean_reviewer_output(raw: str) -> dict:
+    """Extract pure JSON from reviewer agent output and parse it.
 
     Handles:
     1. Markdown code block: ```json ... ```
     2. Prefix text: \"Here is the review: {...}\"
     3. Suffix text: \"{...} That's the review\"
     4. Pure JSON: \"{...}\"
+    5. Bare ASCII \" inside CJK text values (sanitized as fallback)
     """
     if not raw or not raw.strip():
         raise ValueError("reviewer output is empty")
@@ -44,15 +56,25 @@ def clean_reviewer_output(raw: str) -> str:
     # Try markdown code block first
     m = re.search(r'```(?:json)?\s*\n?([\s\S]*?)```', raw)
     if m:
-        return m.group(1).strip()
+        json_str = m.group(1).strip()
+    else:
+        # Find first { and last }
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start >= 0 and end > start:
+            json_str = raw[start : end + 1]
+        else:
+            raise ValueError("no valid JSON found in reviewer output")
 
-    # Find first { and last }
-    start = raw.find("{")
-    end = raw.rfind("}")
-    if start >= 0 and end > start:
-        return raw[start:end+1]
-
-    raise ValueError("no valid JSON found in reviewer output")
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        try:
+            sanitized = _sanitize_json_text(json_str)
+            return json.loads(sanitized)
+        except json.JSONDecodeError as e:
+            preview = json_str[:500] + "..." if len(json_str) > 500 else json_str
+            raise ValueError(f"JSON解析失败，raw前500字符: {preview}") from e
 
 
 def _resolve_report_path(project_root: Path, report_file: str) -> Path:
@@ -175,7 +197,7 @@ def build_review_artifacts(
     report_file: str = "",
 ) -> Dict[str, Any]:
     raw_text = review_results_path.read_text(encoding="utf-8")
-    raw = json.loads(clean_reviewer_output(raw_text))
+    raw = clean_reviewer_output(raw_text)
     result = parse_review_output(chapter=chapter, raw=raw)
     anti_patterns_added = append_ai_flavor_anti_patterns(project_root, result)
     metrics = result.to_metrics_dict(report_file=report_file)
