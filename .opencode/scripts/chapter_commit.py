@@ -42,6 +42,12 @@ def main() -> None:
     service.persist_commit(payload)
     if payload["meta"]["status"] == "accepted":
         payload = service.apply_projections(payload)
+    # Close aiohttp sessions opened by projection writers (embedding API)
+    try:
+        from data_modules.api_client import get_client
+        get_client().close()
+    except Exception:
+        pass
     print(json.dumps(payload, ensure_ascii=False))
 
 
