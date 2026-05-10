@@ -109,7 +109,7 @@ s = {
   'chapter_results': {},
   'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
 }
-open('$BATCH_STATE', 'w').write(json.dumps(s, ensure_ascii=False, indent=2))
+open('$BATCH_STATE', 'w', encoding='utf-8').write(json.dumps(s, ensure_ascii=False, indent=2))
 "
 fi
 ```

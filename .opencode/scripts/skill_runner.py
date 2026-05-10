@@ -148,7 +148,7 @@ def cmd_pause_batch(args: argparse.Namespace) -> int:
     if not state_path.is_file():
         print("NO_BATCH")
         return 0
-    s = json.loads(state_path.read_text("utf-8"))
+    s = json.loads(state_path.read_text("utf-8-sig"))
     prev = s.get("status", "")
     if prev == "running":
         s["status"] = "paused"
@@ -184,7 +184,7 @@ def cmd_check_batch_integrity(project_root: str, start: int, end: int) -> int:
     if not state_path.is_file():
         print("MISSING: batch_state.json not found")
         return 1
-    s = json.loads(state_path.read_text("utf-8"))
+    s = json.loads(state_path.read_text("utf-8-sig"))
     completed = set(s.get("completed_chapters", []))
     expected = set(range(start, end + 1))
     missing = sorted(expected - completed)
