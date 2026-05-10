@@ -274,12 +274,12 @@ def cmd_preflight(args: argparse.Namespace) -> int:
                 print(f"  detail: {item['error']}")
         story_runtime = report.get("story_runtime") or {}
         if story_runtime:
-            print(
-                "INFO story_runtime: "
+            display = story_runtime.get("display_text") or (
                 f"chapter={story_runtime.get('chapter')} "
                 f"mainline_ready={story_runtime.get('mainline_ready')} "
                 f"latest_commit_status={story_runtime.get('latest_commit_status')}"
             )
+            print(f"INFO story_runtime: {display}")
     return 0 if report["ok"] else 1
 
 

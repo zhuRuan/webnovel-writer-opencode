@@ -77,10 +77,18 @@ def build_story_runtime_health(project_root: Path, chapter: int | None = None) -
 
     snapshot = load_runtime_sources(project_root, current_chapter)
     latest_commit = snapshot.latest_commit or {}
-    return {
+    volume_num = max(1, (current_chapter - 1) // 20 + 1)
+    status_text = (latest_commit.get("meta") or {}).get("status", "missing")
+    result = {
         "chapter": current_chapter,
         "mainline_ready": not snapshot.fallback_sources,
         "fallback_sources": list(snapshot.fallback_sources),
-        "latest_commit_status": (latest_commit.get("meta") or {}).get("status", "missing"),
+        "latest_commit_status": status_text,
         "primary_write_source": snapshot.primary_write_source,
+        "display_text": (
+            f"主合同链: 第{current_chapter}章 "
+            f"(MASTER_SETTING -> volume_{volume_num:03d} -> chapter_{current_chapter:03d}), "
+            f"提交: {status_text}"
+        ),
     }
+    return result
