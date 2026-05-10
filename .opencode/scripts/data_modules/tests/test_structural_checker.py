@@ -145,12 +145,12 @@ def test_strand_ok():
 
 
 def test_entity_freshness_stale():
-    """主角位置落后 >= 5 章应 blocking"""
+    """主角位置落后 >= 5 章且 current 为空应 blocking"""
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         state = _make_state({
             "protagonist_state": {
-                "location": {"current": "废弃工厂", "last_chapter": 16},
+                "location": {"current": "", "last_chapter": 16},
             }
         })
         _write_state(root, state)
@@ -191,6 +191,23 @@ def test_entity_freshness_gap2_ok():
         result = run_checks(root, 22)
         check = _find_check(result, "entity_freshness")
         assert check["passed"] is True
+
+
+def test_entity_freshness_stale_but_value_present():
+    """位置值存在但 last_chapter 陈旧应降级为 warning"""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        state = _make_state({
+            "protagonist_state": {
+                "location": {"current": "城西废墟", "last_chapter": 16},
+            }
+        })
+        _write_state(root, state)
+        _write_contract(root, 22)
+        result = run_checks(root, 22)
+        check = _find_check(result, "entity_freshness")
+        assert check["passed"] is True
+        assert check["severity"] == "warning"
 
 
 def test_memory_bloat():

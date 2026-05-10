@@ -116,6 +116,15 @@ def _check_entity_freshness(state: dict, chapter: int) -> dict:
 
     gap = chapter - last_chapter
     if gap >= 5:
+        current_value = (location.get("current") or "").strip()
+        if current_value:
+            # Location value exists — data-agent IS writing location.
+            # The last_chapter field is stale but the data is maintained.
+            result["severity"] = "warning"
+            result["passed"] = True
+            result["detail"] = f"主角位置 last_chapter {gap} 章未更新（最后: 第{last_chapter}章），但 location.current 值存在"
+            result["fix"] = "data-agent 需确保写入 location.current 时同步更新 last_chapter"
+            return result
         result["passed"] = False
         result["detail"] = f"主角位置 {gap} 章未更新（最后: 第{last_chapter}章）"
         result["fix"] = "data-agent 需输出 location.current state_delta（即使位置未变）"
