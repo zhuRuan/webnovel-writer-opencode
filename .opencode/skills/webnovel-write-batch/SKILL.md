@@ -196,7 +196,8 @@ genre 从 `.webnovel/state.json` 的初始化配置快照读取。调用 story-s
 ```bash
 # 用 skill_runner 传递 CJK，genre 自动从 state.json 读取，goal 从 stdin 传入
 echo "${CHAPTER_GOAL}" | python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" story-system \
-  --project-root "${PROJECT_ROOT}" --chapter {N}
+  --project-root "${PROJECT_ROOT}" --chapter {N} \
+  || { echo "❌ story-system 合同刷新失败，阻断流程"; exit 1; }
 ```
 
 必备文件：`MASTER_SETTING.json`、`volume_{NNN}.json`、`chapter_{NNN}.review.json`。缺失则阻断。

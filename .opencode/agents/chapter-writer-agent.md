@@ -53,6 +53,17 @@ fi
 
 **修复轮额外约束:**
 □ 逐条对照【审查反馈】中的每条 issue，只修改指出的位置，不改无关段落
+□ 合同树: .story-system/chapters/chapter_{NNN}.json 必须存在。若不存在，输出 "❌ 合同树缺失: 请先运行 story-system 刷新合同" 并退出，不进行起草。
+
+```bash
+# 验证合同树存在
+CHAPTER_CONTRACT="${PROJECT_ROOT}/.story-system/chapters/chapter_$(printf '%03d' $N).json"
+if [ ! -f "$CHAPTER_CONTRACT" ]; then
+  echo "❌ 合同树缺失: $CHAPTER_CONTRACT"
+  echo "请先运行: echo \"\${CHAPTER_GOAL}\" | python -X utf8 \"\${SCRIPTS_DIR}/skill_runner.py\" story-system --project-root \"\${PROJECT_ROOT}\" --chapter $N"
+  exit 1
+fi
+```
 
 ### Step B: 起草正文
 
