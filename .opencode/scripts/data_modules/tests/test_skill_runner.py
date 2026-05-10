@@ -5,8 +5,15 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 import tempfile
 from pathlib import Path
+
+
+def _ensure_scripts_on_path() -> None:
+    scripts_dir = Path(__file__).resolve().parents[2]
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
 
 from skill_runner import (
     cmd_check_file,
@@ -108,3 +115,44 @@ def test_filter_structural_only_infra():
     }
     filtered = filter_structural_checks(result)
     assert filtered["passed"] is True
+
+
+def test_verify_chapter_files_ok(tmp_path):
+    """验证全部文件存在且投影完成应返回 OK"""
+    _ensure_scripts_on_path()
+    from skill_runner import cmd_verify_chapter_files
+    import argparse
+
+    # Setup chapter file
+    text_dir = tmp_path / "正文"
+    text_dir.mkdir()
+    (text_dir / "第001章-测试.md").write_text("测试内容", encoding="utf-8")
+
+    # Setup commit with all projections done
+    commits = tmp_path / ".story-system" / "commits"
+    commits.mkdir(parents=True)
+    commit = {
+        "meta": {"chapter": 1, "status": "accepted"},
+        "projection_status": {
+            "state": "done", "index": "done", "summary": "done",
+            "memory": "done", "vector": "skipped",
+        },
+    }
+    (commits / "chapter_001.commit.json").write_text(
+        json.dumps(commit, ensure_ascii=False), encoding="utf-8"
+    )
+
+    ns = argparse.Namespace(project_root=str(tmp_path), chapter=1)
+    rc = cmd_verify_chapter_files(ns)
+    assert rc == 0
+
+
+def test_verify_chapter_files_missing_chapter(tmp_path):
+    """章节文件缺失应返回 FAIL"""
+    _ensure_scripts_on_path()
+    from skill_runner import cmd_verify_chapter_files
+    import argparse
+
+    ns = argparse.Namespace(project_root=str(tmp_path), chapter=1)
+    rc = cmd_verify_chapter_files(ns)
+    assert rc == 1

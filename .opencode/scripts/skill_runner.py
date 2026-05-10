@@ -113,6 +113,36 @@ def cmd_check_index(project_root: str, chapter: int) -> int:
         conn.close()
 
 
+def cmd_verify_chapter_files(args: argparse.Namespace) -> int:
+    root = Path(args.project_root)
+    ch = int(args.chapter)
+    errors = []
+
+    text_dir = root / "正文"
+    chapter_files = list(text_dir.rglob(f"第*{ch}*章*.md"))
+    if not chapter_files:
+        errors.append(f"章节文件缺失: 第{ch}章")
+    elif not chapter_files[0].stat().st_size:
+        errors.append(f"章节文件为空: 第{ch}章")
+
+    commit_file = root / ".story-system" / "commits" / f"chapter_{ch:03d}.commit.json"
+    if not commit_file.is_file():
+        errors.append(f"commit缺失: chapter_{ch:03d}.commit.json")
+    else:
+        commit = json.loads(commit_file.read_text("utf-8"))
+        proj = commit.get("projection_status", {})
+        for name in ("state", "index", "summary", "memory", "vector"):
+            status = proj.get(name, "missing")
+            if status not in ("done", "skipped"):
+                errors.append(f"projection {name}={status}")
+
+    if errors:
+        print("FAIL: " + "; ".join(errors))
+        return 1
+    print("OK")
+    return 0
+
+
 def cmd_compact_memory(args: argparse.Namespace) -> int:
     from data_modules.memory.store import ScratchpadManager
     from data_modules.memory.compactor import collect_garbage
@@ -183,6 +213,11 @@ def main() -> None:
     p_cbi.add_argument("--start", type=int, required=True)
     p_cbi.add_argument("--end", type=int, required=True)
     p_cbi.set_defaults(func=lambda args: cmd_check_batch_integrity(args.project_root, args.start, args.end))
+
+    p_vcf = sub.add_parser("verify-chapter-files")
+    p_vcf.add_argument("--project-root", required=True)
+    p_vcf.add_argument("--chapter", type=int, required=True)
+    p_vcf.set_defaults(func=cmd_verify_chapter_files)
 
     p_cm = sub.add_parser("compact-memory")
     p_cm.add_argument("--project-root", required=True)

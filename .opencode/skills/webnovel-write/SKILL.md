@@ -241,6 +241,14 @@ chapter_status 由 projection writer 自动推进：accepted→committed，rejec
 
 commit 未生成→重跑 5.2。projection 失败→只补跑失败项。不回退 Step 1-4。
 
+#### 5.5 写后校验
+
+```bash
+python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" verify-chapter-files \
+  --project-root "${PROJECT_ROOT}" --chapter {chapter_num} \
+  || { echo "❌ 写后校验失败"; exit 1; }
+```
+
 ### Step 6：Git 备份
 
 ```bash

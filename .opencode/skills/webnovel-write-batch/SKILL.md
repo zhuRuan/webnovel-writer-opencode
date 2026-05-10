@@ -440,27 +440,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" cha
 #### 写后校验
 
 ```bash
-# 1. commit 验证
-python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-commit \
-  --project-root "${PROJECT_ROOT}" --chapter {N}
-
-# 2. projection 验证
-python -c "
-import json
-state = json.load(open('${PROJECT_ROOT}/.webnovel/state.json'))
-status = state.get('progress', {}).get('chapter_status', {}).get(str($N))
-if status != 'chapter_committed':
-    raise SystemExit(f'chapter_status={status}, expected committed')
-print('OK: projection committed')
-"
-
-# 3. index.db 验证
-python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-index \
-  --project-root "${PROJECT_ROOT}" --chapter {N}
-
-# 4. batch_state 跨章完整性
-python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-batch-integrity \
-  --project-root "${PROJECT_ROOT}" --start {S} --end {N}
+python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" verify-chapter-files \
+  --project-root "${PROJECT_ROOT}" --chapter {N} \
+  || { echo "❌ 写后校验失败"; exit 1; }
 ```
 
 ```bash
