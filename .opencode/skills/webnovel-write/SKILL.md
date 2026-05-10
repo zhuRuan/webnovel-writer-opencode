@@ -147,6 +147,12 @@ Agent(
 
 只根据任务书起草。不加载 core-constraints/anti-ai-guide（已内化到任务书）。只输出纯正文，无占位符。有结构化节点时围绕 CBN→CPNs→CEN 展开。中文思维写作。
 
+```bash
+# 不依赖 Agent 返回文本，直接校验章节文件
+CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter {chapter_num})
+test -s "${PROJECT_ROOT}/${CHAPTER_PATH}" || { echo "❌ 章节文件未生成或为空"; exit 1; }
+```
+
 ### Step 3：审查
 
 必须使用 `Agent` 工具调用 `reviewer`，不得由主流程伪造审查 JSON。
@@ -189,6 +195,11 @@ rm -f "${PROJECT_ROOT}/.webnovel/tmp/review_results.json"
 
 blocking=true → 修复后重审，不进 Step 4。`--fast` 只检查 setting/timeline/continuity。`--minimal` 跳过。
 
+```bash
+# 校验审查结果文件
+test -s "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" || { echo "❌ 审查结果未生成"; exit 1; }
+```
+
 ### Step 4：润色
 
 加载 `polish-guide.md`、`typesetting.md`、`style-adapter.md`。
@@ -218,6 +229,13 @@ Agent(
 ```
 
 Data Agent 只提取事实+生成 artifacts，不直接写 state/index/summaries/memory。
+
+```bash
+# 校验 data-agent 输出文件
+for f in fulfillment_result.json disambiguation_result.json extraction_result.json; do
+  test -s "${PROJECT_ROOT}/.webnovel/tmp/${f}" || { echo "❌ ${f} 缺失"; exit 1; }
+done
+```
 
 #### 5.2 CHAPTER_COMMIT
 
