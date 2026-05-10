@@ -39,9 +39,11 @@ def load_upload_log(platform: str, book_id: str) -> set[int]:
         return set()
 
 
-def save_upload_log(platform: str, book_id: str, uploaded: set[int]):
+def save_upload_log(platform: str, book_id: str, uploaded: set[int], book_name: str = ""):
     p = _log_path(platform, book_id)
     payload = {
+        "book_id": book_id,
+        "book_name": book_name,
         "uploaded": sorted(uploaded),
         "last_upload": datetime.now(timezone.utc).isoformat(),
     }

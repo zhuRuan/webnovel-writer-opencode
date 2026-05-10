@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 from pathlib import Path
 
@@ -96,6 +97,24 @@ async def _cmd_upload(args: argparse.Namespace):
     adapter = _get_adapter(args.platform)
     cfg = PublishConfig(mode=args.mode)
     uploaded = load_upload_log(args.platform, args.book_id)
+
+    # 交叉校验：防止 book_id 误用，避免上传到错误的书籍
+    from publisher.config import _log_path as get_log_path
+    log_path = get_log_path(args.platform, args.book_id)
+    if log_path.is_file():
+        try:
+            log_data = json.loads(log_path.read_text(encoding="utf-8"))
+            logged_book_id = log_data.get("book_id", "")
+            if logged_book_id and logged_book_id != args.book_id:
+                logged_name = log_data.get("book_name", "未知")
+                print(f"⚠️ 警告: 上传日志中的 book_id ({logged_book_id}, {logged_name}) 与当前 book_id ({args.book_id}) 不一致！")
+                print("可能原因: 误用了另一本书的 book_id。")
+                resp = input("确认继续上传？(y/N): ")
+                if resp.lower() != "y":
+                    print("已取消。")
+                    return
+        except (json.JSONDecodeError, KeyError):
+            pass  # old format without book_id field, skip check
 
     project_root = Path(args.project_root).expanduser().resolve()
     chapter_indices = _parse_range(args.range, project_root)
