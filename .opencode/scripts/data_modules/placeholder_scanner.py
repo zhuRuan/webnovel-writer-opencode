@@ -53,13 +53,37 @@ def scan_placeholders(project_root: str | Path) -> List[Dict[str, Any]]:
     return results
 
 
+def load_known_placeholders(project_root: Path) -> set:
+    """Load known (ignorable) placeholder entries from .webnovel/known_placeholders.json."""
+    ignore_file = project_root / ".webnovel" / "known_placeholders.json"
+    if not ignore_file.is_file():
+        return set()
+    try:
+        data = json.loads(ignore_file.read_text(encoding="utf-8"))
+        ignored = data.get("ignored", [])
+        return {(e["file"], e.get("line", 0), e["text"]) for e in ignored if "file" in e and "text" in e}
+    except (json.JSONDecodeError, OSError):
+        return set()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Scan outline/settings files for unresolved placeholders")
     parser.add_argument("--project-root", required=True)
     parser.add_argument("--format", choices=["json", "text"], default="json")
     args = parser.parse_args()
 
-    results = scan_placeholders(args.project_root)
+    root = Path(args.project_root).expanduser().resolve()
+    results = scan_placeholders(root)
+    ignored = load_known_placeholders(root)
+
+    if ignored:
+        filtered = []
+        for item in results:
+            key = (item["file"], item["line"], item["pattern"])
+            if key not in ignored:
+                filtered.append(item)
+        results = filtered
+
     if args.format == "json":
         print(json.dumps({"ok": not results, "placeholders": results}, ensure_ascii=False, indent=2))
         return
