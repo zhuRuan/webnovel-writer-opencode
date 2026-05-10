@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Any
 
 
-def run_checks(project_root: Path, chapter: int) -> dict[str, Any]:
+def run_checks(project_root: Path, chapter: int, intended_strand: str = "") -> dict[str, Any]:
     checks = []
     state = _load_state(project_root)
 
-    checks.append(_check_strand_balance(state, chapter))
+    checks.append(_check_strand_balance(state, chapter, intended_strand))
     checks.append(_check_entity_freshness(state, chapter))
     checks.append(_check_memory_bloat(project_root))
     checks.append(_check_debt_burden(state, project_root, chapter))
@@ -30,7 +30,7 @@ def _load_state(project_root: Path) -> dict:
     return {}
 
 
-def _check_strand_balance(state: dict, chapter: int) -> dict:
+def _check_strand_balance(state: dict, chapter: int, intended_strand: str = "") -> dict:
     tracker = state.get("strand_tracker") or {}
     history = tracker.get("history") or []
     result = {
@@ -57,6 +57,32 @@ def _check_strand_balance(state: dict, chapter: int) -> dict:
         result["detail"] = f"quest 连续主导 {consecutive} 章（上限 5 章）"
         result["fix"] = "切换到 Fire（感情线）或 Constellation（世界观线）"
         return result
+
+    # If intended_strand matches the missing strand, this chapter is actively fixing it
+    if intended_strand:
+        last_const = _safe_int(tracker.get("last_constellation_chapter"))
+        if intended_strand == "constellation" and (last_const == 0 or chapter - last_const > 8):
+            result["passed"] = True
+            detail_msg = "本章已设定为 constellation 线，正在修复中"
+            if last_const == 0:
+                detail_msg += "（从未激活）"
+            else:
+                detail_msg += f"（上次: 第{last_const}章）"
+            result["detail"] = detail_msg
+            result["fix"] = ""
+            return result
+        # Similarly for fire strand intent
+        last_fire = _safe_int(tracker.get("last_fire_chapter"))
+        if intended_strand == "fire" and (last_fire == 0 or chapter - last_fire > 8):
+            result["passed"] = True
+            detail_msg = "本章已设定为 fire 线，正在修复中"
+            if last_fire == 0:
+                detail_msg += "（从未激活）"
+            else:
+                detail_msg += f"（上次: 第{last_fire}章）"
+            result["detail"] = detail_msg
+            result["fix"] = ""
+            return result
 
     # constellation check
     last_const = _safe_int(tracker.get("last_constellation_chapter"))

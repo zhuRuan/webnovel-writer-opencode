@@ -219,8 +219,18 @@ echo "${CHAPTER_GOAL}" | python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" story-s
 ### 准备：结构自检
 
 ```bash
+# 从章纲提取 intended_strand
+INTENDED_STRAND=$(python -c "
+import json
+contract_file = '${PROJECT_ROOT}/.story-system/chapters/chapter_$(printf '%03d' {N}).json'
+try:
+    d = json.load(open(contract_file))
+    print(d.get('chapter_directive', {}).get('strand', ''))
+except: pass
+")
+
 python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-structural \
-  --project-root "${PROJECT_ROOT}" --chapter {N} --format json \
+  --project-root "${PROJECT_ROOT}" --chapter {N} --intended-strand "${INTENDED_STRAND}" --format json \
   > "${PROJECT_ROOT}/.webnovel/tmp/structural_check.json"
 ```
 

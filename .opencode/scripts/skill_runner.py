@@ -62,7 +62,7 @@ def cmd_check_structural(args: argparse.Namespace) -> int:
     from data_modules.structural_checker import run_checks
 
     root = Path(args.project_root)
-    result = run_checks(root, args.chapter)
+    result = run_checks(root, args.chapter, intended_strand=args.intended_strand or "")
     result = filter_structural_checks(result)
 
     if args.format == "json":
@@ -209,6 +209,7 @@ def main() -> None:
     p_cs = sub.add_parser("check-structural")
     p_cs.add_argument("--project-root", required=True)
     p_cs.add_argument("--chapter", type=int, required=True)
+    p_cs.add_argument("--intended-strand", choices=["quest", "fire", "constellation"], default=None)
     p_cs.add_argument("--format", choices=["json", "text"], default="json")
     p_cs.set_defaults(func=cmd_check_structural)
 
