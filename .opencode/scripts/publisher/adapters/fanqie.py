@@ -8,6 +8,7 @@ API 逆向自 fanqienovel.com JS bundle, 2026-02。
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -19,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://fanqienovel.com"
 _COMMON_PARAMS = "aid=2503&app_name=muye_novel"
+
+_COMMON_FORM = {"aid": "2503", "app_name": "muye_novel"}
 
 # 女频 genres (gender=0)，其余为男频 (gender=1)
 _FEMALE_GENRES = {"言情", "女频", "现代言情", "古代言情", "仙侠言情", "豪门", "穿越", "宫斗"}
@@ -78,7 +81,8 @@ async def _page_fetch(
 
     raw = result.get("body", "")
     if not raw:
-        raise RuntimeError(f"API {path} returned empty response")
+        status = result.get("status", "?")
+        raise RuntimeError(f"API {path} returned empty response (status={status})")
 
     try:
         body = json.loads(raw)
@@ -155,7 +159,6 @@ class FanqieAdapter(BasePlatform):
             return True
 
         logger.info("Login required, current URL: %s", page.url)
-        import asyncio
         timeout_ms = 180_000
         elapsed = 0
         while elapsed < timeout_ms:
@@ -183,8 +186,9 @@ class FanqieAdapter(BasePlatform):
     async def _ensure_writer_context(self, page):
         """确保页面在 fanqienovel.com 域名下。空白页上的 fetch 会因
         origin/referer 限制失败，必须先导航到作家后台域名。"""
-        if page.url == "about:blank":
-            await page.goto(self.login_url, wait_until="commit", timeout=30_000)
+        if page.url == "about:blank" or "fanqienovel.com" not in page.url:
+            await page.goto(self.login_url, wait_until="networkidle", timeout=30_000)
+            await asyncio.sleep(3)
 
     # ── 书单 ─────────────────────────────────────────────
 
@@ -229,8 +233,7 @@ class FanqieAdapter(BasePlatform):
         p1 = _clean_protagonist_name(meta.protagonist)[:5]
 
         data = await _page_fetch(page, "POST", "/api/author/book/create/v0/", form={
-            "aid": "2503",
-            "app_name": "muye_novel",
+            **_COMMON_FORM,
             "book_name": meta.title,
             "gender": str(gender),
             "abstract": abstract,
@@ -313,6 +316,7 @@ class FanqieAdapter(BasePlatform):
         # Step 1: 分配章节槽位
         create_data = await _page_fetch(page, "POST",
             "/api/author/article/new_article/v0/", form={
+                **_COMMON_FORM,
                 "book_id": book_id,
                 "title": full_title,
                 "content": html_content,
@@ -330,6 +334,7 @@ class FanqieAdapter(BasePlatform):
         # Step 2: 写入内容
         await _page_fetch(page, "POST",
             "/api/author/article/cover_article/v0/", form={
+                **_COMMON_FORM,
                 "book_id": book_id,
                 "item_id": item_id,
                 "title": full_title,
