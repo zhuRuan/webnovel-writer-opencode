@@ -46,10 +46,10 @@ class ChapterCommitService:
                 "status": status,
             },
             "contract_refs": {
-                "master": "MASTER_SETTING.json",
-                "volume": f"volume_{volume:03d}.json",
-                "chapter": f"chapter_{chapter:03d}.json",
-                "review": f"chapter_{chapter:03d}.review.json",
+                "master": ".story-system/MASTER_SETTING.json",
+                "volume": f".story-system/volumes/volume_{volume:03d}.json",
+                "chapter": f".story-system/chapters/chapter_{chapter:03d}.json",
+                "review": f".story-system/reviews/chapter_{chapter:03d}.review.json",
             },
             "provenance": {
                 "write_fact_role": "chapter_commit",

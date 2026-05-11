@@ -79,6 +79,8 @@ export PYTHONUTF8=1
 
 # 先解析 PROJECT_ROOT（避免 preflight 内部重复解析）
 export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PWD}" where)"
+# 归一化为正斜杠，避免路径中的 \b \n 等在 python -c 中被转义
+export PROJECT_ROOT="${PROJECT_ROOT//\\//}"
 test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "错误: PROJECT_ROOT 解析失败，请用 --project-root 显式指定"; exit 1; }
 echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 
