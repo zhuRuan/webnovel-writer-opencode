@@ -62,9 +62,13 @@ def cmd_check_structural(args: argparse.Namespace) -> int:
     from data_modules.structural_checker import run_checks
 
     root = Path(args.project_root)
-    result = run_checks(root, args.chapter, intended_strand=args.intended_strand or "")
+    intended = (args.intended_strand or "").strip().lower()
+    result = run_checks(root, args.chapter, intended_strand=intended)
     result = filter_structural_checks(result)
 
+    if getattr(args, 'output', None):
+        Path(args.output).write_text(
+            json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     if args.format == "json":
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
@@ -210,6 +214,7 @@ def main() -> None:
     p_cs.add_argument("--project-root", required=True)
     p_cs.add_argument("--chapter", type=int, required=True)
     p_cs.add_argument("--intended-strand", choices=["quest", "fire", "constellation"], default=None)
+    p_cs.add_argument("--output", default=None, help="直接写入文件（避免 shell 重定向编码问题）")
     p_cs.add_argument("--format", choices=["json", "text"], default="json")
     p_cs.set_defaults(func=cmd_check_structural)
 

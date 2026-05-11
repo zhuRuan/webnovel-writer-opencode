@@ -13,7 +13,7 @@ from data_modules.chapter_commit_service import ChapterCommitService
 
 
 def _read_json(path: str) -> dict:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
 
 def main() -> None:
@@ -43,9 +43,10 @@ def main() -> None:
     if payload["meta"]["status"] == "accepted":
         payload = service.apply_projections(payload)
     # Close aiohttp sessions opened by projection writers (embedding API)
+    import asyncio
     try:
         from data_modules.api_client import get_client
-        get_client().close()
+        asyncio.run(get_client().close())
     except Exception:
         pass
     print(json.dumps(payload, ensure_ascii=False))

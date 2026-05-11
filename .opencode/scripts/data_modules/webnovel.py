@@ -166,7 +166,7 @@ def cmd_chapter_path(args: argparse.Namespace) -> int:
     pattern = re.compile(rf"第0*{args.chapter}章")
     for f in text_dir.rglob("*.md"):
         if pattern.search(f.name):
-            print(str(f.relative_to(root)))
+            print(str(f.relative_to(root)).replace('\\', '/'))
             return 0
 
     print(f"ERROR: 未找到第{args.chapter}章的章节文件", file=sys.stderr)
