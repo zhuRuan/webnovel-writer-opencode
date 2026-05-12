@@ -28,8 +28,8 @@ _FEMALE_GENRES = {"言情", "女频", "现代言情", "古代言情", "仙侠言
 
 
 def _text_to_html(text: str) -> str:
-    """将纯文本转为 HTML 段落，每段包裹在 <p> 标签中。"""
-    paragraphs = [line.strip() for line in text.splitlines() if line.strip()]
+    """将纯文本转为 HTML 段落。空行分隔段落，段内换行合并。"""
+    paragraphs = [p.strip().replace('\n', '') for p in text.split('\n\n') if p.strip()]
     return "".join(f"<p>{p}</p>" for p in paragraphs)
 
 
@@ -58,7 +58,9 @@ async def _page_fetch(
     result = await page.evaluate(
         """async ([url, method, formJson]) => {
             try {
-                const opts = { method, credentials: 'include' };
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 30_000);
+                const opts = { method, credentials: 'include', signal: controller.signal };
                 if (formJson) {
                     const obj = JSON.parse(formJson);
                     opts.body = new URLSearchParams(obj).toString();
@@ -67,6 +69,7 @@ async def _page_fetch(
                     };
                 }
                 const resp = await fetch(url, opts);
+                clearTimeout(timeout);
                 const text = await resp.text();
                 return { ok: true, status: resp.status, body: text };
             } catch (e) {
@@ -341,16 +344,16 @@ class FanqieAdapter(BasePlatform):
 
         html_content = _text_to_html(chapter.content)
 
-        # Step 1: 分配章节槽位
+        # Step 1: 分配章节槽位（content 不在此阶段发送，服务端忽略）
+        new_article_form = {
+            **_COMMON_FORM,
+            "book_id": book_id,
+            "title": full_title,
+            "volume_id": volume_id,
+            "volume_name": volume_name,
+        }
         create_data = await self._post_with_retry(page,
-            "/api/author/article/new_article/v0/", form={
-                **_COMMON_FORM,
-                "book_id": book_id,
-                "title": full_title,
-                "content": html_content,
-                "volume_id": volume_id,
-                "volume_name": volume_name,
-            })
+            "/api/author/article/new_article/v0/", form=new_article_form)
 
         item_id = str(create_data.get("item_id", "")) if isinstance(create_data, dict) else ""
         if not item_id:
@@ -359,17 +362,18 @@ class FanqieAdapter(BasePlatform):
                 message="new_article 未返回 item_id",
             )
 
-        # Step 2: 写入内容
+        # Step 2: 写入内容（独立重试，不回退已分配的 item_id，避免孤立文章）
+        cover_form = {
+            **_COMMON_FORM,
+            "book_id": book_id,
+            "item_id": item_id,
+            "title": full_title,
+            "content": html_content,
+            "volume_id": volume_id,
+            "volume_name": volume_name,
+        }
         await self._post_with_retry(page,
-            "/api/author/article/cover_article/v0/", form={
-                **_COMMON_FORM,
-                "book_id": book_id,
-                "item_id": item_id,
-                "title": full_title,
-                "content": html_content,
-                "volume_id": volume_id,
-                "volume_name": volume_name,
-            })
+            "/api/author/article/cover_article/v0/", form=cover_form)
 
         logger.info("Chapter saved: item_id=%s, title=%s", item_id, full_title)
 

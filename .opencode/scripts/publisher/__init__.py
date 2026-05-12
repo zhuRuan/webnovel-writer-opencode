@@ -110,14 +110,19 @@ async def _cmd_upload(args: argparse.Namespace):
                 logged_name = log_data.get("book_name", "未知")
                 print(f"⚠️ 警告: 上传日志中的 book_id ({logged_book_id}, {logged_name}) 与当前 book_id ({args.book_id}) 不一致！")
                 print("可能原因: 误用了另一本书的 book_id。")
-                resp = input("确认继续上传？(y/N): ")
-                if resp.lower() != "y":
-                    print("已取消。")
-                    return
+                if getattr(args, 'yes', False):
+                    print("--yes 已指定，跳过确认继续上传。")
+                else:
+                    resp = input("确认继续上传？(y/N): ")
+                    if resp.lower() != "y":
+                        print("已取消。")
+                        return
         except (json.JSONDecodeError, KeyError):
             pass  # old format without book_id field, skip check
 
     project_root = Path(args.project_root).expanduser().resolve()
+    book_meta = _read_book_meta(project_root)
+    book_name = book_meta.title if book_meta else ""
     chapter_indices = _parse_range(args.range, project_root)
     to_upload = [i for i in chapter_indices if i not in uploaded]
     if not to_upload:
@@ -151,7 +156,7 @@ async def _cmd_upload(args: argparse.Namespace):
                                                    chapter)
             if result.success:
                 uploaded.add(idx)
-                save_upload_log(args.platform, args.book_id, uploaded)
+                save_upload_log(args.platform, args.book_id, uploaded, book_name=book_name)
                 success_count += 1
                 print(f"  [OK] 第{idx}章 {result.message}")
             else:
@@ -198,11 +203,17 @@ def _parse_range(spec: str, project_root: Path) -> list[int]:
     result: set[int] = set()
     for part in spec.split(","):
         part = part.strip()
-        if "-" in part:
-            a, b = part.split("-", 1)
-            result.update(range(int(a), int(b) + 1))
-        else:
-            result.add(int(part))
+        if not part:
+            continue
+        try:
+            if "-" in part:
+                a, b = part.split("-", 1)
+                result.update(range(int(a), int(b) + 1))
+            else:
+                result.add(int(part))
+        except ValueError:
+            print(f"ERROR: 无效的章节范围 '{part}'，应为数字或范围（如 32-37）", file=sys.stderr)
+            raise SystemExit(1)
     return sorted(result)
 
 
@@ -215,13 +226,31 @@ def _extract_title(md: str) -> str:
 
 
 def _find_chapter_file(project_root: Path, index: int) -> Path | None:
+    """在正文目录中定位章节文件。优先按卷目录查找，避免多卷同名冲突。"""
     import re
     text_dir = project_root / "正文"
     if not text_dir.is_dir():
         return None
-    for f in text_dir.rglob("*.md"):
-        m = re.match(rf"第{index:04d}章|第{index}章", f.name)
-        if m:
+
+    def _match(f):
+        return re.match(rf"第0*{index}章", f.name)
+
+    # 优先在当前卷目录查找
+    vol = (index - 1) // 20 + 1
+    vol_dir = text_dir / f"第{vol}卷"
+    if vol_dir.is_dir():
+        for f in sorted(vol_dir.iterdir()):
+            if f.is_file() and f.suffix == ".md" and _match(f):
+                return f
+
+    # 回退到正文根目录
+    for f in sorted(text_dir.iterdir()):
+        if f.is_file() and f.suffix == ".md" and _match(f):
+            return f
+
+    # 最后递归搜索（兼容旧结构）
+    for f in sorted(text_dir.rglob("*.md")):
+        if _match(f):
             return f
     return None
 
@@ -248,6 +277,8 @@ def main():
     p_upload.add_argument("--range", default="all", help="章节范围")
     p_upload.add_argument("--mode", default="draft",
                           help="发布模式 (draft|publish)")
+    p_upload.add_argument("--yes", action="store_true",
+                          help="跳过交叉校验的交互确认")
 
     args = parser.parse_args()
 
