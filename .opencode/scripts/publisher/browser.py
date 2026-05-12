@@ -69,10 +69,12 @@ class Browser:
         return self._page
 
     async def close(self):
-        if self._context:
-            await self._context.close()
-            self._context = None
-            self._page = None
-        if self._playwright:
-            await self._playwright.stop()
-            self._playwright = None
+        try:
+            if self._context:
+                await self._context.close()
+                self._context = None
+                self._page = None
+        finally:
+            if self._playwright:
+                await self._playwright.stop()
+                self._playwright = None

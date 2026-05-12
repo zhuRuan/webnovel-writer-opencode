@@ -94,7 +94,7 @@ async def _page_fetch(
 
     if body.get("code") != 0:
         raise RuntimeError(
-            f"API {path} failed: {body.get('message', 'unknown')}"
+            f"API {path} failed: {body.get('message') or body.get('msg') or 'unknown'}"
         )
 
     data = body.get("data")
@@ -126,13 +126,14 @@ def _find_label_ids(labels: list[dict], genre: str, max_count: int = 4) -> list[
         return str(v) if v else ""
 
     selected: list[str] = []
-    genre_chars = set(genre.replace(" ", ""))
+    genre_lower = genre.strip().lower()
     for label in labels:
         name = get_name(label)
         lid = get_id(label)
         if not name or not lid:
             continue
-        if any(ch in name for ch in genre_chars) or name in genre:
+        name_lower = name.lower()
+        if genre_lower in name_lower or name_lower in genre_lower:
             selected.append(lid)
         if len(selected) >= max_count:
             break
@@ -279,11 +280,12 @@ class FanqieAdapter(BasePlatform):
         if isinstance(data, list):
             labels = data
         elif isinstance(data, dict):
-            for group in data.get("group_list", data.get("label_list", [])):
+            raw_groups = data.get("group_list") or data.get("label_list") or []
+            for group in raw_groups if isinstance(raw_groups, list) else []:
                 if isinstance(group, dict):
-                    labels.extend(
-                        group.get("label_list", group.get("labels", []))
-                    )
+                    group_labels = group.get("label_list") or group.get("labels") or []
+                    if isinstance(group_labels, list):
+                        labels.extend(group_labels)
         return labels
 
     # ── 卷管理 ─────────────────────────────────────────

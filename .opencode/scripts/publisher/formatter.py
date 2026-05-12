@@ -85,6 +85,7 @@ def to_html(md: str) -> str:
 
 
 def _inline_to_html(text: str) -> str:
+    text = re.sub(r"__(.+?)__", r"<b>\1</b>", text)
     text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
     text = re.sub(r"\*(.+?)\*", r"<i>\1</i>", text)
     text = re.sub(r"\[(.+?)\]\(.+?\)", r"\1", text)

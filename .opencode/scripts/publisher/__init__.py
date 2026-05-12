@@ -100,7 +100,7 @@ async def _cmd_upload(args: argparse.Namespace):
     uploaded = load_upload_log(args.platform, args.book_id)
 
     # 交叉校验：防止 book_id 误用，避免上传到错误的书籍
-    from publisher.config import _log_path as get_log_path
+    from publisher.config import get_log_path
     log_path = get_log_path(args.platform, args.book_id)
     if log_path.is_file():
         try:
@@ -152,8 +152,13 @@ async def _cmd_upload(args: argparse.Namespace):
             content = format_for_platform(raw_md, args.platform)
             chapter = Chapter(index=idx, title=title, content=content)
 
-            result = await adapter.upload_chapter(page, args.book_id,
-                                                   chapter)
+            try:
+                result = await adapter.upload_chapter(page, args.book_id, chapter)
+            except RuntimeError as e:
+                fail_count += 1
+                print(f"  [FAIL] 第{idx}章 {e}")
+                await asyncio.sleep(cfg.chapter_gap)
+                continue
             if result.success:
                 uploaded.add(idx)
                 save_upload_log(args.platform, args.book_id, uploaded, book_name=book_name)
