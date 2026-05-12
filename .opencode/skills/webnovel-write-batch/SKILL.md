@@ -393,7 +393,7 @@ blocking_count > 0 → 进入修复轮（最多 2 轮）
        将提取的 issue 列表填入 prompt 的【审查反馈】部分
        prompt 明确指出："修复模式：只修改上述审查反馈指出的具体问题，不大面积重写。保留未涉及部分的原文。"
 
-    rm -f "${PROJECT_ROOT}/.webnovel/tmp/review_results.json"
+    python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" clean-tmp --project-root "${PROJECT_ROOT}"
 
     3. Agent(reviewer) 重新审查
        → 覆盖更新 review_results.json
@@ -416,9 +416,7 @@ blocking_count > 0 → 进入修复轮（最多 2 轮）
 
 ```bash
 # 清空旧 tmp 文件，防止 data-agent 失败时下游读到上一章数据
-rm -f "${PROJECT_ROOT}/.webnovel/tmp/fulfillment_result.json"
-rm -f "${PROJECT_ROOT}/.webnovel/tmp/disambiguation_result.json"
-rm -f "${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json"
+python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" clean-tmp --project-root "${PROJECT_ROOT}"
 ```
 
 ```text

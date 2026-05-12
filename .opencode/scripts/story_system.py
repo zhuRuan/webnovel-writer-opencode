@@ -88,10 +88,15 @@ def main() -> None:
         parser.exit(2, f"error: {exc}\n")
 
     if args.persist:
+        # Ensure chapter contract always includes expected fields (even if engine omits them)
+        chapter_payload = contract.get("chapter_brief") or {}
+        chapter_payload.setdefault("forbidden_zones", [])
+        chapter_payload.setdefault("style_guide", {})
+        chapter_payload.setdefault("ooc_warnings", [])
         persist_story_seed(
             project_root=project_root,
             master_payload=contract["master_setting"],
-            chapter_payload=contract.get("chapter_brief"),
+            chapter_payload=chapter_payload,
             anti_patterns=contract["anti_patterns"],
         )
     if args.emit_runtime_contracts:

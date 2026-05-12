@@ -18,6 +18,7 @@ def run_checks(project_root: Path, chapter: int, intended_strand: str = "") -> d
     checks.append(_check_memory_bloat(project_root))
     checks.append(_check_debt_burden(state, project_root, chapter))
     checks.append(_check_contract_coverage(project_root, chapter))
+    checks.append(_check_entity_name_consistency(state))
 
     passed = not any(c["severity"] == "blocking" and not c["passed"] for c in checks)
     return {"chapter": chapter, "passed": passed, "checks": checks}
@@ -222,11 +223,51 @@ def _check_contract_coverage(project_root: Path, chapter: int) -> dict:
         "detail": "",
         "fix": "",
     }
-    contract = project_root / ".story-system" / "chapters" / f"chapter_{chapter:03d}.json"
-    if not contract.is_file():
+    # Try :03d first, then :04d, then unpadded (legacy formats)
+    candidates = [
+        project_root / ".story-system" / "chapters" / f"chapter_{chapter:03d}.json",
+        project_root / ".story-system" / "chapters" / f"chapter_{chapter:04d}.json",
+        project_root / ".story-system" / "chapters" / f"chapter_{chapter}.json",
+    ]
+    contract = None
+    for c in candidates:
+        if c.is_file():
+            contract = c
+            break
+    if contract is None:
         result["passed"] = False
         result["detail"] = f"缺少 chapter_{chapter:03d}.json 合同"
         result["fix"] = "运行 story-system 生成本章合同"
+    return result
+
+
+def _check_entity_name_consistency(state: dict) -> dict:
+    """检查实体名是否有一字之差的疑似笔误（如 洪/鸿）。"""
+    result = {
+        "name": "entity_name_consistency",
+        "passed": True,
+        "severity": "warning",
+        "detail": "",
+        "fix": "",
+    }
+    entities = state.get("entities") or {}
+    if not isinstance(entities, dict) or len(entities) < 2:
+        return result
+
+    names = [n for n in entities if isinstance(n, str) and len(n) >= 2]
+    suspicious = []
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            if len(a) != len(b):
+                continue
+            diffs = sum(1 for ca, cb in zip(a, b) if ca != cb)
+            if diffs == 1:
+                suspicious.append(f"{a} ↔ {b}")
+
+    if suspicious:
+        result["passed"] = False
+        result["detail"] = f"疑似笔误的相似实体名: {', '.join(suspicious)}"
+        result["fix"] = "确认是否为同一实体，统一名称；若为不同实体，可忽略"
     return result
 
 

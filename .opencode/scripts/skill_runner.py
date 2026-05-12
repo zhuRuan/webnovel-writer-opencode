@@ -165,6 +165,43 @@ def cmd_pause_batch(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_clean_tmp(args: argparse.Namespace) -> int:
+    """清理 .webnovel/tmp/ 下的旧 artifacts（替代 rm -f，跨 shell 兼容）。"""
+    tmp_dir = Path(args.project_root) / ".webnovel" / "tmp"
+    if not tmp_dir.is_dir():
+        return 0
+    cleaned = 0
+    for f in tmp_dir.iterdir():
+        if f.is_file() and f.suffix in (".json",):
+            f.unlink()
+            cleaned += 1
+    print(f"CLEANED {cleaned} tmp files")
+    return 0
+
+
+def cmd_normalize_contracts(args: argparse.Namespace) -> int:
+    """统一 .story-system/chapters/ 下合同文件名为 {:03d} 格式。"""
+    chapters_dir = Path(args.project_root) / ".story-system" / "chapters"
+    if not chapters_dir.is_dir():
+        print("NO_CHAPTERS_DIR")
+        return 0
+    import re
+    pat = re.compile(r"chapter_0*(\d+)\.json$")
+    renamed = 0
+    for f in sorted(chapters_dir.iterdir()):
+        m = pat.match(f.name)
+        if not m:
+            continue
+        num = int(m.group(1))
+        target = chapters_dir / f"chapter_{num:03d}.json"
+        if f != target:
+            f.rename(target)
+            renamed += 1
+            print(f"  {f.name} -> {target.name}")
+    print(f"RENAMED {renamed} files" if renamed else "OK (all normalized)")
+    return 0
+
+
 def cmd_compact_memory(args: argparse.Namespace) -> int:
     from data_modules.memory.store import ScratchpadManager
     from data_modules.memory.compactor import collect_garbage
@@ -246,6 +283,14 @@ def main() -> None:
     p_pb = sub.add_parser("pause-batch")
     p_pb.add_argument("--project-root", required=True)
     p_pb.set_defaults(func=cmd_pause_batch)
+
+    p_ct = sub.add_parser("clean-tmp")
+    p_ct.add_argument("--project-root", required=True)
+    p_ct.set_defaults(func=cmd_clean_tmp)
+
+    p_nc = sub.add_parser("normalize-contracts")
+    p_nc.add_argument("--project-root", required=True)
+    p_nc.set_defaults(func=cmd_normalize_contracts)
 
     p_cm = sub.add_parser("compact-memory")
     p_cm.add_argument("--project-root", required=True)

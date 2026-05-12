@@ -24,6 +24,7 @@ def main() -> None:
     parser.add_argument("--fulfillment-result", required=True)
     parser.add_argument("--disambiguation-result", required=True)
     parser.add_argument("--extraction-result", required=True)
+    parser.add_argument("--dry-run", action="store_true", help="仅构建并打印 payload，不持久化也不触发投影")
     args = parser.parse_args()
 
     service = ChapterCommitService(Path(args.project_root))
@@ -39,6 +40,9 @@ def main() -> None:
         print(json.dumps({"status": "failed", "reason": f"读取输入文件失败: {e}"},
                          ensure_ascii=False), file=sys.stderr)
         sys.exit(1)
+    if args.dry_run:
+        print(json.dumps(payload, ensure_ascii=False))
+        return
     service.persist_commit(payload)
     if payload["meta"]["status"] == "accepted":
         payload = service.apply_projections(payload)

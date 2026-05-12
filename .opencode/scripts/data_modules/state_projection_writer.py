@@ -64,6 +64,7 @@ class StateProjectionWriter:
 
             chapter_status[str(chapter)] = "chapter_committed"
             progress["current_chapter"] = max(old_current, chapter)
+            progress["current_volume"] = max(1, (chapter - 1) // 20 + 1)
 
             projected_total = self._project_total_words(chapter_status)
             if projected_total > 0:
