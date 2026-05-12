@@ -54,6 +54,11 @@ def _check_strand_balance(state: dict, chapter: int, intended_strand: str = "") 
         else:
             break
     if last == "quest" and consecutive > 5:
+        if intended_strand in ("fire", "constellation"):
+            result["passed"] = True
+            result["detail"] = f"quest 连续主导 {consecutive} 章（上限 5 章），但本章已设定为 {intended_strand} 线，正在修复中"
+            result["fix"] = ""
+            return result
         result["passed"] = False
         result["detail"] = f"quest 连续主导 {consecutive} 章（上限 5 章）"
         result["fix"] = "切换到 Fire（感情线）或 Constellation（世界观线）"
