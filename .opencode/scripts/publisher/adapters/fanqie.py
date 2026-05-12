@@ -327,9 +327,8 @@ class FanqieAdapter(BasePlatform):
         """上传单章到番茄。两步：new_article 分配 ID → cover_article 保存内容。"""
         await self._ensure_writer_context(page)
 
-        # 预热：验证登录态并确保在 writer 域名下
-        await page.goto(f"https://writer.fanqienovel.com?aid=2503&app_name=muye_novel",
-                        wait_until="networkidle", timeout=30_000)
+        # 预热：验证登录态（使用 login_url 避免 writer 子域名 DNS 不可解析）
+        await page.goto(self.login_url, wait_until="networkidle", timeout=30_000)
         if "fanqienovel.com" not in page.url:
             raise RuntimeError("登录态失效: 未跳转到 writer 域名，请重新 setup-auth")
 
