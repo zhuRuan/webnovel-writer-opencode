@@ -170,4 +170,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" ind
 
 - 无法读取角色状态 → 跳过设定一致性检查，在 summary 中标注"无法校验设定一致性：数据读取失败"
 - 无法读取上章摘要 → 跳过连贯性检查中的"上章钩子回应"项
+
+## 10. ⛔ 强制输出约束
+
+审查结果**必须**使用 Write 工具写入调用方指定的 `${REVIEW_OUTPUT}` 路径（通常为 `${PROJECT_ROOT}/.webnovel/tmp/review_results.json`）。
+不得写入 `.story-system/reviews/` 或其他路径。写入后确认文件存在且非空再结束响应。
 - 正文为空 → 输出单条 critical issue："正文为空"

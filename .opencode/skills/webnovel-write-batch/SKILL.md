@@ -333,7 +333,7 @@ fi
 ```text
 Agent(
   subagent_type: "reviewer",
-  prompt: "chapter={N}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。
+  prompt: "chapter={N}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; REVIEW_OUTPUT=${PROJECT_ROOT}/.webnovel/tmp/review_results.json。
 
 【自检系统状态 - 审查时需额外关注】
 $(echo "$CHECK_RESULT" | python -c "

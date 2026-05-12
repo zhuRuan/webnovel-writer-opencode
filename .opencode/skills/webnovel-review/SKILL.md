@@ -100,7 +100,7 @@ cat "${PROJECT_ROOT}/.webnovel/state.json"
 ```text
 Agent(
   subagent_type: "reviewer",
-  prompt: "chapter={chapter_num}; chapter_file={chapter_file}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
+  prompt: "chapter={chapter_num}; chapter_file={chapter_file}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; REVIEW_OUTPUT=${PROJECT_ROOT}/.webnovel/tmp/review_results.json。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
 )
 ```
 
