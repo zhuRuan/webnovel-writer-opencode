@@ -88,8 +88,8 @@ def main() -> None:
         parser.exit(2, f"error: {exc}\n")
 
     if args.persist:
-        # Ensure chapter contract always includes expected fields (even if engine omits them)
-        chapter_payload = contract.get("chapter_brief") or {}
+        # 确保章节合同始终包含预期字段（复制后填充，避免污染 engine 原始 dict）
+        chapter_payload = dict(contract.get("chapter_brief") or {})
         chapter_payload.setdefault("forbidden_zones", [])
         chapter_payload.setdefault("style_guide", {})
         chapter_payload.setdefault("ooc_warnings", [])

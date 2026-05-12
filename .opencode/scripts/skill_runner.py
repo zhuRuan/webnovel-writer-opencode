@@ -172,7 +172,7 @@ def cmd_clean_tmp(args: argparse.Namespace) -> int:
         return 0
     cleaned = 0
     for f in tmp_dir.iterdir():
-        if f.is_file() and f.suffix in (".json",):
+        if f.is_file() and f.suffix == ".json":
             f.unlink()
             cleaned += 1
     print(f"CLEANED {cleaned} tmp files")

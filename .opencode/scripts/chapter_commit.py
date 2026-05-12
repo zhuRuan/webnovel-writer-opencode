@@ -10,6 +10,7 @@ from pathlib import Path
 from runtime_compat import enable_windows_utf8_stdio
 
 from data_modules.chapter_commit_service import ChapterCommitService
+from data_modules.cli_output import print_json
 
 
 def _read_json(path: str) -> dict:
@@ -41,7 +42,7 @@ def main() -> None:
                          ensure_ascii=False), file=sys.stderr)
         sys.exit(1)
     if args.dry_run:
-        print(json.dumps(payload, ensure_ascii=False))
+        print_json(payload)
         return
     service.persist_commit(payload)
     if payload["meta"]["status"] == "accepted":
@@ -53,7 +54,7 @@ def main() -> None:
         asyncio.run(get_client().close())
     except Exception:
         pass
-    print(json.dumps(payload, ensure_ascii=False))
+    print_json(payload)
 
 
 if __name__ == "__main__":
