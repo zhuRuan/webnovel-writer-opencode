@@ -6,8 +6,6 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Optional
-
 # 确保 scripts 目录在 Python path 中（subprocess 运行时不会自动添加）
 _scripts_root = Path(__file__).resolve().parent.parent
 if str(_scripts_root) not in sys.path:
