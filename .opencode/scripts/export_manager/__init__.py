@@ -52,11 +52,11 @@ def cmd_export(args: argparse.Namespace) -> int:
     Path(output).parent.mkdir(parents=True, exist_ok=True)
 
     if fmt == "md":
-        from export_manager.markdown import export_markdown
+        from export_manager.formats.markdown import export_markdown
         title = args.title or project_root.name
         export_markdown(chapters, Path(output), title)
     elif fmt == "txt":
-        from export_manager.txt import export_txt
+        from export_manager.formats.txt import export_txt
         export_txt(chapters, Path(output))
     elif fmt == "epub":
         from export_manager.formats.epub import export_epub

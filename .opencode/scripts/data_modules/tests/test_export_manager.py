@@ -12,8 +12,8 @@ if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))
 
 from export_manager import collect_chapters, _parse_range
-from export_manager.markdown import export_markdown
-from export_manager.txt import export_txt, _strip_markdown
+from export_manager.formats.markdown import export_markdown
+from export_manager.formats.txt import export_txt, _strip_markdown
 
 
 class TestParseRange:
