@@ -221,3 +221,31 @@ class TestParser:
         first = blocks[0]
         assert isinstance(first, dict)
         assert "type" in first
+
+
+class TestStyles:
+    def test_default_css(self):
+        from export_manager.styles import get_default_css
+        css = get_default_css()
+        assert "text-indent" in css
+        assert "line-height" in css
+        assert "chapter-title" in css
+
+    def test_load_custom_css(self, tmp_path):
+        from export_manager.styles import load_custom_css
+        css_file = tmp_path / "custom.css"
+        css_file.write_text("p { color: red; }", encoding="utf-8")
+        css = load_custom_css(css_file)
+        assert "color: red" in css
+
+    def test_get_css_fallback(self):
+        from export_manager.styles import get_css
+        css = get_css()
+        assert "text-indent" in css
+
+    def test_get_css_custom(self, tmp_path):
+        from export_manager.styles import get_css
+        css_file = tmp_path / "custom.css"
+        css_file.write_text("body { margin: 0; }", encoding="utf-8")
+        css = get_css(custom_path=css_file)
+        assert "margin: 0" in css
