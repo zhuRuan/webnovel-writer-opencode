@@ -2,8 +2,6 @@
 """Unified Markdown parser — mistune v3 based, outputs HTML and AST."""
 from __future__ import annotations
 
-import re
-
 import mistune
 
 
@@ -11,11 +9,9 @@ class WebnovelRenderer(mistune.HTMLRenderer):
     """Custom HTML renderer for Chinese web novel content."""
 
     def heading(self, text: str, level: int, **attrs) -> str:
-        result = super().heading(text, level, **attrs)
-        # Add chapter-title class to H1 headings
         if level == 1:
-            result = re.sub(r'^<h1(\s*)>', r'<h1\1 class="chapter-title">', result)
-        return result
+            return f'<h1 class="chapter-title">{text}</h1>\n'
+        return super().heading(text, level, **attrs)
 
     def thematic_break(self) -> str:
         return '<hr class="scene-break" />\n'
