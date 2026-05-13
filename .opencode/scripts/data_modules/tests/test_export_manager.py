@@ -172,7 +172,7 @@ class TestEpubImportError:
 
         monkeypatch.setattr(builtins, "__import__", _mock_import)
 
-        from export_manager.epub import export_epub
+        from export_manager.formats.epub import export_epub
 
         with pytest.raises(SystemExit) as exc:
             export_epub(chapters, output, title="测试", author="作者")
@@ -335,3 +335,29 @@ class TestHtmlExport:
         assert "正文内容。" in content
         assert 'class="toc"' in content
         assert 'id="ch0001"' in content
+
+
+class TestEpubForward:
+    def test_epub_creates_file(self, tmp_path):
+        """Test that EPUB export produces a non-empty file (requires ebooklib)."""
+        try:
+            from ebooklib import epub  # noqa: F401
+        except ImportError:
+            pytest.skip("ebooklib not installed")
+
+        from export_manager import collect_chapters
+        from export_manager.formats.epub import export_epub
+
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text(
+            "# 第1章 开篇\n\n这是正文。\n\n第二段。", encoding="utf-8"
+        )
+
+        chapters = collect_chapters(tmp_path)
+        output = tmp_path / "导出" / "小说.epub"
+        output.parent.mkdir()
+
+        export_epub(chapters, output, title="测试", author="作者")
+
+        assert output.is_file()
+        assert output.stat().st_size > 0

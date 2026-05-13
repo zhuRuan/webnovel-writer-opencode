@@ -3,24 +3,11 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Optional
 
-_DEFAULT_CSS = """
-body {
-    font-family: "Songti SC", "SimSun", serif;
-    line-height: 1.8;
-    text-indent: 2em;
-    margin: 1em 0.5em;
-}
-h1, h2 {
-    text-align: center;
-    text-indent: 0;
-    margin-top: 1.5em;
-}
-p { margin: 0.3em 0; }
-"""
+from export_manager.parser import md_to_html
+from export_manager.styles import get_default_css
 
 
 def _detect_cover(project_root: Path) -> Optional[Path]:
@@ -58,7 +45,12 @@ def _crop_cover(src: Path, size: str) -> bytes:
     w_s, h_s = size.split("x")
     target_w, target_h = int(w_s), int(h_s)
 
-    img = Image.open(src).convert("RGB")
+    try:
+        img = Image.open(src).convert("RGB")
+    except Exception:
+        print(f"警告: 无法打开封面图片 {src}，将使用原图字节")
+        return src.read_bytes()
+
     orig_w, orig_h = img.size
 
     # 居中裁剪到目标比例
@@ -108,7 +100,7 @@ def export_epub(
         book.add_author(author)
 
     # 样式
-    css_text = _DEFAULT_CSS
+    css_text = get_default_css()
     if style:
         try:
             css_text = Path(style).read_text(encoding="utf-8")
@@ -146,7 +138,7 @@ def export_epub(
 
     for num, chapter_title, path in chapters:
         text = path.read_text(encoding="utf-8")
-        html_body = _md_to_html(text)
+        html_body = md_to_html(text)
 
         c = epub.EpubHtml(
             title=f"第{num}章",
@@ -170,48 +162,3 @@ def export_epub(
     book.add_item(epub.EpubNav())
 
     epub.write_epub(str(output_path), book)
-
-
-def _md_to_html(text: str) -> str:
-    """将 markdown 正文转为简单 HTML。"""
-    from html import escape
-
-    lines = text.split("\n")
-    html_lines: list[str] = []
-    in_para = False
-
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            if in_para:
-                html_lines.append("</p>")
-                in_para = False
-            continue
-
-        if stripped.startswith("# "):
-            if in_para:
-                html_lines.append("</p>")
-                in_para = False
-            html_lines.append(f"<h1>{escape(stripped[2:])}</h1>")
-        elif stripped.startswith("## "):
-            if in_para:
-                html_lines.append("</p>")
-                in_para = False
-            html_lines.append(f"<h2>{escape(stripped[3:])}</h2>")
-        elif stripped.startswith("---"):
-            if in_para:
-                html_lines.append("</p>")
-                in_para = False
-            html_lines.append("<hr/>")
-        else:
-            if not in_para:
-                html_lines.append("<p>")
-                in_para = True
-            else:
-                html_lines.append("<br/>")
-            html_lines.append(escape(stripped))
-
-    if in_para:
-        html_lines.append("</p>")
-
-    return "\n".join(html_lines)

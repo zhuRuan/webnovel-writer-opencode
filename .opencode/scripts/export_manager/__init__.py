@@ -59,7 +59,7 @@ def cmd_export(args: argparse.Namespace) -> int:
         from export_manager.txt import export_txt
         export_txt(chapters, Path(output))
     elif fmt == "epub":
-        from export_manager.epub import export_epub
+        from export_manager.formats.epub import export_epub
         export_epub(
             chapters=chapters,
             output_path=Path(output),
