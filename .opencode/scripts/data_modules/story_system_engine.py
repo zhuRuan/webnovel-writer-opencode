@@ -354,6 +354,12 @@ class StorySystemEngine:
         row = self._match_row_by_genre_text(rows, genre_text)
         if row:
             return row
+        # Try raw genre text before canonicalization (e.g. "末世" before "科幻")
+        raw_text = self._normalize_text(genre)
+        if raw_text != genre_text:
+            row = self._match_row_by_genre_text(rows, raw_text)
+            if row:
+                return row
         # 复合题材拆解: "末世+异能" -> ["末世", "异能"] -> try each component
         if "+" in genre:
             for component in genre.split("+"):

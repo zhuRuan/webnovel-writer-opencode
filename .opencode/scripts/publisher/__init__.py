@@ -156,11 +156,12 @@ async def _cmd_upload(args: argparse.Namespace):
     adapter = _get_adapter(args.platform)
     adapter.set_mode(args.mode)
     cfg = PublishConfig(mode=args.mode)
-    uploaded = load_upload_log(args.platform, book_id)
+    project_name = project_root.name
+    uploaded = load_upload_log(args.platform, book_id, project_name)
 
     # 交叉校验：防止 book_id 误用
     from publisher.config import get_log_path
-    log_path = get_log_path(args.platform, book_id)
+    log_path = get_log_path(args.platform, book_id, project_name)
     if log_path.is_file():
         try:
             log_data = json.loads(log_path.read_text(encoding="utf-8"))
@@ -229,7 +230,7 @@ async def _cmd_upload(args: argparse.Namespace):
                 continue
             if result.success:
                 uploaded.add(idx)
-                save_upload_log(args.platform, book_id, uploaded, book_name=book_name)
+                save_upload_log(args.platform, book_id, uploaded, book_name=book_name, project_name=project_name)
                 success_count += 1
                 print(f"  [OK] 第{idx}章 {result.message}")
             else:

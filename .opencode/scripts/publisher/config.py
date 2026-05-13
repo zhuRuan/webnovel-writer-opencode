@@ -18,23 +18,26 @@ class PublishConfig:
     timeout: float = 30.0        # 单次操作超时
 
 
-def get_upload_log_dir() -> Path:
-    return Path.home() / ".webnovel-publish" / "upload_log"
+def get_upload_log_dir(project_name: str = "") -> Path:
+    base = Path.home() / ".webnovel-publish" / "upload_log"
+    if project_name:
+        base = base / project_name
+    return base
 
 
-def _log_path(platform: str, book_id: str) -> Path:
-    d = get_upload_log_dir()
+def _log_path(platform: str, book_id: str, project_name: str = "") -> Path:
+    d = get_upload_log_dir(project_name)
     d.mkdir(parents=True, exist_ok=True)
     return d / f"{platform}_{book_id}.json"
 
 
-def get_log_path(platform: str, book_id: str) -> Path:
+def get_log_path(platform: str, book_id: str, project_name: str = "") -> Path:
     """公开接口：获取上传日志文件路径。"""
-    return _log_path(platform, book_id)
+    return _log_path(platform, book_id, project_name)
 
 
-def load_upload_log(platform: str, book_id: str) -> set[int]:
-    p = _log_path(platform, book_id)
+def load_upload_log(platform: str, book_id: str, project_name: str = "") -> set[int]:
+    p = _log_path(platform, book_id, project_name)
     if not p.is_file():
         return set()
     try:
@@ -44,8 +47,8 @@ def load_upload_log(platform: str, book_id: str) -> set[int]:
         return set()
 
 
-def save_upload_log(platform: str, book_id: str, uploaded: set[int], book_name: str = ""):
-    p = _log_path(platform, book_id)
+def save_upload_log(platform: str, book_id: str, uploaded: set[int], book_name: str = "", project_name: str = ""):
+    p = _log_path(platform, book_id, project_name)
     # 先读出已有数据，合并 upload 列表（防止多进程竞态覆盖）
     existing = set()
     try:
