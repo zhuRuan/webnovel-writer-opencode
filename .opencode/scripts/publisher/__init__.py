@@ -72,15 +72,44 @@ async def _cmd_list_books(args: argparse.Namespace):
 async def _cmd_create_book(args: argparse.Namespace):
     from publisher.browser import Browser
     from publisher.base import BookMeta
+    from publisher.config import save_publish_config, load_publish_config
     adapter = _get_adapter(args.platform)
     project_root = Path(args.project_root).expanduser().resolve()
     meta = _read_book_meta(project_root)
+
+    # 简介：自动生成 or 用户输入 or 跳过
+    abstract = _build_abstract_from_project(project_root)
+    if args.abstract:
+        abstract = args.abstract
+    elif not args.yes:
+        print(f"\n自动生成简介:\n  {abstract}\n")
+        choice = input("使用自动简介？[Y=使用 / 输入新简介 / N=跳过]: ").strip()
+        if choice.lower() == 'n':
+            abstract = ""
+        elif choice and choice.lower() != 'y':
+            abstract = choice
+    print(f"书名: {meta.title}")
+    print(f"题材: {meta.genre}")
+    print(f"简介: {abstract or '(跳过)'}")
+    if not args.yes:
+        resp = input("\n确认创建？(Y/n): ").strip()
+        if resp.lower() in ('n', 'no'):
+            print("已取消。")
+            return
+
     browser = Browser(platform=args.platform)
     page = await browser.start()
     try:
         book_id = await adapter.create_book(page, meta)
         if book_id:
             print(f"[OK] 书籍创建成功！book_id: {book_id}")
+            # 绑定到项目
+            cfg = load_publish_config(project_root)
+            cfg.setdefault("bindings", {})[args.platform] = {
+                "book_id": book_id, "book_name": meta.title,
+            }
+            save_publish_config(project_root, cfg)
+            print(f"  已绑定到项目: {project_root}")
         else:
             print("[FAIL] 创建失败，请手动检查")
             sys.exit(1)
@@ -88,27 +117,51 @@ async def _cmd_create_book(args: argparse.Namespace):
         await browser.close()
 
 
+def _build_abstract_from_project(project_root: Path) -> str:
+    """从项目元数据自动生成简介（50+ 字）。"""
+    import json as _json
+    state_path = project_root / ".webnovel" / "state.json"
+    pi = {}
+    if state_path.is_file():
+        try:
+            state = _json.loads(state_path.read_text(encoding="utf-8"))
+            pi = state.get("project_info", {})
+        except (_json.JSONDecodeError, OSError):
+            pass
+    parts = []
+    selling = pi.get("core_selling_points", "")
+    if selling:
+        parts.append(selling)
+    world = pi.get("world_scale", "")
+    gf = pi.get("golden_finger_name", "")
+    if gf and world:
+        parts.append(f"{world}背景，{gf}为刃")
+    return "。".join(parts) if parts else ""
+
+
 async def _cmd_upload(args: argparse.Namespace):
     from publisher.browser import Browser
     from publisher.base import Chapter
-    from publisher.config import PublishConfig, load_upload_log, save_upload_log
+    from publisher.config import PublishConfig, load_upload_log, save_upload_log, resolve_book_id
     from publisher.formatter import format_for_platform
 
+    project_root = Path(args.project_root).expanduser().resolve()
+    book_id = resolve_book_id(project_root, args.platform, getattr(args, 'book', None))
     adapter = _get_adapter(args.platform)
     adapter.set_mode(args.mode)
     cfg = PublishConfig(mode=args.mode)
-    uploaded = load_upload_log(args.platform, args.book_id)
+    uploaded = load_upload_log(args.platform, book_id)
 
-    # 交叉校验：防止 book_id 误用，避免上传到错误的书籍
+    # 交叉校验：防止 book_id 误用
     from publisher.config import get_log_path
-    log_path = get_log_path(args.platform, args.book_id)
+    log_path = get_log_path(args.platform, book_id)
     if log_path.is_file():
         try:
             log_data = json.loads(log_path.read_text(encoding="utf-8"))
             logged_book_id = log_data.get("book_id", "")
-            if logged_book_id and logged_book_id != args.book_id:
+            if logged_book_id and logged_book_id != book_id:
                 logged_name = log_data.get("book_name", "未知")
-                print(f"⚠️ 警告: 上传日志中的 book_id ({logged_book_id}, {logged_name}) 与当前 book_id ({args.book_id}) 不一致！")
+                print(f"⚠️ 警告: 上传日志中的 book_id ({logged_book_id}, {logged_name}) 与当前 book_id ({book_id}) 不一致！")
                 print("可能原因: 误用了另一本书的 book_id。")
                 if getattr(args, 'yes', False):
                     print("--yes 已指定，跳过确认继续上传。")
@@ -118,9 +171,8 @@ async def _cmd_upload(args: argparse.Namespace):
                         print("已取消。")
                         return
         except (json.JSONDecodeError, KeyError):
-            pass  # old format without book_id field, skip check
+            pass
 
-    project_root = Path(args.project_root).expanduser().resolve()
     book_meta = _read_book_meta(project_root)
     book_name = book_meta.title if book_meta else ""
     chapter_indices = _parse_range(args.range, project_root)
@@ -129,10 +181,18 @@ async def _cmd_upload(args: argparse.Namespace):
         print("所有章节已上传。")
         return
 
+    # 上传确认摘要
     print(
+        f"目标书籍: {book_name or '?'} (book_id: {book_id})\n"
         f"待上传: {len(to_upload)} 章 "
-        f"(共 {len(chapter_indices)} 章, {len(uploaded)} 章已传)"
+        f"(共 {len(chapter_indices)} 章, {len(uploaded)} 章已传)\n"
+        f"模式: {args.mode}"
     )
+    if not getattr(args, 'yes', False):
+        resp = input("继续？(Y/n): ").strip()
+        if resp.lower() in ('n', 'no'):
+            print("已取消。")
+            return
 
     browser = Browser(headless=cfg.headless, platform=args.platform)
     page = await browser.start()
@@ -149,11 +209,13 @@ async def _cmd_upload(args: argparse.Namespace):
 
             raw_md = chapter_file.read_text(encoding="utf-8")
             title = _extract_title(raw_md) or f"第{idx}章"
+            # 剔除首行标题（平台 API 单独设标题，正文不需重复）
+            raw_md = _strip_heading_line(raw_md)
             content = format_for_platform(raw_md, args.platform)
             chapter = Chapter(index=idx, title=title, content=content)
 
             try:
-                result = await adapter.upload_chapter(page, args.book_id, chapter)
+                result = await adapter.upload_chapter(page, book_id, chapter)
             except RuntimeError as e:
                 fail_count += 1
                 print(f"  [FAIL] 第{idx}章 {e}")
@@ -161,7 +223,7 @@ async def _cmd_upload(args: argparse.Namespace):
                 continue
             if result.success:
                 uploaded.add(idx)
-                save_upload_log(args.platform, args.book_id, uploaded, book_name=book_name)
+                save_upload_log(args.platform, book_id, uploaded, book_name=book_name)
                 success_count += 1
                 print(f"  [OK] 第{idx}章 {result.message}")
             else:
@@ -222,6 +284,17 @@ def _parse_range(spec: str, project_root: Path) -> list[int]:
     return sorted(result)
 
 
+def _strip_heading_line(md: str) -> str:
+    """剔除首行 Markdown 标题（## 第XX章 标题），避免正文重复标题。"""
+    import re
+    lines = md.splitlines()
+    if lines:
+        first = lines[0].strip()
+        if first.startswith("#") and re.search(r'第\d+章', first):
+            return '\n'.join(lines[1:]).lstrip('\n')
+    return md
+
+
 def _extract_title(md: str) -> str:
     for line in md.splitlines():
         stripped = line.strip()
@@ -275,10 +348,11 @@ def main():
 
     p_create = sub.add_parser("create-book", help="创建新书")
     p_create.add_argument("--platform", required=True, help="平台名称")
+    p_create.add_argument("--abstract", default=None, help="书籍简介（默认自动生成）")
 
     p_upload = sub.add_parser("upload", help="上传章节")
     p_upload.add_argument("--platform", required=True, help="平台名称")
-    p_upload.add_argument("--book-id", required=True, help="书籍 ID")
+    p_upload.add_argument("--book", default=None, help="书籍 ID 或书名（未指定时从项目绑定读取）")
     p_upload.add_argument("--range", default="all", help="章节范围")
     p_upload.add_argument("--mode", default="draft",
                           help="发布模式 (draft|publish)")

@@ -65,3 +65,54 @@ def save_upload_log(platform: str, book_id: str, uploaded: set[int], book_name: 
     tmp = p.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(tmp, p)
+
+
+def get_publish_config_path(project_root: str | Path) -> Path:
+    """项目级发布配置：绑定的 book_id、平台等。"""
+    return Path(project_root) / ".webnovel" / "publish_config.json"
+
+
+def load_publish_config(project_root: str | Path) -> dict:
+    p = get_publish_config_path(project_root)
+    if not p.is_file():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_publish_config(project_root: str | Path, data: dict):
+    p = get_publish_config_path(project_root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def resolve_book_id(project_root: str | Path, platform: str, book_spec: str | None) -> str:
+    """将 book_spec（ID 或书名）解析为 book_id。
+    优先顺序：显式传入 → publish_config.json 绑定 → 报错。"""
+    if book_spec and book_spec.strip():
+        spec = book_spec.strip()
+        # 纯数字 → book_id
+        if spec.isdigit():
+            return spec
+        # 书名 → 从上传日志查找
+        log_dir = get_upload_log_dir()
+        if log_dir.is_dir():
+            for f in log_dir.glob(f"{platform}_*.json"):
+                try:
+                    data = json.loads(f.read_text(encoding="utf-8"))
+                    name = (data.get("book_name") or "").strip()
+                    if name and spec.lower() in name.lower():
+                        return data.get("book_id", "")
+                except (json.JSONDecodeError, OSError):
+                    pass
+        raise ValueError(f"未找到匹配 '{spec}' 的书籍。请先 list-books 确认书名，或使用 book_id。")
+
+    # 从项目配置读取
+    cfg = load_publish_config(project_root)
+    bound = cfg.get("bindings", {}).get(platform, {})
+    bid = bound.get("book_id", "")
+    if bid:
+        return bid
+    raise ValueError(f"未指定 --book 且项目未绑定书籍。请先 create-book 或传入 --book <id/书名>。")
