@@ -2,7 +2,7 @@
 """PDF export — renders HTML to PDF via weasyprint (optional dependency)."""
 from __future__ import annotations
 
-import sys
+from html import escape
 from pathlib import Path
 from typing import Optional
 
@@ -41,7 +41,7 @@ def export_pdf(
         '<html lang="zh-CN">',
         "<head>",
         '<meta charset="utf-8">',
-        f"<title>{_escape(title) or '小说导出'}</title>",
+        f"<title>{escape(title) or '小说导出'}</title>",
         "<style>",
         css,
         "</style>",
@@ -50,15 +50,14 @@ def export_pdf(
     ]
 
     if title:
-        html_parts.append(f"<h1 class='book-title'>{_escape(title)}</h1>")
+        html_parts.append(f"<h1 class='book-title'>{escape(title)}</h1>")
 
-    # TOC
     html_parts.append('<nav class="toc"><h2>目录</h2><ol>')
     for ch in chapters:
         ch_index = ch.index if hasattr(ch, 'index') else ch[0]
         ch_title = ch.title if hasattr(ch, 'title') else ch[1]
         html_parts.append(
-            f'<li><a href="#ch{ch_index:04d}">第{ch_index}章 {_escape(ch_title)}</a></li>'
+            f'<li><a href="#ch{ch_index:04d}">第{ch_index}章 {escape(ch_title)}</a></li>'
         )
     html_parts.append("</ol></nav>")
 
@@ -70,7 +69,7 @@ def export_pdf(
         body_html = md_to_html(text)
         html_parts.append(
             f'<section id="ch{ch_index:04d}">'
-            f'<h1 class="chapter-title">第{ch_index}章 {_escape(ch_title)}</h1>'
+            f'<h1 class="chapter-title">第{ch_index}章 {escape(ch_title)}</h1>'
             f"{body_html}"
             f"</section>"
         )
@@ -79,7 +78,3 @@ def export_pdf(
 
     html_str = "\n".join(html_parts)
     HTML(string=html_str).write_pdf(str(output_path))
-
-
-def _escape(text: str) -> str:
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")

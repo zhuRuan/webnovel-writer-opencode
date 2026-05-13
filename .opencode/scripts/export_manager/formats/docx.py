@@ -10,7 +10,7 @@ from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 
-from export_manager.parser import md_to_blocks
+from export_manager.parser import md_to_blocks, ast_to_text
 
 
 def export_docx(
@@ -22,12 +22,10 @@ def export_docx(
     """Export chapters as a .docx file with Chinese novel typesetting."""
     doc = Document()
 
-    # Page setup: A4
     section = doc.sections[0]
     section.page_width = Cm(21.0)
     section.page_height = Cm(29.7)
 
-    # Default paragraph style
     style = doc.styles["Normal"]
     style.font.size = Pt(12)
     style.font.name = "宋体"
@@ -37,7 +35,6 @@ def export_docx(
     pf.line_spacing = 1.8
     pf.space_after = Pt(4)
 
-    # Title
     if title:
         h = doc.add_heading(title, level=0)
         h.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -45,7 +42,6 @@ def export_docx(
     if author:
         doc.add_paragraph(f"作者: {author}").alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    # Chapters
     for ch in chapters:
         if hasattr(ch, 'path'):
             text = ch.path.read_text(encoding="utf-8")
@@ -84,31 +80,15 @@ def export_docx(
                 p = doc.add_paragraph()
                 _add_inline_runs(p, children)
             elif btype in ("blank_line", "block_code"):
-                text_content = _extract_text(block)
+                text_content = ast_to_text(block)
                 if text_content.strip():
                     doc.add_paragraph(text_content)
             else:
-                text_content = _extract_text(block)
+                text_content = ast_to_text(block)
                 if text_content.strip():
                     doc.add_paragraph(text_content)
 
     doc.save(str(output_path))
-
-
-def _extract_text(block: dict) -> str:
-    """Extract plain text from a mistune AST block or inline token."""
-    if "text" in block:
-        return block.get("text", "")
-    if "raw" in block:
-        return block.get("raw", "")
-    children = block.get("children", [])
-    parts = []
-    for child in children:
-        if isinstance(child, dict):
-            parts.append(_extract_text(child))
-        elif isinstance(child, str):
-            parts.append(child)
-    return "".join(parts)
 
 
 def _add_inline_runs(paragraph, children: list) -> None:
@@ -130,6 +110,6 @@ def _add_inline_runs(paragraph, children: list) -> None:
                     run = paragraph.add_run(inner.get("raw", ""))
                     run.italic = True
         else:
-            text = _extract_text(child)
+            text = ast_to_text(child)
             if text:
                 paragraph.add_run(text)

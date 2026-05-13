@@ -1,43 +1,23 @@
 #!/usr/bin/env python3
-"""TXT plain text export — strips markdown via mistune text renderer."""
+"""TXT plain text export — strips markdown via mistune AST."""
 from __future__ import annotations
 
 from pathlib import Path
 
-import mistune
+from export_manager.parser import md_to_blocks, ast_to_text
 
 
 def _strip_markdown(text: str) -> str:
     """Remove inline markdown formatting, return plain text."""
-    result_parts: list[str] = []
-    md = mistune.create_markdown(renderer=None)
-    blocks = md(text)
-
+    blocks = md_to_blocks(text)
+    result_parts = []
     for block in blocks:
         if not isinstance(block, dict):
             continue
-        text_content = _extract_inline_text(block)
+        text_content = ast_to_text(block)
         if text_content:
             result_parts.append(text_content)
     return "\n".join(result_parts)
-
-
-def _extract_inline_text(block: dict) -> str:
-    """Recursively extract text from inline children, stripping formatting."""
-    if "raw" in block:
-        return block["raw"]
-    if "text" in block and isinstance(block["text"], str):
-        return block["text"]
-    children = block.get("children", [])
-    if not children:
-        return ""
-    texts = []
-    for child in children:
-        if isinstance(child, dict):
-            texts.append(_extract_inline_text(child))
-        elif isinstance(child, str):
-            texts.append(child)
-    return "".join(texts)
 
 
 def export_txt(chapters: list, output_path: Path) -> None:

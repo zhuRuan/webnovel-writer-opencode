@@ -37,7 +37,6 @@ def collect_chapters(
 
     candidates.sort(key=lambda x: x[0])
 
-    # Volume filter (use file-system directory layout, then formula fallback)
     if volume is not None:
         filtered: list[tuple[int, Path]] = []
         for n, f in candidates:
@@ -46,13 +45,11 @@ def collect_chapters(
                 filtered.append((n, f))
         candidates = filtered
 
-    # Range filter
     if range_spec and range_spec != "all":
         max_num = max(c[0] for c in candidates) if candidates else 0
         allowed = _parse_range(range_spec, max_num=max_num)
         candidates = [(n, f) for n, f in candidates if n in allowed]
 
-    # Build result with title extraction and progress feedback
     total = len(candidates)
     result: list[ChapterInfo] = []
     for i, (num, path) in enumerate(candidates, 1):
@@ -61,53 +58,42 @@ def collect_chapters(
         result.append(ChapterInfo(index=num, title=title, path=path, volume=vol))
         print(f"  [{i}/{total}] 第{num}章 {title}")
 
-    # Validation: detect gaps and duplicates
     _validate(result)
 
     return result
 
 
 def _resolve_volume_from_path(path: Path, project_root: Path) -> int:
-    """Determine volume number from chapter file's directory structure.
-
-    Priority:
-    1. If file is under 正文/第N卷/ — return N
-    2. Fallback: (chapter_num - 1) // 50 + 1
-    """
-    try:
-        from chapter_paths import extract_chapter_num_from_filename
-    except ImportError:
-        from scripts.chapter_paths import extract_chapter_num_from_filename
-
     rel = path.relative_to(project_root)
-    parts = rel.parts
-    for part in parts:
+    for part in rel.parts:
         m = re.match(r"第(\d+)卷", part)
         if m:
             return int(m.group(1))
 
+    try:
+        from chapter_paths import extract_chapter_num_from_filename, volume_num_for_chapter
+    except ImportError:
+        from scripts.chapter_paths import extract_chapter_num_from_filename, volume_num_for_chapter
+
     num = extract_chapter_num_from_filename(path.name)
     if num is not None:
-        return (num - 1) // 50 + 1
+        return volume_num_for_chapter(num)
     return 1
 
 
 def _extract_title(path: Path) -> str:
-    """Extract chapter title from file content. Skips leading blank lines."""
     try:
-        text = path.read_text(encoding="utf-8")
+        with path.open(encoding="utf-8") as fh:
+            for line in fh:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                m = re.match(r"^#{1,3}\s+(.*)", stripped)
+                if m:
+                    return m.group(1).strip()
+                return stripped
     except Exception:
         return "无标题"
-
-    lines = text.split("\n")
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        m = re.match(r"^#{1,3}\s+(.*)", stripped)
-        if m:
-            return m.group(1).strip()
-        return stripped
 
     # No non-empty content — fallback to filename
     try:
@@ -119,11 +105,9 @@ def _extract_title(path: Path) -> str:
 
 
 def _validate(chapters: list[ChapterInfo]) -> None:
-    """Validate chapter list: detect gaps and duplicates. Print warnings/errors."""
     if not chapters:
         return
-    indices = sorted(ch.index for ch in chapters)
-    # Duplicates
+    indices = [ch.index for ch in chapters]  # already sorted
     seen: set[int] = set()
     dups: set[int] = set()
     for idx in indices:
@@ -135,7 +119,6 @@ def _validate(chapters: list[ChapterInfo]) -> None:
         print(f"错误: 存在重复章节号: {dup_str}")
         raise SystemExit(1)
 
-    # Gaps
     missing_count = 0
     for i in range(indices[0], indices[-1]):
         if i not in seen:
