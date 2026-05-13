@@ -87,6 +87,14 @@ def cmd_export(args: argparse.Namespace) -> int:
             title=args.title or project_root.name,
             author=args.author,
         )
+    elif fmt == "pdf":
+        from export_manager.formats.pdf import export_pdf
+        export_pdf(
+            chapters=chapters,
+            output_path=Path(output),
+            title=args.title or project_root.name,
+            custom_css=Path(args.style) if args.style else None,
+        )
     else:
         print(f"不支持的格式: {fmt}，可选: md, txt, epub, html, docx, pdf")
         return 1

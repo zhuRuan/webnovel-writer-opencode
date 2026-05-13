@@ -440,3 +440,31 @@ class TestDocxExport:
                 if run.bold and "粗体" in run.text:
                     found_bold = True
         assert found_bold
+
+
+class TestPdfExport:
+    def test_missing_dependency(self, tmp_path, monkeypatch):
+        """PDF exits gracefully when weasyprint is not installed."""
+        from export_manager.chapter_collector import collect_chapters
+
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text("# 第1章\n\n正文。", encoding="utf-8")
+        chapters = collect_chapters(tmp_path)
+        output = tmp_path / "导出" / "小说.pdf"
+        output.parent.mkdir()
+
+        import builtins
+        _orig_import = builtins.__import__
+
+        def _mock_import(name, *args, **kwargs):
+            if name == "weasyprint":
+                raise ImportError("No module named 'weasyprint'")
+            return _orig_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", _mock_import)
+
+        from export_manager.formats.pdf import export_pdf
+
+        with pytest.raises(SystemExit) as exc:
+            export_pdf(chapters, output, title="测试")
+        assert exc.value.code == 1
