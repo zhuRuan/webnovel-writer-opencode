@@ -20,19 +20,17 @@ _scripts_root = Path(__file__).resolve().parent.parent
 if str(_scripts_root) not in sys.path:
     sys.path.insert(0, str(_scripts_root))
 
-from publisher.adapters.fanqie import FanqieAdapter
-
-REGISTRY: dict[str, type] = {
-    "fanqie": FanqieAdapter,
-}
+from publisher.adapters import get_adapter as _get_adapter_impl
 
 
 def _get_adapter(platform: str):
-    cls = REGISTRY.get(platform)
-    if cls is None:
-        print(f"未知平台: {platform}。可用: {', '.join(REGISTRY)}")
+    try:
+        return _get_adapter_impl(platform)
+    except ValueError as e:
+        from publisher.adapters import list_platforms
+        print(f"{e}")
+        print(f"可用平台: {', '.join(list_platforms())}")
         sys.exit(1)
-    return cls()
 
 
 async def _cmd_setup_auth(args: argparse.Namespace):

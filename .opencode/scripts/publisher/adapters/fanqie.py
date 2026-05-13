@@ -143,6 +143,10 @@ def _find_label_ids(labels: list[dict], genre: str, max_count: int = 4) -> list[
     return selected
 
 
+from publisher.adapters import register
+
+
+@register("fanqie")
 class FanqieAdapter(BasePlatform):
     name = "fanqie"
     display_name = "番茄小说"
