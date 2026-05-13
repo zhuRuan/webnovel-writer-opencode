@@ -361,3 +361,82 @@ class TestEpubForward:
 
         assert output.is_file()
         assert output.stat().st_size > 0
+
+
+class TestDocxExport:
+    def test_basic(self, tmp_path):
+        try:
+            from docx import Document  # noqa: F401
+        except ImportError:
+            pytest.skip("python-docx not installed")
+
+        from export_manager.chapter_collector import collect_chapters
+        from export_manager.formats.docx import export_docx
+
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text(
+            "# 第1章 开篇\n\n这是正文内容。\n\n第二段。", encoding="utf-8"
+        )
+
+        chapters = collect_chapters(tmp_path)
+        output = tmp_path / "导出" / "小说.docx"
+        output.parent.mkdir()
+
+        export_docx(chapters, output, title="测试", author="作者")
+
+        assert output.is_file()
+        assert output.stat().st_size > 0
+
+    def test_scene_break(self, tmp_path):
+        try:
+            from docx import Document  # noqa: F401
+        except ImportError:
+            pytest.skip("python-docx not installed")
+
+        from export_manager.chapter_collector import collect_chapters
+        from export_manager.formats.docx import export_docx
+
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text(
+            "第一场景。\n\n---\n\n第二场景。", encoding="utf-8"
+        )
+
+        chapters = collect_chapters(tmp_path)
+        output = tmp_path / "导出" / "小说.docx"
+        output.parent.mkdir()
+
+        export_docx(chapters, output, title="测试")
+
+        from docx import Document
+        doc = Document(str(output))
+        texts = [p.text for p in doc.paragraphs]
+        assert any("* * *" in t for t in texts)
+
+    def test_bold_text(self, tmp_path):
+        try:
+            from docx import Document  # noqa: F401
+        except ImportError:
+            pytest.skip("python-docx not installed")
+
+        from export_manager.chapter_collector import collect_chapters
+        from export_manager.formats.docx import export_docx
+
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text(
+            "这是**粗体**文字。", encoding="utf-8"
+        )
+
+        chapters = collect_chapters(tmp_path)
+        output = tmp_path / "导出" / "小说.docx"
+        output.parent.mkdir()
+
+        export_docx(chapters, output, title="测试")
+
+        from docx import Document
+        doc = Document(str(output))
+        found_bold = False
+        for p in doc.paragraphs:
+            for run in p.runs:
+                if run.bold and "粗体" in run.text:
+                    found_bold = True
+        assert found_bold
