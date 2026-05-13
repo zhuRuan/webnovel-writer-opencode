@@ -71,7 +71,9 @@ class StorySystemEngine:
             route.get("default_query", ""),
             self._directive_query_text(chapter_directive),
         )
-        # Boost dynamic context query with strand info for chapter-specific relevance
+        # Boost dynamic context with strand keywords.
+        # Doubling strand raises BM25 term frequency so strand-relevant
+        # reference rows rank above generic genre matches for this chapter.
         strand = str(chapter_directive.get("strand") or "").strip()
         dynamic_query = f"{search_query} {strand} {strand}" if strand else search_query
         base_context = self._collect_tables(

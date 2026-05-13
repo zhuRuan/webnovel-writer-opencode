@@ -71,8 +71,8 @@ def clean_reviewer_output(raw: str) -> dict:
     try:
         return json.loads(json_str)
     except json.JSONDecodeError as e:
-            preview = json_str[:500] + "..." if len(json_str) > 500 else json_str
-            raise ValueError(f"JSON解析失败，raw前500字符: {preview}") from e
+        preview = json_str[:500] + "..." if len(json_str) > 500 else json_str
+        raise ValueError(f"JSON解析失败，raw前500字符: {preview}") from e
 
 
 def _resolve_report_path(project_root: Path, report_file: str) -> Path:

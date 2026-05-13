@@ -191,6 +191,28 @@ def _project_root_diagnostic(
 
 def _build_fs_state_sync(project_root: Path) -> dict:
     import re
+
+    # Light check first: volume file continuity
+    story_dir = project_root / ".story-system" / "volumes"
+    missing_volumes = []
+    if story_dir.is_dir():
+        for f in sorted(story_dir.glob("volume_*.json")):
+            m = re.match(r"volume_0*(\d+)\.json", f.name)
+            if m:
+                vol_num = int(m.group(1))
+                if vol_num > 1:
+                    prev_path = story_dir / f"volume_{vol_num - 1:03d}.json"
+                    if not prev_path.is_file():
+                        missing_volumes.append(str(prev_path.relative_to(project_root)))
+        missing_volumes = sorted(set(missing_volumes))
+    if missing_volumes:
+        return {
+            "name": "fs_state_sync",
+            "ok": True,
+            "severity": "warning",
+            "detail": f"缺失卷文件: {', '.join(missing_volumes[:10])}",
+        }
+
     fs_nums = set()
     text_dir = project_root / "正文"
     if text_dir.is_dir():
@@ -208,27 +230,6 @@ def _build_fs_state_sync(project_root: Path) -> dict:
             state_nums = set(int(k) for k in chapter_status.keys())
         except (json.JSONDecodeError, OSError, ValueError):
             pass
-
-    # Volume file existence check
-    story_dir = project_root / ".story-system" / "volumes"
-    missing_volumes = []
-    if story_dir.is_dir():
-        for f in sorted(story_dir.glob("volume_*.json")):
-            m = re.match(r"volume_0*(\d+)\.json", f.name)
-            if m:
-                vol_num = int(m.group(1))
-                prev = max(1, vol_num - 1)
-                prev_path = story_dir / f"volume_{prev:03d}.json"
-                if not prev_path.is_file() and prev_path != f:
-                    missing_volumes.append(str(prev_path.relative_to(project_root)))
-        missing_volumes = sorted(set(missing_volumes))
-    if missing_volumes:
-        return {
-            "name": "fs_state_sync",
-            "ok": True,
-            "severity": "warning",
-            "detail": f"缺失卷文件: {', '.join(missing_volumes[:10])}",
-        }
 
     orphans = sorted(fs_nums - state_nums)
     ghosts = sorted(state_nums - fs_nums)
