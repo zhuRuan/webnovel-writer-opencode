@@ -69,8 +69,18 @@ def cmd_export(args: argparse.Namespace) -> int:
             style=args.style,
             cover_size=args.cover_size,
         )
+    elif fmt == "html":
+        from export_manager.chapter_collector import ChapterInfo
+        from export_manager.formats.html import export_html
+        html_chapters = [ChapterInfo(index=n, title=t, path=p, volume=0) for n, t, p in chapters]
+        export_html(
+            chapters=html_chapters,
+            output_path=Path(output),
+            title=args.title or project_root.name,
+            custom_css=Path(args.style) if args.style else None,
+        )
     else:
-        print(f"不支持的格式: {fmt}，可选: md, txt, epub")
+        print(f"不支持的格式: {fmt}，可选: md, txt, epub, html, docx, pdf")
         return 1
 
     print(f"导出完成: {output}")
@@ -88,14 +98,14 @@ def main() -> None:
 
     # export (执行导出)
     p_export = sub.add_parser("export", help="执行导出")
-    p_export.add_argument("--format", choices=["md", "txt", "epub"], default="md", help="输出格式")
+    p_export.add_argument("--format", choices=["md", "txt", "epub", "html", "docx", "pdf"], default="md", help="输出格式")
     p_export.add_argument("--range", help="章节范围: 1-50 / 1,3,5 / all")
     p_export.add_argument("--volume", type=int, help="按卷导出")
     p_export.add_argument("--output", help="输出文件路径")
     p_export.add_argument("--title", help="书名")
     p_export.add_argument("--author", help="作者名 (EPUB)")
     p_export.add_argument("--cover", help="封面图路径 (EPUB)")
-    p_export.add_argument("--style", help="自定义 CSS 路径 (EPUB)")
+    p_export.add_argument("--style", help="自定义 CSS 文件路径")
     p_export.add_argument("--cover-size", default="1200x1600", help="封面裁剪尺寸 (EPUB)")
 
     args = parser.parse_args()

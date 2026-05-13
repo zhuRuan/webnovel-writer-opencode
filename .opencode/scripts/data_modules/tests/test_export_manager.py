@@ -309,3 +309,29 @@ class TestCollectorValidation:
         (tmp_path / "正文" / "第0051章.md").write_text("# 第51章", encoding="utf-8")
         result = collect_chapters(tmp_path)
         assert result[0].volume == 2  # (51-1)//50+1 = 2
+
+
+class TestHtmlExport:
+    def test_basic(self, tmp_path):
+        from export_manager.chapter_collector import collect_chapters
+        from export_manager.formats.html import export_html
+
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text("# 第1章 开篇\n\n正文内容。", encoding="utf-8")
+        (tmp_path / "正文" / "第0002章.md").write_text("# 第2章 发展\n\n更多内容。", encoding="utf-8")
+
+        chapters = collect_chapters(tmp_path)
+        output = tmp_path / "导出" / "小说.html"
+        output.parent.mkdir()
+
+        export_html(chapters, output, title="测试小说")
+
+        content = output.read_text(encoding="utf-8")
+        assert "<!DOCTYPE html>" in content
+        assert '<html lang="zh-CN"' in content
+        assert '<meta charset="utf-8">' in content
+        assert "测试小说" in content
+        assert "第1章 开篇" in content
+        assert "正文内容。" in content
+        assert 'class="toc"' in content
+        assert 'id="ch0001"' in content
