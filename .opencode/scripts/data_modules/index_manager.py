@@ -236,8 +236,9 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
         self._init_db()
 
     def _init_db(self):
-        """初始化数据库表"""
-        self.config.ensure_dirs()
+        """初始化数据库表（仅在 state.json 存在时创建目录，防止错误 PROJECT_ROOT 漂移）"""
+        if self.config.state_file.is_file():
+            self.config.ensure_dirs()
 
         with self._get_conn() as conn:
             cursor = conn.cursor()

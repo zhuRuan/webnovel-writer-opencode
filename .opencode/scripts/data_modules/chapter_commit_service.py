@@ -25,6 +25,12 @@ _FORESHADOW_DUE_OFFSET = 10
 class ChapterCommitService:
     def __init__(self, project_root: Path):
         self.project_root = Path(project_root)
+        state_file = self.project_root / ".webnovel" / "state.json"
+        if not state_file.is_file():
+            raise FileNotFoundError(
+                f"无效的项目根目录: {self.project_root}（缺少 .webnovel/state.json）。"
+                "请确认 --project-root 指向正确的书项目目录。"
+            )
 
     def build_commit(
         self,
