@@ -468,3 +468,30 @@ class TestPdfExport:
         with pytest.raises(SystemExit) as exc:
             export_pdf(chapters, output, title="测试")
         assert exc.value.code == 1
+
+
+class TestExportCli:
+    def test_export_html_integration(self, tmp_path, monkeypatch):
+        """End-to-end CLI test for HTML export."""
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text("# 第1章\n\n内容。", encoding="utf-8")
+
+        monkeypatch.setattr("sys.argv", [
+            "export_manager",
+            "--project-root", str(tmp_path),
+            "export",
+            "--format", "html",
+            "--range", "1",
+        ])
+
+        with pytest.raises(SystemExit) as exc:
+            from export_manager.__init__ import main
+            main()
+        assert exc.value.code == 0
+
+        # Verify file was created
+        export_dir = tmp_path / "导出"
+        html_files = list(export_dir.glob("*.html"))
+        assert len(html_files) == 1
+        content = html_files[0].read_text(encoding="utf-8")
+        assert "第1章" in content
