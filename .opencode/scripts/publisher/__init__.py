@@ -5,7 +5,7 @@
   python publisher/__init__.py --project-root <path> setup-auth --platform fanqie
   python publisher/__init__.py --project-root <path> list-books --platform fanqie
   python publisher/__init__.py --project-root <path> create-book --platform fanqie
-  python publisher/__init__.py --project-root <path> upload --platform fanqie --book-id <id>
+  python publisher/__init__.py --project-root <path> upload --platform fanqie --book <id>
 """
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ async def _cmd_create_book(args: argparse.Namespace):
         abstract = args.abstract
     elif not args.yes:
         print(f"\n自动生成简介:\n  {abstract}\n")
-        choice = input("使用自动简介？[Y=使用 / 输入新简介 / N=跳过]: ").strip()
+        choice = _safe_input("使用自动简介？[Y=使用 / 输入新简介 / N=跳过]: ", default="y")
         if choice.lower() == 'n':
             abstract = ""
         elif choice and choice.lower() != 'y':
@@ -90,7 +90,7 @@ async def _cmd_create_book(args: argparse.Namespace):
     print(f"题材: {meta.genre}")
     print(f"简介: {abstract or '(跳过)'}")
     if not args.yes:
-        resp = input("\n确认创建？(Y/n): ").strip()
+        resp = _safe_input("\n确认创建？(Y/n): ", default="y")
         if resp.lower() in ('n', 'no'):
             print("已取消。")
             return
@@ -145,6 +145,14 @@ async def _cmd_upload(args: argparse.Namespace):
 
     project_root = Path(args.project_root).expanduser().resolve()
     book_id = resolve_book_id(project_root, args.platform, getattr(args, 'book', None))
+    # 首次上传时自动持久化绑定
+    if getattr(args, 'book', None):
+        from publisher.config import load_publish_config, save_publish_config
+        cfg = load_publish_config(project_root)
+        if str(args.platform) not in cfg.get("bindings", {}):
+            cfg.setdefault("bindings", {})[args.platform] = {"book_id": book_id}
+            save_publish_config(project_root, cfg)
+
     adapter = _get_adapter(args.platform)
     adapter.set_mode(args.mode)
     cfg = PublishConfig(mode=args.mode)
@@ -164,7 +172,7 @@ async def _cmd_upload(args: argparse.Namespace):
                 if getattr(args, 'yes', False):
                     print("--yes 已指定，跳过确认继续上传。")
                 else:
-                    resp = input("确认继续上传？(y/N): ")
+                    resp = _safe_input("确认继续上传？(y/N): ", default="n")
                     if resp.lower() != "y":
                         print("已取消。")
                         return
@@ -187,7 +195,7 @@ async def _cmd_upload(args: argparse.Namespace):
         f"模式: {args.mode}"
     )
     if not getattr(args, 'yes', False):
-        resp = input("继续？(Y/n): ").strip()
+        resp = _safe_input("继续？(Y/n): ", default="y")
         if resp.lower() in ('n', 'no'):
             print("已取消。")
             return
@@ -233,6 +241,15 @@ async def _cmd_upload(args: argparse.Namespace):
         await browser.close()
 
     print(f"\n上传完成: 成功 {success_count}, 失败 {fail_count}")
+
+
+def _safe_input(prompt: str, default: str = "y") -> str:
+    """Wrap input() with EOFError guard for non-TTY environments."""
+    try:
+        return input(prompt).strip()
+    except (EOFError, KeyboardInterrupt):
+        print(f"\n[非交互环境] 输入不可用，使用默认值: {default}")
+        return default
 
 
 def _read_book_meta(project_root: Path):
@@ -347,6 +364,7 @@ def main():
     p_create = sub.add_parser("create-book", help="创建新书")
     p_create.add_argument("--platform", required=True, help="平台名称")
     p_create.add_argument("--abstract", default=None, help="书籍简介（默认自动生成）")
+    p_create.add_argument("--yes", action="store_true", help="跳过交互确认")
 
     p_upload = sub.add_parser("upload", help="上传章节")
     p_upload.add_argument("--platform", required=True, help="平台名称")

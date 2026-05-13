@@ -576,6 +576,9 @@ def main() -> None:
         raise SystemExit(_run_script("export_manager/__init__.py", [*forward_args, *rest]))
 
     if tool == "publish":
+        # 拦截 --help，转发到 publisher 的 argparse
+        if rest and set(rest) & {"-h", "--help"}:
+            raise SystemExit(_run_script("publisher/__init__.py", ["--help"]))
         raise SystemExit(_run_script("publisher/__init__.py", [*forward_args, *rest]))
 
     if tool == "knowledge":

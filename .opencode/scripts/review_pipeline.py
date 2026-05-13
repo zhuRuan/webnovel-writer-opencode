@@ -26,20 +26,18 @@ def _ensure_scripts_path() -> None:
 
 _ensure_scripts_path()
 
-from data_modules.review_schema import append_ai_flavor_anti_patterns, parse_review_output
-
-CONTENT_DIMENSIONS = {"continuity", "setting", "character", "timeline", "ai_flavor", "logic", "pacing"}
-SYSTEM_DIMENSIONS = {"other"}
+from data_modules.review_schema import (
+    append_ai_flavor_anti_patterns,
+    parse_review_output,
+    CONTENT_DIMENSIONS,
+    SYSTEM_DIMENSIONS,
+)
 
 
 def _sanitize_json_text(raw: str) -> str:
-    """Replace bare ASCII double quotes inside CJK text values with Chinese quotes."""
-    sanitized = re.sub(
-        r'(?<=[一-鿿　-〿＀-￯])"'
-        r'(?=[一-鿿　-〿＀-￯])',
-        "「",  # 「
-        raw,
-    )
+    """Normalize curly quotes and strip BOM before JSON parse."""
+    sanitized = raw.replace("“", "「").replace("”", "」")
+    sanitized = sanitized.lstrip("﻿")  # UTF-8 BOM
     return sanitized
 
 
@@ -69,13 +67,10 @@ def clean_reviewer_output(raw: str) -> dict:
         else:
             raise ValueError("no valid JSON found in reviewer output")
 
+    json_str = _sanitize_json_text(json_str)
     try:
         return json.loads(json_str)
-    except json.JSONDecodeError:
-        try:
-            sanitized = _sanitize_json_text(json_str)
-            return json.loads(sanitized)
-        except json.JSONDecodeError as e:
+    except json.JSONDecodeError as e:
             preview = json_str[:500] + "..." if len(json_str) > 500 else json_str
             raise ValueError(f"JSON解析失败，raw前500字符: {preview}") from e
 
@@ -199,7 +194,7 @@ def build_review_artifacts(
     review_results_path: Path,
     report_file: str = "",
 ) -> Dict[str, Any]:
-    raw_text = review_results_path.read_text(encoding="utf-8")
+    raw_text = review_results_path.read_text(encoding="utf-8-sig")
     raw = clean_reviewer_output(raw_text)
     result = parse_review_output(chapter=chapter, raw=raw)
     anti_patterns_added = append_ai_flavor_anti_patterns(project_root, result)
