@@ -249,3 +249,63 @@ class TestStyles:
         css_file.write_text("body { margin: 0; }", encoding="utf-8")
         css = get_css(custom_path=css_file)
         assert "margin: 0" in css
+
+
+class TestCollectorValidation:
+    def test_gap_warning(self, tmp_path, capsys):
+        from export_manager.chapter_collector import collect_chapters
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text("# 第1章", encoding="utf-8")
+        (tmp_path / "正文" / "第0003章.md").write_text("# 第3章", encoding="utf-8")
+        result = collect_chapters(tmp_path)
+        captured = capsys.readouterr()
+        assert len(result) == 2
+        assert "缺失" in captured.out
+
+    def test_duplicate_error(self, tmp_path):
+        from export_manager.chapter_collector import collect_chapters
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text("# 第1章", encoding="utf-8")
+        (tmp_path / "正文" / "第1卷").mkdir()
+        (tmp_path / "正文" / "第1卷" / "第001章-b.md").write_text("# 第1章b", encoding="utf-8")
+        with pytest.raises(SystemExit) as exc:
+            collect_chapters(tmp_path)
+        assert exc.value.code == 1
+
+    def test_empty_file_title_fallback(self, tmp_path):
+        from export_manager.chapter_collector import collect_chapters
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text("", encoding="utf-8")
+        result = collect_chapters(tmp_path)
+        assert result[0].title == "第1章"
+
+    def test_no_heading_title(self, tmp_path):
+        from export_manager.chapter_collector import collect_chapters
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0001章.md").write_text("正文直接开始，没有标题。", encoding="utf-8")
+        result = collect_chapters(tmp_path)
+        assert "正文直接开始" in result[0].title
+
+    def test_progress_output(self, tmp_path, capsys):
+        from export_manager.chapter_collector import collect_chapters
+        (tmp_path / "正文").mkdir()
+        for i in range(1, 4):
+            (tmp_path / "正文" / f"第{i:04d}章.md").write_text(f"# 第{i}章", encoding="utf-8")
+        collect_chapters(tmp_path)
+        captured = capsys.readouterr()
+        assert "[1/3]" in captured.out
+        assert "[3/3]" in captured.out
+
+    def test_volume_from_dir(self, tmp_path):
+        from export_manager.chapter_collector import collect_chapters
+        (tmp_path / "正文" / "第2卷").mkdir(parents=True)
+        (tmp_path / "正文" / "第2卷" / "第051章.md").write_text("# 第51章", encoding="utf-8")
+        result = collect_chapters(tmp_path)
+        assert result[0].volume == 2
+
+    def test_volume_fallback(self, tmp_path):
+        from export_manager.chapter_collector import collect_chapters
+        (tmp_path / "正文").mkdir()
+        (tmp_path / "正文" / "第0051章.md").write_text("# 第51章", encoding="utf-8")
+        result = collect_chapters(tmp_path)
+        assert result[0].volume == 2  # (51-1)//50+1 = 2

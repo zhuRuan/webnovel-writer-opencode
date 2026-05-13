@@ -14,90 +14,13 @@ if str(_scripts_root) not in sys.path:
     sys.path.insert(0, str(_scripts_root))
 
 
-# ── 章节收集 ─────────────────────────────────────────────
-
-def collect_chapters(
-    project_root: Path,
-    range_spec: Optional[str] = None,
-    volume: Optional[int] = None,
-) -> list[tuple[int, str, Path]]:
-    """
-    收集 正文/ 下所有章节文件，返回 [(章号, 标题文本, 文件路径), ...]，
-    按章号升序排列。支持 --range / --volume 过滤。
-
-    章号从文件名提取，兼容:
-      - 正文/第0001章-标题.md  (平铺布局)
-      - 正文/第1卷/第001章-标题.md  (卷布局)
-    """
-    chapters_dir = project_root / "正文"
-    if not chapters_dir.is_dir():
-        return []
-
-    # 兼容导入路径
-    try:
-        from chapter_paths import extract_chapter_num_from_filename
-    except ImportError:
-        from scripts.chapter_paths import extract_chapter_num_from_filename
-
-    candidates: list[tuple[int, Path]] = []
-    for f in sorted(chapters_dir.rglob("第*章*.md")):
-        num = extract_chapter_num_from_filename(f.name)
-        if num is not None:
-            candidates.append((num, f))
-
-    candidates.sort(key=lambda x: x[0])
-
-    # 按卷过滤
-    if volume is not None:
-        try:
-            from chapter_paths import volume_num_for_chapter
-        except ImportError:
-            from scripts.chapter_paths import volume_num_for_chapter
-        candidates = [(n, f) for n, f in candidates if volume_num_for_chapter(n) == volume]
-
-    # 按范围过滤
-    if range_spec and range_spec != "all":
-        allowed = _parse_range(range_spec, max_num=max(c[0] for c in candidates) if candidates else 0)
-        candidates = [(n, f) for n, f in candidates if n in allowed]
-
-    # 读取每章第一行作为标题
-    result: list[tuple[int, str, Path]] = []
-    for num, path in candidates:
-        try:
-            first_line = path.read_text(encoding="utf-8").split("\n", 1)[0].strip()
-            # 去掉 markdown heading 符号
-            title = first_line.lstrip("#").strip() if first_line.startswith("#") else first_line
-        except Exception:
-            title = f"第{num}章"
-        result.append((num, title, path))
-
-    return result
+from export_manager.chapter_collector import collect_chapters as _collect, ChapterInfo, _parse_range
 
 
-def _parse_range(spec: str, max_num: int = 0) -> set[int]:
-    """解析范围字符串: '1-50', '1,3,5', 'all'"""
-    allowed: set[int] = set()
-    try:
-        for part in spec.split(","):
-            part = part.strip()
-            if not part:
-                continue
-            if "-" in part:
-                lo_s, hi_s = part.split("-", 1)
-                lo, hi = int(lo_s.strip()), int(hi_s.strip())
-                allowed.update(range(lo, hi + 1))
-            else:
-                allowed.add(int(part))
-    except ValueError:
-        print(f"错误：章节范围格式无效，预期格式: 1-50 / 1,3,5，实际收到: {spec}")
-        return set()
-    if max_num > 0:
-        before = len(allowed)
-        allowed = {n for n in allowed if 1 <= n <= max_num}
-        dropped = before - len(allowed)
-        if dropped > 0:
-            print(f"警告：{dropped} 个章节号超出实际范围(1-{max_num})，已忽略")
-    return allowed
+def collect_chapters(*args, **kwargs):
+    """Backward-compat: returns list[tuple[int, str, Path]]."""
+    results = _collect(*args, **kwargs)
+    return [(ch.index, ch.title, ch.path) for ch in results]
 
 
 # ── CLI ──────────────────────────────────────────────────
