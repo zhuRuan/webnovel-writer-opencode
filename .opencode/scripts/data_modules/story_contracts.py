@@ -191,7 +191,11 @@ def persist_story_seed(
     )
     if chapter_payload is not None:
         chapter_num = int(chapter_payload["meta"]["chapter"])
-        write_json(paths.chapter_json(chapter_num), chapter_payload)
+        ch_path = paths.chapter_json(chapter_num)
+        is_new = not ch_path.is_file()
+        write_json(ch_path, chapter_payload)
+        if is_new:
+            print(f"[story-system] 创建新章合同: {ch_path.name}")
         write_marked_markdown(
             paths.chapter_json(chapter_num).with_suffix(".md"),
             render_chapter_markdown(chapter_payload),

@@ -71,6 +71,9 @@ class StorySystemEngine:
             route.get("default_query", ""),
             self._directive_query_text(chapter_directive),
         )
+        # Boost dynamic context query with strand info for chapter-specific relevance
+        strand = str(chapter_directive.get("strand") or "").strip()
+        dynamic_query = f"{search_query} {strand} {strand}" if strand else search_query
         base_context = self._collect_tables(
             search_query,
             route["recommended_base_tables"],
@@ -78,7 +81,7 @@ class StorySystemEngine:
             top_k=1,
         )
         dynamic_context = self._collect_tables(
-            search_query,
+            dynamic_query,
             route["recommended_dynamic_tables"],
             genre=route["genre_filter"],
             top_k=2,

@@ -165,6 +165,17 @@ def cmd_pause_batch(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mark_step_done(args: argparse.Namespace) -> int:
+    """创建步骤完成标记，支持断点续跑。"""
+    root = Path(args.project_root)
+    marker_dir = root / ".webnovel" / "tmp" / "step_done"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    marker = marker_dir / f"ch{args.chapter:04d}_{args.step}.done"
+    marker.write_text("1", encoding="utf-8")
+    print(f"[OK] 步骤标记: {marker.name}")
+    return 0
+
+
 def cmd_clean_tmp(args: argparse.Namespace) -> int:
     """清理 .webnovel/tmp/ 下的旧 artifacts（替代 rm -f，跨 shell 兼容）。"""
     tmp_dir = Path(args.project_root) / ".webnovel" / "tmp"
@@ -295,6 +306,12 @@ def main() -> None:
     p_cm = sub.add_parser("compact-memory")
     p_cm.add_argument("--project-root", required=True)
     p_cm.set_defaults(func=cmd_compact_memory)
+
+    p_mark = sub.add_parser("mark-step-done")
+    p_mark.add_argument("--project-root", required=True)
+    p_mark.add_argument("--step", required=True, help="步骤名 (story-system, check-structural, review, commit)")
+    p_mark.add_argument("--chapter", type=int, required=True)
+    p_mark.set_defaults(func=cmd_mark_step_done)
 
     args = parser.parse_args()
     raise SystemExit(args.func(args))

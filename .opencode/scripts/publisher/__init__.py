@@ -371,8 +371,8 @@ def main():
     p_upload.add_argument("--platform", required=True, help="平台名称")
     p_upload.add_argument("--book", default=None, help="书籍 ID 或书名（未指定时从项目绑定读取）")
     p_upload.add_argument("--range", default="all", help="章节范围")
-    p_upload.add_argument("--mode", default="draft",
-                          help="发布模式 (draft|publish)")
+    p_upload.add_argument("--mode", default="draft", choices=["draft"],
+                          help="发布模式 (目前仅支持草稿)")
     p_upload.add_argument("--yes", action="store_true",
                           help="跳过交叉校验的交互确认")
 
