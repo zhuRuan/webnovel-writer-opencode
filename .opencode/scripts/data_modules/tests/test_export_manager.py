@@ -177,3 +177,47 @@ class TestEpubImportError:
         with pytest.raises(SystemExit) as exc:
             export_epub(chapters, output, title="测试", author="作者")
         assert exc.value.code == 1
+
+
+class TestParser:
+    """Tests for unified markdown parser."""
+
+    def test_heading_to_html(self):
+        from export_manager.parser import md_to_html
+        html = md_to_html("# 第1章 开篇")
+        assert '<h1 class="chapter-title">第1章 开篇</h1>' in html
+
+    def test_paragraph_to_html(self):
+        from export_manager.parser import md_to_html
+        html = md_to_html("这是第一段。")
+        assert '<p>这是第一段。</p>' in html
+
+    def test_bold_to_html(self):
+        from export_manager.parser import md_to_html
+        html = md_to_html("**粗体**文字")
+        assert '<strong' in html
+        assert '粗体' in html
+
+    def test_scene_break_to_html(self):
+        from export_manager.parser import md_to_html
+        html = md_to_html("---")
+        assert 'class="scene-break"' in html
+
+    def test_empty_input(self):
+        from export_manager.parser import md_to_html
+        html = md_to_html("")
+        assert html == ""
+
+    def test_multi_paragraph(self):
+        from export_manager.parser import md_to_html
+        html = md_to_html("第一段。\n\n第二段。")
+        assert html.count("<p>") == 2
+
+    def test_blocks_output(self):
+        from export_manager.parser import md_to_blocks
+        blocks = md_to_blocks("正文内容。")
+        assert isinstance(blocks, list)
+        assert len(blocks) > 0
+        first = blocks[0]
+        assert isinstance(first, dict)
+        assert "type" in first
