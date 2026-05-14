@@ -96,6 +96,57 @@ Code is organized as a pipeline — each layer feeds the next:
 
 All Python functionality routes through a single entry point: `.opencode/scripts/webnovel.py` → `data_modules/webnovel.py`. Subcommands are dispatched via argparse — most forward to `data_modules/<module>.py` via `_run_data_module()`. New subcommands should be added to the argparse subparser chain in `webnovel.py`.
 
+## Commit Convention & Versioning
+
+All commits **MUST** follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>: <简短描述>
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+```
+
+### Types
+
+| Type | 用途 | 版本影响 |
+|------|------|---------|
+| `feat:` | 新功能 | **bump MINOR** (v2.8 → v2.9) |
+| `fix:` | Bug 修复 | **bump PATCH** (v2.8.0 → v2.8.1) |
+| `feat!:_/fix!:_/BREAKING CHANGE:` | 破坏性变更 | **bump MAJOR** (v2 → v3) |
+| `docs:` | 文档 | 不触发版本变更 |
+| `refactor:` | 重构 | **bump PATCH** |
+| `perf:` | 性能优化 | **bump PATCH** |
+| `ci:` | CI/CD | 不触发版本变更 |
+| `chore:` | 杂项 | 不触发版本变更 |
+| `simplify:` | 代码审查清理 | 不触发版本变更 |
+| `test:` | 测试 | 不触发版本变更 |
+
+### 自动发版
+
+CI（`.github/workflows/manifest.yml`）在 push 到 master 时自动执行：
+
+1. 读取 `git tag` 获取当前版本号
+2. 分析上次 tag 以来的所有提交
+3. 根据 type 计算下一个 semver 版本
+4. 更新 `manifest.json` + 创建 `git tag` + 创建 GitHub Release
+
+**版本号是 git tag**，不是 manifest.json 字段。发布就是打 tag。
+
+### 示例
+
+```bash
+git commit -m "feat: add HTML export format"     # → v2.9.0
+git commit -m "fix: resolve JSON corruption"     # → v2.8.1
+git commit -m "docs: update install guide"        # → 无版本变更
+git commit -m "feat!: drop Python 3.9 support"    # → v3.0.0
+```
+
+### 注意
+
+- 不要在提交里手动改 `manifest.json` 版本号——CI 自动处理
+- 多个提交一起 push → CI 取最高优先级的 bump
+- `docs:`/`ci:`/`chore:`/`simplify:`/`test:` 不触发版本变更，可放心多用
+
 ## Guidelines
 
 These behavioral guidelines bias toward caution over speed. For trivial tasks, use judgment.
