@@ -30,9 +30,6 @@ MIRRORS = [
     "https://mirror.ghproxy.com/",
 ]
 
-DIRS = [".opencode", ".opencode_staging", ".opencode_backup"]
-
-
 def build_urls(repo, branch, custom_mirror=None):
     mirrors = [custom_mirror] if custom_mirror else MIRRORS
     direct = f"https://github.com/{repo}/archive/refs/heads/{branch}.zip"
@@ -81,11 +78,9 @@ def extract_opencode(zip_path, dest_dir):
 
 
 def interactive_menu(args):
-    """Visual interactive mode — single entry point for all operations."""
     installed = Path(".opencode").is_dir()
     staging = Path(".opencode_staging").is_dir()
 
-    # Detect local version
     version = "未知"
     vf = Path(".opencode/version.json")
     if vf.is_file():
@@ -113,8 +108,8 @@ def interactive_menu(args):
     print("  [3] 清洁安装            擦除后全新安装")
     if staging:
         print("  [4] 应用暂存更新        关闭 IDE 后执行两阶段更新")
-    print(f"  [{'4' if staging else '5'}] 卸载                 移除 .opencode/")
-    print(f"  [{'5' if staging else '6'}] 完全卸载             移除 .opencode/ + .venv/")
+    print("  [5] 卸载                移除 .opencode/")
+    print("  [6] 完全卸载            移除 .opencode/ + .venv/")
     print("  [0] 退出")
     print()
 
@@ -128,35 +123,20 @@ def interactive_menu(args):
         choice = "1"
 
     if choice == "1":
-        # Install / Update
         if installed:
             args.update = True
-        else:
-            args.clean = False
     elif choice == "2":
         args.incremental = True
     elif choice == "3":
         args.clean = True
-    elif choice == "4":
-        if staging:
-            args.apply = True
-        else:
-            args.uninstall = True
-            args.full = False
+    elif choice == "4" and staging:
+        args.apply = True
     elif choice == "5":
-        if staging:
-            args.uninstall = True
-            args.full = False
-        else:
-            args.uninstall = True
-            args.full = True
-            args.yes = True
+        args.uninstall = True
     elif choice == "6":
-        if staging:
-            args.uninstall = True
-            args.full = True
-            args.yes = True
-        # else: 5 or 6 in non-staging means nothing — choice will be unrecognized
+        args.uninstall = True
+        args.full = True
+        args.yes = True
     elif choice == "0":
         print("  已取消。")
         return
