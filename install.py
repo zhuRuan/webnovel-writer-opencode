@@ -96,7 +96,7 @@ def extract_opencode(zip_path, dest_dir):
                         shutil.copyfileobj(src, dst)
 
         # Self-update: extract install.py to .new (swapped on next startup)
-        for root_file in ("install.py", "manifest.json"):
+        for root_file in ("install.py",):
             zip_name = prefix + root_file
             if zip_name in names:
                 dest = Path(root_file)
@@ -108,6 +108,39 @@ def extract_opencode(zip_path, dest_dir):
                     os.replace(str(tmp), str(dest))
                 except OSError:
                     pass  # locked — startup check handles it next run
+
+
+def _cjk_width(s: str) -> int:
+    """Count display width: CJK=2, ASCII=1. Strips ANSI escapes first."""
+    import re
+    clean = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', s)
+    w = 0
+    for ch in clean:
+        w += 2 if '一' <= ch <= '鿿' or '　' <= ch <= '〿' or '＀' <= ch <= '￯' else 1
+    return w
+
+
+def _pad(s: str, w: int) -> str:
+    """Pad string to display width w."""
+    return s + ' ' * (w - _cjk_width(s))
+
+
+BOX_W = 52  # fixed content area width (display)
+C = "\033[1m\033[96m"  # cyan bold
+R = "\033[0m"       # reset
+D = "\033[90m"       # dim
+B = "\033[1m"        # bold
+G = "\033[92m"       # green
+Y = "\033[93m"       # yellow
+X = "\033[90m"       # gray (inactive)
+
+BAR = C + "─" * (BOX_W + 2) + R
+
+
+def _row(text: str, color: str = "", right: str = "") -> None:
+    """Print a box row: │ content │"""
+    content = color + text + R + right
+    print(f"{C}│{R} {_pad(content, BOX_W)} {C}│{R}")
 
 
 def interactive_menu(args):
@@ -123,38 +156,33 @@ def interactive_menu(args):
         except Exception:
             pass
 
-    # Header
-    print("\n\033[1m\033[96m┌──────────────────────────────────────────────────────────┐\033[0m")
-    print("\033[1m\033[96m│\033[0m  \033[1mWebnovel Writer for OpenCode — 安装管理\033[0m              \033[1m\033[96m│\033[0m")
-    print("\033[1m\033[96m├──────────────────────────────────────────────────────────┤\033[0m")
+    print(f"\n{C}┌{BAR}┐{R}")
+    print(f"{C}│{R}  {B}Webnovel Writer for OpenCode — 安装管理{R}  {C}│{R}")
+    print(f"{C}├{BAR}┤{R}")
 
-    status_parts = []
     if installed:
-        status_parts.append(f"\033[92m●\033[0m 已安装 (\033[1m{version}\033[0m)")
+        _row(f"{G}●{R} 已安装 ({B}{version}{R})")
     else:
-        status_parts.append("\033[90m●\033[0m 未安装")
+        _row(f"{X}●{R} 未安装")
     if staging:
-        status_parts.append("\033[93m◐\033[0m 有暂存更新待应用")
+        _row(f"{Y}◐{R} 有暂存更新待应用")
 
-    for sp in status_parts:
-        print(f"\033[1m\033[96m│\033[0m  {sp:<52s}\033[1m\033[96m│\033[0m")
-
-    print("\033[1m\033[96m├──────────────────────────────────────────────────────────┤\033[0m")
-    print("\033[1m\033[96m│\033[0m  \033[90m请选择操作:\033[0m                                            \033[1m\033[96m│\033[0m")
-    print("\033[1m\033[96m│\033[0m                                                          \033[1m\033[96m│\033[0m")
-    print(f"\033[1m\033[96m│\033[0m  \033[1m[1]\033[0m 安装 / 更新        \033[90m下载最新版\033[0m                         \033[1m\033[96m│\033[0m")
-    print(f"\033[1m\033[96m│\033[0m  \033[1m[2]\033[0m 增量更新            \033[90m仅变更文件 (快)\033[0m                    \033[1m\033[96m│\033[0m")
-    print(f"\033[1m\033[96m│\033[0m  \033[1m[3]\033[0m 清洁安装            \033[90m擦除后全新安装\033[0m                      \033[1m\033[96m│\033[0m")
+    print(f"{C}├{BAR}┤{R}")
+    _row("请选择操作:", color=D)
+    _row("")
+    _row(f" {B}[1]{R} 安装 / 更新      {D}下载最新版本{R}")
+    _row(f" {B}[2]{R} 增量更新          {D}仅变更文件 (快){R}")
+    _row(f" {B}[3]{R} 清洁安装          {D}擦除后全新安装{R}")
     if staging:
-        print(f"\033[1m\033[96m│\033[0m  \033[1m[4]\033[0m \033[93m应用暂存更新\033[0m        \033[90m关闭 IDE 后执行\033[0m                    \033[1m\033[96m│\033[0m")
-    print(f"\033[1m\033[96m│\033[0m  \033[1m[5]\033[0m 卸载                \033[90m移除 .opencode/\033[0m                  \033[1m\033[96m│\033[0m")
-    print(f"\033[1m\033[96m│\033[0m  \033[1m[6]\033[0m 完全卸载            \033[90m移除 .opencode/ + .venv/\033[0m     \033[1m\033[96m│\033[0m")
-    print(f"\033[1m\033[96m│\033[0m  \033[1m[0]\033[0m 退出                                       \033[1m\033[96m│\033[0m")
-    print("\033[1m\033[96m└──────────────────────────────────────────────────────────┘\033[0m")
+        _row(f" {B}[4]{R} {Y}应用暂存更新{R}      {D}关闭 IDE 后执行{R}")
+    _row(f" {B}[5]{R} 卸载              {D}移除 .opencode/{R}")
+    _row(f" {B}[6]{R} 完全卸载          {D}移除 .opencode/ + .venv/{R}")
+    _row(f" {B}[0]{R} 退出")
+    print(f"{C}└{BAR}┘{R}")
     print()
 
     try:
-        choice = input("  \033[1m输入数字选择\033[0m \033[90m(默认=1)\033[0m: ").strip()
+        choice = input(f"  {B}输入数字选择{R} {D}(默认=1){R}: ").strip()
     except (EOFError, KeyboardInterrupt):
         print("\n  已取消。")
         return
@@ -228,9 +256,9 @@ def run_selected_action(args):
                 print(f"  Clean: removing {d}/")
                 shutil.rmtree(str(d))
 
-    print("\n\033[1m\033[96m┌──────────────────────────────────────────────────────────┐\033[0m")
-    print("\033[1m\033[96m│\033[0m        \033[1mWebnovel Writer — Installer\033[0m                       \033[1m\033[96m│\033[0m")
-    print("\033[1m\033[96m└──────────────────────────────────────────────────────────┘\033[0m\n")
+    print(f"\n{C}┌{BAR}┐{R}")
+    print(f"{C}│{R}  {B}Webnovel Writer — Installer{R}  {C}│{R}")
+    print(f"{C}└{BAR}┘{R}\n")
 
     print("[1/3] Downloading latest version...")
     urls = build_urls(REPO, BRANCH, getattr(args, 'mirror', None))

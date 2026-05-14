@@ -83,7 +83,7 @@ def extract_opencode_from_zip(zip_path: Path, dest_dir: Path) -> None:
                         shutil.copyfileobj(src, dst)
 
         # Self-update: also extract install.py and manifest.json from repo root
-        for root_file in ("install.py", "manifest.json"):
+        for root_file in ("install.py",):
             zip_name = prefix + root_file
             if zip_name in names:
                 try:
