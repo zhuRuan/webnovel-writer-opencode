@@ -94,7 +94,7 @@ def interactive_menu(args):
     print("  Webnovel Writer for OpenCode — 安装管理")
     print("=" * 60)
     if installed:
-        print(f"  状态: 已安装 (v{version})")
+        print(f"  状态: 已安装 ({version})")
     else:
         print(f"  状态: 未安装")
     if staging:
