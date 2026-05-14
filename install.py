@@ -15,6 +15,24 @@ Usage:
   python install.py --skip-playwright  # Skip browser install
   python install.py --mirror URL       # Use custom GitHub mirror
 """
+# Self-update: if install.py.new exists, swap it in.
+# Two-step rename works around Windows file locking on running .py files.
+import os as _os
+from pathlib import Path as _P
+
+_NEW = _P(__file__).with_suffix('.py.new') if '__file__' in dir() else _P('install.py.new')
+if _NEW.is_file():
+    _CUR = _P(__file__).resolve() if '__file__' in dir() else _P('install.py')
+    _OLD = _CUR.with_suffix('.py.old')
+    try:
+        _os.replace(str(_CUR), str(_OLD))
+        _os.replace(str(_NEW), str(_CUR))
+        _OLD.unlink(missing_ok=True)
+        print("install.py 已自动更新，请重新运行 python install.py")
+        _os._exit(0)
+    except OSError:
+        pass
+
 import argparse
 import os
 import shutil
@@ -77,17 +95,19 @@ def extract_opencode(zip_path, dest_dir):
                     with zf.open(name) as src, open(target, 'wb') as dst:
                         shutil.copyfileobj(src, dst)
 
-        # Self-update: also extract install.py and manifest.json from repo root
+        # Self-update: extract install.py to .new (swapped on next startup)
         for root_file in ("install.py", "manifest.json"):
             zip_name = prefix + root_file
             if zip_name in names:
-                self_dest = Path(root_file)
+                dest = Path(root_file)
+                tmp = Path(str(dest) + ".new")
+                with zf.open(zip_name) as src, open(str(tmp), 'wb') as dst:
+                    shutil.copyfileobj(src, dst)
+                # Try in-place replace (works if not locked); .new persists otherwise
                 try:
-                    with zf.open(zip_name) as src, open(str(self_dest) + ".new", 'wb') as dst:
-                        shutil.copyfileobj(src, dst)
-                    os.replace(str(self_dest) + ".new", str(self_dest))
+                    os.replace(str(tmp), str(dest))
                 except OSError:
-                    pass
+                    pass  # locked — startup check handles it next run
 
 
 def interactive_menu(args):
