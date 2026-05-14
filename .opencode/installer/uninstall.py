@@ -2,7 +2,7 @@
 import shutil
 from pathlib import Path
 
-from installer.ui import info, warn, success_box
+from installer.ui import info, warn, success
 
 
 def _safe_rmtree(path: Path) -> bool:
@@ -58,7 +58,7 @@ def cmd_uninstall(args=None):
         return
 
     print()
-    success_box("卸载完成", [
+    success("卸载完成", [
         f"已删除: {', '.join(removed)}",
         "项目文件（正文、大纲、state.json 等）未被删除。",
     ])

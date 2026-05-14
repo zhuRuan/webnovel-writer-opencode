@@ -14,7 +14,10 @@ class TestModuleImports:
         assert hasattr(ui, 'info')
         assert hasattr(ui, 'warn')
         assert hasattr(ui, 'error')
-        assert hasattr(ui, 'success_box')
+        assert hasattr(ui, 'success')
+        assert hasattr(ui, 'step')
+        assert hasattr(ui, 'step_ok')
+        assert hasattr(ui, 'spinner')
         assert hasattr(ui, 'display_width')
 
     def test_import_check(self):

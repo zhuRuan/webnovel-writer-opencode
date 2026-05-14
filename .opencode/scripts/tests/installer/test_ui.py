@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-from installer.ui import display_width, Colors, step_header, step_done, info, warn
+from installer.ui import display_width, Colors, step, step_ok, info, warn
 
 
 class TestDisplayWidth:
@@ -25,17 +25,17 @@ class TestDisplayWidth:
 
 
 class TestStepFormatting:
-    def test_step_header(self, capsys):
-        step_header(1, 4, "Checking system")
+    def test_step(self, capsys):
+        step(1, 4, "系统预检")
         out = capsys.readouterr().out
         assert "1/4" in out
-        assert "Checking system" in out
+        assert "系统预检" in out
 
-    def test_step_done(self, capsys):
-        step_done(1, 4, "System check passed")
+    def test_step_ok(self, capsys):
+        step_ok(1, 4, "系统预检通过")
         out = capsys.readouterr().out
         assert "1/4" in out
-        assert "System check passed" in out
+        assert "系统预检通过" in out
 
 
 class TestInfoWarn:
