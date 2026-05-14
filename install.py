@@ -4,12 +4,16 @@ Webnovel Writer for OpenCode — one-click installer.
 Downloads .opencode/ from GitHub and sets up the writing toolchain.
 
 Usage:
-  python install.py               # Fresh install or update
-  python install.py --update      # Check and apply updates
-  python install.py --apply       # Apply staged update (after closing OpenCode)
-  python install.py --venv        # Create and use .venv/
+  python install.py                    # Fresh install or update
+  python install.py --update           # Check and apply updates
+  python install.py --clean            # Wipe .opencode/ then fresh install
+  python install.py --incremental      # Incremental update (manifest diff)
+  python install.py --apply            # Apply staged update (after closing OpenCode)
+  python install.py --uninstall        # Remove .opencode/ (keep project files)
+  python install.py --uninstall --full # Full uninstall: .opencode/ + .venv/ + deps
+  python install.py --venv             # Create and use .venv/
   python install.py --skip-playwright  # Skip browser install
-  python install.py --mirror URL  # Use custom GitHub mirror
+  python install.py --mirror URL       # Use custom GitHub mirror
 """
 import argparse
 import shutil
@@ -78,13 +82,29 @@ def main():
     parser = argparse.ArgumentParser(description="Webnovel Writer for OpenCode Installer")
     parser.add_argument("--update", action="store_true", help="Check and apply updates")
     parser.add_argument("--apply", action="store_true", help="Apply staged update")
+    parser.add_argument("--clean", action="store_true", help="Wipe .opencode/ before install or update")
+    parser.add_argument("--incremental", action="store_true",
+                        help="Incremental update: only download changed files via manifest diff")
+    parser.add_argument("--uninstall", action="store_true", help="Remove .opencode/ (keep project files)")
+    parser.add_argument("--full", action="store_true", help="With --uninstall: also remove .venv/")
+    parser.add_argument("--yes", action="store_true", help="Skip confirmation prompts")
     parser.add_argument("--venv", action="store_true", help="Use/create .venv/")
     parser.add_argument("--skip-playwright", action="store_true", help="Skip playwright install")
     parser.add_argument("--mirror", type=str, help="Custom GitHub mirror URL")
     parser.add_argument("--timeout", "-t", type=int, default=30, help="Download timeout seconds")
     args = parser.parse_args()
 
-    # Phase 0: --apply mode (separate entry point)
+    # --- Uninstall path ---
+    if args.uninstall:
+        print("\n" + "=" * 60)
+        print("  Webnovel Writer — 卸载")
+        print("=" * 60 + "\n")
+        sys.path.insert(0, str(Path.cwd() / ".opencode"))
+        from installer.uninstall import cmd_uninstall
+        cmd_uninstall(args)
+        return
+
+    # --- --apply: apply staged update ---
     if args.apply:
         print("\n--- Apply Staged Update ---\n")
 
@@ -107,12 +127,22 @@ def main():
             sys.exit(1)
         return
 
-    # Phase 1: Download repo zip and extract installer modules
+    # --- Clean mode: wipe before install/update ---
+    if args.clean:
+        import shutil as _shutil
+        for d in [".opencode", ".opencode_staging", ".opencode_backup"]:
+            p = Path(d)
+            if p.is_dir():
+                print(f"  Clean: removing {d}/")
+                _shutil.rmtree(str(p))
+
+    # --- Main install flow ---
     print("\n" + "=" * 60)
     print("  Webnovel Writer for OpenCode — Installer")
     print("=" * 60 + "\n")
 
-    print("[Step 1/3] Downloading latest version...")
+    # Phase 1: Download repo zip and extract installer modules
+    print("[Phase 1] Downloading latest version...")
     urls = build_urls(REPO, BRANCH, args.mirror)
     zip_path = Path(tempfile.gettempdir()) / "webnovel_writer_repo.zip"
 
@@ -120,11 +150,22 @@ def main():
         print("[ERROR] Download failed. Check network or use --mirror URL.")
         sys.exit(1)
 
-    extract_opencode(zip_path, Path(".opencode"))
-    zip_path.unlink(missing_ok=True)
-    print("  Done.\n")
+    # Phase 2: If incremental, only extract changed files. Otherwise full extract.
+    sys.path.insert(0, str(Path.cwd()))
+    print("[Phase 2] Extracting...")
 
-    # Phase 2: Delegate to installer/preflight
+    if args.incremental and Path(".opencode").is_dir():
+        sys.path.insert(0, str(Path.cwd() / ".opencode"))
+        from installer.update import run_incremental_update
+        extract_opencode(zip_path, Path(".opencode_staging"))
+        run_incremental_update()
+        Path(zip_path).unlink(missing_ok=True)
+    else:
+        extract_opencode(zip_path, Path(".opencode"))
+        Path(zip_path).unlink(missing_ok=True)
+        print("  Done.\n")
+
+    # Phase 3: Delegate to installer/preflight
     sys.path.insert(0, str(Path.cwd() / ".opencode"))
     from installer.preflight import run_install, run_update
 

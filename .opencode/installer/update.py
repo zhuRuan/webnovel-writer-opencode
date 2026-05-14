@@ -98,3 +98,77 @@ def needs_update(manifest_url: str = None) -> bool:
     if local_ver == "unknown":
         return True
     return remote_ver != local_ver
+
+
+def run_incremental_update(manifest_url: str = None):
+    """Apply incremental update from .opencode_staging/ → .opencode/.
+
+    Compares manifest.json against local files and only copies changed files.
+    Falls back to full staging-apply if manifest is unavailable.
+    """
+    import urllib.request
+    import shutil
+    from pathlib import Path
+
+    if manifest_url is None:
+        manifest_url = MANIFEST_URL
+
+    staging = Path(".opencode_staging")
+    target = Path(".opencode")
+    if not staging.is_dir():
+        warn("No .opencode_staging/ directory for incremental update.")
+        return
+
+    # Fetch manifest
+    try:
+        with urllib.request.urlopen(manifest_url, timeout=10) as resp:
+            manifest = json.loads(resp.read().decode("utf-8", errors="replace"))
+    except Exception as e:
+        warn(f"Cannot fetch manifest for incremental update: {e}")
+        warn("Falling back to full staging apply.")
+        from installer.preflight import apply_staging
+        apply_staging()
+        return
+
+    files = manifest.get("files", {})
+    if not files:
+        warn("Manifest empty — falling back to full staging apply.")
+        from installer.preflight import apply_staging
+        apply_staging()
+        return
+
+    # Build diff
+    changes = compute_diff(manifest, target)
+    if not changes:
+        info("All files up to date — nothing to do.")
+        shutil.rmtree(str(staging))
+        return
+
+    added = sum(1 for _, a in changes if a == "add")
+    updated = sum(1 for _, a in changes if a == "update")
+    info(f"Incremental update: {added} new, {updated} changed ({len(changes)} total)")
+
+    # Apply changes
+    applied = 0
+    for rel_path, _action in changes:
+        src = staging / rel_path
+        dst = target / rel_path
+        if src.exists():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(src), str(dst))
+            applied += 1
+        elif _action == "update":
+            # File removed upstream — delete local copy
+            if dst.exists():
+                dst.unlink()
+
+    info(f"Applied {applied}/{len(changes)} incremental changes.")
+
+    # Clean staging
+    shutil.rmtree(str(staging))
+
+    # Update version file
+    version = manifest.get("version", "unknown")
+    vf = target / "version.json"
+    write_version_file(vf, version)
+    print(f"  Updated to {version}")
