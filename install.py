@@ -16,6 +16,7 @@ Usage:
   python install.py --mirror URL       # Use custom GitHub mirror
 """
 import argparse
+import os
 import shutil
 import sys
 import tempfile
@@ -75,6 +76,18 @@ def extract_opencode(zip_path, dest_dir):
                     target.parent.mkdir(parents=True, exist_ok=True)
                     with zf.open(name) as src, open(target, 'wb') as dst:
                         shutil.copyfileobj(src, dst)
+
+        # Self-update: also extract install.py and manifest.json from repo root
+        for root_file in ("install.py", "manifest.json"):
+            zip_name = prefix + root_file
+            if zip_name in names:
+                self_dest = Path(root_file)
+                try:
+                    with zf.open(zip_name) as src, open(str(self_dest) + ".new", 'wb') as dst:
+                        shutil.copyfileobj(src, dst)
+                    os.replace(str(self_dest) + ".new", str(self_dest))
+                except OSError:
+                    pass
 
 
 def interactive_menu(args):

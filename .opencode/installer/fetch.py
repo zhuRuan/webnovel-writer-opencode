@@ -1,4 +1,5 @@
 """Download management with mirror fallback. Pure stdlib."""
+import os
 import shutil
 import urllib.request
 import zipfile
@@ -80,3 +81,15 @@ def extract_opencode_from_zip(zip_path: Path, dest_dir: Path) -> None:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     with zf.open(name) as src, open(target, 'wb') as dst:
                         shutil.copyfileobj(src, dst)
+
+        # Self-update: also extract install.py and manifest.json from repo root
+        for root_file in ("install.py", "manifest.json"):
+            zip_name = prefix + root_file
+            if zip_name in names:
+                try:
+                    tmp = Path(root_file + ".new")
+                    with zf.open(zip_name) as src, open(str(tmp), 'wb') as dst:
+                        shutil.copyfileobj(src, dst)
+                    os.replace(str(tmp), str(Path(root_file)))
+                except OSError:
+                    pass
