@@ -1,4 +1,4 @@
-name: Update manifest.json
+name: Version & Release
 
 on:
   push:
@@ -6,36 +6,124 @@ on:
     paths:
       - '.opencode/**'
       - '!manifest.json'
+      - '!.github/**'
 
 jobs:
-  update-manifest:
+  bump-and-release:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     permissions:
       contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      created_tag: ${{ steps.tag.outputs.created }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Regenerate manifest.json
+      - name: Determine version bump
+        id: bump
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          PREV_VER=${PREV_TAG#v}
+          echo "Previous: $PREV_TAG"
+
+          # Analyze conventional commits since last tag
+          COMMITS=$(git log ${PREV_TAG}..HEAD --format="%s" 2>/dev/null || git log --format="%s")
+          echo "Commits since $PREV_TAG:"
+          echo "$COMMITS"
+
+          # Determine bump type
+          MAJOR=0; MINOR=0; PATCH=0
+          while IFS= read -r msg; do
+            case "$msg" in
+              BREAKING\ CHANGE:*|*!*) MAJOR=$((MAJOR+1)) ;;
+              feat:*)                 MINOR=$((MINOR+1)) ;;
+              fix:*|perf:*|refactor:*) PATCH=$((PATCH+1)) ;;
+            esac
+          done <<< "$COMMITS"
+
+          IFS='.' read -r V_MAJ V_MIN V_PAT <<< "$PREV_VER"
+          V_MAJ=${V_MAJ:-0}; V_MIN=${V_MIN:-0}; V_PAT=${V_PAT:-0}
+
+          if [ $MAJOR -gt 0 ]; then
+            V_MAJ=$((V_MAJ+1)); V_MIN=0; V_PAT=0
+          elif [ $MINOR -gt 0 ]; then
+            V_MIN=$((V_MIN+1)); V_PAT=0
+          elif [ $PATCH -gt 0 ]; then
+            V_PAT=$((V_PAT+1))
+          else
+            echo "No conventional commits found, skipping version bump"
+            echo "version=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          NEW_VERSION="v${V_MAJ}.${V_MIN}.${V_PAT}"
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Regenerate manifest
+        if: steps.bump.outputs.version != ''
         env:
           PYTHONUTF8: "1"
         run: |
-          # Preserve current version, regenerate all hashes
-          VERSION=$(python3 -c "import json; m=json.load(open('manifest.json', encoding='utf-8')); print(m.get('version','0.0.0'))")
-          python3 .opencode/scripts/gen_manifest.py --version "$VERSION" --opencode-dir .opencode > manifest.json
+          python3 .opencode/scripts/gen_manifest.py \
+            --version "${{ steps.bump.outputs.version }}" \
+            --opencode-dir .opencode > manifest.json
 
-      - name: Commit and push if changed
+      - name: Create tag
+        if: steps.bump.outputs.version != ''
+        id: tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet manifest.json; then
-            git add manifest.json
-            git commit -m "chore: auto-update manifest.json [skip ci]"
-            git push
+
+          # Commit manifest
+          git add manifest.json
+          git commit -m "chore: release ${{ steps.bump.outputs.version }} [skip ci]" || true
+
+          # Create and push tag
+          git tag -a "${{ steps.bump.outputs.version }}" -m "${{ steps.bump.outputs.version }}"
+          git push origin master --tags
+          echo "created=true" >> $GITHUB_OUTPUT
+
+  release:
+    needs: bump-and-release
+    if: needs.bump-and-release.outputs.created_tag == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Generate changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 --exclude="${{ needs.bump-and-release.outputs.version }}" 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..${{ needs.bump-and-release.outputs.version }}"
+          else
+            RANGE="${{ needs.bump-and-release.outputs.version }}"
           fi
+          git log "$RANGE" --format="- %s (%h)" --no-merges > /tmp/changelog.md
+          [ -s /tmp/changelog.md ] || echo "Initial release" > /tmp/changelog.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.bump-and-release.outputs.version }}
+          name: ${{ needs.bump-and-release.outputs.version }}
+          body_path: /tmp/changelog.md
+          generate_release_notes: true
