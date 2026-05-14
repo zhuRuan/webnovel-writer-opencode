@@ -1,5 +1,5 @@
 {
-  "version": "v2.6.0",
+  "version": "v2.8.0",
   "files": {
     ".opencode/.gitignore": {
       "sha256": "91f3164a21c475225c3989dfc9f750f95c9b7ef6b3658ea543c27624003671f3",
@@ -13,21 +13,25 @@
       "sha256": "894b4b85c472d84f0fc7c8c880592cfd365280bc440cf852d6aa54b491f5874f",
       "size": 61
     },
+    ".opencode/agents/chapter-writer-agent.md": {
+      "sha256": "79f3293d21ec57542a193af8839bedf1d67c4644d1ad05e36a9496176dc817a5",
+      "size": 5508
+    },
     ".opencode/agents/context-agent.md": {
-      "sha256": "3abf1933b0bf340cadb3336c48368a70fa7cc43a8cc86cf5e3c3f8a271cb6f36",
-      "size": 9391
+      "sha256": "0f195385ab21b8a9b356f84c945700de705233d42f4d0219e1c8932fb4de2a54",
+      "size": 10666
     },
     ".opencode/agents/data-agent.md": {
-      "sha256": "fee8f3dceb324de0979daadcd4e51637107db683accc61f07c3fb259ba3e6a7e",
-      "size": 6836
+      "sha256": "0c53c10360251ce46a04c88d8e6754805af8f43e5efc3c917c1c6f3dce63a0ae",
+      "size": 7439
     },
     ".opencode/agents/deconstruction-agent.md": {
       "sha256": "5c6ff6a02ffd19635b5376be35ecc441592ea75ec3c779923c693d0ddb77bd69",
       "size": 12142
     },
     ".opencode/agents/reviewer.md": {
-      "sha256": "257f32a6b4cd108393592604cbce57510b350bdf95fd93af4be11b434f59dbef",
-      "size": 6155
+      "sha256": "7b68d9647ccf6f9504dd146c7152d62ada777616946d408df339ae564b39effe",
+      "size": 7047
     },
     ".opencode/agents/evals/evals.json": {
       "sha256": "60456a7d2424e07a77fd1a300d71c6a15095c3166916724dbcbbbbb99ec7cfd0",
@@ -45,23 +49,23 @@
       "sha256": "f42ee3b60656cd7b0da74dab59d1b94c0e43947216f54a55e1a139a366cf54c0",
       "size": 728
     },
-    ".opencode/agents/evals/files/test-project/Â§ßÁ∫≤/ÊÄªÁ∫≤.md": {
+    ".opencode/agents/evals/files/test-project/¥Û∏Ÿ/◊‹∏Ÿ.md": {
       "sha256": "c84323fbb4af13c92e80500bc483cf58f7b34b444ad5a2a1807e1a55fc24ad64",
       "size": 738
     },
-    ".opencode/agents/evals/files/test-project/Â§ßÁ∫≤/Á¨¨1Âç∑-Êó∂Èó¥Á∫ø.md": {
+    ".opencode/agents/evals/files/test-project/¥Û∏Ÿ/µ⁄1æÌ- ±º‰œﬂ.md": {
       "sha256": "9772373114fc7ac9bb3624f481837a64a9d2fb45474888ec9ae30173d0e32c98",
       "size": 364
     },
-    ".opencode/agents/evals/files/test-project/Â§ßÁ∫≤/Á¨¨1Âç∑-ËØ¶ÁªÜÂ§ßÁ∫≤.md": {
+    ".opencode/agents/evals/files/test-project/¥Û∏Ÿ/µ⁄1æÌ-œÍœ∏¥Û∏Ÿ.md": {
       "sha256": "cb5698af45f4bd4f76766bd8f03cd9c46c4748ebcd606ba2a556ee12121723ab",
       "size": 761
     },
-    ".opencode/agents/evals/files/test-project/Ê≠£Êñá/Á¨¨0004Á´†-Ëø¶ÂçóÂ≠¶Èô¢ÁöÑËÄÉÈ™å.md": {
+    ".opencode/agents/evals/files/test-project/’˝Œƒ/µ⁄0004’¬-Â»ƒœ—ß‘∫µƒøº—È.md": {
       "sha256": "750cb8cbd268e95443423419a9c1a00dcde1cc233aefe913c897dfbbc77a7637",
       "size": 2482
     },
-    ".opencode/agents/evals/files/test-project/ËÆæÂÆöÈõÜ/‰∏ñÁïåËßÇ.md": {
+    ".opencode/agents/evals/files/test-project/…Ë∂®ºØ/ ¿ΩÁπ€.md": {
       "sha256": "f5f03eba3a114324d1632deae69bbb22445320112c8490a6ce2564ec1482f27c",
       "size": 558
     },
@@ -418,16 +422,20 @@
       "size": 2765
     },
     ".opencode/installer/preflight.py": {
-      "sha256": "778ac620767313744c4ee20bb6256cec858b953aa4053759afabb7a922998ac7",
-      "size": 6748
+      "sha256": "ee6342549500fc51e53081957bb4fd4d034badfbfe8fce424ca414262c1862c9",
+      "size": 7042
     },
     ".opencode/installer/ui.py": {
       "sha256": "ebfaa595135b01333ca42c53d2e513afe6a60f99bff3889e9d91411d23762d0a",
       "size": 1909
     },
+    ".opencode/installer/uninstall.py": {
+      "sha256": "6c80c4debb230431aeb13c5395c1ed011a82d0b69a2a20af636e568bf6f1c08a",
+      "size": 1926
+    },
     ".opencode/installer/update.py": {
-      "sha256": "7043fc41fe3fc8c2f92a2e90ff37cc4b65bbdd61e44902b76b82c29a0b81621e",
-      "size": 3316
+      "sha256": "d5061868f69c0a6a79c8c5ed8ec31fd44fd34393e14fa1c69058a90c48afa1e6",
+      "size": 6013
     },
     ".opencode/installer/__init__.py": {
       "sha256": "fca41afd97d96cf110768a2ec1275dea5ddacd5571c1cd2c0e14c72c2c1abfd0",
@@ -457,39 +465,39 @@
       "sha256": "89b5759d3c4e92af7bbe54a542797b81ad34679689770b2915bd3e0913370a88",
       "size": 7877
     },
-    ".opencode/references/csv/‰∫∫ËÆæ‰∏éÂÖ≥Á≥ª.csv": {
+    ".opencode/references/csv/»À…Ë”Îπÿœµ.csv": {
       "sha256": "3c76a12a060d4662dd69a2af36c70b2bcf3cd5fae863fe48a08661028228b6d0",
       "size": 83620
     },
-    ".opencode/references/csv/ÂÜô‰ΩúÊäÄÊ≥ï.csv": {
+    ".opencode/references/csv/–¥◊˜ºº∑®.csv": {
       "sha256": "e34e77d412c201763a66fa40dc8b06f530859ffad409961d989e80604bc82317",
       "size": 87379
     },
-    ".opencode/references/csv/ÂëΩÂêçËßÑÂàô.csv": {
+    ".opencode/references/csv/√¸√˚πÊ‘Ú.csv": {
       "sha256": "bc86d2a422eee806259cf85924ca86cef0efa10f5ab93504474284432089be6c",
       "size": 56441
     },
-    ".opencode/references/csv/Âú∫ÊôØÂÜôÊ≥ï.csv": {
+    ".opencode/references/csv/≥°æ∞–¥∑®.csv": {
       "sha256": "ed266b1307dbdd3a89050c163e1187919368b13697064796f4b6ce77e8f39c5b",
       "size": 78063
     },
-    ".opencode/references/csv/Ê°•ÊÆµÂ•óË∑Ø.csv": {
+    ".opencode/references/csv/«≈∂ŒÃ◊¬∑.csv": {
       "sha256": "82437a8c80e40f80c5a3ce044763082f585a8a853186baf37b42cfcf4f570171",
       "size": 94139
     },
-    ".opencode/references/csv/ÁàΩÁÇπ‰∏éËäÇÂ•è.csv": {
+    ".opencode/references/csv/À¨µ„”ÎΩ⁄◊‡.csv": {
       "sha256": "cbc41cbd6ce23ed7355b5ae8be7c5e9683dc33fbed8b06a57af5db77b5020742",
       "size": 67471
     },
-    ".opencode/references/csv/Ë£ÅÂÜ≥ËßÑÂàô.csv": {
+    ".opencode/references/csv/≤√æˆπÊ‘Ú.csv": {
       "sha256": "80d741c74c7e3364bd5ebc6f0c6d466289f05f279f206c35199e1ac45bc3de66",
       "size": 8821
     },
-    ".opencode/references/csv/ÈáëÊâãÊåá‰∏éËÆæÂÆö.csv": {
+    ".opencode/references/csv/Ω ÷÷∏”Î…Ë∂®.csv": {
       "sha256": "1fc0b11dd54cdb5295151650102efdf27a860d014ab89c27f4b28f5fb26b0880",
       "size": 74257
     },
-    ".opencode/references/csv/È¢òÊùê‰∏éË∞ÉÊÄßÊé®ÁêÜ.csv": {
+    ".opencode/references/csv/Ã‚≤ƒ”Îµ˜–‘Õ∆¿Ì.csv": {
       "sha256": "4923d10f878cbf58257401d36178becfff64a2f415d13b35015ba6e48d3f4d22",
       "size": 22747
     },
@@ -534,12 +542,12 @@
       "size": 23612
     },
     ".opencode/scripts/backup_manager.py": {
-      "sha256": "21418779861efbc240747df0ec3834629346779fa7db7dfbce8758cf1c9125c9",
-      "size": 16189
+      "sha256": "d6e332b95cee9ff8db70a8fd3a1ff99c0ee30c4e3cef93b59cf9fe198af5129c",
+      "size": 16295
     },
     ".opencode/scripts/chapter_commit.py": {
-      "sha256": "11ebef01885ac88290657a00fb62422134758e04d9bf3a422312a52c80e75679",
-      "size": 1587
+      "sha256": "55c3e11271c1f87608d9f84520f660e1025a1033585c14d481e6838756ce53ad",
+      "size": 2334
     },
     ".opencode/scripts/chapter_outline_loader.py": {
       "sha256": "07e05f13d52c127f5ce6e1fa2020c0ee763d9a73d6902d82c771f3104eb8c8a2",
@@ -570,8 +578,8 @@
       "size": 4094
     },
     ".opencode/scripts/project_locator.py": {
-      "sha256": "23b5a981c1064ad88e6f88fad2f899d490092f67ba53cc6c74fbf74231c08823",
-      "size": 16833
+      "sha256": "9dacfa5f4267c3fc4018e3688be63573767f54ba818eac302e5ebc15fec9fa1f",
+      "size": 17076
     },
     ".opencode/scripts/project_memory.py": {
       "sha256": "613b0846a3eb4fc307a4795206a6c844a16d00e1653ddfff8ebc7b4009474067",
@@ -590,8 +598,8 @@
       "size": 471
     },
     ".opencode/scripts/review_pipeline.py": {
-      "sha256": "2de7b23384d95f1e6711a446f56ba3bc4dad6ba554be4737712714e460c3305d",
-      "size": 7694
+      "sha256": "15c52742b688e97179af3a8887287f4a314b28d6e7f1577d1ab85e3d33d834a6",
+      "size": 9574
     },
     ".opencode/scripts/runtime_compat.py": {
       "sha256": "d7a61f8438c60b18c82f42b06ea0b1bb49fbd1047cf3e9839e539b76d291c5a1",
@@ -605,6 +613,14 @@
       "sha256": "418d9540bc046b0ebaa75f81be5b06f58c4658188e64e7c1c32d6d05a753cdf5",
       "size": 18916
     },
+    ".opencode/scripts/skills-lock.json": {
+      "sha256": "c645cd9c65a3203eb8012ce2530e53883ed8468e260ad94fd0b16a767dd38db3",
+      "size": 1251
+    },
+    ".opencode/scripts/skill_runner.py": {
+      "sha256": "763a3830e842b71b769c9f775d4783b3d8b1c98ee257230712bd3bf48647a7d8",
+      "size": 11644
+    },
     ".opencode/scripts/status_reporter.py": {
       "sha256": "a8ee635f115466d810f9daaf6e3e4a87981759a2cd340b11d359666d9a0aa752",
       "size": 48471
@@ -614,8 +630,8 @@
       "size": 1225
     },
     ".opencode/scripts/story_system.py": {
-      "sha256": "80bdbc4d73f074e35d00f3ee29990a14d49acaddd2be7c9f3da28ba22cf7fd6d",
-      "size": 4111
+      "sha256": "73b99530699e2a828b03421935c75bb97dfe4debd822403c4c3431ba6e3d10bf",
+      "size": 4445
     },
     ".opencode/scripts/sync_plugin_version.py": {
       "sha256": "27ba3bf93b9cfd3164a17dab7c65b94c3bd7edf72ccbd4f40ff75e6495d5e2fb",
@@ -641,6 +657,118 @@
       "sha256": "a2dee2606128aa0caf92732c9d13ed8d26012d0cf522a7010a58aac8d5f205af",
       "size": 523
     },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/SKILL.md": {
+      "sha256": "b3b1327ef2c66df313caf2a34ca931d0a6b2153002b5a7e8582f3bc7c61be1b8",
+      "size": 14661
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/adapter-template.md": {
+      "sha256": "4256e91a7c5cf66af9a7183d1eaef41f7cb14cdaccd6489a1fcc67324e15c890",
+      "size": 22139
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/api-discovery.md": {
+      "sha256": "b704af6590abe6f44f7fd780bfa816b79d4600ec1dd671a82c7ecc77bc3b7404",
+      "size": 11979
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/coverage-matrix.md": {
+      "sha256": "dbad67544806d9fa0a302805fb602ef5b46cb6b7687ec2bcf89a5f4ae0e3b662",
+      "size": 5282
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/field-conventions.md": {
+      "sha256": "4d1a57e0ff880ed85cc3a7bb4e3283c4fd0baefe935bc6febae318cc4217a592",
+      "size": 5480
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/field-decode-playbook.md": {
+      "sha256": "44e732cba468b2d35d128858275076374e6aaf5fdbbf623b1972b278ba2032e5",
+      "size": 7316
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/jsdom-fixture-pattern.md": {
+      "sha256": "7adb1a5b9c1d75e96f6130f2f0c19d08e4f0ffb893c6f4732cef8738d9574d18",
+      "size": 8207
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/output-design.md": {
+      "sha256": "d57c1d2b99caa13edd3b4a74b263149e063bb3dbb35ff57e471ca23b8e06973e",
+      "size": 4965
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/site-memory.md": {
+      "sha256": "b25516fba9828fbe004fd402fe68ae1ca5af9ef957e6a3ca342d6819d60fdbe2",
+      "size": 10494
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/site-recon.md": {
+      "sha256": "c0ff56037d5852f4c8ff6f63b1c0ec8230de71a9db1814b9681df6de3e8444ca",
+      "size": 4960
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/success-rate-pitfalls.md": {
+      "sha256": "db6378c78a47b87f87c5699a9a1074f53b992fec035204bcb8cbac3fed609aa8",
+      "size": 9813
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/typed-errors.md": {
+      "sha256": "d4b162e17e456dad735e008b78f11bc89892174b1971323732103cf09ada8855",
+      "size": 13144
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/site-memory/bilibili.md": {
+      "sha256": "971fff0125aeec8dda2ab217403358968e86c79fa852f2348cf18a672c465818",
+      "size": 3784
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/site-memory/eastmoney.md": {
+      "sha256": "a666674e25d0eee588523a8fa8eb9585402551cfc283f68cd0822f6496812c6b",
+      "size": 3966
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/site-memory/tonghuashun.md": {
+      "sha256": "2a43f839c6430f0487e1e75aebab75454f430e7925df6c62d368605d3fd84d24",
+      "size": 2543
+    },
+    ".opencode/scripts/.agents/skills/opencli-adapter-author/references/site-memory/xueqiu.md": {
+      "sha256": "fc5ab0a787076155c45cd7ede3470b24397af0f02f203c2c0a4624d23377d910",
+      "size": 2933
+    },
+    ".opencode/scripts/.agents/skills/opencli-autofix/SKILL.md": {
+      "sha256": "e197aa8d7fa359f4c95cc0a3b4e9a396ce97e813230538ab3879e33f2384feb2",
+      "size": 13084
+    },
+    ".opencode/scripts/.agents/skills/opencli-browser/SKILL.md": {
+      "sha256": "a3d28571a8803f67dbf29fd9dc55d1b7ecc3004106015cbae7f0a660a9ab8565",
+      "size": 29660
+    },
+    ".opencode/scripts/.agents/skills/opencli-usage/SKILL.md": {
+      "sha256": "0dfc7322f763ea1e179b139b91e90baa905c2b00c6d062b32a61e938e746dc73",
+      "size": 10479
+    },
+    ".opencode/scripts/.agents/skills/smart-search/SKILL.md": {
+      "sha256": "c115df78c760d40687669c7ec37e3109dd11d3654bf85d207391ef36999a651b",
+      "size": 6507
+    },
+    ".opencode/scripts/.agents/skills/smart-search/references/sources-ai.md": {
+      "sha256": "0e07ada9cbd58aa8e17142ae1f37da1a265a1b4d0aff500978db381222042a89",
+      "size": 3216
+    },
+    ".opencode/scripts/.agents/skills/smart-search/references/sources-info.md": {
+      "sha256": "a6e47307c5f822180818a517cf968b9849757bed4a31c21427353863d20209a4",
+      "size": 1011
+    },
+    ".opencode/scripts/.agents/skills/smart-search/references/sources-media.md": {
+      "sha256": "2057d1e34fd0b44eed2fa049762c531150eef332059b6fb233815e90dcc75a4c",
+      "size": 1235
+    },
+    ".opencode/scripts/.agents/skills/smart-search/references/sources-other.md": {
+      "sha256": "2842f6c69c2cbd202c3194628a41065272869053dbe7bf16af2aac21b6c03a50",
+      "size": 977
+    },
+    ".opencode/scripts/.agents/skills/smart-search/references/sources-shopping.md": {
+      "sha256": "acf5fb13749b9a8306c2ae8787f84fb5087457c91d1629e5f59cc501251b67ee",
+      "size": 826
+    },
+    ".opencode/scripts/.agents/skills/smart-search/references/sources-social.md": {
+      "sha256": "771fba01be397372f38b8e2043f7a962c90fcfefade17fb6ab20ec9048dde925",
+      "size": 1267
+    },
+    ".opencode/scripts/.agents/skills/smart-search/references/sources-tech.md": {
+      "sha256": "ed422eb0690a0d3abaa38d628cb6fc8d7bb740dfeb19f6c291ed5fb1675a3739",
+      "size": 1213
+    },
+    ".opencode/scripts/.agents/skills/smart-search/references/sources-travel.md": {
+      "sha256": "678e13e9d69ab6a7868e51dabbc04e7338f290637c91167a6b1dee4de32be4fb",
+      "size": 526
+    },
     ".opencode/scripts/data_modules/amend_proposal_schema.py": {
       "sha256": "b56069a9b37d928077c577d6b72950b494107bdb72b61f0a203bc7af7e15367b",
       "size": 333
@@ -649,9 +777,13 @@
       "sha256": "6c04beea1b69f9d667229b78dcb3056b9e0b8c2e7167f861f41f6bac9360b6ab",
       "size": 19256
     },
+    ".opencode/scripts/data_modules/chapter_commit_schema.py": {
+      "sha256": "010f1a3cf6491abfbd4c2568f3b62d43c32374ee2628ae21c0c32085fb12b65b",
+      "size": 10102
+    },
     ".opencode/scripts/data_modules/chapter_commit_service.py": {
-      "sha256": "d156a4eef0063b905b6c6240684f8fccf514460808e88521a1fdf422a03c6ac0",
-      "size": 5715
+      "sha256": "62b2875e38cb0fb805749db1fbf45cdfc3f06ba5a5cee7d7aa71cc737be785d4",
+      "size": 7640
     },
     ".opencode/scripts/data_modules/cli_args.py": {
       "sha256": "4255c80565d29e0b2c7bd286c9e2047ba949dfd9126462d5d7e93bec5a105669",
@@ -702,16 +834,16 @@
       "size": 10041
     },
     ".opencode/scripts/data_modules/index_debt_mixin.py": {
-      "sha256": "363031e4439e4b07cf3f9212618532c8dbd441d1752cecc665994bdd09c996b5",
-      "size": 19029
+      "sha256": "605c7c4cb9110a96f58a329f8efe941886cd535247ddb804ab9beb3be4700395",
+      "size": 21188
     },
     ".opencode/scripts/data_modules/index_entity_mixin.py": {
       "sha256": "994a8de0a84420a19acb2b427093ce64536253943f7342b798046fcf675ebf9a",
       "size": 39625
     },
     ".opencode/scripts/data_modules/index_manager.py": {
-      "sha256": "904e104bc5cdcfd69d7ba6cc2f4a29d6a18ad136b67aa6fced10ecc81aaada59",
-      "size": 57332
+      "sha256": "cecbdf74e2af3a7db54f691b1817f7f662d7e6fd039e55f8e595dd150e9fde70",
+      "size": 57462
     },
     ".opencode/scripts/data_modules/index_observability_mixin.py": {
       "sha256": "7345d0a73b1c9c07b2db9079579f5eee2a8621319afa6800ac899d10d29bf2de",
@@ -754,8 +886,8 @@
       "size": 4810
     },
     ".opencode/scripts/data_modules/placeholder_scanner.py": {
-      "sha256": "d2b84da2c9b9964d485615a7d282923fc3d39d7b96f065fc7caccd239336e652",
-      "size": 2443
+      "sha256": "27e0c02df0aa2e0a64f7fee0c3ad4fa4a15893eaefff2bd532b6537ce9ab539e",
+      "size": 3357
     },
     ".opencode/scripts/data_modules/prewrite_validator.py": {
       "sha256": "7bfdde22e12464f63369e7b8f30024b7e2dafed2864e333fc9230060a1552093",
@@ -770,8 +902,8 @@
       "size": 60211
     },
     ".opencode/scripts/data_modules/review_schema.py": {
-      "sha256": "f7c4a280e03bec1072fb0bac710e09f1186c0f109826b54f3ae32fbaa7fd8587",
-      "size": 7519
+      "sha256": "6217d8da0adfab5d3d4151622b47ed308a7241e555b5c42e616e269859119991",
+      "size": 7800
     },
     ".opencode/scripts/data_modules/runtime_contract_builder.py": {
       "sha256": "ce45e2f8593a8b5f94ab45c2aec8986d5c1052a00ad2513a49677c2bb62b1355",
@@ -790,16 +922,16 @@
       "size": 62839
     },
     ".opencode/scripts/data_modules/state_projection_writer.py": {
-      "sha256": "668493b7c7962885533ba77b82542410bb798a869417e3150eb68c2b04d92f67",
-      "size": 12727
+      "sha256": "948ca461b24bb04ffd19f142b924cce6ee7001bd2522157f4a61bb217837e786",
+      "size": 12848
     },
     ".opencode/scripts/data_modules/state_validator.py": {
       "sha256": "b4e0bee9753e0f80ff709a833253add5564a44a2e5521137f8f760b7e2b0c3b8",
       "size": 8962
     },
     ".opencode/scripts/data_modules/story_contracts.py": {
-      "sha256": "924e1dd4a14c6f7712cfa6991518a836c8e6fe69b05eef08610c42bcc9fedf6e",
-      "size": 7291
+      "sha256": "ba89fef5270b56b4d147ce642bb340858540952b99076638b02393707319dcbb",
+      "size": 7427
     },
     ".opencode/scripts/data_modules/story_contract_schema.py": {
       "sha256": "72bcea2e0bbfccc5fccbbc6556c564a7cc89f9d572562556022c094150fcb07d",
@@ -810,16 +942,20 @@
       "size": 670
     },
     ".opencode/scripts/data_modules/story_runtime_health.py": {
-      "sha256": "d82e97bc80643c6dbb31f0004836a11c2663c035c670c79ddc2f669c064fcf1f",
-      "size": 2793
+      "sha256": "06a22c9e89b7d6e04afbd0fdc3b2409ea61bbe8e57f42f5a94172abe07a17b43",
+      "size": 3130
     },
     ".opencode/scripts/data_modules/story_runtime_sources.py": {
       "sha256": "c63d9a4ad41df499ea9c28ac4e1f7ce1d02e018c8a61f6d9b531177fb2e2fab5",
       "size": 2999
     },
     ".opencode/scripts/data_modules/story_system_engine.py": {
-      "sha256": "f9ea93018ca4897ff3e433dfa6ae53f1e1f1b4f6d7094c0d5d662e8ff219064f",
-      "size": 24520
+      "sha256": "cf39791339a08be8c5c34c68c56e7f357c59268890c14d2a63275917c35564d8",
+      "size": 26606
+    },
+    ".opencode/scripts/data_modules/structural_checker.py": {
+      "sha256": "8e18f89fbf70b56221c27ebf012118eea6417a8cfab30a03e7a6391d0045db39",
+      "size": 12023
     },
     ".opencode/scripts/data_modules/style_sampler.py": {
       "sha256": "8a7e844dad7fc7d407bad177189e59f1278b8aeb222912754fea65e827ad1f6c",
@@ -834,8 +970,8 @@
       "size": 7811
     },
     ".opencode/scripts/data_modules/webnovel.py": {
-      "sha256": "f295418a5a2305b5973c567d3f70e1271b13d4f78026004e0ee2fbf8da338f05",
-      "size": 22757
+      "sha256": "b299485ba619798130588fdb88eea00424c45269d974097372802aadae415997",
+      "size": 27468
     },
     ".opencode/scripts/data_modules/writing_guidance_builder.py": {
       "sha256": "8cad40418459629ca9120fb27b3d7bdc43c83b2b7cd1cab8aba35cf3e0059f29",
@@ -854,8 +990,8 @@
       "size": 1679
     },
     ".opencode/scripts/data_modules/memory/compactor.py": {
-      "sha256": "0ce89e2617b69f5442973f7a9e06b0868a5e65b05bd07aa3407e2a2ebb5b92e2",
-      "size": 4467
+      "sha256": "dd5ee96220417879934e6496aaecc13b2299a6c30287eeff675106a8b8cf06c4",
+      "size": 4430
     },
     ".opencode/scripts/data_modules/memory/orchestrator.py": {
       "sha256": "dbd2e0823f88f644a96b41c7782bc74a422ece0ed2d9230bd4fdea3bf797d73b",
@@ -866,8 +1002,8 @@
       "size": 5866
     },
     ".opencode/scripts/data_modules/memory/store.py": {
-      "sha256": "af8e4b211e636f65715be0a1f9ea569311d258566548aa717bf31c53cc2aa124",
-      "size": 9336
+      "sha256": "5271ff864e64aafff8839f8e2ac41359dd5a10343d92db68880e84df2072a560",
+      "size": 9202
     },
     ".opencode/scripts/data_modules/memory/writer.py": {
       "sha256": "db0112467a5aa38ba57cb0e8b6d77a57c236646a410ed6fc0284028f18c40c29",
@@ -918,8 +1054,8 @@
       "size": 1852
     },
     ".opencode/scripts/data_modules/tests/test_coverage_boost.py": {
-      "sha256": "3a5a1d355c4ccd6ce4c07fea59fa6c5f5cbdd5a5f47b7502c2f9ee89f9255ed6",
-      "size": 23895
+      "sha256": "2aac02070dc325357993f2efe853ed2c96f39777c030d7e101616b0de8195e01",
+      "size": 23669
     },
     ".opencode/scripts/data_modules/tests/test_csv_config.py": {
       "sha256": "d6f694814a84cc882ef0754f5d68d619b800fd53f4491dd75e0cd5def7c83466",
@@ -950,8 +1086,8 @@
       "size": 3561
     },
     ".opencode/scripts/data_modules/tests/test_export_manager.py": {
-      "sha256": "adb1e212b0904f5335bc099212987db9e6307c1cdfd8be27272b183ea78a30a8",
-      "size": 6383
+      "sha256": "637596efeb95127752c6d3bdc23dd0b2bf0c58533facb06b9c903d61c05da5e3",
+      "size": 18257
     },
     ".opencode/scripts/data_modules/tests/test_extract_chapter_context.py": {
       "sha256": "b4a81e5c614475388961e9858b7869dbe7f6096b1a1c9ff59dc99dc849fa7de7",
@@ -994,8 +1130,8 @@
       "size": 1331
     },
     ".opencode/scripts/data_modules/tests/test_memory_store.py": {
-      "sha256": "a454fbe608bbb1b4023eb0a540f99ae0d0f118d5f81e2cfe13cd213d007dd4ba",
-      "size": 5856
+      "sha256": "e604869588fe6d02a724205dc4a364c7cb2b4bb7ffbbd59b49f3437f1b433181",
+      "size": 5952
     },
     ".opencode/scripts/data_modules/tests/test_memory_writer.py": {
       "sha256": "460c09f4a42dab4f41358cf9e1f2a1dffe27fa6690becfa88f87ce2ed7537476",
@@ -1010,8 +1146,8 @@
       "size": 2922
     },
     ".opencode/scripts/data_modules/tests/test_placeholder_scanner.py": {
-      "sha256": "539cf979fc67d556b240e4a31115ea5f8cba67abffd2ec79ca34106a3b56c641",
-      "size": 1751
+      "sha256": "8fff94f4cb99e24fa55e66d80d96c741299ad2293ea157117b0144a948c9b596",
+      "size": 4313
     },
     ".opencode/scripts/data_modules/tests/test_prewrite_validator.py": {
       "sha256": "f6f4df80f7de3a8139d927eba6b40ec676975bd42a761b6a3214ad668c884107",
@@ -1026,8 +1162,8 @@
       "size": 18923
     },
     ".opencode/scripts/data_modules/tests/test_project_locator.py": {
-      "sha256": "54bcb251d2878abdd25305b39061bcef90e4ed3cbd2266e1b72ad115c234a08c",
-      "size": 4706
+      "sha256": "280f066aa9bcbcc5878ecb992ba179dc40e09793f48c85dbf20937e8b8998c4b",
+      "size": 5327
     },
     ".opencode/scripts/data_modules/tests/test_prompt_integrity.py": {
       "sha256": "c1d336ebe5e696a34421f0bac8307cf0147e6943f3ae31936cbd94cc11ac059e",
@@ -1049,6 +1185,10 @@
       "sha256": "655f10894619d6dd0cc08543f61d96652adc51c813d4108ca06a021c3c759268",
       "size": 9091
     },
+    ".opencode/scripts/data_modules/tests/test_review_pipeline.py": {
+      "sha256": "309b3bd4e035230d20f08ed0d83ceff47b6e40c05a040a99e7ae2b26ebc31cb4",
+      "size": 583
+    },
     ".opencode/scripts/data_modules/tests/test_review_schema.py": {
       "sha256": "c6a0a10f0b3f181b11b2de3e806f50ad845bd0fbf365755f991e44df6d3c271b",
       "size": 5858
@@ -1056,6 +1196,10 @@
     ".opencode/scripts/data_modules/tests/test_runtime_contract_builder.py": {
       "sha256": "d45ac7da78e1c57dcb76dab9e0916fd9192eb737c57347f2ff59f6395e48cc61",
       "size": 4108
+    },
+    ".opencode/scripts/data_modules/tests/test_skill_runner.py": {
+      "sha256": "2ade7ce21b4185bab735f9993fb2b688d356ed6725bebd30d9b80cad044056b3",
+      "size": 5775
     },
     ".opencode/scripts/data_modules/tests/test_sql_state_manager.py": {
       "sha256": "b1df1d1148f90ad57e631e765af1efae973465398b4edb4ff0d0dd0cf8b235fb",
@@ -1101,6 +1245,10 @@
       "sha256": "da1df7e50dfbef76ea03d744dba9595671880ee76fe1d573a5acffd81b59e1e8",
       "size": 29825
     },
+    ".opencode/scripts/data_modules/tests/test_structural_checker.py": {
+      "sha256": "ae4979cee010d73d793c2c6132067f0dc3abe7e5a75c5c851a4661b0307ea6c4",
+      "size": 10277
+    },
     ".opencode/scripts/data_modules/tests/test_style_sampler_cli.py": {
       "sha256": "426b7e708610a644f364320db5e7f62df602360dd52eb33f94c757b3428d337b",
       "size": 2745
@@ -1118,56 +1266,88 @@
       "size": 4252
     },
     ".opencode/scripts/data_modules/tests/test_webnovel_unified_cli.py": {
-      "sha256": "26b738dcfa27bd28a7a3170aecb925e4b7262e15d92e0c64755ac5199bba1962",
-      "size": 29116
+      "sha256": "2bf93564307709d834a4b686d5c7153e15b2ab303945d94bec8c25054d613e2b",
+      "size": 29876
     },
     ".opencode/scripts/data_modules/tests/__init__.py": {
       "sha256": "9fdc18d731e157288f24c005ef9554e1bf5a9a41b20bd856e8582fb790ac5639",
       "size": 30
     },
-    ".opencode/scripts/export_manager/epub.py": {
-      "sha256": "49e6dcdf6ac8642144a4bc7ccb8bbc96c69c03c9f83e5b3ac785f57b482fba87",
-      "size": 5996
+    ".opencode/scripts/export_manager/chapter_collector.py": {
+      "sha256": "bf8bb22c011bc9afe6f156816a196c387ccfaa8c23a011514cfff0864a96510d",
+      "size": 5092
     },
-    ".opencode/scripts/export_manager/markdown.py": {
+    ".opencode/scripts/export_manager/parser.py": {
+      "sha256": "e816baa4f40b9e6bd93d88da5518096e3c83659136f9e2bf207a83929e54cdce",
+      "size": 1570
+    },
+    ".opencode/scripts/export_manager/styles.py": {
+      "sha256": "0eb11729701a65de2052618b76b292c3ec3ff673f0483854bef6e3e3f2110dad",
+      "size": 1215
+    },
+    ".opencode/scripts/export_manager/__init__.py": {
+      "sha256": "896de43b9991d52965a41c072c879f985b557323ee00e7b96afa03d34266c55d",
+      "size": 5042
+    },
+    ".opencode/scripts/export_manager/formats/docx.py": {
+      "sha256": "013c9a7a43a8f907cc2df6197a7b2dde719b8e3e19f6130e68f330df0dbfe916",
+      "size": 3828
+    },
+    ".opencode/scripts/export_manager/formats/epub.py": {
+      "sha256": "fa9defc472cbb3e97e7bb9ff3fc5c73d213f3b345e7ae6c220d56f66b2d5a66d",
+      "size": 4696
+    },
+    ".opencode/scripts/export_manager/formats/html.py": {
+      "sha256": "1df24e18e9c47f34600317be5ae2600517d74389bc0d8955ad2d217190517ce7",
+      "size": 1622
+    },
+    ".opencode/scripts/export_manager/formats/markdown.py": {
       "sha256": "f6ef1406d7a0db090b93513e42b5f28278554635e13cabe9d303e026d9573f60",
       "size": 648
     },
-    ".opencode/scripts/export_manager/txt.py": {
-      "sha256": "6b8ed885ee05c7c92462760873bf29708e9d94ec7fc3f91c790658686a5bd3b2",
-      "size": 1226
+    ".opencode/scripts/export_manager/formats/pdf.py": {
+      "sha256": "3e245deb7f79490372e16185b1fbe29345127048d07e0bab2a837b48e3890327",
+      "size": 2259
     },
-    ".opencode/scripts/export_manager/__init__.py": {
-      "sha256": "3a96b2bcdfd34c5ef10c2329ff7d3674fd4a4eee9d9b2eb3583a19b3c73e18c9",
-      "size": 6856
+    ".opencode/scripts/export_manager/formats/txt.py": {
+      "sha256": "a8f15da50ca44387585a76068514616aaa51df04133037052a2079ec50f2bbce",
+      "size": 1273
+    },
+    ".opencode/scripts/export_manager/formats/__init__.py": {
+      "sha256": "d2a89d5d2186e48b5f5fc7cb87c2c3663b609b496336db8c405a754b36e34a77",
+      "size": 103
     },
     ".opencode/scripts/publisher/base.py": {
       "sha256": "09ae17c5fe922273698e476cf89d128735c0633a40ceb7ebc928551cd984116a",
       "size": 1031
     },
     ".opencode/scripts/publisher/browser.py": {
-      "sha256": "18f3e065a0c1f298d31d8a5249afa3ec0d62ed6efa296f74a2f302fb2767bc97",
-      "size": 2393
+      "sha256": "cb3f60ed0f83c531b906fd03fe5f4d4d427fae3a2ff460dd9f5ad6ff685e9c9b",
+      "size": 2451
     },
     ".opencode/scripts/publisher/config.py": {
-      "sha256": "dbfecd778aac924e4185a87c73b2bf71e3c7dbbb3783deccf18d7a3c10e1f844",
-      "size": 1433
+      "sha256": "f773d5008b17670440ce67d2d0e6b10d2b2387e6b55f771ee22e65220124b34c",
+      "size": 4444
     },
     ".opencode/scripts/publisher/formatter.py": {
-      "sha256": "8e78ef4a85df89783f0f25d7185b1e007b3054ca5c1dcc4d15066c9b4c5d7f23",
-      "size": 3238
+      "sha256": "03ba72075d23ae2ebc05fdfd2b881c0db41c3e9249e9bf9f9475da5828a8259e",
+      "size": 3290
     },
     ".opencode/scripts/publisher/__init__.py": {
-      "sha256": "f0d196335dd43d5e8c2bbbdbf4b36fd4138d122ff425e9949b25d3355a56e683",
-      "size": 8391
+      "sha256": "8c53316f3a5b816d699e4dd6b3d7b38718424cfc6d3d3aeb36997066752a1671",
+      "size": 14884
     },
     ".opencode/scripts/publisher/adapters/fanqie.py": {
-      "sha256": "d881bbe5edd69f31411fb3c7e69922d43f22215743c4138986bf436f26694d39",
-      "size": 13062
+      "sha256": "011c4ebbd307026ee0114181fd4dd7629125fb076e295bb0365d9a087341e030",
+      "size": 15173
+    },
+    ".opencode/scripts/publisher/adapters/qimao.py": {
+      "sha256": "3f32d9763774bb02a56b53dc16d97c6aec1a1d41d5c1026b0a7493553f3bc297",
+      "size": 9924
     },
     ".opencode/scripts/publisher/adapters/__init__.py": {
-      "sha256": "e25f75807445d6e7961ff57d24ae44cd51d169e56ea8e30fcc55587618f59e64",
-      "size": 82
+      "sha256": "ff2b669c9c9c247bcc723b53e62a4eb5b37d0f9a18671e066bf7751d2c617a0a",
+      "size": 979
     },
     ".opencode/scripts/tests/test_reference_search.py": {
       "sha256": "3e140f56555ebc76de1f0a55a833554712f4468c9cd11593f5ab01b556e7f338",
@@ -1218,10 +1398,9 @@
       "size": 2776
     },
     ".opencode/skills/webnovel-export/SKILL.md": {
-      "sha256": "1d1dea8b3d31f306ac939a967ce1b46652a011828cd10f5dc54a7c770f076214",
-      "size": 4411
+      "sha256": "4850f76a31fb44b16440795f94dfd9841e542ed85c1c2e242149814e6898be9a",
+      "size": 5328
     },
-
     ".opencode/skills/webnovel-init/SKILL.md": {
       "sha256": "47bb3944a355b9678610dd2487c9ee967bfc2fb0b2521b8ce3b7b6eb972e07d0",
       "size": 18956
@@ -1327,8 +1506,8 @@
       "size": 7933
     },
     ".opencode/skills/webnovel-publish/SKILL.md": {
-      "sha256": "082baae44bb45c5bbf83a25e7a8255fcecbf60436643f9d2393f5f850e47c21a",
-      "size": 2884
+      "sha256": "41a43a67562a0efcb7a993992b94be3242a25554c62d8cd67c5d3aae56bd4533",
+      "size": 2979
     },
     ".opencode/skills/webnovel-query/SKILL.md": {
       "sha256": "b040723a731feb829c9fe94a284d7af164853d8c25e417b016a7a3983cab8d1d",
@@ -1347,8 +1526,8 @@
       "size": 3772
     },
     ".opencode/skills/webnovel-review/SKILL.md": {
-      "sha256": "9461ec376a2e5b12bdfae867f141770d0d413c22a2b26837efd572a8aaba46c5",
-      "size": 6502
+      "sha256": "0cd37b35c61a192039f7b72dff9b20c649874911cc8d16a1a59f32d40144b539",
+      "size": 6567
     },
     ".opencode/skills/webnovel-review/evals/evals.json": {
       "sha256": "21c6e5d9385300065eb30937cd0385bfcb603052e0c4a45cd728780fcb3cbf3b",
@@ -1363,8 +1542,8 @@
       "size": 4310
     },
     ".opencode/skills/webnovel-write/SKILL.md": {
-      "sha256": "16ac251ded00f728b9a69755b47bc803cc04c828edd378fdfc0d395e0ab21c82",
-      "size": 8238
+      "sha256": "98a49882b1fcb4d45c7e3fee6f6d224eadf39fb8b8b618fa69b9931f2547f995",
+      "size": 12369
     },
     ".opencode/skills/webnovel-write/evals/evals.json": {
       "sha256": "4e3a05a9d8be0359e356226f88a19fdfb62340a4464f5c18999e7dedb0016be5",
@@ -1415,8 +1594,8 @@
       "size": 2826
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
-      "sha256": "f66325d5c6a10a78f9f6f79a73a69a9c6e6f37c23f488bc327ea10595c2b2ba0",
-      "size": 15509
+      "sha256": "2a2822704b2d3197821bb1f239ccf20d5ef031012264302a67168cb9b45e3448",
+      "size": 20583
     },
     ".opencode/skills/webnovel-write-batch/references/batch-protocol.md": {
       "sha256": "71a4a57263a69267bb80857d734eea64f3d79322bfe8c6a3331a96540c3167d2",
@@ -1426,151 +1605,151 @@
       "sha256": "b7772976d9ef982c4e845cf2a1d84bf5d9660d898c27bf5eae44dcd932ece39c",
       "size": 17241
     },
-    ".opencode/templates/genres/‰øÆ‰ªô.md": {
+    ".opencode/templates/genres/–ﬁœ….md": {
       "sha256": "9c8485cb019beb0f3b250f86df5061d1af764a70944962670c50b4267ee75758",
       "size": 4292
     },
-    ".opencode/templates/genres/ÂÖãËãèÈ≤Å.md": {
+    ".opencode/templates/genres/øÀÀ’¬≥.md": {
       "sha256": "8768148ba6b886dd7e315a28aa5651838c0c2e262d9fe020d480dff3e06f8ab7",
       "size": 3804
     },
-    ".opencode/templates/genres/ÂéÜÂè≤Âè§‰ª£.md": {
+    ".opencode/templates/genres/¿˙ ∑π≈¥˙.md": {
       "sha256": "01dd55c439733aae451ceff0114cf2aaecb1433b8cdefaf46f27f661b5d7e3e5",
       "size": 6273
     },
-    ".opencode/templates/genres/ÂéÜÂè≤ËÑëÊ¥û.md": {
+    ".opencode/templates/genres/¿˙ ∑ƒ‘∂¥.md": {
       "sha256": "20a728f39403ffc4096cd925fcddbb704d3ffb7c9751ac8f402c15768e2e6fdd",
       "size": 6611
     },
-    ".opencode/templates/genres/Âè§Ë®Ä.md": {
+    ".opencode/templates/genres/π≈—‘.md": {
       "sha256": "ff78bad8d96392d5aee2a69276457379d68d5a4404286a7c512124383bb83792",
       "size": 6511
     },
-    ".opencode/templates/genres/Â§öÂ≠êÂ§öÁ¶è.md": {
+    ".opencode/templates/genres/∂‡◊”∂‡∏£.md": {
       "sha256": "deaec1c6bfecb67cbce02ba664cc6f956ea5da6493977c0ba31a957369d361b3",
       "size": 5356
     },
-    ".opencode/templates/genres/Â•≥È¢ëÊÇ¨Áñë.md": {
+    ".opencode/templates/genres/≈Æ∆µ–¸“….md": {
       "sha256": "deb75be9fd662af89ef39830bfea9ec1ce6df556655af483f2ab303f55072848",
       "size": 6535
     },
-    ".opencode/templates/genres/ÂÆ´ÊñóÂÆÖÊñó.md": {
+    ".opencode/templates/genres/π¨∂∑’¨∂∑.md": {
       "sha256": "13b7b2028d1ba212fa9fa4067fc017d51c1df1ef6dd9006b42b36ef6967e4f58",
       "size": 6064
     },
-    ".opencode/templates/genres/Âπ¥‰ª£.md": {
+    ".opencode/templates/genres/ƒÍ¥˙.md": {
       "sha256": "e12eab5e2a99e9e1d094ae0375ddd84df35781781bd2344a29b75bbc0c7e5180",
       "size": 5952
     },
-    ".opencode/templates/genres/ÂπªÊÉ≥Ë®ÄÊÉÖ.md": {
+    ".opencode/templates/genres/ª√œÎ—‘«È.md": {
       "sha256": "6e79a2fe101f4773f0f82ca79d17cd7aea8542053713e33016dd55e0190e1aa2",
       "size": 6220
     },
-    ".opencode/templates/genres/ÊÇ¨ÁñëÁÅµÂºÇ.md": {
+    ".opencode/templates/genres/–¸“…¡È“Ï.md": {
       "sha256": "87959deb22c1873c82bfda4a2c91b1db021b4e01c9f933198fb2fa61dcd8b72a",
       "size": 5696
     },
-    ".opencode/templates/genres/ÊÇ¨ÁñëËÑëÊ¥û.md": {
+    ".opencode/templates/genres/–¸“…ƒ‘∂¥.md": {
       "sha256": "be1fa7922587f3e17264f68f528cb3d5f64e2c881e09ca1de02c6303c53866c1",
       "size": 6475
     },
-    ".opencode/templates/genres/ÊäóÊàòË∞çÊàò.md": {
+    ".opencode/templates/genres/øπ’Ωµ˝’Ω.md": {
       "sha256": "b1b17b393fa7fb4003309594c9f385a602ec0261c860992c1c806b292dd3018e",
       "size": 6069
     },
-    ".opencode/templates/genres/Êó†ÈôêÊµÅ.md": {
+    ".opencode/templates/genres/Œﬁœﬁ¡˜.md": {
       "sha256": "f3385543ca1e243c04bb1bac5da9f93651ad869c509e5e12c5c6f52c818b4665",
       "size": 6963
     },
-    ".opencode/templates/genres/ÊõøË∫´Êñá.md": {
+    ".opencode/templates/genres/ÃÊ…ÌŒƒ.md": {
       "sha256": "c6828a4de8aae0be577a9d5453537c41dbc0bbb7d15b8c2f0f56d9a0a910ed89",
       "size": 3722
     },
-    ".opencode/templates/genres/Êú´‰∏ñ.md": {
+    ".opencode/templates/genres/ƒ© ¿.md": {
       "sha256": "4953debe35c43f708beb0746d915a0c30d47e6216c96568601520220f308b24c",
       "size": 6931
     },
-    ".opencode/templates/genres/Ê∞ëÂõΩË®ÄÊÉÖ.md": {
+    ".opencode/templates/genres/√Òπ˙—‘«È.md": {
       "sha256": "7bd4ebe82209ba81463fac852bbddb0e83b1272efe3e22a24ee4aa5477472cda",
       "size": 6208
     },
-    ".opencode/templates/genres/Ê∏∏Êàè‰ΩìËÇ≤.md": {
+    ".opencode/templates/genres/”Œœ∑ÃÂ”˝.md": {
       "sha256": "ae37f3f2f4f0818c48c7747c38017506a716a7b0f33b86c55a6f57351fa20812",
       "size": 6052
     },
-    ".opencode/templates/genres/ÁãóË°ÄË®ÄÊÉÖ.md": {
+    ".opencode/templates/genres/π∑—™—‘«È.md": {
       "sha256": "7d5be41502376e90249f8d981530ecac1b615fb9de32c7e9130a5899a7a88784",
       "size": 5388
     },
-    ".opencode/templates/genres/Áé∞ÂÆûÈ¢òÊùê.md": {
+    ".opencode/templates/genres/œ÷ µÃ‚≤ƒ.md": {
       "sha256": "f24c7edfd6a94024a3e4f1607094e22b0d32d431fb55f1002d37916e3ebbc5d7",
       "size": 6430
     },
-    ".opencode/templates/genres/Áé∞Ë®ÄËÑëÊ¥û.md": {
+    ".opencode/templates/genres/œ÷—‘ƒ‘∂¥.md": {
       "sha256": "f1f02665d12825c37f01c119fea3c916ed67ae1ae83d1131d8e71749ca191054",
       "size": 6570
     },
-    ".opencode/templates/genres/ÁîµÁ´û.md": {
+    ".opencode/templates/genres/µÁæ∫.md": {
       "sha256": "d8f267e1be630afc42672e329271b723580a962813bc70bceda281f8a06b8dc6",
       "size": 4034
     },
-    ".opencode/templates/genres/Áõ¥Êí≠Êñá.md": {
+    ".opencode/templates/genres/÷±≤•Œƒ.md": {
       "sha256": "f6821570aa2ff99a8f34158d571720983217aaeade16463d38877ad2c1c91af7",
       "size": 4010
     },
-    ".opencode/templates/genres/Áü•‰πéÁü≠ÁØá.md": {
+    ".opencode/templates/genres/÷™∫ı∂Ã∆™.md": {
       "sha256": "fb9446b2203f175c745ef737f9ad98b5231c403c277689051c0794d8bb9772e3",
       "size": 6268
     },
-    ".opencode/templates/genres/ÁßçÁî∞.md": {
+    ".opencode/templates/genres/÷÷ÃÔ.md": {
       "sha256": "668273209f9accf9c44c382b098a38d26485160c1a9b00a41d9a8ae29114a180",
       "size": 8635
     },
-    ".opencode/templates/genres/ÁßëÂπª.md": {
+    ".opencode/templates/genres/ø∆ª√.md": {
       "sha256": "b976a7013dacadd357a7377f751949254ec039da808c6be6be2f94ebeef1b94a",
       "size": 6724
     },
-    ".opencode/templates/genres/Á≥ªÁªüÊµÅ.md": {
+    ".opencode/templates/genres/œµÕ≥¡˜.md": {
       "sha256": "575ff0ffba8256eda7877e8639eff1603b2d73dcc828e49a15dc6ecd3f9d19c5",
       "size": 4099
     },
-    ".opencode/templates/genres/ËÅåÂú∫Â©öÊÅã.md": {
+    ".opencode/templates/genres/÷∞≥°ªÈ¡µ.md": {
       "sha256": "9aabc0f64414fac722bdf44972d8f466d1cca8cbf2649d74a61fb2d5df57e845",
       "size": 6407
     },
-    ".opencode/templates/genres/Ë•øÂπª.md": {
+    ".opencode/templates/genres/Œ˜ª√.md": {
       "sha256": "4f8af22ccbd3dd6c62a255426f1e1dc3c283a90100a4360be9380d61a4016a6e",
       "size": 6964
     },
-    ".opencode/templates/genres/ËßÑÂàôÊÄ™Ë∞à.md": {
+    ".opencode/templates/genres/πÊ‘Úπ÷Ã∏.md": {
       "sha256": "740543600272dc3c990df8d556e76b9d0e02161fdf7c44c88b779bd44ac9e83d",
       "size": 7913
     },
-    ".opencode/templates/genres/Ë±™Èó®ÊÄªË£Å.md": {
+    ".opencode/templates/genres/∫¿√≈◊‹≤√.md": {
       "sha256": "664433a663d29521f976c0dfcf4d99834df626277f219750a0a936f6d08fdbcb",
       "size": 5840
     },
-    ".opencode/templates/genres/ÈÉΩÂ∏ÇÂºÇËÉΩ.md": {
+    ".opencode/templates/genres/∂º –“Ïƒ‹.md": {
       "sha256": "1b427160d19c91a3ce1f17fd0ead37a8b57c17bc7b95028d8235461efc55438d",
       "size": 4159
     },
-    ".opencode/templates/genres/ÈÉΩÂ∏ÇÊó•Â∏∏.md": {
+    ".opencode/templates/genres/∂º –»’≥£.md": {
       "sha256": "7f1e09a47c88eee8942f8f4f2bac444ce1d27ccab34524a044c00d756bf700c2",
       "size": 5718
     },
-    ".opencode/templates/genres/ÈÉΩÂ∏ÇËÑëÊ¥û.md": {
+    ".opencode/templates/genres/∂º –ƒ‘∂¥.md": {
       "sha256": "ed7159641f3bf5ce19f4152810a39daf4e38896805c1baad30f13d2c94f18510",
       "size": 6650
     },
-    ".opencode/templates/genres/ÈùíÊò•ÁîúÂÆ†.md": {
+    ".opencode/templates/genres/«‡¥∫Ã≥Ë.md": {
       "sha256": "41356a86f3348e7183d5da74a1cff068580f86f513c6bb9853ae42e01dba584f",
       "size": 6128
     },
-    ".opencode/templates/genres/È´òÊ≠¶.md": {
+    ".opencode/templates/genres/∏ﬂŒ‰.md": {
       "sha256": "a9fd10c4537e59ca9cb7aab2b674989a718162b519a5b834561ef5eee594b40d",
       "size": 6138
     },
-    ".opencode/templates/genres/ÈªëÊöóÈ¢òÊùê.md": {
+    ".opencode/templates/genres/∫⁄∞µÃ‚≤ƒ.md": {
       "sha256": "b4ee5f7532a10964e0c7c7754d3db83c69f0557cd858cdf23dbdae1eb0aeeb66",
       "size": 5258
     },
@@ -1582,47 +1761,47 @@
       "sha256": "fc7c6ad51ef0cbce4a43b5e1680c5ad91fadbec2c0f8f00cda92a25e12097c1a",
       "size": 1827
     },
-    ".opencode/templates/output/Â§çÂêàÈ¢òÊùê-ËûçÂêàÈÄªËæë.md": {
+    ".opencode/templates/output/∏¥∫œÃ‚≤ƒ-»⁄∫œ¬ﬂº≠.md": {
       "sha256": "2f478447cdc3dd5cc728297eb0297277ade04cb52f747a850b2254846dbd7f85",
       "size": 716
     },
-    ".opencode/templates/output/Â§ßÁ∫≤-Âç∑Êó∂Èó¥Á∫ø.md": {
+    ".opencode/templates/output/¥Û∏Ÿ-æÌ ±º‰œﬂ.md": {
       "sha256": "50c45f6ee288cf8c13df623aa6909b1ecfddd9f8494e6d6ce20f0e8c12216261",
       "size": 2042
     },
-    ".opencode/templates/output/Â§ßÁ∫≤-Âç∑ËäÇÊãçË°®.md": {
+    ".opencode/templates/output/¥Û∏Ÿ-æÌΩ⁄≈ƒ±Ì.md": {
       "sha256": "a7b2c12cc9be1f6e2c2b9b75e68b075f552805d9d03309e99bd63d6e3401bc87",
       "size": 1313
     },
-    ".opencode/templates/output/Â§ßÁ∫≤-ÊÄªÁ∫≤.md": {
+    ".opencode/templates/output/¥Û∏Ÿ-◊‹∏Ÿ.md": {
       "sha256": "1d2f33f64958cf473aa0ed60e04937e83a74d7d24d01750995b7de67c11bbb32",
       "size": 1114
     },
-    ".opencode/templates/output/ËÆæÂÆöÈõÜ-‰∏ñÁïåËßÇ.md": {
+    ".opencode/templates/output/…Ë∂®ºØ- ¿ΩÁπ€.md": {
       "sha256": "2fb7db61666c4b8c5ef8908cb2be4ba1492a3892b43cccfd423d61f66c24619e",
       "size": 1747
     },
-    ".opencode/templates/output/ËÆæÂÆöÈõÜ-‰∏ªËßíÂç°.md": {
+    ".opencode/templates/output/…Ë∂®ºØ-÷˜Ω«ø®.md": {
       "sha256": "78e31c36cab912ef4d2bb5dd40ad218e6cd9d8d0cbc36ef796ccddc3d8a6aa5e",
       "size": 1114
     },
-    ".opencode/templates/output/ËÆæÂÆöÈõÜ-‰∏ªËßíÁªÑ.md": {
+    ".opencode/templates/output/…Ë∂®ºØ-÷˜Ω«◊È.md": {
       "sha256": "4b4e4bbc4de007ac084d9fb86a0546efe36900ae5d7eefe7c3b7ed95643184ac",
       "size": 736
     },
-    ".opencode/templates/output/ËÆæÂÆöÈõÜ-ÂäõÈáè‰ΩìÁ≥ª.md": {
+    ".opencode/templates/output/…Ë∂®ºØ-¡¶¡øÃÂœµ.md": {
       "sha256": "7d2d6bb58a9c1a617c8234970ad90ff6e33bfbb61c0eab271526f4ef7467883a",
       "size": 1473
     },
-    ".opencode/templates/output/ËÆæÂÆöÈõÜ-ÂèçÊ¥æËÆæËÆ°.md": {
+    ".opencode/templates/output/…Ë∂®ºØ-∑¥≈……Ëº∆.md": {
       "sha256": "9ca4c6df8176b149f5ec7e5d25cf44b5fbb915695e373647893fad76c2424561",
       "size": 988
     },
-    ".opencode/templates/output/ËÆæÂÆöÈõÜ-Â•≥‰∏ªÂç°.md": {
+    ".opencode/templates/output/…Ë∂®ºØ-≈Æ÷˜ø®.md": {
       "sha256": "662c4410832099371490e1c2690e824990b62f855456cf5d2d26a286f30b07e9",
       "size": 927
     },
-    ".opencode/templates/output/ËÆæÂÆöÈõÜ-ÈáëÊâãÊåá.md": {
+    ".opencode/templates/output/…Ë∂®ºØ-Ω ÷÷∏.md": {
       "sha256": "a51866008e99b4c5ceeb45ce3f3d8df5d5f85ba3f03621e87dd2aa18cf17d9ef",
       "size": 1059
     }
