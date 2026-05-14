@@ -1,0 +1,37 @@
+name: Update manifest.json
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.opencode/**'
+      - '!manifest.json'
+
+jobs:
+  update-manifest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Regenerate manifest.json
+        run: |
+          # Preserve current version, regenerate all hashes
+          VERSION=$(python3 -c "import json; m=json.load(open('manifest.json')); print(m.get('version','0.0.0'))")
+          python3 .opencode/scripts/gen_manifest.py --version "$VERSION" --opencode-dir .opencode > manifest.json
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet manifest.json; then
+            git add manifest.json
+            git commit -m "chore: auto-update manifest.json [skip ci]"
+            git push
+          fi
