@@ -3,7 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from installer.ui import info, warn, error
+from installer.ui import info, warn, error, spinner
 
 
 def check_pip_available() -> bool:
@@ -70,23 +70,22 @@ def install_pip_requirements(req_files: list, venv_path: Path = None) -> bool:
 def install_playwright_browser(venv_path: Path = None) -> bool:
     """Install playwright and chromium browser."""
     pip = _get_pip_path(venv_path)
-    info("Installing playwright...")
     try:
         subprocess.run(pip + ["install", "playwright", "--quiet"], check=True, timeout=60)
     except subprocess.CalledProcessError:
         warn("playwright pip install failed")
         return False
 
-    info("Installing chromium browser...")
-    try:
-        subprocess.run(
-            [pip[0], "-m", "playwright", "install", "chromium"],
-            check=True, timeout=300
-        )
-        return True
-    except subprocess.CalledProcessError:
-        warn("playwright chromium install failed")
-        return False
+    with spinner("安装 Chromium 浏览器 (可能需要几分钟)..."):
+        try:
+            subprocess.run(
+                [pip[0], "-m", "playwright", "install", "chromium"],
+                check=True, timeout=300, capture_output=True
+            )
+            return True
+        except subprocess.CalledProcessError:
+            warn("playwright chromium install failed")
+            return False
 
 
 def install_core_deps(venv_path: Path = None, skip_playwright: bool = False):

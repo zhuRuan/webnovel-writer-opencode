@@ -103,31 +103,38 @@ def interactive_menu(args):
         except Exception:
             pass
 
-    print("\n" + "=" * 60)
-    print("  Webnovel Writer for OpenCode — 安装管理")
-    print("=" * 60)
+    # Header
+    print("\n\033[1m\033[96m┌──────────────────────────────────────────────────────────┐\033[0m")
+    print("\033[1m\033[96m│\033[0m  \033[1mWebnovel Writer for OpenCode — 安装管理\033[0m              \033[1m\033[96m│\033[0m")
+    print("\033[1m\033[96m├──────────────────────────────────────────────────────────┤\033[0m")
+
+    status_parts = []
     if installed:
-        print(f"  状态: 已安装 ({version})")
+        status_parts.append(f"\033[92m●\033[0m 已安装 (\033[1m{version}\033[0m)")
     else:
-        print(f"  状态: 未安装")
+        status_parts.append("\033[90m●\033[0m 未安装")
     if staging:
-        print(f"  有暂存更新待应用")
-    print("-" * 60)
-    print()
-    print("  请选择操作:")
-    print()
-    print("  [1] 安装 / 更新        下载最新版本并安装")
-    print("  [2] 增量更新            仅更新变更文件 (快)")
-    print("  [3] 清洁安装            擦除后全新安装")
+        status_parts.append("\033[93m◐\033[0m 有暂存更新待应用")
+
+    for sp in status_parts:
+        print(f"\033[1m\033[96m│\033[0m  {sp:<52s}\033[1m\033[96m│\033[0m")
+
+    print("\033[1m\033[96m├──────────────────────────────────────────────────────────┤\033[0m")
+    print("\033[1m\033[96m│\033[0m  \033[90m请选择操作:\033[0m                                            \033[1m\033[96m│\033[0m")
+    print("\033[1m\033[96m│\033[0m                                                          \033[1m\033[96m│\033[0m")
+    print(f"\033[1m\033[96m│\033[0m  \033[1m[1]\033[0m 安装 / 更新        \033[90m下载最新版\033[0m                         \033[1m\033[96m│\033[0m")
+    print(f"\033[1m\033[96m│\033[0m  \033[1m[2]\033[0m 增量更新            \033[90m仅变更文件 (快)\033[0m                    \033[1m\033[96m│\033[0m")
+    print(f"\033[1m\033[96m│\033[0m  \033[1m[3]\033[0m 清洁安装            \033[90m擦除后全新安装\033[0m                      \033[1m\033[96m│\033[0m")
     if staging:
-        print("  [4] 应用暂存更新        关闭 IDE 后执行两阶段更新")
-    print("  [5] 卸载                移除 .opencode/")
-    print("  [6] 完全卸载            移除 .opencode/ + .venv/")
-    print("  [0] 退出")
+        print(f"\033[1m\033[96m│\033[0m  \033[1m[4]\033[0m \033[93m应用暂存更新\033[0m        \033[90m关闭 IDE 后执行\033[0m                    \033[1m\033[96m│\033[0m")
+    print(f"\033[1m\033[96m│\033[0m  \033[1m[5]\033[0m 卸载                \033[90m移除 .opencode/\033[0m                  \033[1m\033[96m│\033[0m")
+    print(f"\033[1m\033[96m│\033[0m  \033[1m[6]\033[0m 完全卸载            \033[90m移除 .opencode/ + .venv/\033[0m     \033[1m\033[96m│\033[0m")
+    print(f"\033[1m\033[96m│\033[0m  \033[1m[0]\033[0m 退出                                       \033[1m\033[96m│\033[0m")
+    print("\033[1m\033[96m└──────────────────────────────────────────────────────────┘\033[0m")
     print()
 
     try:
-        choice = input("  输入数字选择 (默认=1): ").strip()
+        choice = input("  \033[1m输入数字选择\033[0m \033[90m(默认=1)\033[0m: ").strip()
     except (EOFError, KeyboardInterrupt):
         print("\n  已取消。")
         return
@@ -201,9 +208,9 @@ def run_selected_action(args):
                 print(f"  Clean: removing {d}/")
                 shutil.rmtree(str(d))
 
-    print("\n" + "=" * 60)
-    print("  Webnovel Writer for OpenCode — Installer")
-    print("=" * 60 + "\n")
+    print("\n\033[1m\033[96m┌──────────────────────────────────────────────────────────┐\033[0m")
+    print("\033[1m\033[96m│\033[0m        \033[1mWebnovel Writer — Installer\033[0m                       \033[1m\033[96m│\033[0m")
+    print("\033[1m\033[96m└──────────────────────────────────────────────────────────┘\033[0m\n")
 
     print("[1/3] Downloading latest version...")
     urls = build_urls(REPO, BRANCH, getattr(args, 'mirror', None))

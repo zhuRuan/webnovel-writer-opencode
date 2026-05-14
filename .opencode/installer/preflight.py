@@ -3,7 +3,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from installer.ui import step_header, step_done, info, warn, error, success_box
+from installer.ui import step, step_ok, step_warn, info, warn, error, success, spinner
 from installer.check import run_preflight_checks, is_opencode_running
 from installer.fetch import build_urls, download_with_fallback, extract_opencode_from_zip, REPO, BRANCH
 from installer.update import write_version_file, needs_update, MANIFEST_URL
@@ -11,179 +11,153 @@ from installer.deps import install_core_deps
 
 
 def _download_and_extract(target_dir_name: str):
-    """Download repo zip and extract .opencode/ contents to target_dir_name."""
     urls = build_urls(REPO, BRANCH)
     zip_dest = Path(tempfile.gettempdir()) / "webnovel_writer_repo.zip"
-
     if not download_with_fallback(urls, zip_dest):
         error("All download URLs failed. Check network or use --mirror.")
-
     dest = Path(target_dir_name)
     extract_opencode_from_zip(zip_dest, dest)
     zip_dest.unlink(missing_ok=True)
 
 
 def run_install(args, skip_download=False):
-    """Main install flow: fresh install or update."""
     total = 3 if skip_download else 4
-    step = 1
+    n = 1
 
-    # Step 1: preflight checks
-    step_header(step, total, "Running system checks")
+    step(n, total, "系统预检")
     run_preflight_checks()
-    step_done(step, total, "System checks passed")
-    step += 1
+    step_ok(n, total, "系统预检通过")
+    n += 1
 
-    # Step 2: download (skip if caller already extracted .opencode/)
     if skip_download:
-        info(".opencode/ up to date from bootstrap, skipping download")
+        info(".opencode/ 已就绪，跳过下载")
     else:
-        step_header(step, total, "Downloading latest version")
+        step(n, total, "下载最新版本")
         existing = Path(".opencode").is_dir()
         is_running = is_opencode_running(".opencode") if existing else "not_running"
 
         if existing and is_running == "running":
-            info("OpenCode detected — using staging mode")
+            info("检测到 OpenCode 运行中 — 使用暂存模式")
             _download_and_extract(".opencode_staging")
-            step_done(step, total, "Downloaded to .opencode_staging/")
-            print()
-            warn("OpenCode is running. New version saved to .opencode_staging/")
-            print("  To apply the update:")
-            print("  1. Close all OpenCode windows")
-            print("  2. Run: python install.py --apply")
+            step_ok(n, total, "已下载到 .opencode_staging/")
+            warn("OpenCode 正在运行，新版本已保存到 .opencode_staging/")
+            print("    关闭 OpenCode 后运行: python install.py --apply")
             return
         elif existing and is_running == "locked":
-            error("Cannot check if OpenCode is running. Close OpenCode and try again.")
+            error("无法检测 OpenCode 状态。关闭 OpenCode 后重试。")
         elif existing:
-            info("Replacing existing .opencode/")
+            info("替换现有 .opencode/")
             _download_and_extract(".opencode_staging")
             if not apply_staging():
-                error("Failed to replace .opencode/. Check permissions.")
-            step_done(step, total, "Downloaded and applied")
+                error("替换失败，请检查文件权限。")
+            step_ok(n, total, "下载并应用完成")
         else:
             _download_and_extract(".opencode")
-            step_done(step, total, "Downloaded .opencode/")
-        step += 1
+            step_ok(n, total, "下载完成")
+        n += 1
 
-    # Step 3: install dependencies
-    step_header(step, total, "Installing dependencies")
+    step(n, total, "安装依赖")
     install_core_deps(
         venv_path=Path(args.venv) if getattr(args, 'venv', None) else None,
         skip_playwright=getattr(args, 'skip_playwright', False)
     )
-    step_done(step, total, "Dependencies installed")
-    step += 1
+    step_ok(n, total, "依赖安装完成")
+    n += 1
 
-    # Step 4: verify
-    step_header(step, total, "Verifying installation")
+    step(n, total, "验证安装")
     if verify_installation():
-        step_done(step, total, "Installation verified")
+        step_ok(n, total, "安装验证通过")
         _write_installed_version()
-        success_box("Installation complete!", [
-            "Next steps:",
-            "  1. Edit .env and add your API keys",
-            "  2. Restart OpenCode",
-            "  3. Run /webnovel-init to start a new project",
+        success("安装完成!", [
+            "  1. 编辑 .env 添加 API Key",
+            "  2. 重启 OpenCode",
+            "  3. 运行 /webnovel-init 初始化项目",
         ])
     else:
-        warn("Verification failed. Run: python .opencode/scripts/webnovel.py preflight")
+        step_warn("验证未通过。运行: python .opencode/scripts/webnovel.py preflight")
 
 
 def run_update(args):
-    """Update flow: check for new version and update if needed."""
     if not needs_update():
-        info("Already up to date.")
+        info("已是最新版本。")
         return
-
-    info("New version available. Updating...")
+    info("发现新版本，开始更新...")
     run_install(args)
 
 
 def apply_staging() -> bool:
-    """Move .opencode_staging/ to .opencode/ with backup+rollback safety."""
     staging = Path(".opencode_staging")
     target = Path(".opencode")
     backup = Path(".opencode_backup")
 
     if not staging.is_dir():
-        warn("No .opencode_staging/ directory found. Run install.py first.")
+        warn("未找到 .opencode_staging/ 目录。先运行 install.py 下载。")
         return False
 
-    # Check OpenCode again before applying
     if target.is_dir():
         status = is_opencode_running(str(target))
         if status in ("running", "locked"):
-            error("OpenCode appears to be running. Close it before running --apply.")
+            error("OpenCode 仍在运行。请先关闭。")
 
-    # Phase 1: backup existing
     if target.is_dir():
         try:
             shutil.move(str(target), str(backup))
         except OSError as e:
-            error(f"Cannot move .opencode/ - it may be in use. Error: {e}")
+            error(f"无法移动 .opencode/ — 文件可能被占用。{e}")
 
-    # Phase 2: move staging to target
     try:
         shutil.move(str(staging), str(target))
     except OSError as e:
-        # Rollback: restore backup
         if backup.is_dir():
             shutil.move(str(backup), str(target))
-        error(f"Failed to apply staging. Rolled back. Error: {e}")
+        error(f"应用暂存失败，已回滚。{e}")
 
-    # Phase 3: clean up backup
     try:
         if backup.is_dir():
             shutil.rmtree(str(backup))
     except OSError:
-        warn(f"Could not remove backup directory: {backup}")
-        warn("You can safely delete it manually.")
+        warn(f"无法删除备份目录: {backup}")
+        warn("你可以手动删除它。")
 
     return True
 
 
 def run_clean_install(args):
-    """Wipe .opencode/ and perform fresh install."""
     for d in [".opencode", ".opencode_staging", ".opencode_backup"]:
         p = Path(d)
         if p.is_dir():
-            info(f"Clean: removing {d}/")
+            info(f"清理: {d}/")
             shutil.rmtree(str(p))
     run_install(args)
 
 
 def verify_installation() -> bool:
-    """Verify key scripts exist and core dependencies are importable."""
     scripts_dir = Path(".opencode/scripts")
     webnovel_py = scripts_dir / "webnovel.py"
-
     if not scripts_dir.is_dir():
-        warn("Scripts directory not found: .opencode/scripts/")
+        warn(".opencode/scripts/ 目录不存在")
         return False
     if not webnovel_py.exists():
-        warn(f"Entry script not found: {webnovel_py}")
+        warn(f"入口脚本不存在: {webnovel_py}")
         return False
 
     checks = []
-    # Verify core Python dependencies can be imported
     for mod in ("aiohttp", "pydantic", "filelock"):
         try:
             __import__(mod)
-            checks.append(f"  OK {mod}")
+            checks.append(f"  ✓  {mod}")
         except ImportError:
-            checks.append(f"  MISSING {mod}")
+            checks.append(f"  ✗  {mod} (缺失)")
 
-    ok_count = sum(1 for c in checks if c.startswith("  OK"))
+    ok_count = sum(1 for c in checks if c.startswith("  ✓"))
     total = len(checks)
-    print(f"  Dependencies: {ok_count}/{total} core packages OK")
+    print(f"  核心依赖: {ok_count}/{total}")
     for c in checks:
         print(c)
-
     return ok_count == total
 
 
 def _write_installed_version():
-    """Write version.json after successful install."""
     import json
     import urllib.request
     try:
@@ -192,8 +166,7 @@ def _write_installed_version():
             manifest = json.loads(text)
         version = manifest.get("version", "unknown")
     except Exception as e:
-        warn(f"Could not determine version: {e}")
+        warn(f"无法确定版本: {e}")
         version = "unknown"
-
     vf = Path(".opencode") / "version.json"
     write_version_file(vf, version)
