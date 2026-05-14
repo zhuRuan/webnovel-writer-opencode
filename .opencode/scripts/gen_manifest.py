@@ -60,6 +60,8 @@ def main():
         sys.exit(1)
 
     manifest = build_manifest(opencode_dir, args.version)
+    # Ensure stdout uses UTF-8 (CI runners may default to ASCII)
+    sys.stdout.reconfigure(encoding="utf-8")
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
 
 

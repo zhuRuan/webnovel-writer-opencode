@@ -21,9 +21,11 @@ jobs:
           python-version: '3.10'
 
       - name: Regenerate manifest.json
+        env:
+          PYTHONUTF8: "1"
         run: |
           # Preserve current version, regenerate all hashes
-          VERSION=$(python3 -c "import json; m=json.load(open('manifest.json')); print(m.get('version','0.0.0'))")
+          VERSION=$(python3 -c "import json; m=json.load(open('manifest.json', encoding='utf-8')); print(m.get('version','0.0.0'))")
           python3 .opencode/scripts/gen_manifest.py --version "$VERSION" --opencode-dir .opencode > manifest.json
 
       - name: Commit and push if changed
