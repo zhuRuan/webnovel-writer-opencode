@@ -13,28 +13,42 @@ allowed-tools: Read Write Edit Grep Bash Agent
 
 ## 支持平台
 
-| 平台 | 标识 | 认证方式 |
-|------|------|---------|
-| 番茄小说 | fanqie | 扫码登录（一次） |
+| 平台 | 标识 | 认证方式 | 状态 |
+|------|------|---------|------|
+| 番茄小说 | fanqie | 扫码登录（一次） | 可用 |
+| 七猫小说 | qimao | 扫码登录（一次） | 实验性 |
 
 ## 环境设置
 
 ```bash
-# 以下命令假设当前目录为 webnovel-writer 仓库根目录
 export SCRIPTS_DIR="${PWD}/.opencode/scripts"
-
-# 验证工作区正确
 test -d "${SCRIPTS_DIR}" || { echo "错误: 未找到 ${SCRIPTS_DIR}，请确保当前目录是 webnovel-writer 仓库根目录"; exit 1; }
 
 export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PWD}" where)"
 test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "错误: PROJECT_ROOT 解析失败，请用 --project-root 显式指定"; exit 1; }
 echo "项目路径: ${PROJECT_ROOT}"
 
-# 检查 Playwright
 python -c "import playwright" 2>/dev/null || { echo "请先安装: pip install playwright && playwright install chromium"; exit 1; }
 ```
 
-## 执行流程
+## 交互式流程
+
+### Step 0：确认参数
+
+若用户指令模糊，按优先级询问：
+
+| 优先级 | 参数 | 何时必须询问 | 选项 |
+|--------|------|-------------|------|
+| 1 | 平台 | 未指定平台 | fanqie / qimao |
+| 2 | 操作 | 未指定操作 | 首次配置 / 创建新书 / 上传章节 |
+| 3 | book_id | 上传时未绑定书籍 | 输入 ID 或书名 |
+| 4 | 范围 | 未指定章节范围 | 全部 / 指定范围 |
+| 5 | 模式 | 未指定 | 当前仅支持草稿（draft） |
+
+**可直接执行**：
+- "发布到番茄" → 平台明确，进入菜单流程
+- "上传第 90-95 章" → 操作和范围明确
+- "发布全部到番茄" → 平台和范围明确
 
 ### Step 1：首次配置（登录）
 
@@ -42,7 +56,8 @@ python -c "import playwright" 2>/dev/null || { echo "请先安装: pip install p
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" publish setup-auth --platform fanqie
 ```
 
-会弹出浏览器窗口，扫码登录后自动保存认证状态。后续无需重复。
+弹出浏览器窗口，扫码登录后自动保存认证状态。后续无需重复。  
+认证存储在 `~/.webnovel-publish/browser_data/{platform}/`。
 
 ### Step 2：查看书单
 
@@ -50,49 +65,105 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" publish setup-auth --platform fanqie
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" publish list-books --platform fanqie
 ```
 
+确认目标书籍是否存在，获取 book_id。
+
 ### Step 3：创建新书
 
 ```bash
+# 交互式（会询问书名、简介）
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" publish create-book \
   --platform fanqie \
   --project-root "${PROJECT_ROOT}"
+
+# 非交互式（跳过确认）
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" publish create-book \
+  --platform fanqie \
+  --project-root "${PROJECT_ROOT}" \
+  --yes \
+  --abstract "自定义简介"
 ```
 
-自动从项目信息读取书名、题材、简介、主角名。
+自动从 `state.json` 读取：书名、题材、简介、主角名。  
+创建成功后自动绑定 book_id 到项目（写入 `.webnovel/publish_config.json`）。
 
 ### Step 4：上传章节
 
 ```bash
-# 上传全部章节（草稿模式）
+# 上传全部（使用项目绑定的 book_id）
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" publish upload \
   --platform fanqie \
-  --book-id <book_id> \
-  --mode draft \
+  --project-root "${PROJECT_ROOT}"
+
+# 指定 book_id 或书名（首次上传自动绑定）
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" publish upload \
+  --platform fanqie \
+  --book 7631548393474493502 \
   --project-root "${PROJECT_ROOT}"
 
 # 指定范围
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" publish upload \
   --platform fanqie \
-  --book-id <book_id> \
-  --range 1-50 \
-  --mode publish \
+  --range 90-95 \
+  --project-root "${PROJECT_ROOT}"
+
+# 跳过交互确认（脚本/CI 环境）
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" publish upload \
+  --platform fanqie \
+  --yes \
   --project-root "${PROJECT_ROOT}"
 ```
 
-已上传章节自动跳过，支持断点续传。
+已上传章节自动跳过，支持断点续传。  
+上传日志存储在 `~/.webnovel-publish/upload_log/{project_name}/{platform}_{book_id}.json`。
+
+## 参数说明
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--platform` | 平台标识 | fanqie |
+| `--book` | 书籍 ID 或书名 | 从项目绑定读取 |
+| `--range` | 章节范围（1-50 / 1,3,5 / all） | all |
+| `--mode` | 发布模式（当前仅 draft） | draft |
+| `--yes` | 跳过交互确认 | — |
+| `--abstract` | 书籍简介（create-book） | 自动生成 |
+| `--project-root` | 书项目根目录 | 自动探测 |
+
+## 自动绑定机制
+
+- 首次 `create-book` 成功后自动绑定 book_id 到 `.webnovel/publish_config.json`
+- 首次 `upload --book <id>` 成功后自动持久化绑定
+- 后续 `upload` 无需传 `--book`，自动从绑定读取
+- 多书项目：用 `--book` 指定目标即可
+
+## 卸载与重置
+
+```bash
+# 清除认证状态
+rm -rf ~/.webnovel-publish/browser_data/
+
+# 清除上传日志
+rm -rf ~/.webnovel-publish/upload_log/
+
+# 清除项目绑定
+rm "${PROJECT_ROOT}/.webnovel/publish_config.json"
+```
 
 ## 充分性闸门
 
 - [ ] Playwright 已安装且 Chromium 可用
 - [ ] 平台认证状态有效
-- [ ] 目标书籍 book_id 已知
+- [ ] 目标书籍 book_id 已知或在书单中
 - [ ] 上传日志一致（不会重复上传）
+- [ ] 章节文件存在且非空
 
 ## 常见问题
 
 | 问题 | 解决 |
 |------|------|
 | 登录超时 | 重新运行 setup-auth，3 分钟内扫码 |
-| 认证过期 | 重新运行 setup-auth，3 分钟内扫码（认证存储在 `~/.webnovel-publish/browser_data/fanqie/`，仅目录存在不代表有效） |
-| 浏览器不弹 | 检查显示器配置 |
-| Playwright 未安装 | pip install playwright && playwright install chromium |
+| 认证过期 | 重新运行 setup-auth（认证目录存在不代表有效） |
+| 浏览器不弹 | 检查显示器配置，确保非 headless |
+| Playwright 未安装 | `pip install playwright && playwright install chromium` |
+| 项目未绑定 | 传 `--book <id>` 或先 `create-book` |
+| book_id 不匹配 | 检查是否误用了其他书的 ID |
+| 非交互环境报错 | 添加 `--yes` 跳过确认 |
