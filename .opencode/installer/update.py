@@ -150,19 +150,29 @@ def run_incremental_update(manifest_url: str = None):
 
     # Apply changes
     applied = 0
+    failed = 0
     for rel_path, _action in changes:
         src = staging / rel_path
         dst = target / rel_path
-        if src.exists():
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(str(src), str(dst))
-            applied += 1
-        elif _action == "update":
-            # File removed upstream — delete local copy
-            if dst.exists():
-                dst.unlink()
+        try:
+            if src.exists():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(str(src), str(dst))
+                applied += 1
+            elif _action == "update":
+                if dst.exists():
+                    dst.unlink()
+        except OSError as e:
+            failed += 1
+            warn(f"Cannot apply {rel_path}: {e}")
 
-    info(f"Applied {applied}/{len(changes)} incremental changes.")
+    info(f"Applied {applied}/{len(changes)} incremental changes" +
+         (f", {failed} failed" if failed else ""))
+
+    if failed > 0:
+        warn("Some files failed to update. Run install.py --clean for a fresh install.")
+        shutil.rmtree(str(staging))
+        return
 
     # Clean staging
     shutil.rmtree(str(staging))

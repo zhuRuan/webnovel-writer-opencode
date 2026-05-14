@@ -93,13 +93,15 @@ def main():
     parser.add_argument("--mirror", type=str, help="Custom GitHub mirror URL")
     parser.add_argument("--timeout", "-t", type=int, default=30, help="Download timeout seconds")
     args = parser.parse_args()
+    cwd = Path.cwd()
+    opencode_dir = cwd / ".opencode"
 
     # --- Uninstall path ---
     if args.uninstall:
         print("\n" + "=" * 60)
         print("  Webnovel Writer — 卸载")
         print("=" * 60 + "\n")
-        sys.path.insert(0, str(Path.cwd() / ".opencode"))
+        sys.path.insert(0, str(opencode_dir))
         from installer.uninstall import cmd_uninstall
         cmd_uninstall(args)
         return
@@ -119,7 +121,7 @@ def main():
             extract_opencode(zip_path, Path(".opencode"))
             zip_path.unlink(missing_ok=True)
 
-        sys.path.insert(0, str(Path.cwd() / ".opencode"))
+        sys.path.insert(0, str(opencode_dir))
         from installer.preflight import apply_staging
         if apply_staging():
             print("\nUpdate applied. You can now reopen OpenCode.")
@@ -127,14 +129,11 @@ def main():
             sys.exit(1)
         return
 
-    # --- Clean mode: wipe before install/update ---
     if args.clean:
-        import shutil as _shutil
-        for d in [".opencode", ".opencode_staging", ".opencode_backup"]:
-            p = Path(d)
-            if p.is_dir():
+        for d in [opencode_dir, Path(".opencode_staging"), Path(".opencode_backup")]:
+            if d.is_dir():
                 print(f"  Clean: removing {d}/")
-                _shutil.rmtree(str(p))
+                shutil.rmtree(str(d))
 
     # --- Main install flow ---
     print("\n" + "=" * 60)
@@ -142,7 +141,7 @@ def main():
     print("=" * 60 + "\n")
 
     # Phase 1: Download repo zip and extract installer modules
-    print("[Phase 1] Downloading latest version...")
+    print("[1/3] Downloading latest version...")
     urls = build_urls(REPO, BRANCH, args.mirror)
     zip_path = Path(tempfile.gettempdir()) / "webnovel_writer_repo.zip"
 
@@ -150,23 +149,18 @@ def main():
         print("[ERROR] Download failed. Check network or use --mirror URL.")
         sys.exit(1)
 
-    # Phase 2: If incremental, only extract changed files. Otherwise full extract.
-    sys.path.insert(0, str(Path.cwd()))
-    print("[Phase 2] Extracting...")
+    sys.path.insert(0, str(opencode_dir))
+    print("[2/3] Extracting...")
 
-    if args.incremental and Path(".opencode").is_dir():
-        sys.path.insert(0, str(Path.cwd() / ".opencode"))
+    if args.incremental and opencode_dir.is_dir():
         from installer.update import run_incremental_update
         extract_opencode(zip_path, Path(".opencode_staging"))
         run_incremental_update()
         Path(zip_path).unlink(missing_ok=True)
     else:
-        extract_opencode(zip_path, Path(".opencode"))
+        extract_opencode(zip_path, opencode_dir)
         Path(zip_path).unlink(missing_ok=True)
         print("  Done.\n")
-
-    # Phase 3: Delegate to installer/preflight
-    sys.path.insert(0, str(Path.cwd() / ".opencode"))
     from installer.preflight import run_install, run_update
 
     if args.update:

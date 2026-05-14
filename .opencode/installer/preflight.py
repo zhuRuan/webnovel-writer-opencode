@@ -144,12 +144,11 @@ def apply_staging() -> bool:
 
 def run_clean_install(args):
     """Wipe .opencode/ and perform fresh install."""
-    import shutil as _shutil
     for d in [".opencode", ".opencode_staging", ".opencode_backup"]:
         p = Path(d)
         if p.is_dir():
             info(f"Clean: removing {d}/")
-            _shutil.rmtree(str(p))
+            shutil.rmtree(str(p))
     run_install(args)
 
 

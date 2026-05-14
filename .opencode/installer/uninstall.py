@@ -2,7 +2,7 @@
 import shutil
 from pathlib import Path
 
-from installer.ui import info, warn, error, success_box
+from installer.ui import info, warn, success_box
 
 
 def _safe_rmtree(path: Path) -> bool:
@@ -36,9 +36,11 @@ def cmd_uninstall(args=None):
         print("    - .venv/ (虚拟环境)")
         print()
         if not yes:
-            from installer.ui import info
             info("使用 --yes 跳过确认，或重新运行 python install.py --uninstall --full --yes")
-            resp = input("确认完全卸载？(yes/N): ").strip()
+            try:
+                resp = input("确认完全卸载？(yes/N): ").strip()
+            except (EOFError, KeyboardInterrupt):
+                resp = "n"
             if resp.lower() != "yes":
                 info("已取消。")
                 return
