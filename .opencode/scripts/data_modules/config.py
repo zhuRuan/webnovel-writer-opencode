@@ -17,24 +17,7 @@ from runtime_compat import normalize_windows_path
 
 from .context_weights import TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT
 
-def _get_user_config_root() -> Path:
-    # OpenCode 环境变量优先
-    raw = (
-        os.environ.get("WEBNOVEL_OPENCODE_HOME")
-        or os.environ.get("OPENCODE_HOME")
-        or os.environ.get("WEBNOVEL_CLAUDE_HOME")
-        or os.environ.get("CLAUDE_HOME")
-    )
-    if raw:
-        try:
-            return normalize_windows_path(raw).expanduser().resolve()
-        except Exception:
-            return normalize_windows_path(raw).expanduser()
-    # 向后兼容：优先使用 .opencode，不存在时退回到 .claude
-    opencode_home = Path.home() / ".opencode"
-    if opencode_home.exists():
-        return opencode_home.resolve()
-    return (Path.home() / ".claude").resolve()
+from project_locator import _get_user_config_root
 
 
 def _load_dotenv_file(env_path: Path, *, override: bool = False) -> bool:

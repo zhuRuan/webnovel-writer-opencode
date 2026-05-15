@@ -45,6 +45,7 @@
 
 import json
 import os
+import re
 import sys
 import argparse
 import shutil
@@ -66,7 +67,6 @@ from data_modules.state_validator import (
 
 def _normalize_chapters_range(raw: str) -> str:
     """Normalize chapters_range to 'start-end' format. Raises ValueError on invalid input."""
-    import re
     text = str(raw or "").strip()
     if not text:
         raise ValueError("chapters_range 不能为空")

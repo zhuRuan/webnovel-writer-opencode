@@ -99,14 +99,19 @@ def _find_volume_outline_file(project_root: Path, chapter_num: int) -> Path | No
 
 
 def _extract_outline_section(content: str, chapter_num: int) -> str | None:
-    """Extract a chapter section using _CHAPTER_HEADING_RE."""
-    matches = list(_CHAPTER_HEADING_RE.finditer(content))
-    for index, match in enumerate(matches):
-        parsed = _parse_chinese_chapter_num(match.group(2))
-        if parsed != chapter_num:
-            continue
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
-        return content[match.start():end].strip()
+    """Extract chapter section using _CHAPTER_HEADING_RE with lazy iteration."""
+    prev_match = None
+    prev_end = 0
+    for match in _CHAPTER_HEADING_RE.finditer(content):
+        if prev_match is not None:
+            parsed = _parse_chinese_chapter_num(prev_match.group(2))
+            if parsed == chapter_num:
+                return content[prev_match.start():match.start()].strip()
+        prev_match = match
+    if prev_match is not None:
+        parsed = _parse_chinese_chapter_num(prev_match.group(2))
+        if parsed == chapter_num:
+            return content[prev_match.start():].strip()
     return None
 
 

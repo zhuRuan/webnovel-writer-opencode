@@ -40,7 +40,8 @@ def _require_current_volume_artifacts(project_root: Path, volume: int) -> list[s
     outline_dir = project_root / "大纲"
     for pattern in REQUIRED_VOLUME_ARTIFACTS:
         path = outline_dir / pattern.format(volume=volume)
-        if not path.is_file() or not path.read_text(encoding="utf-8").strip():
+        # 用 stat 检查非空，避免与 _validate_planning_artifacts 重复读取文件内容
+        if not path.is_file() or path.stat().st_size == 0:
             missing.append(path.relative_to(project_root).as_posix())
     if missing:
         raise MasterOutlineSyncError(
@@ -50,38 +51,32 @@ def _require_current_volume_artifacts(project_root: Path, volume: int) -> list[s
 
 
 def _validate_planning_artifacts(project_root: Path, volume: int) -> list[str]:
-    """Run basic validation on planning artifacts. Returns list of issues found."""
+    """Run basic content validation on planning artifacts. Returns list of issues found.
+
+    Prerequisite: _require_current_volume_artifacts must pass first.
+    """
     outline_dir = project_root / "大纲"
     issues: list[str] = []
 
-    # Check detailed outline for time fields
     detail_path = outline_dir / f"第{volume}卷-详细大纲.md"
-    if detail_path.is_file():
-        content = detail_path.read_text(encoding="utf-8")
-        # Check for BLOCKER markers
-        if "BLOCKER" in content:
-            issues.append("详细大纲中存在未裁决的 BLOCKER 标记")
-        # Check time anchor presence (grep for 时间锚点 pattern in chapter sections)
-        chapter_headings = re.findall(r'^###\s*第\s*\d+\s*章', content, re.MULTILINE)
-        if chapter_headings and "时间锚点" not in content and "时间" not in content:
-            issues.append("详细大纲中可能缺少时间锚点字段")
-        # Check for unresolved placeholders
-        if re.search(r'\[待[^\]]*\]|（暂名）|\{占位\}|\(待补充\)', content):
-            issues.append("详细大纲中存在未补齐的占位符")
+    content = detail_path.read_text(encoding="utf-8")
+    if "BLOCKER" in content:
+        issues.append("详细大纲中存在未裁决的 BLOCKER 标记")
+    chapter_headings = re.findall(r'^###\s*第\s*\d+\s*章', content, re.MULTILINE)
+    if chapter_headings and "时间" not in content:
+        issues.append("详细大纲中可能缺少时间锚点字段")
+    if re.search(r'\[待[^\]]*\]|（暂名）|\{占位\}|\(待补充\)', content):
+        issues.append("详细大纲中存在未补齐的占位符")
 
-    # Check beat sheet is substantive
     beat_path = outline_dir / f"第{volume}卷-节拍表.md"
-    if beat_path.is_file():
-        bc = beat_path.read_text(encoding="utf-8")
-        if "中段反转" not in bc:
-            issues.append("节拍表缺少中段反转字段")
+    bc = beat_path.read_text(encoding="utf-8")
+    if "中段反转" not in bc:
+        issues.append("节拍表缺少中段反转字段")
 
-    # Check timeline
     timeline_path = outline_dir / f"第{volume}卷-时间线.md"
-    if timeline_path.is_file():
-        tc = timeline_path.read_text(encoding="utf-8")
-        if "时间跨度" not in tc and "时间体系" not in tc:
-            issues.append("时间线表缺少时间跨度和时间体系信息")
+    tc = timeline_path.read_text(encoding="utf-8")
+    if "时间跨度" not in tc and "时间体系" not in tc:
+        issues.append("时间线表缺少时间跨度和时间体系信息")
 
     return issues
 
