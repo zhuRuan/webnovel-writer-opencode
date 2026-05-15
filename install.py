@@ -125,7 +125,8 @@ def _pad(s: str, w: int) -> str:
     return s + ' ' * (w - _cjk_width(s))
 
 
-BOX_W = 52  # fixed content area width (display)
+MANIFEST_URL = "https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/manifest.json"
+BOX_W = 52
 C = "\033[1m\033[96m"  # cyan bold
 R = "\033[0m"       # reset
 D = "\033[90m"       # dim
@@ -158,23 +159,21 @@ def _check_update():
 
     remote = {}
     try:
-        with urllib.request.urlopen(
-            "https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/manifest.json",
-            timeout=10
-        ) as resp:
+        with urllib.request.urlopen(MANIFEST_URL, timeout=10) as resp:
             remote = _json.loads(resp.read().decode("utf-8", errors="replace"))
     except Exception:
         return (False, [], {}, "", "")
 
+    local_tag = local.get("tag", "")
+    remote_tag = remote.get("tag", "")
     local_ver = local.get("version", "unknown")
     remote_ver = remote.get("version", "")
     if local_ver == "unknown" or not remote_ver:
-        return (True, [], remote, local.get("tag", ""), remote.get("tag", ""))
+        return (True, [], remote, local_tag, remote_tag)
     if local_ver == remote_ver:
-        return (False, [], remote, local.get("tag", ""), remote.get("tag", ""))
+        return (False, [], remote, local_tag, remote_tag)
 
-    changelog = remote.get("changelog", [])
-    return (True, changelog, remote, local.get("tag", ""), remote.get("tag", ""))
+    return (True, remote.get("changelog", []), remote, local_tag, remote_tag)
 
 
 def _show_changelog(changelog, remote_version, local_tag, remote_tag):

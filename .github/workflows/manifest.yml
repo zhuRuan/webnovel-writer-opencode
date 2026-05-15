@@ -119,19 +119,22 @@ jobs:
           if [ -n "${{ steps.tags.outputs.prev_tag }}" ]; then
             RANGE="${{ steps.tags.outputs.prev_tag }}..${{ steps.tags.outputs.tag }}"
           fi
+          # Generate both JSON (manifest) and Markdown (Release body)
           git log $RANGE --format='%h|%s' --no-merges \
             | python3 -c "
           import sys, json
           entries = []
           for line in sys.stdin:
               line = line.strip()
-              if not line or '|' not in line:
-                  continue
+              if not line or '|' not in line: continue
               h, msg = line.split('|', 1)
               t = msg.split(':')[0] if ':' in msg else 'chore'
               entries.append({'hash': h, 'type': t, 'message': msg})
-          print(json.dumps(entries, ensure_ascii=True))
-          " > /tmp/changelog.json
+          json.dump(entries, open('/tmp/changelog.json', 'w'), ensure_ascii=True)
+          with open('/tmp/changelog.md', 'w') as f:
+              for e in entries:
+                  f.write(f\"- {e['message']} ({e['hash']})\n\")
+          "
 
       - name: Update manifest for tag
         env:
@@ -154,5 +157,5 @@ jobs:
         with:
           tag_name: ${{ steps.tags.outputs.tag }}
           name: Webnovel Writer for OpenCode ${{ steps.tags.outputs.tag }}
-          body_path: /tmp/changelog.json
+          body_path: /tmp/changelog.md
           generate_release_notes: false
