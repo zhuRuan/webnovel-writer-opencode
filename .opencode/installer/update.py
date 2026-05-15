@@ -9,6 +9,18 @@ from installer.ui import info, warn
 MANIFEST_URL = "https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/manifest.json"
 
 
+def fetch_remote_manifest(manifest_url: str = None) -> dict:
+    """Download remote manifest.json. Returns empty dict on failure."""
+    import urllib.request
+    if manifest_url is None:
+        manifest_url = MANIFEST_URL
+    try:
+        with urllib.request.urlopen(manifest_url, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8", errors="replace"))
+    except Exception:
+        return {}
+
+
 def read_local_version(version_file: Path = None) -> dict:
     """Read local version.json. Returns {'version': 'unknown'} if absent."""
     if version_file is None:
@@ -21,10 +33,12 @@ def read_local_version(version_file: Path = None) -> dict:
     return {"version": "unknown"}
 
 
-def write_version_file(path: Path, version: str):
+def write_version_file(path: Path, version: str, tag: str = "", updated: str = ""):
     """Write version.json after successful install."""
     data = {
         "version": version,
+        "tag": tag or (version.split("-")[0] if "-" in version else version),
+        "updated": updated or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "installed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "channel": "install.py",
     }
@@ -55,6 +69,14 @@ def current_repo_version(project_root: Path = None) -> str:
     except Exception:
         pass
     return "unknown"
+
+
+def current_repo_version_full(project_root: Path = None) -> dict:
+    """Get current version dict (version, tag, updated) from version.json."""
+    if project_root is None:
+        project_root = Path.cwd()
+    vf = project_root / ".opencode" / "version.json"
+    return read_local_version(vf)
 
 
 def compute_diff(manifest: dict, local_dir: Path) -> list:
@@ -177,8 +199,10 @@ def run_incremental_update(manifest_url: str = None):
     # Clean staging
     shutil.rmtree(str(staging))
 
-    # Update version file
+    # Update version file with full data
     version = manifest.get("version", "unknown")
+    tag = manifest.get("tag", "")
+    updated = manifest.get("updated", "")
     vf = target / "version.json"
-    write_version_file(vf, version)
+    write_version_file(vf, version, tag=tag, updated=updated)
     print(f"  Updated to {version}")
