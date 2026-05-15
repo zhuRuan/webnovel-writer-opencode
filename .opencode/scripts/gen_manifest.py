@@ -26,7 +26,9 @@ def hash_file(path: Path) -> str:
     return sha.hexdigest()
 
 
-def build_manifest(opencode_dir: Path, version: str) -> dict:
+def build_manifest(opencode_dir: Path, version: str,
+                   tag: str = "", updated: str = "",
+                   changelog: list = None) -> dict:
     """Build manifest dict for all files under opencode_dir."""
     files = {}
     for root, dirs, filenames in os.walk(opencode_dir):
@@ -44,22 +46,35 @@ def build_manifest(opencode_dir: Path, version: str) -> dict:
 
     return {
         "version": version,
+        "tag": tag,
+        "updated": updated,
+        "changelog": changelog or [],
         "files": files,
     }
 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate manifest.json for webnovel-writer")
-    parser.add_argument("--version", default="0.0.0", help="Version tag (e.g., v1.2.0)")
-    parser.add_argument("--opencode-dir", default=".opencode", help="Path to .opencode directory")
+    parser.add_argument("--version", default="0.0.0")
+    parser.add_argument("--tag", default="")
+    parser.add_argument("--updated", default="")
+    parser.add_argument("--changelog-file", default="",
+                        help="Path to JSON file with changelog array")
+    parser.add_argument("--opencode-dir", default=".opencode")
     args = parser.parse_args()
+
+    changelog = []
+    if args.changelog_file and Path(args.changelog_file).is_file():
+        changelog = json.loads(Path(args.changelog_file).read_text(encoding="utf-8"))
 
     opencode_dir = Path(args.opencode_dir).resolve()
     if not opencode_dir.is_dir():
         print(f"Error: {opencode_dir} not found", file=sys.stderr)
         sys.exit(1)
 
-    manifest = build_manifest(opencode_dir, args.version)
+    manifest = build_manifest(opencode_dir, args.version,
+                              tag=args.tag, updated=args.updated,
+                              changelog=changelog)
     # ensure_ascii=True avoids encoding issues with non-UTF-8 filesystem paths
     # (e.g., GBK-encoded Chinese paths on Windows that break Linux CI runners)
     sys.stdout.reconfigure(encoding="utf-8")
