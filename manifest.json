@@ -1,5 +1,259 @@
 {
-  "version": "v2.8.1",
+  "version": "v2.8.1-20260515.0937",
+  "tag": "v2.8.1",
+  "updated": "2026-05-15T09:37:10Z",
+  "changelog": [
+    {
+      "hash": "2fd6664",
+      "type": "feat",
+      "message": "feat: show update changelog in install, compare tag/dates"
+    },
+    {
+      "hash": "81095de",
+      "type": "feat",
+      "message": "feat: add tag/updated fields to version.json, fetch_remote_manifest"
+    },
+    {
+      "hash": "d6c7fbe",
+      "type": "ci",
+      "message": "ci: rewrite manifest workflow for date-stamped versions + manual tags"
+    },
+    {
+      "hash": "89932e5",
+      "type": "feat",
+      "message": "feat: add tag, updated, changelog fields to gen_manifest.py"
+    },
+    {
+      "hash": "7c0cdc6",
+      "type": "docs",
+      "message": "docs: tag + date-stamped versioning implementation plan"
+    },
+    {
+      "hash": "046fd9d",
+      "type": "docs",
+      "message": "docs: tag + date-stamped versioning design spec"
+    },
+    {
+      "hash": "b6f6d36",
+      "type": "chore",
+      "message": "chore: release v2.8.1 [skip ci]"
+    },
+    {
+      "hash": "e3e7387",
+      "type": "fix",
+      "message": "fix: CJK-aware menu padding, remove manifest self-update"
+    },
+    {
+      "hash": "d9b81d8",
+      "type": "fix",
+      "message": "fix: self-update via startup swap to bypass Windows file locking"
+    },
+    {
+      "hash": "2ddf61d",
+      "type": "docs",
+      "message": "docs: add commit convention and versioning rules to CLAUDE.md"
+    },
+    {
+      "hash": "b27a551",
+      "type": "ci",
+      "message": "ci: implement conventional-commits-driven auto versioning"
+    },
+    {
+      "hash": "ef5fab9",
+      "type": "ci",
+      "message": "ci: force Node.js 24 for manifest workflow actions"
+    },
+    {
+      "hash": "406bad4",
+      "type": "chore",
+      "message": "chore: auto-update manifest.json [skip ci]"
+    },
+    {
+      "hash": "30d075e",
+      "type": "fix",
+      "message": "fix: use ensure_ascii=True in gen_manifest.py to prevent encoding issues"
+    },
+    {
+      "hash": "79d4e52",
+      "type": "docs",
+      "message": "docs: update export and publish skills for v2.8 features"
+    },
+    {
+      "hash": "bcae58d",
+      "type": "fix",
+      "message": "fix: add explicit UTF-8 encoding to manifest workflow and gen_manifest.py"
+    },
+    {
+      "hash": "7c9a47e",
+      "type": "fix",
+      "message": "fix: update uninstall and tests to match renamed UI functions"
+    },
+    {
+      "hash": "07714e1",
+      "type": "ci",
+      "message": "ci: add GitHub Actions workflow to auto-update manifest.json"
+    },
+    {
+      "hash": "9cde194",
+      "type": "feat",
+      "message": "feat: enhance terminal UI with box-drawing, spinners, and cleaner steps"
+    },
+    {
+      "hash": "9dbc848",
+      "type": "feat",
+      "message": "feat: add install.py self-update capability"
+    },
+    {
+      "hash": "0aa7214",
+      "type": "fix",
+      "message": "fix: remove double v prefix in install menu version display"
+    },
+    {
+      "hash": "aa9afef",
+      "type": "chore",
+      "message": "chore: bump manifest.json to v2.8.0"
+    },
+    {
+      "hash": "2efc920",
+      "type": "docs",
+      "message": "docs: update INSTALL.md and README.md for enhanced installer"
+    },
+    {
+      "hash": "a638f28",
+      "type": "simplify",
+      "message": "simplify: fix menu numbering bug, remove dead code"
+    },
+    {
+      "hash": "d8470e4",
+      "type": "feat",
+      "message": "feat: add interactive visual menu to install.py"
+    },
+    {
+      "hash": "ed5f700",
+      "type": "simplify",
+      "message": "simplify: remove dead imports, add EOFError guard, consolidate sys.path"
+    },
+    {
+      "hash": "0a42f10",
+      "type": "feat",
+      "message": "feat: add install --uninstall, --clean, --incremental modes"
+    },
+    {
+      "hash": "6e44efa",
+      "type": "simplify",
+      "message": "simplify: fix indentation bug, reorder preflight checks, clarify BM25 weighting"
+    },
+    {
+      "hash": "7ee04cc",
+      "type": "fix",
+      "message": "fix: Batch 3 \u2014 remaining P3 + design issues"
+    },
+    {
+      "hash": "9e2cf39",
+      "type": "fix",
+      "message": "fix: Batch 2 \u2014 P2 bugs in preflight, upload log, genre routing"
+    },
+    {
+      "hash": "7e9dcf1",
+      "type": "fix",
+      "message": "fix: Batch 1 \u2014 P0/P1 bugs in review pipeline, publisher CLI"
+    },
+    {
+      "hash": "d1474a8",
+      "type": "simplify",
+      "message": "simplify: deduplicate code across export modules"
+    },
+    {
+      "hash": "935fb2c",
+      "type": "@ refactor",
+      "message": "@ refactor: finalize __init__.py cleanup, add CLI integration test"
+    },
+    {
+      "hash": "727f092",
+      "type": "refactor",
+      "message": "refactor: move md/txt to formats/, replace txt regex with mistune renderer"
+    },
+    {
+      "hash": "fb9510d",
+      "type": "feat",
+      "message": "feat: add PDF export via weasyprint (optional dependency)"
+    },
+    {
+      "hash": "0bbd335",
+      "type": "feat",
+      "message": "feat: add DOCX export \u2014 AST-path via python-docx with Chinese typesetting"
+    },
+    {
+      "hash": "7e2175f",
+      "type": "refactor",
+      "message": "refactor: move epub.py to formats/, use parser.py, fix exception handling"
+    },
+    {
+      "hash": "47d078a",
+      "type": "@ feat",
+      "message": "@ feat: add HTML single-file export with inline CSS and TOC"
+    },
+    {
+      "hash": "d9b1fa6",
+      "type": "chore",
+      "message": "chore: remove dead imports from chapter_collector.py and __init__.py"
+    },
+    {
+      "hash": "4e202cb",
+      "type": "refactor",
+      "message": "refactor: extract chapter_collector.py \u2014 volume detection, validation, progress"
+    },
+    {
+      "hash": "9583ecb",
+      "type": "feat",
+      "message": "feat: add styles.py \u2014 CSS typesetting templates for web novel export"
+    },
+    {
+      "hash": "3b33bc4",
+      "type": "fix",
+      "message": "fix: replace fragile regex in heading() with direct string construction"
+    },
+    {
+      "hash": "e58a738",
+      "type": "feat",
+      "message": "feat: add parser.py \u2014 unified MD->HTML/AST via mistune v3"
+    },
+    {
+      "hash": "6dc54b7",
+      "type": "docs",
+      "message": "docs: export pipeline implementation plan \u2014 9 tasks, 39 tests"
+    },
+    {
+      "hash": "b2a2bb8",
+      "type": "docs",
+      "message": "docs: export pipeline redesign spec \u2014 unified MD\u2192HTML/AST architecture"
+    },
+    {
+      "hash": "40a4dd9",
+      "type": "fix",
+      "message": "fix: prevent PROJECT_ROOT drift from creating .webnovel in wrong directory"
+    },
+    {
+      "hash": "196c52d",
+      "type": "docs",
+      "message": "docs: multi-platform adapter framework, qimao pending browser verification"
+    },
+    {
+      "hash": "2b0338a",
+      "type": "feat",
+      "message": "feat: add qimao adapter + plugin registry for multi-platform support"
+    },
+    {
+      "hash": "df61122",
+      "type": "feat",
+      "message": "feat: auto create-book, book binding, duplicate title fix, upload summary"
+    },
+    {
+      "hash": "6c36fb4",
+      "type": "fix",
+      "message": "fix: 7 publisher bugs \u2014 null safety, error msg, tag match, browser close, batch resilience, bold html, log race"
+    }
+  ],
   "files": {
     ".opencode/package-lock.json": {
       "sha256": "9f95cf967187512dce2f7be3fd94cff4301aa2407f79751ec3b3291ec6a4235c",
@@ -34,12 +288,12 @@
       "size": 3242
     },
     ".opencode/installer/update.py": {
-      "sha256": "d5061868f69c0a6a79c8c5ed8ec31fd44fd34393e14fa1c69058a90c48afa1e6",
-      "size": 6013
+      "sha256": "80589c9858794058717a7f8e596664ac0a89726e2004bda414aebc6322158a2d",
+      "size": 7054
     },
     ".opencode/installer/preflight.py": {
-      "sha256": "57e7713d45ea17caa15669c759b3440b1cbcb2e60ada245f17892b3221f3504e",
-      "size": 5807
+      "sha256": "9df93ecf6582423515a9b5b1d3e066641f96bc42e2552de0e157c0b342eed163",
+      "size": 5931
     },
     ".opencode/installer/__init__.py": {
       "sha256": "fca41afd97d96cf110768a2ec1275dea5ddacd5571c1cd2c0e14c72c2c1abfd0",
@@ -326,8 +580,8 @@
       "size": 458
     },
     ".opencode/scripts/gen_manifest.py": {
-      "sha256": "dfe7bb3fdecd482633b22f00a76970a9f7f2f0e44a783fafda9644fcb9ad04eb",
-      "size": 2215
+      "sha256": "4349584531b9b6124017dd3e05e880de61f7ec8c84d42f94a93ca926f259da96",
+      "size": 2838
     },
     ".opencode/scripts/init_project.py": {
       "sha256": "05b31a5ef0ffe2ee7c599a4ec8e4262df4212bbe0253ce2a690a02cba19ee667",
