@@ -1,22 +1,17 @@
 {
-  "version": "v2.7.0-20260515.1611",
+  "version": "v2.7.0-20260515.1632",
   "tag": "v2.7.0",
-  "updated": "2026-05-15T16:11:12Z",
+  "updated": "2026-05-15T16:32:24Z",
   "changelog": [
     {
-      "hash": "43da6d4",
-      "type": "@ refactor",
-      "message": "@ refactor: OpenCode \u8fc1\u79fb + \u4e09\u4efd\u4fee\u590d\u6e05\u5355\u5168\u90e8\u95ed\u73af (20/20)"
+      "hash": "8a5dcfb",
+      "type": "@ simplify",
+      "message": "@ simplify: \u6d88\u9664\u51fd\u6570\u91cd\u590d\u3001\u51cf\u5c11\u6587\u4ef6\u91cd\u590d\u8bfb\u53d6\u3001\u60f0\u5316\u6b63\u5219\u8fed\u4ee3"
     },
     {
-      "hash": "0220104",
-      "type": "fix",
-      "message": "fix: generate markdown changelog for GitHub Release, cleanup install.py"
-    },
-    {
-      "hash": "c8a55ee",
+      "hash": "df50bd5",
       "type": "chore",
-      "message": "chore: update manifest to v2.8.1-20260515.0937 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260515.1611 [skip ci]"
     }
   ],
   "files": {
@@ -953,8 +948,8 @@
       "size": 5610
     },
     ".opencode/scripts/chapter_outline_loader.py": {
-      "sha256": "54295d5155296d2c59316387a30938799fd6e3cfb5fb78fafc86341061be8e5d",
-      "size": 12400
+      "sha256": "3bbd5341ac2b28cf8698392743b27843500ef387c8e358a650f294c998387b03",
+      "size": 12587
     },
     ".opencode/scripts/webnovel.py": {
       "sha256": "06dfc3f9621b9ea2172a57194be5fd85c33444d14bdcd9f5cc1b9ed7b34bdb8c",
@@ -973,8 +968,8 @@
       "size": 2271
     },
     ".opencode/scripts/update_master_outline.py": {
-      "sha256": "2e61cbad0be97fe4ffb97b1a622df4e2a946dff6a76b2ff51126564d655a6518",
-      "size": 13596
+      "sha256": "f0ea98d6f8e1adb9194c488cb9aa5ba96b264f8e750318a5e932d41c5ed5a64d",
+      "size": 13304
     },
     ".opencode/scripts/memory_cli.py": {
       "sha256": "1a38252087442bddeeb6c75b737ec21c887f0ad11bfa4d3cb242eb94f2ed00a2",
@@ -997,8 +992,8 @@
       "size": 32604
     },
     ".opencode/scripts/update_state.py": {
-      "sha256": "f2e3a4fde17baf1eab7fd8942f32b1ffc9b213ff27fc75d210693c56598a3582",
-      "size": 23388
+      "sha256": "8ffd603ee655a61bf57fb8eb28f3b8140a8a372c2e5ba1b32176a3f3ca617000",
+      "size": 23384
     },
     ".opencode/scripts/review_pipeline.py": {
       "sha256": "3e332cc5e738faa7cd53da1597241128c7a451ce6f197db308668fc028ee83d6",
@@ -1285,8 +1280,8 @@
       "size": 34979
     },
     ".opencode/scripts/data_modules/config.py": {
-      "sha256": "f1f3f11d0b42e48eb26ceb5ed20d1756ba6be4ed439030c938ab28ad55ee1918",
-      "size": 13932
+      "sha256": "8e67d1290946ee7839799e532456ac849c1352d6b54e764ad7c3fe9c25c36333",
+      "size": 13290
     },
     ".opencode/scripts/data_modules/override_ledger_service.py": {
       "sha256": "a196b6cc7251702d0e7fc4ddbde0d2722ea261a813549fe1e0f232af9e2617bc",
