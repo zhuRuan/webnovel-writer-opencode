@@ -158,15 +158,20 @@ def verify_installation() -> bool:
 
 
 def _write_installed_version():
-    import json
+    import json as _json
     import urllib.request
+
+    version = "unknown"
+    tag = ""
+    updated = ""
     try:
         with urllib.request.urlopen(MANIFEST_URL, timeout=10) as resp:
-            text = resp.read().decode("utf-8", errors="replace")
-            manifest = json.loads(text)
+            manifest = _json.loads(resp.read().decode("utf-8", errors="replace"))
         version = manifest.get("version", "unknown")
+        tag = manifest.get("tag", "")
+        updated = manifest.get("updated", "")
     except Exception as e:
         warn(f"无法确定版本: {e}")
-        version = "unknown"
+
     vf = Path(".opencode") / "version.json"
-    write_version_file(vf, version)
+    write_version_file(vf, version, tag=tag, updated=updated)

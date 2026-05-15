@@ -143,6 +143,67 @@ def _row(text: str, color: str = "", right: str = "") -> None:
     print(f"{C}│{R} {_pad(content, BOX_W)} {C}│{R}")
 
 
+def _check_update():
+    """Compare local version with remote manifest. Returns (is_update, changelog, remote, local_tag, remote_tag)."""
+    import json as _json
+    import urllib.request
+
+    local = {}
+    local_vf = Path(".opencode/version.json")
+    if local_vf.is_file():
+        try:
+            local = _json.loads(local_vf.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    remote = {}
+    try:
+        with urllib.request.urlopen(
+            "https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/manifest.json",
+            timeout=10
+        ) as resp:
+            remote = _json.loads(resp.read().decode("utf-8", errors="replace"))
+    except Exception:
+        return (False, [], {}, "", "")
+
+    local_ver = local.get("version", "unknown")
+    remote_ver = remote.get("version", "")
+    if local_ver == "unknown" or not remote_ver:
+        return (True, [], remote, local.get("tag", ""), remote.get("tag", ""))
+    if local_ver == remote_ver:
+        return (False, [], remote, local.get("tag", ""), remote.get("tag", ""))
+
+    changelog = remote.get("changelog", [])
+    return (True, changelog, remote, local.get("tag", ""), remote.get("tag", ""))
+
+
+def _show_changelog(changelog, remote_version, local_tag, remote_tag):
+    """Display update changelog in CJK-aware box."""
+    is_major = bool(local_tag and remote_tag and local_tag != remote_tag)
+    tag_display = remote_tag or remote_version
+
+    title = f"Webnovel Writer for OpenCode {tag_display}"
+    subtitle = "大版本更新" if is_major else "小版本更新"
+
+    print(f"\n{C}┌{BAR}┐{R}")
+    print(f"{C}│{R}  {_pad(B + title + R, BOX_W)}  {C}│{R}")
+    print(f"{C}│{R}  {_pad(subtitle, BOX_W)}  {C}│{R}")
+    print(f"{C}├{BAR}┤{R}")
+    if changelog:
+        shown = 0
+        for entry in changelog:
+            if shown >= 15:
+                print(f"{C}│{R}  {_pad(D + f'... 还有 {len(changelog) - 15} 条变更' + R, BOX_W)}  {C}│{R}")
+                break
+            msg = entry.get("message", "")[:48]
+            print(f"{C}│{R}  {_pad(D + '- ' + R + msg, BOX_W)}  {C}│{R}")
+            shown += 1
+    else:
+        print(f"{C}│{R}  {_pad(D + '(无详细日志)' + R, BOX_W)}  {C}│{R}")
+    print(f"{C}└{BAR}┘{R}")
+    print()
+
+
 def interactive_menu(args):
     installed = Path(".opencode").is_dir()
     staging = Path(".opencode_staging").is_dir()
@@ -255,6 +316,11 @@ def run_selected_action(args):
             if d.is_dir():
                 print(f"  Clean: removing {d}/")
                 shutil.rmtree(str(d))
+
+    # Show update changelog
+    is_update, changelog, remote, local_tag, remote_tag = _check_update()
+    if is_update and changelog:
+        _show_changelog(changelog, remote.get("version", ""), local_tag, remote_tag)
 
     print(f"\n{C}┌{BAR}┐{R}")
     print(f"{C}│{R}  {B}Webnovel Writer — Installer{R}  {C}│{R}")
