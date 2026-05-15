@@ -2,7 +2,6 @@
 name: webnovel-init
 description: 深度初始化网文项目。通过分阶段交互收集完整创作信息，生成可直接进入规划与写作的项目骨架与约束文件。
 compatibility: opencode
-allowed-tools: Read Write Edit Grep Bash Agent AskUserQuestion WebSearch WebFetch
 ---
 
 # Project Initialization (Deep Mode)
@@ -404,7 +403,7 @@ python "${SCRIPTS_DIR}/webnovel.py" init \
 init 完成后，立即生成 MASTER_SETTING，让后续 plan 有调性/禁忌参照：
 
 ```bash
-GENRE="$(python -X utf8 -c "import json,os; root=os.environ['PROJECT_ROOT']; s=json.load(open(root + '/.webnovel/state.json',encoding='utf-8')); print(s.get('project',{}).get('genre',''))")"
+GENRE="$(python -X utf8 -c "import json,os; root=os.environ['PROJECT_ROOT']; s=json.load(open(root + '/.webnovel/state.json',encoding='utf-8')); print(s.get('project_info',{}).get('genre',''))")"
 
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
   story-system "${GENRE}" --genre "${GENRE}" --persist --format json

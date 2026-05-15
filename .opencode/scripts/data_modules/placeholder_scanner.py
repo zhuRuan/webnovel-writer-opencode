@@ -86,12 +86,15 @@ def main() -> None:
 
     if args.format == "json":
         print(json.dumps({"ok": not results, "placeholders": results}, ensure_ascii=False, indent=2))
-        return
-    if not results:
-        print("OK no placeholders found")
-        return
-    for item in results:
-        print(f"{item['file']}:{item['line']} {item['pattern']} {item['context']}")
+    else:
+        if not results:
+            print("OK no placeholders found")
+        else:
+            for item in results:
+                print(f"{item['file']}:{item['line']} {item['pattern']} {item['context']}")
+
+    if results:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

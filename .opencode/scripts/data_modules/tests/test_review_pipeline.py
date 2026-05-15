@@ -13,7 +13,7 @@ def test_clean_reviewer_output_handles_chinese_quotes():
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from review_pipeline import clean_reviewer_output
 
-    raw = '{"description": "陈升回答能量剩余"二十二"次"}'
+    raw = '{"description": "陈升回答能量剩余“二十二”次"}'
     result = clean_reviewer_output(raw)
     assert isinstance(result, dict)
     assert "二十二" in result.get("description", "")

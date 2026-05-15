@@ -2,7 +2,6 @@
 name: webnovel-dashboard
 description: 启动只读小说管理面板，查看项目状态、实体图谱与章节内容。
 compatibility: opencode
-allowed-tools: Bash Read
 ---
 
 # Webnovel Dashboard
@@ -72,7 +71,7 @@ curl -s http://127.0.0.1:8765/api/preflight || echo "服务未启动，请检查
 |------|---------|
 | 依赖安装失败 | 检查 Python 版本，手动 `pip install -r requirements.txt` |
 | 前端 `dist/` 缺失 | 确认插件完整安装 |
-| PROJECT_ROOT 解析失败 | 显式传 `--project-root` 或检查 `.claude/.webnovel-current-project` 指针 |
+| PROJECT_ROOT 解析失败 | 显式传 `--project-root` 或检查 `.opencode/.webnovel-current-project` 指针 |
 | 端口占用 | 使用 `--port <其他端口>` |
 | 服务被 timeout 终止 | 确保使用后台模式（`run_in_background: true`）启动 |
 | 页面空白/数据缺失 | 确认 `.webnovel/` 下有 state.json、index.db 等数据文件 |

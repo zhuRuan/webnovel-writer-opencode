@@ -72,6 +72,15 @@ def test_init_generates_conditional_protagonist_group_and_heroine(tmp_path, monk
     assert (project_root / "设定集" / "女主卡.md").is_file()
 
 
+def test_init_rejects_opencode_path(tmp_path, monkeypatch):
+    import init_project as init_project_module
+    monkeypatch.setattr(init_project_module, "is_git_available", lambda: False)
+    project_root = tmp_path / ".opencode" / "book"
+    with pytest.raises(SystemExit) as exc:
+        init_project_module.init_project(str(project_root), title="test", genre="玄幻")
+    assert ".opencode" in str(exc.value)
+
+
 def test_init_rejects_english_profile_key_before_writing_state(tmp_path, monkeypatch):
     import init_project as init_project_module
 

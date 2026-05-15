@@ -17,7 +17,9 @@ def _ensure_scripts_on_path() -> None:
 def isolate_project_locator_environment(monkeypatch, tmp_path):
     monkeypatch.delenv("WEBNOVEL_PROJECT_ROOT", raising=False)
     monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.delenv("OPENCODE_PROJECT_DIR", raising=False)
     monkeypatch.setenv("WEBNOVEL_CLAUDE_HOME", str(tmp_path / "empty-claude-home"))
+    monkeypatch.setenv("WEBNOVEL_OPENCODE_HOME", str(tmp_path / "empty-opencode-home"))
 
 
 def test_resolve_project_root_prefers_cwd_project(tmp_path):
@@ -107,6 +109,26 @@ def test_resolve_project_root_explicit_workspace_uses_unique_child_project(tmp_p
     (project_root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
 
     resolved = resolve_project_root(str(workspace))
+    assert resolved == project_root.resolve()
+
+
+def test_resolve_project_root_uses_opencode_workspace_pointer(tmp_path):
+    _ensure_scripts_on_path()
+    from project_locator import resolve_project_root, write_current_project_pointer
+
+    workspace = tmp_path / "workspace"
+    (workspace / ".opencode").mkdir(parents=True, exist_ok=True)
+
+    project_root = workspace / "凡人资本论"
+    (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (project_root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+
+    pointer_file = write_current_project_pointer(project_root, workspace_root=workspace)
+    assert pointer_file is not None
+    assert pointer_file.is_file()
+    assert pointer_file.parent.name == ".opencode"
+
+    resolved = resolve_project_root(cwd=workspace)
     assert resolved == project_root.resolve()
 
 

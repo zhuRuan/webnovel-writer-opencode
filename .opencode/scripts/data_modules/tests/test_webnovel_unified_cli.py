@@ -334,7 +334,9 @@ def test_where_reports_empty_workspace_without_traceback(monkeypatch, tmp_path, 
     monkeypatch.chdir(workspace)
     monkeypatch.delenv("WEBNOVEL_PROJECT_ROOT", raising=False)
     monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.delenv("OPENCODE_PROJECT_DIR", raising=False)
     monkeypatch.setenv("WEBNOVEL_CLAUDE_HOME", str(tmp_path / "empty-claude-home"))
+    monkeypatch.setenv("WEBNOVEL_OPENCODE_HOME", str(tmp_path / "empty-opencode-home"))
     monkeypatch.setattr(sys, "argv", ["webnovel", "where"])
 
     with pytest.raises(SystemExit) as exc:
@@ -355,7 +357,9 @@ def test_preflight_reports_empty_workspace_without_traceback(monkeypatch, tmp_pa
     monkeypatch.chdir(workspace)
     monkeypatch.delenv("WEBNOVEL_PROJECT_ROOT", raising=False)
     monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.delenv("OPENCODE_PROJECT_DIR", raising=False)
     monkeypatch.setenv("WEBNOVEL_CLAUDE_HOME", str(tmp_path / "empty-claude-home"))
+    monkeypatch.setenv("WEBNOVEL_OPENCODE_HOME", str(tmp_path / "empty-opencode-home"))
     monkeypatch.setattr(sys, "argv", ["webnovel", "preflight", "--format", "json"])
 
     with pytest.raises(SystemExit) as exc:

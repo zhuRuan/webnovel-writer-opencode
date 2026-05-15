@@ -17,13 +17,23 @@ from runtime_compat import normalize_windows_path
 
 from .context_weights import TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT
 
-def _get_user_claude_root() -> Path:
-    raw = os.environ.get("WEBNOVEL_CLAUDE_HOME") or os.environ.get("CLAUDE_HOME")
+def _get_user_config_root() -> Path:
+    # OpenCode 环境变量优先
+    raw = (
+        os.environ.get("WEBNOVEL_OPENCODE_HOME")
+        or os.environ.get("OPENCODE_HOME")
+        or os.environ.get("WEBNOVEL_CLAUDE_HOME")
+        or os.environ.get("CLAUDE_HOME")
+    )
     if raw:
         try:
             return normalize_windows_path(raw).expanduser().resolve()
         except Exception:
             return normalize_windows_path(raw).expanduser()
+    # 向后兼容：优先使用 .opencode，不存在时退回到 .claude
+    opencode_home = Path.home() / ".opencode"
+    if opencode_home.exists():
+        return opencode_home.resolve()
     return (Path.home() / ".claude").resolve()
 
 
@@ -54,13 +64,13 @@ def _load_dotenv():
 
     约定：
     - 项目级 `.env`（当前工作目录下）优先；
-    - 全局 `.env` 作为兜底：`~/.claude/webnovel-writer/.env`
+    - 全局 `.env` 作为兜底：`~/.opencode/webnovel-writer/.env`（优先）或 `~/.claude/webnovel-writer/.env`（向后兼容）
     """
     # 1) 当前目录（常见：用户从项目根目录执行）
     _load_dotenv_file(Path.cwd() / ".env", override=False)
 
     # 2) 用户级全局（常见：skills/agents 全局安装，API key 放这里最省心）
-    global_env = _get_user_claude_root() / "webnovel-writer" / ".env"
+    global_env = _get_user_config_root() / "webnovel-writer" / ".env"
     _load_dotenv_file(global_env, override=False)
 
 
@@ -360,7 +370,7 @@ def get_config(project_root: Optional[Path] = None) -> DataModulesConfig:
         # 默认不要盲目以 CWD 作为 project_root（很容易写到错误目录）。
         # 使用统一的 project_locator 自动探测：
         # - 支持 WEBNOVEL_PROJECT_ROOT
-        # - 支持 `.claude/.webnovel-current-project` 指针文件
+        # - 支持 `.opencode/.webnovel-current-project` 指针文件
         # - 支持从当前目录/父目录寻找 `.webnovel/state.json`
         from project_locator import resolve_project_root
 

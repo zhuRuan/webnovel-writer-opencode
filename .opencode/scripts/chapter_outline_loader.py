@@ -99,14 +99,14 @@ def _find_volume_outline_file(project_root: Path, chapter_num: int) -> Path | No
 
 
 def _extract_outline_section(content: str, chapter_num: int) -> str | None:
-    patterns = [
-        rf"###\s*第\s*{chapter_num}\s*章[：:]\s*(.+?)(?=###\s*第\s*\d+\s*章|##\s|$)",
-        rf"###\s*第{chapter_num}章[：:]\s*(.+?)(?=###\s*第\d+章|##\s|$)",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, content, re.DOTALL)
-        if match:
-            return match.group(0).strip()
+    """Extract a chapter section using _CHAPTER_HEADING_RE."""
+    matches = list(_CHAPTER_HEADING_RE.finditer(content))
+    for index, match in enumerate(matches):
+        parsed = _parse_chinese_chapter_num(match.group(2))
+        if parsed != chapter_num:
+            continue
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
+        return content[match.start():end].strip()
     return None
 
 
@@ -136,13 +136,6 @@ def _parse_chinese_chapter_num(value: str) -> int | None:
 
 
 def _extract_directive_section(content: str, chapter_num: int) -> str | None:
-    matches = list(_CHAPTER_HEADING_RE.finditer(content))
-    for index, match in enumerate(matches):
-        parsed = _parse_chinese_chapter_num(match.group(2))
-        if parsed != chapter_num:
-            continue
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
-        return content[match.start():end].strip()
     return _extract_outline_section(content, chapter_num)
 
 

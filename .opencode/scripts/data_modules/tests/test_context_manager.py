@@ -468,7 +468,7 @@ def test_context_manager_includes_reader_signal_and_genre_profile(temp_project):
 
 
 def test_context_manager_genre_section_and_refs_extraction(temp_project):
-    refs_dir = temp_project.project_root / ".claude" / "references"
+    refs_dir = temp_project.project_root / ".opencode" / "references"
     refs_dir.mkdir(parents=True, exist_ok=True)
 
     (refs_dir / "genre-profiles.md").write_text(

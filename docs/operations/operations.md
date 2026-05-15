@@ -14,16 +14,16 @@
 
 | 层级 | 说明 | 示例 |
 |------|------|------|
-| `WORKSPACE_ROOT` | Claude Code 工作区根目录 | `D:\wk\novels` |
-| `.claude/` | 工作区级配置与项目指针 | `D:\wk\novels\.claude\` |
+| `WORKSPACE_ROOT` | OpenCode 工作区根目录 | `D:\wk\novels` |
+| `.opencode/` | 工作区级配置与项目指针 | `D:\wk\novels\.opencode\` |
 | `PROJECT_ROOT` | 某本书的项目根目录（由 `/webnovel-init` 创建） | `D:\wk\novels\凡人资本论` |
-| `CLAUDE_PLUGIN_ROOT` | 插件缓存目录（不在项目内，由 Marketplace 安装管理） | 自动管理 |
+| `SCRIPTS_DIR` | 插件脚本目录（即工作区 `.opencode/scripts/`） | `D:\wk\novels\.opencode\scripts\` |
 
 ### 工作区目录
 
 ```text
 workspace-root/
-├── .claude/
+├── .opencode/
 │   ├── .webnovel-current-project   # 指向当前书项目根
 │   └── settings.json
 ├── 小说A/                          # PROJECT_ROOT
@@ -59,12 +59,12 @@ project-root/
 
 ### 插件目录
 
-插件安装在 Claude 插件缓存目录，不在书项目内。运行时通过 `CLAUDE_PLUGIN_ROOT` 引用：
+插件即工作区 `.opencode/` 目录，运行时脚本路径为 `${SCRIPTS_DIR}`：
 
 ```text
-${CLAUDE_PLUGIN_ROOT}/
-├── skills/       # 7 个 Skill 命令定义
-├── agents/       # 3 个 Agent 定义
+${WORKSPACE_ROOT}/.opencode/
+├── skills/       # 技能命令定义
+├── agents/       # Agent 定义
 ├── scripts/      # Python 脚本与数据模块
 ├── references/   # 参考文档（题材画像、追读力分类法等）
 ├── templates/    # 初始化模板
@@ -77,7 +77,7 @@ ${CLAUDE_PLUGIN_ROOT}/
 当工作区指针不可用时，系统会从用户级 registry 查找 workspace → project 映射：
 
 ```text
-${CLAUDE_HOME:-~/.claude}/webnovel-writer/workspaces.json
+${HOME}/.claude/webnovel-writer/workspaces.json
 ```
 
 ## 常用运维命令
@@ -85,7 +85,7 @@ ${CLAUDE_HOME:-~/.claude}/webnovel-writer/workspaces.json
 ### 环境预检
 
 ```bash
-python -X utf8 "${CLAUDE_PLUGIN_ROOT}/scripts/webnovel.py" --project-root "${WORKSPACE_ROOT}" preflight
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" preflight
 ```
 
 检查项：插件脚本路径 / 项目根是否可解析 / Skill 目录是否存在。
@@ -116,8 +116,8 @@ python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" rag stats
 ### 测试
 
 ```bash
-pwsh "${CLAUDE_PLUGIN_ROOT}/scripts/run_tests.ps1" -Mode smoke
-pwsh "${CLAUDE_PLUGIN_ROOT}/scripts/run_tests.ps1" -Mode full
+pwsh "${SCRIPTS_DIR}/run_tests.ps1" -Mode smoke
+pwsh "${SCRIPTS_DIR}/run_tests.ps1" -Mode full
 ```
 
 ## Story System 运维
@@ -125,7 +125,7 @@ pwsh "${CLAUDE_PLUGIN_ROOT}/scripts/run_tests.ps1" -Mode full
 ### 健康检查
 
 ```bash
-python -X utf8 "${CLAUDE_PLUGIN_ROOT}/scripts/webnovel.py" --project-root "${PROJECT_ROOT}" story-events --health
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" story-events --health
 ```
 
 返回字段：`sqlite_rows` / `event_files` / `ok`

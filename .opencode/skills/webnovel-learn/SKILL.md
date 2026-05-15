@@ -2,7 +2,6 @@
 name: webnovel-learn
 description: 从当前会话提取成功模式并写入 project_memory.json
 compatibility: opencode
-allowed-tools: Read Bash
 ---
 
 # /webnovel-learn

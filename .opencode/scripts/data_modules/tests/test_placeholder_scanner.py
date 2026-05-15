@@ -42,7 +42,7 @@ def test_webnovel_placeholder_scan_cli_forwards_project_root(monkeypatch, tmp_pa
     with pytest.raises(SystemExit) as exc:
         webnovel_module.main()
 
-    assert int(exc.value.code or 0) == 0
+    assert int(exc.value.code or 0) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is False
     assert payload["placeholders"][0]["file"] == "大纲/总纲.md"
@@ -114,9 +114,30 @@ def test_placeholder_scan_filters_known(tmp_path, monkeypatch):
     )
     captured = io.StringIO()
     monkeypatch.setattr(sys, "stdout", captured)
-    ps_main()
+    with pytest.raises(SystemExit):
+        ps_main()
     monkeypatch.undo()
 
     output = captured.getvalue()
     assert "（暂名）" not in output
     assert "{占位}" in output
+
+
+def test_placeholder_scan_exits_nonzero_when_placeholders_found(tmp_path, monkeypatch):
+    """当存在占位时，CLI 应返回退出码 1"""
+    import io
+    from data_modules.placeholder_scanner import main as ps_main
+
+    outline_dir = tmp_path / "大纲"
+    outline_dir.mkdir()
+    (tmp_path / ".webnovel").mkdir()
+    (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+    (outline_dir / "总纲.md").write_text("[待补充]\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        sys, "argv",
+        ["placeholder-scan", "--project-root", str(tmp_path), "--format", "json"],
+    )
+    with pytest.raises(SystemExit) as exc:
+        ps_main()
+    assert exc.value.code == 1

@@ -1,4 +1,14 @@
-﻿from __future__ import annotations
+﻿"""
+DEPRECATED
+
+This script was designed for the old Claude Code plugin release workflow
+(.claude-plugin/plugin.json, marketplace.json). The OpenCode version uses
+manifest.json and .github/workflows/manifest.yml for release management instead.
+
+Kept for historical reference only.
+"""
+
+from __future__ import annotations
 
 import argparse
 import json
@@ -170,6 +180,12 @@ def check_versions(expected_version: str | None = None) -> int:
 
 
 def main() -> int:
+    raise SystemExit(
+        "DEPRECATED: sync_plugin_version.py was designed for the old Claude Code plugin release "
+        "workflow (.claude-plugin/plugin.json, marketplace.json). The OpenCode version uses "
+        "manifest.json and .github/workflows/manifest.yml for release management instead."
+    )
+
     parser = argparse.ArgumentParser(description="Sync Claude plugin release metadata")
     parser.add_argument(
         "--check",

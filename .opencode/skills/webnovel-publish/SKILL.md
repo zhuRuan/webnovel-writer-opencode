@@ -2,7 +2,6 @@
 name: webnovel-publish
 description: 将小说章节自动发布到国内主流小说平台（番茄等）。触发条件："发布小说"、"发布章节"、"上传到番茄"、"自动发布"。
 compatibility: opencode
-allowed-tools: Read Write Edit Grep Bash Agent
 ---
 
 # 小说自动发布

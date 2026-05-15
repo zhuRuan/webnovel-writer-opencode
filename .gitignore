@@ -1,3 +1,4 @@
+# Legacy Claude workspace artifacts (kept for backward compatibility)
 .claude/
 .agents/
 .codex/
@@ -47,14 +48,12 @@ hapi-tool/
 ai-writing-knowledge/
 novel/
 novel-refined/
-oh-story-claudecode/
 
 # Local analysis snapshots and draft docs
 PROJECT_MINDMAP*.md
 webnovel-writer-v5*-architecture.svg
 _v52_*.json
 _v52_*.txt
-claude_inventory.csv
 *_utf8_sample.txt
 C*tool-results*.txt
 

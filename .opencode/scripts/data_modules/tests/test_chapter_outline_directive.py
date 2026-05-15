@@ -3,7 +3,7 @@
 
 import json
 
-from chapter_outline_loader import load_chapter_execution_directive
+from chapter_outline_loader import load_chapter_execution_directive, load_chapter_outline
 
 
 def test_load_chapter_execution_directive_from_volume_outline(tmp_path):
@@ -53,3 +53,22 @@ def test_load_chapter_execution_directive_from_volume_outline(tmp_path):
     assert "不得离开宗门" in directive["forbidden_zones"]
     assert "借据" in directive["key_entities"]
     assert directive["chapter_end_open_question"] == "谁改了借据？"
+
+
+def test_load_chapter_outline_finds_chinese_numeral_heading(tmp_path):
+    """load_chapter_outline should find 第一章 with chapter_num=1"""
+    outline_dir = tmp_path / "大纲"
+    outline_dir.mkdir()
+    (tmp_path / ".webnovel").mkdir()
+    (tmp_path / ".webnovel" / "state.json").write_text(
+        json.dumps({"progress": {"volumes_planned": [{"volume": 1, "chapters_range": "1-50"}]}}),
+        encoding="utf-8",
+    )
+    (outline_dir / "第1卷-详细大纲.md").write_text(
+        "### 第一章：债从天降\n- 目标：搞清楚借据条款\n",
+        encoding="utf-8",
+    )
+
+    outline = load_chapter_outline(tmp_path, 1)
+    assert "债从天降" in outline
+    assert "⚠️" not in outline

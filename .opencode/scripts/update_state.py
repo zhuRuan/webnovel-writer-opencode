@@ -64,6 +64,28 @@ from data_modules.state_validator import (
     normalize_state_runtime_sections,
 )
 
+def _normalize_chapters_range(raw: str) -> str:
+    """Normalize chapters_range to 'start-end' format. Raises ValueError on invalid input."""
+    import re
+    text = str(raw or "").strip()
+    if not text:
+        raise ValueError("chapters_range 不能为空")
+    # Strip common prefixes: 第, 章, etc.
+    text = re.sub(r'^第', '', text)
+    text = re.sub(r'章$', '', text)
+    # Replace common separators
+    text = text.replace('至', '-').replace('~', '-').replace('到', '-')
+    # Parse numbers
+    m = re.match(r'^\s*(\d+)\s*[-]\s*(\d+)\s*$', text)
+    if not m:
+        raise ValueError(f"chapters_range 格式无效: '{raw}'，应为 'start-end'（如 1-50）")
+    start, end = int(m.group(1)), int(m.group(2))
+    if start <= 0 or end <= 0:
+        raise ValueError(f"chapters_range 章节号必须为正整数: {start}-{end}")
+    if start > end:
+        raise ValueError(f"chapters_range 起始章 {start} 不能大于结束章 {end}")
+    return f"{start}-{end}"
+
 # Windows 编码兼容性修复
 if sys.platform == "win32":
     enable_windows_utf8_stdio()
@@ -311,6 +333,7 @@ class StateUpdater:
 
     def mark_volume_planned(self, volume: int, chapters_range: str):
         """标记卷已规划"""
+        normalized = _normalize_chapters_range(chapters_range)
         if "volumes_planned" not in self.state["progress"]:
             self.state["progress"]["volumes_planned"] = []
 
@@ -318,16 +341,16 @@ class StateUpdater:
         for item in self.state["progress"]["volumes_planned"]:
             if item.get("volume") == volume:
                 print(f"⚠️  第{volume}卷已规划，更新章节范围")
-                item["chapters_range"] = chapters_range
+                item["chapters_range"] = normalized
                 item["updated_at"] = datetime.now().strftime("%Y-%m-%d")
                 return
 
         self.state["progress"]["volumes_planned"].append({
             "volume": volume,
-            "chapters_range": chapters_range,
+            "chapters_range": normalized,
             "planned_at": datetime.now().strftime("%Y-%m-%d")
         })
-        print(f"📝 标记第{volume}卷已规划: 第{chapters_range}章")
+        print(f"📝 标记第{volume}卷已规划: 第{normalized}章")
 
     def add_review_checkpoint(self, chapters_range: str, report_file: str):
         """添加审查记录"""
@@ -599,7 +622,11 @@ def main():
             if not args.chapters_range:
                 print("❌ --volume-planned 需要 --chapters-range 参数")
                 sys.exit(1)
-            updater.mark_volume_planned(args.volume_planned, args.chapters_range)
+            try:
+                updater.mark_volume_planned(args.volume_planned, args.chapters_range)
+            except ValueError as e:
+                print(f"❌ {e}")
+                sys.exit(1)
 
         if args.add_review:
             chapters_range, report_file = args.add_review

@@ -25,7 +25,7 @@
 
 1. **进程环境变量**（最高优先级）
 2. **书项目根目录**下的 `.env`
-3. **用户级全局**：`~/.claude/webnovel-writer/.env`
+3. **用户级全局**：`~/.opencode/webnovel-writer/.env`
 
 ## `.env` 最小配置
 

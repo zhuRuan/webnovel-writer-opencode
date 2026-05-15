@@ -16,13 +16,6 @@ class QueryRouter:
             "setting": [r"设定", r"规则", r"体系", r"世界观"],
             "plot": [r"剧情", r"发生", r"事件", r"经过"],
         }
-        self.patterns = {
-            "entity": list(self.intent_patterns["entity"]),
-            "scene": list(self.intent_patterns["scene"]),
-            "setting": list(self.intent_patterns["setting"]),
-            "plot": list(self.intent_patterns["plot"]),
-        }
-
     def _extract_entities(self, query: str) -> List[str]:
         # 轻量启发式提取：提取长度 2-6 的中文短语，过滤常见查询词
         candidates = re.findall(r"[\u4e00-\u9fff]{2,6}", query)

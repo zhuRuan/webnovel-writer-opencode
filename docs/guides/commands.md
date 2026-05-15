@@ -1,6 +1,6 @@
 # 命令详解
 
-## Skill 命令（在 Claude Code 中使用）
+## Skill 命令（在 OpenCode 中使用）
 
 ### `/webnovel-init`
 
@@ -77,7 +77,7 @@
 所有 CLI 命令的入口都是 `webnovel.py`，格式：
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" <子命令> [参数]
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" <子命令> [参数]
 ```
 
 ## Story System 主链
@@ -87,13 +87,13 @@ python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJE
 1. 生成合同
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-system "玄幻退婚流" --chapter 12 --persist --emit-runtime-contracts --format both
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-system "玄幻退婚流" --chapter 12 --persist --emit-runtime-contracts --format both
 ```
 
 2. 提交章节
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" chapter-commit \
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" chapter-commit \
   --chapter 12 \
   --review-result ".webnovel/tmp/review_results.json" \
   --fulfillment-result ".webnovel/tmp/fulfillment_result.json" \
@@ -104,7 +104,7 @@ python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJE
 3. 检查主链健康
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" preflight --format json
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" preflight --format json
 ```
 
 其中 `.story-system/` 是主链真源，`.webnovel/*` 是投影/read-model。
@@ -153,8 +153,8 @@ python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJE
 示例：
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" memory stats
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" memory query --category character_state --subject xiaoyan
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" memory stats
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" memory query --category character_state --subject xiaoyan
 ```
 
 ### Story System 子命令
@@ -172,9 +172,9 @@ python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJE
 示例：
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-system "玄幻退婚流" --persist
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" chapter-commit --chapter 12 --review-result .webnovel/tmp/review.json
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-events --health
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-system "玄幻退婚流" --persist
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" chapter-commit --chapter 12 --review-result .webnovel/tmp/review.json
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-events --health
 ```
 
 产物：

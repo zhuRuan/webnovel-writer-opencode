@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to OpenCode when working with code in this repository.
 
 ## Project
 
@@ -103,7 +103,7 @@ All commits **MUST** follow [Conventional Commits](https://www.conventionalcommi
 ```
 <type>: <简短描述>
 
-Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+Co-Authored-By: AI Assistant <noreply@anthropic.com>
 ```
 
 ### Types
@@ -191,3 +191,4 @@ For multi-step tasks, state a brief plan with verification per step. Strong succ
 **实际写小说的目录。**
 
 D:\workspace\凡尘之舞
+D:\workspace\webnovel

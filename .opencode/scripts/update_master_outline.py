@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -46,6 +47,43 @@ def _require_current_volume_artifacts(project_root: Path, volume: int) -> list[s
             "current volume planning artifacts are incomplete: " + ", ".join(missing)
         )
     return [f.format(volume=volume) for f in REQUIRED_VOLUME_ARTIFACTS]
+
+
+def _validate_planning_artifacts(project_root: Path, volume: int) -> list[str]:
+    """Run basic validation on planning artifacts. Returns list of issues found."""
+    outline_dir = project_root / "大纲"
+    issues: list[str] = []
+
+    # Check detailed outline for time fields
+    detail_path = outline_dir / f"第{volume}卷-详细大纲.md"
+    if detail_path.is_file():
+        content = detail_path.read_text(encoding="utf-8")
+        # Check for BLOCKER markers
+        if "BLOCKER" in content:
+            issues.append("详细大纲中存在未裁决的 BLOCKER 标记")
+        # Check time anchor presence (grep for 时间锚点 pattern in chapter sections)
+        chapter_headings = re.findall(r'^###\s*第\s*\d+\s*章', content, re.MULTILINE)
+        if chapter_headings and "时间锚点" not in content and "时间" not in content:
+            issues.append("详细大纲中可能缺少时间锚点字段")
+        # Check for unresolved placeholders
+        if re.search(r'\[待[^\]]*\]|（暂名）|\{占位\}|\(待补充\)', content):
+            issues.append("详细大纲中存在未补齐的占位符")
+
+    # Check beat sheet is substantive
+    beat_path = outline_dir / f"第{volume}卷-节拍表.md"
+    if beat_path.is_file():
+        bc = beat_path.read_text(encoding="utf-8")
+        if "中段反转" not in bc:
+            issues.append("节拍表缺少中段反转字段")
+
+    # Check timeline
+    timeline_path = outline_dir / f"第{volume}卷-时间线.md"
+    if timeline_path.is_file():
+        tc = timeline_path.read_text(encoding="utf-8")
+        if "时间跨度" not in tc and "时间体系" not in tc:
+            issues.append("时间线表缺少时间跨度和时间体系信息")
+
+    return issues
 
 
 def _resolve_writeback_source(
@@ -98,7 +136,13 @@ def _normalize_anchor(payload: dict[str, Any], expected_volume: int) -> dict[str
     name = raw.get("volume_name") or raw.get("name") or raw.get("卷名")
     conflict = raw.get("core_conflict") or raw.get("核心冲突")
     climax = raw.get("volume_end_climax") or raw.get("end_climax") or raw.get("卷末高潮")
-    if not all(_cell(v) for v in (name, conflict, climax)):
+    chapters_range = _cell(raw.get("chapters_range") or raw.get("章节范围") or "")
+    if not all(_cell(v) for v in (name, conflict, climax, chapters_range)):
+        if not chapters_range:
+            raise MasterOutlineSyncError(
+                "next_volume_anchor 必须包含 chapters_range（下一卷的章节范围），"
+                "否则下轮规划会在总纲缺少章节范围时阻断。"
+            )
         raise MasterOutlineSyncError(
             "next_volume_anchor requires volume_name, core_conflict, and volume_end_climax"
         )
@@ -107,7 +151,7 @@ def _normalize_anchor(payload: dict[str, Any], expected_volume: int) -> dict[str
         "volume_name": _cell(name),
         "core_conflict": _cell(conflict),
         "volume_end_climax": _cell(climax),
-        "chapters_range": _cell(raw.get("chapters_range") or raw.get("章节范围") or ""),
+        "chapters_range": chapters_range,
     }
 
 
@@ -147,6 +191,7 @@ def _update_volume_table(text: str, anchor: dict[str, str]) -> tuple[str, bool]:
             cells[1] = anchor["volume_name"]
             if anchor["chapters_range"]:
                 cells[2] = anchor["chapters_range"]
+            # 若 writeback 未提供章节范围，保留表中已有值
             cells[3] = anchor["core_conflict"]
             cells[4] = anchor["volume_end_climax"]
             rendered = _render_row(cells[:5])
@@ -248,6 +293,12 @@ def sync_master_outline(
         raise MasterOutlineSyncError("volume must be >= 1")
 
     _require_current_volume_artifacts(root, volume)
+
+    validation_issues = _validate_planning_artifacts(root, volume)
+    if validation_issues:
+        raise MasterOutlineSyncError(
+            "规划产物验证未通过:\n- " + "\n- ".join(validation_issues)
+        )
 
     outline_dir = root / "大纲"
     master_path = outline_dir / "总纲.md"

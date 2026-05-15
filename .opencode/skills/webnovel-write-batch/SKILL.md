@@ -12,7 +12,6 @@ description: |
   - 单章 → webnovel-write
   - 多章 → 必须使用本 skill
 compatibility: opencode
-allowed-tools: Read Write Edit Grep Bash Agent
 ---
 
 # 批量写作

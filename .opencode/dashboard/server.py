@@ -3,7 +3,7 @@ Dashboard 启动脚本
 
 用法：
     python -m dashboard.server --project-root /path/to/novel-project
-    python -m dashboard.server                   # 自动从 .claude 指针读取
+    python -m dashboard.server                   # 自动从 .opencode/.claude 指针读取
 """
 
 import argparse
@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 def _resolve_project_root(cli_root: str | None) -> Path:
-    """按优先级解析 PROJECT_ROOT：CLI > 环境变量 > .claude 指针 > CWD。"""
+    """按优先级解析 PROJECT_ROOT：CLI > 环境变量 > .opencode/.claude 指针 > CWD。"""
     if cli_root:
         return Path(cli_root).resolve()
 
@@ -22,9 +22,11 @@ def _resolve_project_root(cli_root: str | None) -> Path:
     if env:
         return Path(env).resolve()
 
-    # 尝试从 .claude 指针读取
+    # 尝试从 .opencode 指针读取，兼容旧的 .claude 指针
     cwd = Path.cwd()
-    pointer = cwd / ".claude" / ".webnovel-current-project"
+    pointer = cwd / ".opencode" / ".webnovel-current-project"
+    if not pointer.is_file():
+        pointer = cwd / ".claude" / ".webnovel-current-project"
     if pointer.is_file():
         target = pointer.read_text(encoding="utf-8").strip()
         if target:

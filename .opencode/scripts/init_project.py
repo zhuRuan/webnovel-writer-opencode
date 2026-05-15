@@ -37,6 +37,7 @@ if sys.platform == "win32":
 
 
 _ASCII_LETTER_RE = re.compile(r"[A-Za-z]")
+_DEFAULT_CHAPTERS_PER_VOLUME = 50
 
 
 def _validate_initial_genre_source(genre: str) -> str:
@@ -195,7 +196,7 @@ def _ensure_state_schema(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 
-def _build_master_outline(target_chapters: int, *, chapters_per_volume: int = 50) -> str:
+def _build_master_outline(target_chapters: int, *, chapters_per_volume: int = _DEFAULT_CHAPTERS_PER_VOLUME) -> str:
     volumes = (target_chapters - 1) // chapters_per_volume + 1 if target_chapters > 0 else 1
     lines: list[str] = [
         "# 总纲",
@@ -224,8 +225,8 @@ def _build_master_outline(target_chapters: int, *, chapters_per_volume: int = 50
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _inject_volume_rows(template_text: str, target_chapters: int, *, chapters_per_volume: int = 50) -> str:
-    """在总纲模板的卷表中只注入首卷行（后续卷由规划完成后写回）。"""
+def _inject_volume_rows(template_text: str, target_chapters: int, *, chapters_per_volume: int = _DEFAULT_CHAPTERS_PER_VOLUME) -> str:
+    """在总纲模板的卷表中注入或更新首卷行（后续卷由规划完成后写回）。"""
     lines = template_text.splitlines()
     header_idx = None
     for i, line in enumerate(lines):
@@ -235,14 +236,25 @@ def _inject_volume_rows(template_text: str, target_chapters: int, *, chapters_pe
     if header_idx is None:
         return template_text
 
-    insert_idx = header_idx + 2 if header_idx + 1 < len(lines) else len(lines)
+    row_start = header_idx + 2  # Skip header + separator line
     end = min(chapters_per_volume, target_chapters) if target_chapters > 0 else chapters_per_volume
-    rows = [f"| 1 | | 第1-{end}章 | | |"]
+    new_row = f"| 1 | | 第1-{end}章 | | |"
 
-    # 避免重复插入（若模板已有数据行）
-    existing = {line.strip() for line in lines}
-    rows = [r for r in rows if r.strip() not in existing]
-    return "\n".join(lines[:insert_idx] + rows + lines[insert_idx:])
+    # Check if volume 1 row already exists by scanning existing rows
+    row_end = row_start
+    while row_end < len(lines) and lines[row_end].strip().startswith("|"):
+        row_end += 1
+
+    for idx in range(row_start, row_end):
+        cells = [c.strip() for c in lines[idx].strip().strip("|").split("|")]
+        if cells and cells[0] == "1":
+            # Update existing row instead of inserting
+            lines[idx] = new_row
+            return "\n".join(lines).rstrip() + "\n"
+
+    # No existing volume 1 row — insert after header
+    lines.insert(row_start, new_row)
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def init_project(
@@ -284,8 +296,12 @@ def init_project(
     cultivation_subtiers: str = "",
 ) -> None:
     project_path = Path(project_dir).expanduser().resolve()
-    if ".claude" in project_path.parts:
-        raise SystemExit("Refusing to initialize a project inside .claude. Choose a different directory.")
+    for forbidden in (".opencode", ".claude"):
+        if forbidden in project_path.parts:
+            raise SystemExit(
+                f"不能在插件目录 {forbidden}/ 内创建书项目。"
+                "请在工作区目录下选择一个独立的书名目录。"
+            )
     genre = _validate_initial_genre_source(genre)
     project_path.mkdir(parents=True, exist_ok=True)
 
@@ -307,8 +323,12 @@ def init_project(
     if state_path.exists():
         try:
             state: Dict[str, Any] = json.loads(state_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            state = {}
+        except json.JSONDecodeError as e:
+            raise SystemExit(
+                f"state.json 已损坏，无法解析：{e}\n"
+                f"请先修复或从备份恢复：{state_path}.bak\n"
+                f"如需强制重建，请删除 {state_path} 后重新运行初始化。"
+            )
     else:
         state = {}
 
@@ -672,7 +692,17 @@ __pycache__/
                 )
                 print("Git initialized.")
             except subprocess.CalledProcessError as e:
-                print(f"Git init failed (non-fatal): {e}")
+                err = e.stderr
+                if isinstance(err, bytes):
+                    stderr_info = err.decode("utf-8", errors="replace").strip()
+                elif isinstance(err, str):
+                    stderr_info = err.strip()
+                else:
+                    stderr_info = ""
+                if stderr_info:
+                    print(f"Git init failed (non-fatal): {e}\n  stderr: {stderr_info}")
+                else:
+                    print(f"Git init failed (non-fatal): {e}")
 
     # 记录工作区默认项目指针（非阻断）
     try:

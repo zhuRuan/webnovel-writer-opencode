@@ -2,7 +2,6 @@
 name: webnovel-query
 description: 查询项目设定、角色、力量体系、势力、伏笔等信息。支持紧急度分析与金手指状态查询。
 compatibility: opencode
-allowed-tools: Read Grep Bash AskUserQuestion
 ---
 
 # Information Query Skill

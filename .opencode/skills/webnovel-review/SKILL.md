@@ -2,7 +2,6 @@
 name: webnovel-review
 description: 使用审查 Agent 评估章节质量，生成报告并写回审查指标。
 compatibility: opencode
-allowed-tools: Read Grep Write Edit Bash Agent AskUserQuestion
 ---
 
 # Quality Review Skill
@@ -53,7 +52,7 @@ test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { e
 若目标章缺少 runtime 合同，先补齐：
 
 ```bash
-GENRE="$(python -X utf8 -c "import json,sys; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json',encoding='utf-8')); print(s.get('project',{}).get('genre',''))")"
+GENRE="$(python -X utf8 -c "import json,sys; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json',encoding='utf-8')); print(s.get('project_info',{}).get('genre',''))")"
 
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
   story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --chapter {chapter_num} --persist --emit-runtime-contracts --format both

@@ -38,6 +38,15 @@ def _write_project(project_root: Path) -> None:
     )
     for name in ("第1卷-节拍表.md", "第1卷-时间线.md", "第1卷-详细大纲.md"):
         (outline_dir / name).write_text(f"# {name}\n有效内容\n", encoding="utf-8")
+    # Add required validation markers to planning artifacts
+    (outline_dir / "第1卷-节拍表.md").write_text(
+        (outline_dir / "第1卷-节拍表.md").read_text(encoding="utf-8") + "中段反转\n",
+        encoding="utf-8",
+    )
+    (outline_dir / "第1卷-时间线.md").write_text(
+        (outline_dir / "第1卷-时间线.md").read_text(encoding="utf-8") + "时间跨度\n",
+        encoding="utf-8",
+    )
 
 
 def _write_writeback(project_root: Path, *, include_free_text: bool = False) -> Path:
@@ -47,6 +56,7 @@ def _write_writeback(project_root: Path, *, include_free_text: bool = False) -> 
             "volume_name": "黑水账",
             "core_conflict": "追查黑水账簿背后的债脉",
             "volume_end_climax": "账簿主人在宗门大比现身",
+            "chapters_range": "51-100",
         },
         "foreshadow_writeback": [
             {
@@ -78,7 +88,7 @@ def test_next_volume_anchor_writeback(tmp_path):
 
     summary = (tmp_path / "大纲" / "总纲.md").read_text(encoding="utf-8")
     assert result["next_volume"] == 2
-    assert "| 2 | 黑水账 |  | 追查黑水账簿背后的债脉 | 账簿主人在宗门大比现身 |" in summary
+    assert "| 2 | 黑水账 | 51-100 | 追查黑水账簿背后的债脉 | 账簿主人在宗门大比现身 |" in summary
     assert "| 3 |" not in summary
 
 

@@ -19,6 +19,9 @@
 
 - [`operations/operations.md`](./operations/operations.md)：项目目录结构、运维命令、备份恢复
 - [`operations/plugin-release.md`](./operations/plugin-release.md)：插件发版流程与版本同步
+- [`operations/init-project-fix-list.md`](./operations/init-project-fix-list.md)：项目初始化链路待修复清单
+- [`operations/outline-planning-fix-list.md`](./operations/outline-planning-fix-list.md)：大纲规划链路待修复清单
+- [`operations/opencode-migration-fix-list.md`](./operations/opencode-migration-fix-list.md)：Claude 残留清理与 OpenCode 适配待修复清单
 
 ### 记忆系统
 
