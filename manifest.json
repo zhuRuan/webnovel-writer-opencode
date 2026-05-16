@@ -1,22 +1,17 @@
 {
-  "version": "v2.7.0-20260516.0946",
+  "version": "v2.7.0-20260516.1422",
   "tag": "v2.7.0",
-  "updated": "2026-05-16T09:46:26Z",
+  "updated": "2026-05-16T14:22:55Z",
   "changelog": [
     {
-      "hash": "d79c16a",
-      "type": "@ chore",
-      "message": "@ chore: \u6e05\u7406\u6700\u540e 5 \u5904 .claude/ \u6ce8\u91ca\u6b8b\u7559"
+      "hash": "6d751a3",
+      "type": "@ feat",
+      "message": "@ feat: \u5b89\u88c5\u5668\u652f\u6301\u53ef\u9009\u529f\u80fd\u6a21\u5757\uff0c\u6309\u9700\u5b89\u88c5\u4f9d\u8d56"
     },
     {
-      "hash": "1c2dd8d",
-      "type": "@ chore",
-      "message": "@ chore: \u5220\u9664\u5e9f\u5f03\u811a\u672c + \u4fee\u6b63\u67b6\u6784\u56fe\u548c\u6d4b\u8bd5\u6ce8\u91ca"
-    },
-    {
-      "hash": "3e9f36d",
+      "hash": "c3fe0da",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260515.1632 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260516.0946 [skip ci]"
     }
   ],
   "files": {
@@ -333,8 +328,8 @@
       "size": 3845
     },
     ".opencode/installer/preflight.py": {
-      "sha256": "9df93ecf6582423515a9b5b1d3e066641f96bc42e2552de0e157c0b342eed163",
-      "size": 5931
+      "sha256": "ff0bf42fe7db3452584ff4ce4ba4edb00908095e0169c24e3b644a6962e0e618",
+      "size": 6039
     },
     ".opencode/installer/ui.py": {
       "sha256": "2e77fbd5d1131214668717f8cc900ea04d8d82a996af71184102786673e99699",
@@ -361,8 +356,8 @@
       "size": 1918
     },
     ".opencode/installer/deps.py": {
-      "sha256": "f2bd3ec4f25491806d1ab6ed81101b4dfdeeaa2a52962b9f9b3b7669a8e3a859",
-      "size": 3242
+      "sha256": "a1e3aef981ecbb73182a491e0ed51b584935307e4c024d0a77c3edd77d75ad07",
+      "size": 5365
     },
     ".opencode/dashboard/app.py": {
       "sha256": "8c37922b7c4c323e11cf015b1c939de6bce1283560555467272a84f6f4fc86be",
@@ -901,8 +896,8 @@
       "size": 4454
     },
     ".opencode/scripts/requirements.txt": {
-      "sha256": "7a4603dceaaee631a5b459b0824f0526f12c119e178a7882dfed5dacbf675680",
-      "size": 458
+      "sha256": "6063cc8e2a44ebef9fbdec6c6cfaa4c1c4ac5c8890e54f5c23e2f6b885e77957",
+      "size": 262
     },
     ".opencode/scripts/quality_trend_report.py": {
       "sha256": "d1635eecaa5cc9679e98afe398b8bd31e3e340c8181b314423e18430c40ae975",
@@ -963,6 +958,14 @@
     ".opencode/scripts/__init__.py": {
       "sha256": "7956a21d50911873402f3a1c4ba6546665574449c06ac739df94eba43d52f474",
       "size": 498
+    },
+    ".opencode/scripts/requirements-export.txt": {
+      "sha256": "2858aff6b4296d45821d01c28e1bb27c951ec4fb30bdaa191518a5cf6034b0d2",
+      "size": 232
+    },
+    ".opencode/scripts/requirements-dev.txt": {
+      "sha256": "ded750f88aca95d358f6759b1b40d06f571f65f6711d737a29f90d6ac6715333",
+      "size": 272
     },
     ".opencode/scripts/chapter_commit.py": {
       "sha256": "0e57dc39e7b3b43c19b772f1970a6eafd7bd6200687a8eba73950cf93ec4556b",
