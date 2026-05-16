@@ -203,6 +203,65 @@ def _show_changelog(changelog, remote_version, local_tag, remote_tag):
     print()
 
 
+# 功能模块定义（与 installer.deps.FEATURE_GROUPS 保持一致）
+_FEATURES = [
+    ("dashboard", "Dashboard — Web 管理面板", "(fastapi/uvicorn ~15MB)", True),
+    ("export",    "导出 — MD/TXT/EPUB/HTML/DOCX/PDF", "(mistune/python-docx ~8MB)", True),
+    ("publish",   "发布 — 小说平台自动发布", "(playwright+Chromium ~150MB)", False),
+    ("dev",       "开发工具 — 测试套件", "(pytest ~10MB)", False),
+]
+
+
+def _select_features_interactive():
+    """交互式选择要安装的功能模块。返回 {feature: bool}。"""
+    selected = {k: default for k, _, _, default in _FEATURES}
+
+    while True:
+        print(f"\n{C}┌{BAR}┐{R}")
+        print(f"{C}│{R}  {B}功能模块选择{R}  {C}│{R}")
+        print(f"{C}├{BAR}┤{R}")
+        _row(f"{G}●{R} 核心依赖 (必装): aiohttp + filelock + pydantic")
+        print(f"{C}├{BAR}┤{R}")
+        _row("可选模块:", color=D)
+        _row("")
+        for idx, (key, label, desc, _) in enumerate(_FEATURES):
+            mark = f"{G}Y{R}" if selected[key] else f"{X}N{R}"
+            _row(f" {B}[{idx + 1}]{R} [{mark}] {label} {D}{desc}{R}")
+        _row("")
+        _row(f" {B}[A]{R} 全选    {B}[N]{R} 仅核心    {B}[0]{R} 确认", color=D)
+        print(f"{C}└{BAR}┘{R}")
+        print()
+
+        try:
+            choice = input(f"  {B}切换选项 (默认=0 确认){R}: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n  已取消。")
+            return None
+
+        if not choice or choice == "0":
+            break
+        if choice.upper() == "A":
+            for key, _, _, _ in _FEATURES:
+                selected[key] = True
+            continue
+        if choice.upper() == "N":
+            for key, _, _, _ in _FEATURES:
+                selected[key] = False
+            continue
+
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(_FEATURES):
+                key = _FEATURES[idx][0]
+                selected[key] = not selected[key]
+            else:
+                print(f"  无效选择: {choice}")
+        except ValueError:
+            print(f"  无效选择: {choice}")
+
+    return selected
+
+
 def interactive_menu(args):
     installed = Path(".opencode").is_dir()
     staging = Path(".opencode_staging").is_dir()
@@ -249,6 +308,16 @@ def interactive_menu(args):
 
     if not choice:
         choice = "1"
+
+    # 安装类操作：交互式选择功能模块
+    if choice in ("1", "2", "3"):
+        features = _select_features_interactive()
+        if features is None:
+            return
+        args.with_features = [k for k, v in features.items() if v]
+        for key, *_ in _FEATURES:
+            if not features[key]:
+                setattr(args, f'no_{key}', True)
 
     if choice == "1":
         if installed:
@@ -366,6 +435,13 @@ def main():
     parser.add_argument("--yes", action="store_true", help="Skip confirmation prompts")
     parser.add_argument("--venv", action="store_true", help="Use/create .venv/")
     parser.add_argument("--skip-playwright", action="store_true", help="Skip playwright install")
+    parser.add_argument("--with", dest="with_features", action="append", default=[],
+                        choices=["dashboard", "export", "publish", "dev"],
+                        help="Enable optional feature (repeatable)")
+    parser.add_argument("--no-dashboard", action="store_true", help="Disable dashboard module")
+    parser.add_argument("--no-export", action="store_true", help="Disable export module")
+    parser.add_argument("--no-publish", action="store_true", help="Disable publish module")
+    parser.add_argument("--no-dev", action="store_true", help="Disable dev tools")
     parser.add_argument("--mirror", type=str, help="Custom GitHub mirror URL")
     parser.add_argument("--timeout", "-t", type=int, default=30, help="Download timeout seconds")
     parser.add_argument("--no-menu", action="store_true", help=argparse.SUPPRESS)

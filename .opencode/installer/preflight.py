@@ -57,9 +57,11 @@ def run_install(args, skip_download=False):
         n += 1
 
     step(n, total, "安装依赖")
+    from installer.deps import _resolve_features
+    features = _resolve_features(args, skip_playwright=getattr(args, 'skip_playwright', False))
     install_core_deps(
         venv_path=Path(args.venv) if getattr(args, 'venv', None) else None,
-        skip_playwright=getattr(args, 'skip_playwright', False)
+        features=features,
     )
     step_ok(n, total, "依赖安装完成")
     n += 1
