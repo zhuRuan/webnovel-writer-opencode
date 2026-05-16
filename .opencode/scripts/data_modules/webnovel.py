@@ -130,7 +130,7 @@ def _run_data_module(module: str, argv: list[str]) -> int:
 
 def _run_script(script_name: str, argv: list[str]) -> int:
     """
-    Run a script under `.claude/scripts/` via a subprocess.
+    Run a script under `.opencode/scripts/` via a subprocess.
 
     用途：兼容没有 main() 的脚本。
     """
@@ -343,7 +343,7 @@ def cmd_use(args: argparse.Namespace) -> int:
             print(f"⚠️ path.resolve() 失败 ({workspace_root}): {exc}", file=sys.stderr)
             workspace_root = workspace_root
 
-    # 1) 写入工作区指针（若工作区内存在 `.claude/`）
+    # 1) 写入工作区指针（若工作区内存在 `.opencode/` 或 `.claude/`）
     pointer_file = write_current_project_pointer(project_root, workspace_root=workspace_root)
     if pointer_file is not None:
         print(f"workspace pointer: {pointer_file}")
