@@ -261,7 +261,7 @@ def test_webnovel_review_skill_uses_unified_reviewer_pipeline():
 
 
 def test_active_skills_use_agent_tool_name_not_legacy_task():
-    """Claude Code 2.1.63+ 将 Task 工具改名为 Agent；active skills 不应再声明 Task。"""
+    """Agent 工具已替换旧 Task 工具名；active skills 不应再声明 Task。"""
     for skill_file in SKILL_FILES:
         text = _read_text(skill_file)
         fm = _extract_frontmatter(text)

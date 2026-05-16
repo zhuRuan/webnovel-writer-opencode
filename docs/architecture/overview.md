@@ -35,13 +35,15 @@
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│                      Claude Code                           │
+│                      OpenCode                              │
 ├─────────────────────────────────────────────────────────────┤
-│  Skills (7个):                                             │
-│    init / plan / write / review / query / learn / dashboard │
+│  Skills (10个):                                            │
+│    init / plan / write / write-batch / review / query       │
+│    export / publish / learn / dashboard                     │
 ├─────────────────────────────────────────────────────────────┤
-│  Agents (3个):                                             │
-│    Context Agent / Data Agent / Reviewer (含六维审查)        │
+│  Agents (5个):                                             │
+│    context-agent / data-agent / reviewer /                  │
+│    chapter-writer-agent / deconstruction-agent              │
 ├─────────────────────────────────────────────────────────────┤
 │  Data Layer:                                               │
 │    state.json / index.db (SQLite) / vectors.db             │
