@@ -87,8 +87,8 @@ def install_pip_requirements(req_files: list, venv_path: Path = None) -> bool:
         info(f"Installing: {rf}")
         try:
             subprocess.run(
-                pip + ["install", "-r", str(rf), "--quiet"],
-                check=True, timeout=120
+                pip + ["install", "-r", str(rf), "--progress-bar", "on"],
+                check=True, timeout=300
             )
         except subprocess.CalledProcessError as e:
             warn(f"pip install failed for {rf}: {e}")
@@ -105,11 +105,11 @@ def install_playwright_browser(venv_path: Path = None) -> bool:
         warn("playwright pip install failed")
         return False
 
-    with spinner("安装 Chromium 浏览器 (可能需要几分钟)..."):
+    with spinner("安装 Chromium 浏览器 (~150MB，可能需要几分钟，请耐心等待)..."):
         try:
             subprocess.run(
                 [pip[0], "-m", "playwright", "install", "chromium"],
-                check=True, timeout=300, capture_output=True
+                check=True, timeout=600
             )
             return True
         except subprocess.CalledProcessError:
@@ -155,6 +155,9 @@ def install_core_deps(venv_path: Path = None, skip_playwright: bool = False,
     for key, cfg in FEATURE_GROUPS.items():
         labels.append(f"{key}={'Y' if features.get(key) else 'N'}")
     info(f"模块选择: {', '.join(labels)}")
+
+    # 如果下载速度慢，提示国内镜像
+    print("    💡 下载慢？可用国内镜像: pip install -r xxx -i https://pypi.tuna.tsinghua.edu.cn/simple")
 
     if not install_pip_requirements(req_files, venv_path):
         error("Core dependency installation failed")
