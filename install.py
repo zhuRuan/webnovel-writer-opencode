@@ -205,10 +205,10 @@ def _show_changelog(changelog, remote_version, local_tag, remote_tag):
 
 # 功能模块定义（与 installer.deps.FEATURE_GROUPS 保持一致）
 _FEATURES = [
-    ("dashboard", "Dashboard — Web 管理面板", "(fastapi/uvicorn ~15MB)", True),
-    ("export",    "导出 — MD/TXT/EPUB/HTML/DOCX/PDF", "(mistune/python-docx ~8MB)", True),
-    ("publish",   "发布 — 小说平台自动发布", "(playwright+Chromium ~150MB)", False),
-    ("dev",       "开发工具 — 测试套件", "(pytest ~10MB)", False),
+    ("dashboard", "Dashboard — 管理面板",        "fastapi/uvicorn ~15MB", True),
+    ("export",    "导出 MD/EPUB/HTML/DOCX",       "mistune/docx ~8MB",    True),
+    ("publish",   "发布 — 平台自动上传",          "playwright ~150MB",    False),
+    ("dev",       "开发工具 — 测试套件",         "pytest ~10MB",         False),
 ]
 
 
@@ -226,14 +226,14 @@ def _select_features_interactive():
         _row("")
         for idx, (key, label, desc, _) in enumerate(_FEATURES):
             mark = f"{G}Y{R}" if selected[key] else f"{X}N{R}"
-            _row(f" {B}[{idx + 1}]{R} [{mark}] {label} {D}{desc}{R}")
+            _row(f" {B}[{idx + 1}]{R} [{mark}] {label}  {D}{desc}{R}")
         _row("")
         _row(f" {B}[A]{R} 全选    {B}[N]{R} 仅核心    {B}[0]{R} 确认", color=D)
         print(f"{C}└{BAR}┘{R}")
         print()
 
         try:
-            choice = input(f"  {B}切换选项 (默认=0 确认){R}: ").strip()
+            choice = input(f"  {B}输入数字切换开关，0 确认{R}: ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n  已取消。")
             return None
