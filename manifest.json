@@ -1,22 +1,42 @@
 {
-  "version": "v2.7.0-20260516.1529",
+  "version": "v2.7.0-20260519.1117",
   "tag": "v2.7.0",
-  "updated": "2026-05-16T15:29:17Z",
+  "updated": "2026-05-19T11:17:57Z",
   "changelog": [
     {
-      "hash": "6c39016",
-      "type": "@ fix",
-      "message": "@ fix: \u5b89\u88c5\u5668 pip \u4e0b\u8f7d\u65e0\u8fdb\u5ea6\u53cd\u9988\u5bfc\u81f4\u7528\u6237\u4ee5\u4e3a\u5361\u4f4f (#11)"
+      "hash": "8eab408",
+      "type": "fix",
+      "message": "fix: preflight \u5728\u672a\u521d\u59cb\u5316\u9879\u76ee\u65f6\u4e0d\u5e94\u62a5 ERROR"
     },
     {
-      "hash": "874f15d",
-      "type": "@ fix",
-      "message": "@ fix: \u5b89\u88c5\u5668\u529f\u80fd\u9009\u62e9\u83dc\u5355\u6587\u5b57\u8d85\u6846 + \u63d0\u793a\u4f18\u5316"
+      "hash": "00f8137",
+      "type": "plan",
+      "message": "plan: Electron \u542f\u52a8\u5668 MVP \u5b9e\u73b0\u8ba1\u5212 (7 tasks)"
     },
     {
-      "hash": "5495384",
+      "hash": "bd9dcb4",
+      "type": "spec",
+      "message": "spec: Electron \u542f\u52a8\u5668\u8bbe\u8ba1\u89c4\u683c"
+    },
+    {
+      "hash": "9dd74db",
+      "type": "@ docs",
+      "message": "@ docs: \u7b2c\u4e8c\u8f6e\u5b8c\u5584\u65b0\u624b\u6307\u5357 \u2014 \u4fee\u590d\u6b7b\u94fe\u63a5 + \u8865\u5145\u9057\u6f0f + \u6269\u5c55 FAQ"
+    },
+    {
+      "hash": "8b60a82",
+      "type": "@ docs",
+      "message": "@ docs: \u5b8c\u5584\u65b0\u624b\u6307\u5357 - \u4fee\u6b63\u547d\u4ee4\u5f15\u7528 + \u65b0\u589e\u6982\u5ff5\u89e3\u91ca + FAQ \u6269\u5145"
+    },
+    {
+      "hash": "a797678",
+      "type": "@ docs",
+      "message": "@ docs: \u65b0\u624b\u5b8c\u5168\u6307\u5357 getting-started.md + README \u94fe\u63a5"
+    },
+    {
+      "hash": "a82a1f2",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260516.1422 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260516.1529 [skip ci]"
     }
   ],
   "files": {
@@ -1249,8 +1269,8 @@
       "size": 2360
     },
     ".opencode/scripts/data_modules/webnovel.py": {
-      "sha256": "d28b95f68e719331cefba5df9ada4a4e681b5ec6140b8b5f83a7646cb16d753c",
-      "size": 26857
+      "sha256": "52c022645611b3893706c5c7b574b45224d4d6b0940240f322bb03cd3356493d",
+      "size": 27478
     },
     ".opencode/scripts/data_modules/__init__.py": {
       "sha256": "02e7701b523eb2cfab120e0f1cf9ff01a08dcef3a7da128d445c7020cb4a42bb",
@@ -1549,8 +1569,8 @@
       "size": 2150
     },
     ".opencode/scripts/data_modules/tests/test_webnovel_unified_cli.py": {
-      "sha256": "bd2bd5a63517914cfc940a1a1261d0f156cfd681e010527eb7b303f4d9866d90",
-      "size": 29269
+      "sha256": "d872183c12fa99758d327221832e91118d37a21b08f14ca5cc39e8c91f7edb96",
+      "size": 29288
     },
     ".opencode/scripts/data_modules/tests/test_projection_writers.py": {
       "sha256": "f16e17e76d5859c93cb3b40be33a96b6a2a8422b6b9913928fb08e4658b74b10",
