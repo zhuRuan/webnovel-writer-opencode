@@ -172,7 +172,7 @@ _PLOT_SECTION_FIELD_MAP = {
 }
 
 _CHAPTER_HEADING_RE = re.compile(
-    r"^(#{1,6})\s*第\s*([0-9零〇一二两三四五六七八九十]+)\s*章\b.*$",
+    r"^(#{1,6})\s*第\s*([0-9零〇一二两三四五六七八九十]+)\s*章.*$",
     re.MULTILINE,
 )
 
