@@ -17,11 +17,7 @@
 
 ### 运维
 
-- [`operations/operations.md`](./operations/operations.md)：项目目录结构、运维命令、备份恢复
-- [`operations/plugin-release.md`](./operations/plugin-release.md)：插件发版流程与版本同步
-- [`operations/init-project-fix-list.md`](./operations/init-project-fix-list.md)：项目初始化链路待修复清单
-- [`operations/outline-planning-fix-list.md`](./operations/outline-planning-fix-list.md)：大纲规划链路待修复清单
-- [`operations/opencode-migration-fix-list.md`](./operations/opencode-migration-fix-list.md)：Claude 残留清理与 OpenCode 适配待修复清单
+`operations/` 目录中的修复计划均已落地实施，相关文档已随修复完成而归档。当前运维相关命令见 [guides/commands.md](./guides/commands.md) 中的"运维子命令"和"Story System 子命令"章节。
 
 ### 记忆系统
 
@@ -40,7 +36,6 @@
 
 - `architecture/`：系统结构与技术架构
 - `guides/`：使用者需要查阅的命令、配置、题材说明
-- `operations/`：运维、发版、备份与恢复
 - `memory/`：长期记忆架构说明
 - `research/`：论文总结与外部方案调研
 - `superpowers/`：架构 spec 与设计文档
@@ -51,4 +46,4 @@
 2. 再看 [`architecture/overview.md`](./architecture/overview.md) 了解整体架构
 3. 需要配置检索时看 [`guides/rag-and-config.md`](./guides/rag-and-config.md)
 4. 需要使用命令时看 [`guides/commands.md`](./guides/commands.md)
-5. 排查运行问题时看 [`operations/operations.md`](./operations/operations.md)
+5. 系统运行健康状态用 `preflight` 和 `status` 命令诊断，详见 [commands.md](./guides/commands.md) 运维子命令

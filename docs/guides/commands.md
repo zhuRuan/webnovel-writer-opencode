@@ -116,6 +116,7 @@ python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_RO
 | `where` | 打印当前解析出的项目根目录 |
 | `preflight` | 校验 CLI 环境、脚本路径和项目根是否可用 |
 | `use <路径>` | 绑定当前工作区使用的书项目 |
+| `chapter-path <章号>` | 查找指定章节的正文文件路径 |
 
 ### 数据模块子命令
 
@@ -128,6 +129,8 @@ python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_RO
 | `context` | 上下文管理 |
 | `style` | 风格采样 |
 | `migrate` | state.json → SQLite 迁移 |
+| `knowledge` | CSV 知识库管理 |
+| `checkers` | 审查器配置管理 |
 
 ### 运维子命令
 
@@ -138,6 +141,10 @@ python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_RO
 | `backup` | 备份管理 |
 | `archive` | 归档管理 |
 | `extract-context` | 提取章节上下文（`--chapter N --format json`） |
+| `placeholder-scan` | 扫描大纲/设定中的未补齐占位 |
+| `master-outline-sync` | 将规划产物同步回写总纲 |
+| `export` | 正文导出（MD/TXT/EPUB/HTML/DOCX/PDF） |
+| `publish` | 番茄小说平台发布 |
 
 ### 长期记忆子命令
 
@@ -149,6 +156,7 @@ python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_RO
 | `memory conflicts` | 查看同主键 active 冲突项 |
 | `memory bootstrap` | 从 index.db 与 summaries 回填初始长期记忆 |
 | `memory update` | 对指定章节结果执行手动映射写入 |
+| `project-memory` | 项目记忆管理（读写 `.webnovel/project_memory.json`） |
 
 示例：
 

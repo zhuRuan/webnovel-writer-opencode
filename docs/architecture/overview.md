@@ -57,17 +57,17 @@
 
 ### Context Agent（读）
 
-- 文件：`agents/context-agent.md`
+- 文件：`.opencode/agents/context-agent.md`
 - 职责：在写作前构建"创作任务书"，提供本章上下文、约束和追读力策略。
 
 ### Data Agent（写）
 
-- 文件：`agents/data-agent.md`
+- 文件：`.opencode/agents/data-agent.md`
 - 职责：从正文提取 `accepted_events / state_deltas / entity_deltas / summary_text` 等 commit artifacts，交给 `chapter-commit` 驱动 projection writers 更新 `state.json`、`index.db`、摘要与长期记忆。
 
 ### Reviewer（审）
 
-- 文件：`agents/reviewer.md`
+- 文件：`.opencode/agents/reviewer.md`
 - 职责：章节质量审查，内部包含以下六个审查维度：
 
 | 审查维度 | 检查重点 |
