@@ -1,42 +1,22 @@
 {
-  "version": "v2.7.0-20260519.1117",
+  "version": "v2.7.0-20260519.1423",
   "tag": "v2.7.0",
-  "updated": "2026-05-19T11:17:57Z",
+  "updated": "2026-05-19T14:23:05Z",
   "changelog": [
     {
-      "hash": "8eab408",
+      "hash": "4c2b5fc",
       "type": "fix",
-      "message": "fix: preflight \u5728\u672a\u521d\u59cb\u5316\u9879\u76ee\u65f6\u4e0d\u5e94\u62a5 ERROR"
+      "message": "fix: \u4fee\u590d\u7ae0\u8282\u7ec6\u7eb2\u8de8\u7ae0\u6c61\u67d3 \u2014 _CHAPTER_HEADING_RE \u4e2d\u7684 \\b \u5728 CJK \u6c49\u5b57\u95f4\u5931\u6548"
     },
     {
-      "hash": "00f8137",
-      "type": "plan",
-      "message": "plan: Electron \u542f\u52a8\u5668 MVP \u5b9e\u73b0\u8ba1\u5212 (7 tasks)"
+      "hash": "08c354a",
+      "type": "docs",
+      "message": "docs: \u91cd\u5199 README \u4e3a\u8be6\u7ec6\u7248\uff0c\u878d\u5408\u6a21\u677f\u7ed3\u6784"
     },
     {
-      "hash": "bd9dcb4",
-      "type": "spec",
-      "message": "spec: Electron \u542f\u52a8\u5668\u8bbe\u8ba1\u89c4\u683c"
-    },
-    {
-      "hash": "9dd74db",
-      "type": "@ docs",
-      "message": "@ docs: \u7b2c\u4e8c\u8f6e\u5b8c\u5584\u65b0\u624b\u6307\u5357 \u2014 \u4fee\u590d\u6b7b\u94fe\u63a5 + \u8865\u5145\u9057\u6f0f + \u6269\u5c55 FAQ"
-    },
-    {
-      "hash": "8b60a82",
-      "type": "@ docs",
-      "message": "@ docs: \u5b8c\u5584\u65b0\u624b\u6307\u5357 - \u4fee\u6b63\u547d\u4ee4\u5f15\u7528 + \u65b0\u589e\u6982\u5ff5\u89e3\u91ca + FAQ \u6269\u5145"
-    },
-    {
-      "hash": "a797678",
-      "type": "@ docs",
-      "message": "@ docs: \u65b0\u624b\u5b8c\u5168\u6307\u5357 getting-started.md + README \u94fe\u63a5"
-    },
-    {
-      "hash": "a82a1f2",
+      "hash": "4e547bd",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260516.1529 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260519.1117 [skip ci]"
     }
   ],
   "files": {
@@ -973,8 +953,8 @@
       "size": 5610
     },
     ".opencode/scripts/chapter_outline_loader.py": {
-      "sha256": "3bbd5341ac2b28cf8698392743b27843500ef387c8e358a650f294c998387b03",
-      "size": 12587
+      "sha256": "5cb20697827a68e20a63e352cffdf3b0258d4c78c4cc7830f5cd8c0ba0fbce77",
+      "size": 12585
     },
     ".opencode/scripts/webnovel.py": {
       "sha256": "06dfc3f9621b9ea2172a57194be5fd85c33444d14bdcd9f5cc1b9ed7b34bdb8c",
