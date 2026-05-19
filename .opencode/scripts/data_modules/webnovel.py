@@ -33,8 +33,10 @@ from typing import Optional
 
 from runtime_compat import normalize_windows_path
 from project_locator import resolve_project_root, write_current_project_pointer, update_global_registry_current_project
+from chapter_paths import extract_chapter_num_from_filename
 
 from .story_runtime_health import build_story_runtime_health
+from .story_contracts import read_json_if_exists
 
 
 def _scripts_dir() -> Path:
@@ -192,7 +194,6 @@ def _project_root_diagnostic(
 def _build_fs_state_sync(project_root: Path) -> dict:
     import re
 
-    # Light check first: volume file continuity
     story_dir = project_root / ".story-system" / "volumes"
     missing_volumes = []
     if story_dir.is_dir():
@@ -217,18 +218,17 @@ def _build_fs_state_sync(project_root: Path) -> dict:
     text_dir = project_root / "正文"
     if text_dir.is_dir():
         for f in text_dir.rglob("第*章*.md"):
-            m = re.match(r"第0*(\d+)章", f.name)
-            if m:
-                fs_nums.add(int(m.group(1)))
+            num = extract_chapter_num_from_filename(f.name)
+            if num is not None:
+                fs_nums.add(num)
 
-    state_path = project_root / ".webnovel" / "state.json"
+    state = read_json_if_exists(project_root / ".webnovel" / "state.json")
     state_nums = set()
-    if state_path.is_file():
+    if state is not None:
         try:
-            state = json.loads(state_path.read_text(encoding="utf-8"))
             chapter_status = (state.get("progress") or {}).get("chapter_status") or {}
             state_nums = set(int(k) for k in chapter_status.keys())
-        except (json.JSONDecodeError, OSError, ValueError):
+        except (ValueError, OSError):
             pass
 
     orphans = sorted(fs_nums - state_nums)
@@ -279,14 +279,26 @@ def _build_preflight_report(explicit_project_root: Optional[str]) -> dict:
         checks.append(fs_state_check)
     except FileNotFoundError as exc:
         project_root_error = _project_root_diagnostic(explicit_project_root, exc)
-        checks.append(
-            {
-                "name": "project_root",
-                "ok": False,
-                "path": explicit_project_root or "",
-                "error": project_root_error,
-            }
-        )
+        if explicit_project_root:
+            # 用户显式指定了 --project-root，但找不到 → 硬错误
+            checks.append(
+                {
+                    "name": "project_root",
+                    "ok": False,
+                    "path": explicit_project_root,
+                    "error": project_root_error,
+                }
+            )
+        else:
+            # 未指定 --project-root 且自动探测不到 → 安装环境正常，只需后续 init
+            checks.append(
+                {
+                    "name": "project_root",
+                    "ok": True,
+                    "path": "",
+                    "warning": "尚未初始化书项目，请运行 webnovel init 创建项目",
+                }
+            )
     except Exception as exc:
         project_root_error = str(exc)
         checks.append({"name": "project_root", "ok": False, "path": explicit_project_root or "", "error": project_root_error})
@@ -311,6 +323,8 @@ def cmd_preflight(args: argparse.Namespace) -> int:
             status = "OK" if item["ok"] else "ERROR"
             path = item.get("path") or ""
             print(f"{status} {item['name']}: {path}")
+            if item.get("warning"):
+                print(f"  warn: {item['warning']}")
             if item.get("error"):
                 print(f"  detail: {item['error']}")
         story_runtime = report.get("story_runtime") or {}

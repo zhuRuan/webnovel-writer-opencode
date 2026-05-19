@@ -367,9 +367,9 @@ def test_preflight_reports_empty_workspace_without_traceback(monkeypatch, tmp_pa
 
     captured = capsys.readouterr()
     report = json.loads(captured.out)
-    assert int(exc.value.code or 0) == 1
-    assert report["ok"] is False
-    assert "还没有激活的书项目" in report["project_root_error"]
+    assert int(exc.value.code or 0) == 0
+    assert report["ok"] is True
+    assert any("尚未初始化书项目" in c.get("warning", "") for c in report["checks"])
     assert "Traceback" not in captured.err
 
 
