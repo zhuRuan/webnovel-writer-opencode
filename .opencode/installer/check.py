@@ -8,9 +8,9 @@ import platform as _platform
 from installer.ui import info, warn, error
 
 KNOWN_OPENCODE_PROCESSES = {
-    "windows": ["OpenCode.exe", "Code.exe"],
+    "windows": ["OpenCode.exe"],
     "linux":   [],
-    "darwin":  ["OpenCode", "Electron"],
+    "darwin":  ["OpenCode"],
 }
 
 
@@ -60,7 +60,7 @@ def is_opencode_running(target_dir: str = ".opencode") -> str:
     Check if OpenCode is running. Returns 'running', 'not_running', or 'locked'.
 
     Layer 1: Process name scan (all platforms)
-    Layer 2: File lock detection via os.rename (Windows-specific, definitive)
+    Layer 2: File lock detection (Windows: os.rename, macOS/Linux: lsof/fuser)
     """
     pname = platform_name()
 
@@ -84,30 +84,68 @@ def is_opencode_running(target_dir: str = ".opencode") -> str:
             )
             found = result.returncode == 0
         elif pname == "darwin":
+            # ps aux | grep OpenCode (not Electron — too many false matches)
             result = subprocess.run(
-                ["ps", "aux"], capture_output=True, text=True,
+                ["pgrep", "-i", "OpenCode"],
+                capture_output=True, text=True,
                 encoding="utf-8", errors="replace", timeout=5
             )
-            found = any(
-                p.lower() in result.stdout.lower()
-                for p in ["OpenCode", "Electron"]
-            )
+            found = result.returncode == 0
     except Exception:
         pass  # Process scan failed, try lock test
 
-    # Layer 2: file lock test (Windows definitive check)
-    if pname == "windows" and os.path.isdir(target_dir):
-        lock_test = target_dir + "_lock_test"
-        try:
-            os.rename(target_dir, lock_test)
-            os.rename(lock_test, target_dir)
+    # Layer 2: file lock test
+    if pname == "windows":
+        if os.path.isdir(target_dir):
+            lock_test = target_dir + "_lock_test"
+            try:
+                os.rename(target_dir, lock_test)
+                os.rename(lock_test, target_dir)
+                return "not_running" if not found else "running"
+            except OSError:
+                return "locked"
+        else:
+            return "not_running"
+    else:
+        # macOS / Linux: use lsof to see if any process holds files in .opencode/
+        if os.path.isdir(target_dir):
+            locked = _check_open_files_non_windows(target_dir)
+            if locked:
+                return "locked"
             return "not_running" if not found else "running"
-        except OSError:
-            return "locked"  # 100% certainty — file is locked
-    elif pname == "windows" and not os.path.isdir(target_dir):
-        return "not_running"  # .opencode doesn't exist yet
+        else:
+            return "not_running"
 
-    return "running" if found else "not_running"
+
+def _check_open_files_non_windows(target_dir: str) -> bool:
+    """Check if any process has files open under target_dir (macOS/Linux)."""
+    # Try lsof first (available on macOS, often on Linux)
+    if shutil.which("lsof"):
+        try:
+            result = subprocess.run(
+                ["lsof", "+D", os.path.abspath(target_dir)],
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return True
+        except Exception:
+            pass
+
+    # Fallback: fuser (Linux)
+    if shutil.which("fuser"):
+        try:
+            result = subprocess.run(
+                ["fuser", target_dir],
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return True
+        except Exception:
+            pass
+
+    return False
 
 
 def run_preflight_checks():
