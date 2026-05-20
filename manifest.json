@@ -1,22 +1,22 @@
 {
-  "version": "v2.7.0-20260519.1423",
+  "version": "v2.7.0-20260520.1350",
   "tag": "v2.7.0",
-  "updated": "2026-05-19T14:23:05Z",
+  "updated": "2026-05-20T13:50:29Z",
   "changelog": [
     {
-      "hash": "4c2b5fc",
+      "hash": "57ead07",
       "type": "fix",
-      "message": "fix: \u4fee\u590d\u7ae0\u8282\u7ec6\u7eb2\u8de8\u7ae0\u6c61\u67d3 \u2014 _CHAPTER_HEADING_RE \u4e2d\u7684 \\b \u5728 CJK \u6c49\u5b57\u95f4\u5931\u6548"
+      "message": "fix: \u4fee\u590d macOS install.py \u589e\u91cf\u66f4\u65b0\u8bef\u62a5 OpenCode \u8fd0\u884c"
     },
     {
-      "hash": "08c354a",
+      "hash": "324bda0",
       "type": "docs",
-      "message": "docs: \u91cd\u5199 README \u4e3a\u8be6\u7ec6\u7248\uff0c\u878d\u5408\u6a21\u677f\u7ed3\u6784"
+      "message": "docs: \u4fee\u590d\u8fc7\u671f\u6587\u6863\u5f15\u7528\uff0c\u5220\u9664\u5931\u6548\u94fe\u63a5"
     },
     {
-      "hash": "4e547bd",
+      "hash": "aeef415",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260519.1117 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260519.1423 [skip ci]"
     }
   ],
   "files": {
@@ -353,8 +353,8 @@
       "size": 58
     },
     ".opencode/installer/check.py": {
-      "sha256": "4c04cd2bc046bebcf80f2cea7529109760046e7b4603742922fb169c82529de8",
-      "size": 4339
+      "sha256": "ab1af1168d932a628c30d00e77cbe3354ff7941d8a21e75cf8d7efa9051725c7",
+      "size": 5556
     },
     ".opencode/installer/uninstall.py": {
       "sha256": "7b235b632990778a950ce90995e6999ab347ede31240925fe599d1f5b60f96f3",
