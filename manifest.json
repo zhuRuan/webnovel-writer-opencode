@@ -1,22 +1,17 @@
 {
-  "version": "v2.7.0-20260520.1350",
+  "version": "v2.7.0-20260520.1410",
   "tag": "v2.7.0",
-  "updated": "2026-05-20T13:50:29Z",
+  "updated": "2026-05-20T14:10:19Z",
   "changelog": [
     {
-      "hash": "57ead07",
-      "type": "fix",
-      "message": "fix: \u4fee\u590d macOS install.py \u589e\u91cf\u66f4\u65b0\u8bef\u62a5 OpenCode \u8fd0\u884c"
+      "hash": "fa03f2d",
+      "type": "refactor",
+      "message": "refactor: \u5b89\u88c5\u7cfb\u7edf\u4ee3\u7801\u5ba1\u67e5\u4f18\u5316"
     },
     {
-      "hash": "324bda0",
-      "type": "docs",
-      "message": "docs: \u4fee\u590d\u8fc7\u671f\u6587\u6863\u5f15\u7528\uff0c\u5220\u9664\u5931\u6548\u94fe\u63a5"
-    },
-    {
-      "hash": "aeef415",
+      "hash": "e1e89f1",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260519.1423 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260520.1350 [skip ci]"
     }
   ],
   "files": {
@@ -341,12 +336,12 @@
       "size": 4501
     },
     ".opencode/installer/update.py": {
-      "sha256": "80589c9858794058717a7f8e596664ac0a89726e2004bda414aebc6322158a2d",
-      "size": 7054
+      "sha256": "b59a114bfa8a2be2ae6217fc82377737425df15651594a29d44ba8dca95f2e27",
+      "size": 6942
     },
     ".opencode/installer/fetch.py": {
-      "sha256": "0c33eb6ea76e3c95d95649478d0775b8864114d2816bde4adf7dd8d11bc7dac0",
-      "size": 3299
+      "sha256": "313e502d9e76d6a77241bf44746b257b282e68714213d0dc49e501f05811a929",
+      "size": 3143
     },
     ".opencode/installer/__init__.py": {
       "sha256": "fca41afd97d96cf110768a2ec1275dea5ddacd5571c1cd2c0e14c72c2c1abfd0",
@@ -361,8 +356,8 @@
       "size": 1918
     },
     ".opencode/installer/deps.py": {
-      "sha256": "78f3f218e8bf1f4a9ceae27da7c26b075f026d9412ca6ad00974900ebf77c21b",
-      "size": 5551
+      "sha256": "8e86c6f724b592c5365408ce3e47818a417a17f2ea85d5b3de85312e0d00966c",
+      "size": 5274
     },
     ".opencode/dashboard/app.py": {
       "sha256": "8c37922b7c4c323e11cf015b1c939de6bce1283560555467272a84f6f4fc86be",
