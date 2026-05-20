@@ -42,6 +42,9 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+# 以下 build_urls/download/extract_opencode 与 installer/fetch.py 功能重复，
+# 这是有意为之：install.py 必须在 .opencode/ 下载之前独立运行（启动自举）。
+# 一旦 .opencode/ 就位，后续流程使用 installer/ 模块。
 REPO = "lujih/webnovel-writer-opencode"
 BRANCH = "master"
 MIRRORS = [
@@ -66,7 +69,7 @@ def download(urls, dest, timeout=30):
                 with open(dest, 'wb') as f:
                     shutil.copyfileobj(resp, f)
             return True
-        except Exception as e:
+        except (OSError, urllib.error.URLError, ValueError) as e:
             print(f"  Failed: {e}")
     return False
 
@@ -154,14 +157,14 @@ def _check_update():
     if local_vf.is_file():
         try:
             local = _json.loads(local_vf.read_text(encoding="utf-8"))
-        except Exception:
+        except (OSError, ValueError):
             pass
 
     remote = {}
     try:
         with urllib.request.urlopen(MANIFEST_URL, timeout=10) as resp:
             remote = _json.loads(resp.read().decode("utf-8", errors="replace"))
-    except Exception:
+    except (urllib.error.URLError, OSError, ValueError):
         return (False, [], {}, "", "")
 
     local_tag = local.get("tag", "")
@@ -203,7 +206,8 @@ def _show_changelog(changelog, remote_version, local_tag, remote_tag):
     print()
 
 
-# 功能模块定义（与 installer.deps.FEATURE_GROUPS 保持一致）
+# _FEATURES 与 installer/deps.py 的 FEATURE_GROUPS 功能重复。
+# 启动自举需要：install.py 独立运行时可无 .opencode/ 依赖。
 _FEATURES = [
     ("dashboard", "Dashboard — 管理面板",        "fastapi/uvicorn ~15MB", True),
     ("export",    "导出 MD/EPUB/HTML/DOCX",       "mistune/docx ~8MB",    True),
@@ -272,7 +276,7 @@ def interactive_menu(args):
         import json
         try:
             version = json.loads(vf.read_text(encoding="utf-8")).get("version", "未知")
-        except Exception:
+        except (OSError, ValueError):
             pass
 
     print(f"\n{C}┌{BAR}┐{R}")

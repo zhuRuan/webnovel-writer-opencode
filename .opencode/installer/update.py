@@ -10,25 +10,23 @@ MANIFEST_URL = "https://raw.githubusercontent.com/lujih/webnovel-writer-opencode
 
 
 def fetch_remote_manifest(manifest_url: str = None) -> dict:
-    """Download remote manifest.json. Returns empty dict on failure."""
     import urllib.request
     if manifest_url is None:
         manifest_url = MANIFEST_URL
     try:
         with urllib.request.urlopen(manifest_url, timeout=10) as resp:
             return json.loads(resp.read().decode("utf-8", errors="replace"))
-    except Exception:
+    except (urllib.error.URLError, OSError, ValueError):
         return {}
 
 
 def read_local_version(version_file: Path = None) -> dict:
-    """Read local version.json. Returns {'version': 'unknown'} if absent."""
     if version_file is None:
         version_file = Path(".opencode") / "version.json"
     try:
         if version_file.exists():
             return json.loads(version_file.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError):
         pass
     return {"version": "unknown"}
 
@@ -56,7 +54,6 @@ def current_repo_version(project_root: Path = None) -> str:
         data = read_local_version(vf)
         return data.get("version", "unknown")
 
-    # clone user: try git describe
     import subprocess
     try:
         result = subprocess.run(
@@ -66,7 +63,7 @@ def current_repo_version(project_root: Path = None) -> str:
         )
         if result.returncode == 0:
             return result.stdout.strip()
-    except Exception:
+    except (OSError, subprocess.TimeoutExpired):
         pass
     return "unknown"
 
@@ -95,14 +92,13 @@ def compute_diff(manifest: dict, local_dir: Path) -> list:
                 local_sha = hashlib.sha256(content).hexdigest()
                 if local_sha != info["sha256"]:
                     changes.append((rel_path, "update"))
-            except Exception:
+            except OSError:
                 changes.append((rel_path, "update"))
 
     return changes
 
 
 def needs_update(manifest_url: str = None) -> bool:
-    """Check if a newer version is available."""
     import urllib.request
     if manifest_url is None:
         manifest_url = MANIFEST_URL
@@ -110,7 +106,7 @@ def needs_update(manifest_url: str = None) -> bool:
     try:
         with urllib.request.urlopen(manifest_url, timeout=10) as resp:
             manifest = json.loads(resp.read().decode("utf-8", errors="replace"))
-    except Exception as e:
+    except (urllib.error.URLError, OSError, ValueError) as e:
         warn(f"Cannot check for updates: {e}")
         return False
 
@@ -141,11 +137,10 @@ def run_incremental_update(manifest_url: str = None):
         warn("No .opencode_staging/ directory for incremental update.")
         return
 
-    # Fetch manifest
     try:
         with urllib.request.urlopen(manifest_url, timeout=10) as resp:
             manifest = json.loads(resp.read().decode("utf-8", errors="replace"))
-    except Exception as e:
+    except (urllib.error.URLError, OSError, ValueError) as e:
         warn(f"Cannot fetch manifest for incremental update: {e}")
         warn("Falling back to full staging apply.")
         from installer.preflight import apply_staging

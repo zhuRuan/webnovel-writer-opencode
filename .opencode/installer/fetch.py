@@ -16,7 +16,6 @@ MIRRORS = [
 
 
 def build_urls(repo: str, branch: str, mirrors: list = None) -> list:
-    """Build download URL list: direct GitHub first, then mirrors."""
     if mirrors is None:
         mirrors = MIRRORS
     direct = f"https://github.com/{repo}/archive/refs/heads/{branch}.zip"
@@ -29,20 +28,18 @@ def build_urls(repo: str, branch: str, mirrors: list = None) -> list:
 
 
 def download_file(url: str, dest: Path, timeout: int = 30) -> bool:
-    """Download a file from URL to dest. Returns True on success."""
     try:
         info(f"Downloading {url.rsplit('/', 1)[-1]} ...")
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             with open(dest, 'wb') as f:
                 shutil.copyfileobj(resp, f)
         return True
-    except Exception as e:
+    except (OSError, urllib.error.URLError, ValueError) as e:
         warn(f"Download failed: {e}")
         return False
 
 
 def download_with_fallback(urls: list, dest: Path, timeout: int = 30) -> bool:
-    """Try each URL in order until one succeeds."""
     for url in urls:
         if download_file(url, dest, timeout=timeout):
             return True

@@ -36,7 +36,6 @@ CORE_REQ = ".opencode/scripts/requirements.txt"
 
 
 def check_pip_available() -> bool:
-    """Check if pip can be invoked."""
     try:
         subprocess.run(
             [sys.executable, "-m", "pip", "--version"],
@@ -48,7 +47,6 @@ def check_pip_available() -> bool:
 
 
 def create_venv(path: Path) -> bool:
-    """Create a Python virtual environment. Returns True on success."""
     if path.exists():
         warn(f"Virtual env already exists: {path}")
         return False
@@ -65,7 +63,6 @@ def create_venv(path: Path) -> bool:
 
 
 def _get_pip_path(venv_path: Path = None) -> list:
-    """Get pip command, optionally inside a venv."""
     if venv_path:
         if sys.platform == "win32":
             pip = [str(venv_path / "Scripts" / "python"), "-m", "pip"]
@@ -77,7 +74,6 @@ def _get_pip_path(venv_path: Path = None) -> list:
 
 
 def install_pip_requirements(req_files: list, venv_path: Path = None) -> bool:
-    """Install Python dependencies from requirement files."""
     pip = _get_pip_path(venv_path)
 
     for rf in req_files:
@@ -97,7 +93,6 @@ def install_pip_requirements(req_files: list, venv_path: Path = None) -> bool:
 
 
 def install_playwright_browser(venv_path: Path = None) -> bool:
-    """Install playwright and chromium browser."""
     pip = _get_pip_path(venv_path)
     try:
         subprocess.run(pip + ["install", "playwright", "--quiet"], check=True, timeout=60)
