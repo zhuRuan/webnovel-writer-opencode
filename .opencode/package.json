@@ -1,16 +1,4 @@
 {
-  "name": "webnovel-writer",
-  "version": "2.7.0",
-  "description": "WEB NOVEL WRITER — AI-powered long-form Chinese web novel writing system for OpenCode",
-  "author": {
-    "name": "cszx"
-  },
-  "homepage": "https://github.com/lujih/webnovel-writer-opencode",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/lujih/webnovel-writer-opencode"
-  },
-  "license": "GPL-3.0",
   "dependencies": {
     "@kilocode/plugin": "7.2.40"
   }

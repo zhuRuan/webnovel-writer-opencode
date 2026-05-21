@@ -504,6 +504,16 @@ def main() -> None:
     p_structural.add_argument("--chapter", type=int, required=True, help="目标章节号")
     p_structural.add_argument("--format", choices=["json", "text"], default="json", help="输出格式")
 
+    # orchestrate — batch chapter pipeline
+    p_orchestrate = sub.add_parser("orchestrate", help="批量编排（write/heal/nightly）")
+    p_orchestrate.add_argument("mode", choices=["write", "heal", "nightly"], help="write=全流程, heal=修复, nightly=健康检查")
+    p_orchestrate.add_argument("chapters", help="章节范围，如 '5-12' 或 '5,7,9-12'")
+
+    # delete-chapters — safe chapter deletion with projection cleanup
+    p_delete = sub.add_parser("delete-chapters", help="删除章节并清理投影")
+    p_delete.add_argument("chapters", help="章节范围，如 '5-12' 或 '5,7,9-12'")
+    p_delete.add_argument("--dry-run", action="store_true", help="预览不执行")
+
     # 兼容：允许 `--project-root` 出现在任意位置（减少 agents/skills 拼命令的出错率）
     from .cli_args import normalize_global_project_root
 
@@ -636,6 +646,16 @@ def main() -> None:
             if args.format:
                 return_args.extend(["--format", args.format])
             raise SystemExit(_run_data_module("structural_checker", return_args))
+
+    if tool == "orchestrate":
+        return_args = [*forward_args, args.mode, args.chapters]
+        raise SystemExit(_run_data_module("orchestrate", return_args))
+
+    if tool == "delete-chapters":
+        return_args = [*forward_args, args.chapters]
+        if getattr(args, "dry_run", False):
+            return_args.append("--dry-run")
+        raise SystemExit(_run_data_module("chapter_delete_service", return_args))
 
     raise SystemExit(2)
 
