@@ -184,7 +184,7 @@ def cmd_clean_tmp(args: argparse.Namespace) -> int:
     tmp_dir = Path(args.project_root) / ".webnovel" / "tmp"
     if not tmp_dir.is_dir():
         return 0
-    keep = set(getattr(args, 'keep', []) or [])
+    keep = set(args.keep)
     cleaned = 0
     for f in tmp_dir.iterdir():
         if f.is_file() and f.suffix == ".json":
