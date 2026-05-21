@@ -414,8 +414,8 @@ blocking_count > 0 → 进入修复轮（最多 2 轮）
 **必须使用 Agent 工具调用 data-agent，不得跳过或手动模拟。**
 
 ```bash
-# 清空旧 tmp 文件，防止 data-agent 失败时下游读到上一章数据
-python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" clean-tmp --project-root "${PROJECT_ROOT}"
+# 清空旧 tmp 文件，保留 review_results.json（chapter-commit 仍需）
+python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" clean-tmp --project-root "${PROJECT_ROOT}" --keep review_results.json
 ```
 
 ```text

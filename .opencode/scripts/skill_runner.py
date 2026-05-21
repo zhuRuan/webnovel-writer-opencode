@@ -177,13 +177,19 @@ def cmd_mark_step_done(args: argparse.Namespace) -> int:
 
 
 def cmd_clean_tmp(args: argparse.Namespace) -> int:
-    """清理 .webnovel/tmp/ 下的旧 artifacts（替代 rm -f，跨 shell 兼容）。"""
+    """清理 .webnovel/tmp/ 下的旧 artifacts（替代 rm -f，跨 shell 兼容）。
+
+    --keep 指定保留的文件名（可多次使用），如 --keep review_results.json
+    """
     tmp_dir = Path(args.project_root) / ".webnovel" / "tmp"
     if not tmp_dir.is_dir():
         return 0
+    keep = set(getattr(args, 'keep', []) or [])
     cleaned = 0
     for f in tmp_dir.iterdir():
         if f.is_file() and f.suffix == ".json":
+            if f.name in keep:
+                continue
             f.unlink()
             cleaned += 1
     print(f"CLEANED {cleaned} tmp files")
@@ -297,6 +303,7 @@ def main() -> None:
 
     p_ct = sub.add_parser("clean-tmp")
     p_ct.add_argument("--project-root", required=True)
+    p_ct.add_argument("--keep", nargs="*", default=[], help="保留的文件名（可多选），如 --keep review_results.json")
     p_ct.set_defaults(func=cmd_clean_tmp)
 
     p_nc = sub.add_parser("normalize-contracts")
