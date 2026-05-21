@@ -1,17 +1,17 @@
 {
-  "version": "v2.7.0-20260521.1036",
+  "version": "v2.7.0-20260521.1046",
   "tag": "v2.7.0",
-  "updated": "2026-05-21T10:36:06Z",
+  "updated": "2026-05-21T10:46:22Z",
   "changelog": [
     {
-      "hash": "7e9112e",
+      "hash": "8c26e3a",
       "type": "feat",
-      "message": "feat: \u8865\u5145 package.json \u5143\u6570\u636e + AI \u865a\u6784\u5185\u5bb9\u514d\u8d23\u58f0\u660e"
+      "message": "feat: \u65b0\u589e orchestrate \u6279\u91cf\u7f16\u6392\u5668 + delete-chapters \u5b89\u5168\u5220\u9664"
     },
     {
-      "hash": "de6fcae",
+      "hash": "a91d368",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260521.1015 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260521.1036 [skip ci]"
     }
   ],
   "files": {
@@ -24,8 +24,8 @@
       "size": 386
     },
     ".opencode/package.json": {
-      "sha256": "6a1a7a74aa886c0d228a25bd5e17bc011b8b9e5117d57cbba616f304f5f257ac",
-      "size": 454
+      "sha256": "894b4b85c472d84f0fc7c8c880592cfd365280bc440cf852d6aa54b491f5874f",
+      "size": 61
     },
     ".opencode/skills/webnovel-dashboard/SKILL.md": {
       "sha256": "fd0cf7a24ec44c6ddbf675d02eb53ad925b9e5ec716f0324e18bb32b0a30fe0e",
@@ -46,6 +46,10 @@
     ".opencode/skills/webnovel-review/evals/evals.json": {
       "sha256": "6f48494aa2b73fa5e94d5302f2b2fc4eb6bd9943d13bd697652093ebc8f914f2",
       "size": 948
+    },
+    ".opencode/skills/webnovel-delete/SKILL.md": {
+      "sha256": "ed376b9c6780b6554b913270dfef00ed3e822fe6428a0def0bbe835d0e33b31d",
+      "size": 1143
     },
     ".opencode/skills/webnovel-plan/SKILL.md": {
       "sha256": "ca61dd298a527ce6f93a28ec233b6f7ca73f3d1abeff506f4abaf26f529c2d04",
@@ -170,6 +174,10 @@
     ".opencode/skills/webnovel-publish/SKILL.md": {
       "sha256": "22fdd641c5c9ef5e726a744f2fa56984ac598b769ed71e58e94018d42acd7a1c",
       "size": 5583
+    },
+    ".opencode/skills/webnovel-rewrite/SKILL.md": {
+      "sha256": "83f658fabf9402301de004092e1e3cd1d4d7d46d0502eb67c5686feba0afa715",
+      "size": 1001
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
       "sha256": "47493f5597df900c920d923af44d1cf134cd2985022dc3d1c22ab5ed63d039c9",
@@ -1219,6 +1227,14 @@
       "sha256": "26b6bf1db646923cde92bba48033fe78946ba6d29cff92cc58d375ea63d0d347",
       "size": 15892
     },
+    ".opencode/scripts/data_modules/chapter_delete_service.py": {
+      "sha256": "d85919688b399818155cdc3eec90e66f51f0d32db255998f9db90f8d91e292a4",
+      "size": 5928
+    },
+    ".opencode/scripts/data_modules/orchestrate.py": {
+      "sha256": "713ad97675ea597d64048604f47a27386af275451a24fe03367d383f7b7f9ca5",
+      "size": 3507
+    },
     ".opencode/scripts/data_modules/memory_contract_adapter.py": {
       "sha256": "a206a37c859f69077f16aa8a311f6047991bc97dfaa2a9b78d54c72c607e71f3",
       "size": 13816
@@ -1244,8 +1260,8 @@
       "size": 2360
     },
     ".opencode/scripts/data_modules/webnovel.py": {
-      "sha256": "52c022645611b3893706c5c7b574b45224d4d6b0940240f322bb03cd3356493d",
-      "size": 27478
+      "sha256": "d89fa602de0b1cc7ca27e0cfaf518d5bab8d56931e08ae61fcc6ac7cdcc79030",
+      "size": 28600
     },
     ".opencode/scripts/data_modules/__init__.py": {
       "sha256": "02e7701b523eb2cfab120e0f1cf9ff01a08dcef3a7da128d445c7020cb4a42bb",
