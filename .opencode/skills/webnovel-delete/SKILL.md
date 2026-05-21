@@ -11,7 +11,7 @@ compatibility: opencode
 ## 目标
 
 - 安全删除指定章节的正文文件
-- 同步清理 state.json、index.db、memory 中的关联数据
+- 同步清理 state.json 和 memory 中的关联数据（index.db 需后续手动 `webnovel index process-chapter` 重建）
 - 支持 dry-run 预览变更，默认不立即执行
 
 ## 执行流程

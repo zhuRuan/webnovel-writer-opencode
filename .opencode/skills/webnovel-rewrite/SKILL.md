@@ -17,9 +17,10 @@ compatibility: opencode
 
 1. 确认要重写的章节号（单章或范围）
 2. 确认新旧大纲/设定的变更已就绪
-3. 调用 `webnovel delete-chapters "范围" --project-root "<PROJECT_ROOT>"` 删除旧章节
-4. 调用 `webnovel-write <章节号>` 重新创作
-5. 如果重写多章，推荐使用 `webnovel orchestrate write "范围"` 批量完成
+3. **先 dry-run**：`webnovel delete-chapters "范围" --project-root "<PROJECT_ROOT>" --dry-run`，确认无误
+4. 执行删除：`webnovel delete-chapters "范围" --project-root "<PROJECT_ROOT>"`
+5. 调用 `webnovel-write <章节号>` 重新创作
+6. 重写多章时推荐使用 `webnovel orchestrate write "范围"` 批量完成
 
 ## 注意事项
 

@@ -153,3 +153,16 @@ def default_chapter_draft_path(project_root: Path, chapter_num: int, *, use_volu
     else:
         return project_root / "正文" / _build_chapter_filename(project_root, chapter_num, use_volume_layout=False)
 
+
+def parse_chapter_range(spec: str) -> list[int]:
+    """Parse '5-12' or '5,7,9-12' into a sorted list of unique integers."""
+    chapters = []
+    for part in spec.split(","):
+        part = part.strip()
+        if "-" in part:
+            a, b = part.split("-", 1)
+            chapters.extend(range(int(a), int(b) + 1))
+        else:
+            chapters.append(int(part))
+    return sorted(set(chapters))
+

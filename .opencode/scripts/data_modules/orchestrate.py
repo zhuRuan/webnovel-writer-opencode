@@ -6,47 +6,36 @@ Modes:
   nightly  Health check only (preflight + status scan)
 """
 
-from __future__ import annotations
-
 import subprocess
 import sys
 from pathlib import Path
 
+from chapter_paths import parse_chapter_range
 
-def _scripts_dir() -> Path:
-    return Path(__file__).resolve().parents[1]
+_SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+_MODES_REVIEW_COMMIT = {"write", "heal"}
+_MODES_INDEX = {"write", "heal", "nightly"}
 
 
 def _run(argv: list[str], timeout: int = 300) -> tuple[int, str]:
-    entry = _scripts_dir() / "webnovel.py"
+    entry = _SCRIPTS_DIR / "webnovel.py"
     cmd = [sys.executable, "-X", "utf8", str(entry)] + argv
-    proc = subprocess.run(cmd, capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", timeout=timeout)
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return 1, f"Timeout after {timeout}s: {' '.join(argv)}"
     return proc.returncode, proc.stdout + "\n" + proc.stderr
 
 
-def _parse_range(spec: str) -> list[int]:
-    """Parse '5-12' or '5,7,9-12' into sorted int list."""
-    chapters = []
-    for part in spec.split(","):
-        part = part.strip()
-        if "-" in part:
-            a, b = part.split("-", 1)
-            chapters.extend(range(int(a), int(b) + 1))
-        else:
-            chapters.append(int(part))
-    return sorted(set(chapters))
-
-
 def cmd_orchestrate(args) -> int:
-    """Main entry: orchestrate <mode> <range> [--project-root PATH]."""
     project_root = args.project_root
     if not project_root:
         print("ERROR: --project-root is required for orchestrate", file=sys.stderr)
         return 1
 
     root_flag = ["--project-root", project_root]
-    chapters = _parse_range(args.chapters)
+    chapters = parse_chapter_range(args.chapters)
     mode = args.mode
 
     if not chapters:
@@ -55,7 +44,6 @@ def cmd_orchestrate(args) -> int:
 
     print(f"Orchestrate: {mode} mode, chapters={chapters}")
 
-    # Preflight once before the batch
     rc, out = _run(root_flag + ["preflight"])
     if rc != 0:
         print("Preflight failed. Fix issues before running orchestrate.")
@@ -66,7 +54,7 @@ def cmd_orchestrate(args) -> int:
     for ch in chapters:
         chapter_flag = ["--chapter", str(ch)]
 
-        if mode in ("write", "heal"):
+        if mode in _MODES_REVIEW_COMMIT:
             rc, _ = _run(root_flag + ["review-pipeline"] + chapter_flag)
             if rc != 0:
                 failures.append((ch, "review"))
@@ -77,7 +65,7 @@ def cmd_orchestrate(args) -> int:
                 failures.append((ch, "commit"))
                 continue
 
-        if mode in ("write", "heal", "nightly"):
+        if mode in _MODES_INDEX:
             rc, _ = _run(root_flag + ["index", "process-chapter"] + chapter_flag, timeout=120)
             if rc != 0:
                 failures.append((ch, "index"))
