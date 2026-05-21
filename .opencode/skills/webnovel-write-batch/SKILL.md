@@ -506,12 +506,14 @@ s2 = json.loads(p.read_text())
 assert $N in s2['completed_chapters'], '写入验证失败'
 
 # 跨章完整性校验：范围内所有已完成的章都必须在 completed_chapters 中
-expected = list(range($S, $N + 1))
+contiguous = list(range($S, $N + 1))
 actual = sorted(s2['completed_chapters'])
-missing = [ch for ch in expected if ch not in actual]
-if missing:
-    raise AssertionError(f'batch_state 不完整！缺失章节: {missing}')
-print(f'✅ batch_state 已验证 ({len(actual)}/{len(expected)} 章已记录)')
+gaps = [ch for ch in contiguous if ch not in actual]
+if gaps:
+    raise AssertionError(f'batch_state 不完整！缺失章节: {gaps}')
+total_in_batch = $E - $S + 1
+done = len(actual)
+print(f'✅ batch_state 已验证 ({done}/{total_in_batch} 章已记录)')
 "
 ```
 
