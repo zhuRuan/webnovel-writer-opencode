@@ -1,17 +1,17 @@
 {
-  "version": "v2.7.0-20260520.1410",
+  "version": "v2.7.0-20260521.1015",
   "tag": "v2.7.0",
-  "updated": "2026-05-20T14:10:19Z",
+  "updated": "2026-05-21T10:15:36Z",
   "changelog": [
     {
-      "hash": "fa03f2d",
-      "type": "refactor",
-      "message": "refactor: \u5b89\u88c5\u7cfb\u7edf\u4ee3\u7801\u5ba1\u67e5\u4f18\u5316"
+      "hash": "1f02025",
+      "type": "fix",
+      "message": "fix: urgency \u5b57\u7b26\u4e32\u7c7b\u578b\u5bfc\u81f4\u4f0f\u7b14\u9759\u9ed8\u4e22\u5931 \u2014 \u56db\u5c42\u9632\u5fa1"
     },
     {
-      "hash": "e1e89f1",
+      "hash": "007307b",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260520.1350 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260520.1410 [skip ci]"
     }
   ],
   "files": {
@@ -836,8 +836,8 @@
       "size": 10450
     },
     ".opencode/agents/data-agent.md": {
-      "sha256": "5367a19c679397fc007c14bc1b520f51715aeb178437842b656bdd9b071305d7",
-      "size": 7302
+      "sha256": "c0bb722ba5beb8684a32a09e2284b99136c73c92cd274cb1a61d3c803ab52cea",
+      "size": 7372
     },
     ".opencode/agents/reviewer.md": {
       "sha256": "16a1f5519deada78fbd2aefac68cbb1791043590e3d6326786b8876cc64903d1",
@@ -1220,8 +1220,8 @@
       "size": 15892
     },
     ".opencode/scripts/data_modules/memory_contract_adapter.py": {
-      "sha256": "757ffe8de8c75b695dfe27468f7e4f6cfb3f60ad8c901a75e45abaab3e8c4d2d",
-      "size": 13748
+      "sha256": "a206a37c859f69077f16aa8a311f6047991bc97dfaa2a9b78d54c72c607e71f3",
+      "size": 13816
     },
     ".opencode/scripts/data_modules/summary_projection_writer.py": {
       "sha256": "c0176879bc1d1b7a1bce96d4aed3e503ff274d18b52f4bd67684159ceba82bdc",
@@ -1322,6 +1322,10 @@
     ".opencode/scripts/data_modules/memory_projection_writer.py": {
       "sha256": "3a3f4fd87cc530a2ea2fa4b3be836853e8bdc66d51b40fca5e1ecb7deaac0636",
       "size": 848
+    },
+    ".opencode/scripts/data_modules/urgency_utils.py": {
+      "sha256": "5fb322dec875230a3fc40f700474d58505f3126b55d13924a594ed1471ee6875",
+      "size": 1013
     },
     ".opencode/scripts/data_modules/runtime_contract_builder.py": {
       "sha256": "9fd4054c6829d8a48ec7991867b3e3f3dd0c78d12119c19a902b850a5c96c863",
@@ -1612,8 +1616,8 @@
       "size": 533
     },
     ".opencode/scripts/data_modules/memory/writer.py": {
-      "sha256": "e5346708daeaa5815109d40933535cca6e2cee7d95702e43b910f5d6b94b4444",
-      "size": 15907
+      "sha256": "44ef28d4e8077ee62d5d4400f31ba67423b4e928c27139c1bd30b37bfeb59681",
+      "size": 15977
     },
     ".opencode/scripts/data_modules/memory/schema.py": {
       "sha256": "6b68ef11ef9827d2b69244991a65e7d82a6b0c572a6827a6b23961cb99da3ceb",
