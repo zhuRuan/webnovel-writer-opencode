@@ -9,9 +9,7 @@ Dirty entity examples: "xiao_yan", "XiaoYan", "fire_spirit", "main_character"
 Clean entity examples: "萧炎", "主角·萧炎", "火焰精灵"
 
 Operation:
-  --dry-run       Scan and report only (default)
   --mark-invalid  Write dirty entities to invalid_facts table for manual review
-  --fix-pinyin    Attempt to resolve pinyin → Chinese via entity name mapping (best-effort)
 """
 
 import sqlite3

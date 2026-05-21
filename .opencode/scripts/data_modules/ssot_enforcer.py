@@ -20,12 +20,9 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
-import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 
 # ── Event log ────────────────────────────────────────────────────────
@@ -115,12 +112,15 @@ def read_events(project_root: Path,
 # ── Projection rebuild ───────────────────────────────────────────────
 
 
-def rebuild_state_json(project_root: Path) -> dict:
+def rebuild_state_json(project_root: Path,
+                       events: Optional[list[dict]] = None) -> dict:
     """Rebuild state.json as a materialized view from the event log.
 
     This is deterministic: replaying the same events always produces the same state.
+    Accepts pre-loaded events to avoid redundant I/O.
     """
-    events = read_events(project_root)
+    if events is None:
+        events = read_events(project_root)
     state = _empty_state()
 
     for evt in events:
@@ -184,15 +184,15 @@ def rebuild_projections(project_root: Path) -> dict:
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # Publish a record of this rebuild
+    event_count = sum(1 for _ in _event_log_dir(project_root).glob("*.event.json"))
     publish_event(project_root, "projection_rebuilt", {
         "target": "state.json",
-        "event_count": sum(1 for _ in _event_log_dir(project_root).glob("*.event.json")),
+        "event_count": event_count,
     })
 
     return {
         "projection": "state.json",
-        "event_count": sum(1 for _ in _event_log_dir(project_root).glob("*.event.json")),
+        "event_count": event_count,
         "chapters_in_state": len(state.get("progress", {}).get("chapter_status", {})),
         "entities_in_state": len(state.get("entities_v3", {})),
     }
@@ -205,15 +205,14 @@ def verify_consistency(project_root: Path) -> list[dict]:
     """Compare state.json projection against event log. Returns list of drifts."""
     drifts = []
 
-    events = read_events(project_root)
     state_path = project_root / ".webnovel" / "state.json"
-
     try:
         actual_state = json.loads(state_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return [{"severity": "error", "detail": "state.json missing or unreadable"}]
 
-    expected = rebuild_state_json(project_root)
+    events = read_events(project_root)
+    expected = rebuild_state_json(project_root, events=events)
 
     # Compare chapter_status
     actual_chs = set((actual_state.get("progress") or {}).get("chapter_status") or {}).keys()

@@ -18,8 +18,6 @@ On interruption, read the last checkpoint to determine:
 Storage: .webnovel/workflow_checkpoints.json (append-only, compact per-chapter)
 """
 
-from __future__ import annotations
-
 import json
 import os
 import sys
@@ -118,9 +116,12 @@ def all_chapters_progress(project_root: Path) -> dict:
     return summary
 
 
-def find_interrupted(project_root: Path) -> list[int]:
+def find_interrupted(project_root: Path,
+                     progress: Optional[dict] = None) -> list[int]:
     """Find chapters that started but didn't reach COMMITTED."""
-    return [ch for ch, info in all_chapters_progress(project_root).items()
+    if progress is None:
+        progress = all_chapters_progress(project_root)
+    return [ch for ch, info in progress.items()
             if not info["complete"]]
 
 
@@ -146,7 +147,8 @@ def cmd_workflow(args) -> int:
         return 0
 
     if args.action == "interrupted":
-        interrupted = find_interrupted(project_root)
+        progress = all_chapters_progress(project_root)
+        interrupted = find_interrupted(project_root, progress=progress)
         if interrupted:
             print(f"Interrupted chapters: {interrupted}")
             for ch in interrupted:

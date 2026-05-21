@@ -517,7 +517,6 @@ def main() -> None:
     # entity-clean — dirty entity detection
     p_entity_clean = sub.add_parser("entity-clean", help="扫描并标记 index.db 中的脏实体（拼音/英文ID）")
     p_entity_clean.add_argument("--mark-invalid", action="store_true", help="写入 invalid_facts 表")
-    p_entity_clean.add_argument("--fix-pinyin", action="store_true", help="尝试解析拼音→中文")
 
     # ssot — single source of truth enforcer
     p_ssot = sub.add_parser("ssot", help="SSOT 真理源管理（事件日志/投影重建/一致性校验）")
@@ -703,8 +702,6 @@ def main() -> None:
         return_args = [*forward_args]
         if getattr(args, "mark_invalid", False):
             return_args.append("--mark-invalid")
-        if getattr(args, "fix_pinyin", False):
-            return_args.append("--fix-pinyin")
         raise SystemExit(_run_data_module("entity_cleanup", return_args))
 
     if tool == "ssot":
@@ -717,7 +714,7 @@ def main() -> None:
 
     if tool == "workflow":
         return_args = [*forward_args, args.workflow_action]
-        if hasattr(args, "chapter") and args.chapter:
+        if hasattr(args, "chapter") and args.chapter is not None:
             return_args.extend(["--chapter", str(args.chapter)])
         if hasattr(args, "stage") and args.stage:
             return_args.extend(["--stage", args.stage])
@@ -729,9 +726,15 @@ def main() -> None:
         return_args = [*forward_args, args.override_action]
         if hasattr(args, "constraint_id") and args.constraint_id:
             return_args.extend(["--constraint-id", args.constraint_id])
-        for attr in ("old_rule", "new_rule", "rationale", "domain"):
-            if hasattr(args, attr) and getattr(args, attr, None):
-                return_args.extend([f"--{attr.replace('_', '-')}", str(getattr(args, attr))])
+        for cli_flag, attr in [
+            ("--old-rule", "old_rule"),
+            ("--new-rule", "new_rule"),
+            ("--rationale", "rationale"),
+            ("--domain", "domain"),
+        ]:
+            val = getattr(args, attr, None)
+            if val:
+                return_args.extend([cli_flag, str(val)])
         if hasattr(args, "chapter") and args.chapter:
             return_args.extend(["--chapter", str(args.chapter)])
         raise SystemExit(_run_data_module("override_contract_engine", return_args))
