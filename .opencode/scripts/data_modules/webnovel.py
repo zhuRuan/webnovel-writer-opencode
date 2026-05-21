@@ -514,6 +514,48 @@ def main() -> None:
     p_delete.add_argument("chapters", help="章节范围，如 '5-12' 或 '5,7,9-12'")
     p_delete.add_argument("--dry-run", action="store_true", help="预览不执行")
 
+    # entity-clean — dirty entity detection
+    p_entity_clean = sub.add_parser("entity-clean", help="扫描并标记 index.db 中的脏实体（拼音/英文ID）")
+    p_entity_clean.add_argument("--mark-invalid", action="store_true", help="写入 invalid_facts 表")
+    p_entity_clean.add_argument("--fix-pinyin", action="store_true", help="尝试解析拼音→中文")
+
+    # ssot — single source of truth enforcer
+    p_ssot = sub.add_parser("ssot", help="SSOT 真理源管理（事件日志/投影重建/一致性校验）")
+    p_ssot_sub = p_ssot.add_subparsers(dest="ssot_action")
+    p_ssot_sub.add_parser("verify", help="校验 state.json 与事件日志一致性")
+    p_ssot_sub.add_parser("rebuild", help="从事件日志重建 state.json")
+    ssot_events = p_ssot_sub.add_parser("events", help="读取事件日志")
+    ssot_events.add_argument("--event-type", help="按事件类型过滤")
+    ssot_events.add_argument("--chapter", type=int, help="按章节过滤")
+
+    # workflow — checkpoint engine
+    p_wf = sub.add_parser("workflow", help="章节工作流检查点（阶段追踪/中断恢复）")
+    p_wf_sub = p_wf.add_subparsers(dest="workflow_action")
+    wf_check = p_wf_sub.add_parser("checkpoint", help="记录阶段转换")
+    wf_check.add_argument("--chapter", type=int, required=True)
+    wf_check.add_argument("--stage", choices=["PLANNING", "DRAFTING", "REVIEWING", "REVISING", "COMMITTED"], required=True)
+    wf_check.add_argument("--metadata", help="JSON 元数据")
+    wf_status = p_wf_sub.add_parser("status", help="查看章节进度")
+    wf_status.add_argument("--chapter", type=int, help="指定章节，不填则全部")
+    p_wf_sub.add_parser("interrupted", help="查找中断未完成的章节")
+
+    # override — versioned constraint management
+    p_ovr = sub.add_parser("override", help="Override Contract 版本化规则管理")
+    p_ovr_sub = p_ovr.add_subparsers(dest="override_action")
+    ovr_add = p_ovr_sub.add_parser("add", help="新增规则覆盖（自动升版本）")
+    ovr_add.add_argument("--constraint-id", required=True, help="如 power.flight_limit")
+    ovr_add.add_argument("--old-rule", required=True)
+    ovr_add.add_argument("--new-rule", required=True)
+    ovr_add.add_argument("--rationale", required=True)
+    ovr_add.add_argument("--chapter", type=int, required=True)
+    ovr_add.add_argument("--domain", default="world_rule")
+    ovr_list = p_ovr_sub.add_parser("list", help="列出当前生效规则")
+    ovr_list.add_argument("--domain")
+    ovr_hist = p_ovr_sub.add_parser("history", help="查看规则版本历史")
+    ovr_hist.add_argument("--constraint-id", required=True)
+    ovr_ctx = p_ovr_sub.add_parser("context", help="生成上下文提示")
+    ovr_ctx.add_argument("--chapter", type=int, required=True)
+
     # 兼容：允许 `--project-root` 出现在任意位置（减少 agents/skills 拼命令的出错率）
     from .cli_args import normalize_global_project_root
 
@@ -656,6 +698,43 @@ def main() -> None:
         if getattr(args, "dry_run", False):
             return_args.append("--dry-run")
         raise SystemExit(_run_data_module("chapter_delete_service", return_args))
+
+    if tool == "entity-clean":
+        return_args = [*forward_args]
+        if getattr(args, "mark_invalid", False):
+            return_args.append("--mark-invalid")
+        if getattr(args, "fix_pinyin", False):
+            return_args.append("--fix-pinyin")
+        raise SystemExit(_run_data_module("entity_cleanup", return_args))
+
+    if tool == "ssot":
+        return_args = [*forward_args, args.ssot_action]
+        if hasattr(args, "event_type") and args.event_type:
+            return_args.extend(["--event-type", args.event_type])
+        if hasattr(args, "chapter") and args.chapter:
+            return_args.extend(["--chapter", str(args.chapter)])
+        raise SystemExit(_run_data_module("ssot_enforcer", return_args))
+
+    if tool == "workflow":
+        return_args = [*forward_args, args.workflow_action]
+        if hasattr(args, "chapter") and args.chapter:
+            return_args.extend(["--chapter", str(args.chapter)])
+        if hasattr(args, "stage") and args.stage:
+            return_args.extend(["--stage", args.stage])
+        if hasattr(args, "metadata") and args.metadata:
+            return_args.extend(["--metadata", args.metadata])
+        raise SystemExit(_run_data_module("workflow_checkpoint", return_args))
+
+    if tool == "override":
+        return_args = [*forward_args, args.override_action]
+        if hasattr(args, "constraint_id") and args.constraint_id:
+            return_args.extend(["--constraint-id", args.constraint_id])
+        for attr in ("old_rule", "new_rule", "rationale", "domain"):
+            if hasattr(args, attr) and getattr(args, attr, None):
+                return_args.extend([f"--{attr.replace('_', '-')}", str(getattr(args, attr))])
+        if hasattr(args, "chapter") and args.chapter:
+            return_args.extend(["--chapter", str(args.chapter)])
+        raise SystemExit(_run_data_module("override_contract_engine", return_args))
 
     raise SystemExit(2)
 
