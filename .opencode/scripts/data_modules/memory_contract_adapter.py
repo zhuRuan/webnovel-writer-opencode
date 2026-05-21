@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from .chapter_commit_service import ChapterCommitService
 from .config import DataModulesConfig, get_config
+from .urgency_utils import coerce_urgency
 from .memory_contract import (
     CommitResult,
     ContextPack,
@@ -319,11 +320,11 @@ class MemoryContractAdapter:
                     status=item.status,
                     planted_chapter=item.source_chapter,
                     expected_payoff=item.payload.get("expected_payoff", ""),
-                    urgency=float(item.payload.get("urgency", 0.0)),
+                    urgency=coerce_urgency(item.payload.get("urgency")),
                 )
                 for item in items
             ]
-        except Exception as e:
+        except (OSError, ValueError, KeyError) as e:
             logger.warning("get_open_loops failed: %s", e)
             return []
 
