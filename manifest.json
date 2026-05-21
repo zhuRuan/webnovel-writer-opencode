@@ -1,17 +1,17 @@
 {
-  "version": "v2.7.0-20260521.1511",
+  "version": "v2.7.0-20260521.1514",
   "tag": "v2.7.0",
-  "updated": "2026-05-21T15:11:23Z",
+  "updated": "2026-05-21T15:14:32Z",
   "changelog": [
     {
-      "hash": "e9ccf89",
-      "type": "fix",
-      "message": "fix: clean-tmp \u65e0\u5dee\u522b\u5220\u9664 review_results.json \u5bfc\u81f4\u6bcf\u7ae0\u5ba1\u67e5/\u63d0\u4ea4\u5931\u8d25"
+      "hash": "bf6c8e0",
+      "type": "simplify",
+      "message": "simplify: clean-tmp --keep \u79fb\u9664\u5197\u4f59\u9632\u5fa1\u4ee3\u7801"
     },
     {
-      "hash": "da575a6",
+      "hash": "6f9e9b1",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260521.1449 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260521.1511 [skip ci]"
     }
   ],
   "files": {
@@ -912,8 +912,8 @@
       "size": 8711
     },
     ".opencode/scripts/skill_runner.py": {
-      "sha256": "10527bc24b44d7128c2463c8f6f895ac5d01e9850081a61dfe5986460a640768",
-      "size": 11653
+      "sha256": "df8a73dddcf93f43ad52438f00ddde25e36bd147f74ec3341cb07274c5c514c0",
+      "size": 11631
     },
     ".opencode/scripts/story_events.py": {
       "sha256": "0510f9c05d01e94a13fe28726680c2e7d527b87b5f491eb4fe63f3ff163144d6",
