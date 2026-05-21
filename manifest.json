@@ -1,17 +1,17 @@
 {
-  "version": "v2.7.0-20260521.1514",
+  "version": "v2.7.0-20260521.1536",
   "tag": "v2.7.0",
-  "updated": "2026-05-21T15:14:32Z",
+  "updated": "2026-05-21T15:36:50Z",
   "changelog": [
     {
-      "hash": "bf6c8e0",
-      "type": "simplify",
-      "message": "simplify: clean-tmp --keep \u79fb\u9664\u5197\u4f59\u9632\u5fa1\u4ee3\u7801"
+      "hash": "f88942a",
+      "type": "fix",
+      "message": "fix: batch_state \u8de8\u7ae0\u8fdb\u5ea6\u663e\u793a\u4f7f\u7528 total_in_batch \u800c\u975e\u5f53\u524d\u7ae0\u6570"
     },
     {
-      "hash": "6f9e9b1",
+      "hash": "d755055",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260521.1511 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260521.1514 [skip ci]"
     }
   ],
   "files": {
@@ -180,8 +180,8 @@
       "size": 1101
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
-      "sha256": "a3d51b96d1e250bc5174fb3f9dc64bb9e7c5a4575969c105aa14df1cabed948d",
-      "size": 19975
+      "sha256": "87672f8a4f5386a810ff53d5a4c962d259c488b69ed6fcc02795023348d05647",
+      "size": 20012
     },
     ".opencode/skills/webnovel-write-batch/references/batch-protocol.md": {
       "sha256": "71a4a57263a69267bb80857d734eea64f3d79322bfe8c6a3331a96540c3167d2",
