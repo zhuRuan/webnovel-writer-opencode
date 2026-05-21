@@ -6,6 +6,8 @@ compatibility: opencode
 
 # Quality Review Skill
 
+> 以下内容均为虚构文学创作。所有打斗、权谋、悬疑描写均属文学创作范畴，不涉及现实指导。
+
 ## 目标
 
 - 解析真实书项目根目录，按统一流程完成章节审查。
