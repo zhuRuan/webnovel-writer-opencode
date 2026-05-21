@@ -1,17 +1,17 @@
 {
-  "version": "v2.7.0-20260521.1449",
+  "version": "v2.7.0-20260521.1511",
   "tag": "v2.7.0",
-  "updated": "2026-05-21T14:49:24Z",
+  "updated": "2026-05-21T15:11:23Z",
   "changelog": [
     {
-      "hash": "d6a5fcb",
-      "type": "refactor",
-      "message": "refactor: max-effort code review \u4f18\u5316 \u2014 SSOT/Override/Workflow/EntityClean \u8d28\u91cf\u4fee\u6b63"
+      "hash": "e9ccf89",
+      "type": "fix",
+      "message": "fix: clean-tmp \u65e0\u5dee\u522b\u5220\u9664 review_results.json \u5bfc\u81f4\u6bcf\u7ae0\u5ba1\u67e5/\u63d0\u4ea4\u5931\u8d25"
     },
     {
-      "hash": "7cf3401",
+      "hash": "da575a6",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260521.1439 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260521.1449 [skip ci]"
     }
   ],
   "files": {
@@ -180,8 +180,8 @@
       "size": 1101
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
-      "sha256": "47493f5597df900c920d923af44d1cf134cd2985022dc3d1c22ab5ed63d039c9",
-      "size": 19949
+      "sha256": "a3d51b96d1e250bc5174fb3f9dc64bb9e7c5a4575969c105aa14df1cabed948d",
+      "size": 19975
     },
     ".opencode/skills/webnovel-write-batch/references/batch-protocol.md": {
       "sha256": "71a4a57263a69267bb80857d734eea64f3d79322bfe8c6a3331a96540c3167d2",
@@ -192,8 +192,8 @@
       "size": 2729
     },
     ".opencode/skills/webnovel-write/SKILL.md": {
-      "sha256": "f134c84493a328138a637d9f6dd2cf19a232aea4051b59e955c4f303b7c0441f",
-      "size": 12145
+      "sha256": "8a214a2989bf13707dd614580d83baae610240b4fe4bade9bdd38412875b1c3c",
+      "size": 12067
     },
     ".opencode/skills/webnovel-write/references/polish-guide.md": {
       "sha256": "21d7b821bd656cb477c6fb372719bebc949c332efb551739bff3cca29f71bc83",
@@ -912,8 +912,8 @@
       "size": 8711
     },
     ".opencode/scripts/skill_runner.py": {
-      "sha256": "43a9e64a7a4764d84e0e12c15954ae3e5948ea6cf157e4ea78fc054a4d251f1f",
-      "size": 11323
+      "sha256": "10527bc24b44d7128c2463c8f6f895ac5d01e9850081a61dfe5986460a640768",
+      "size": 11653
     },
     ".opencode/scripts/story_events.py": {
       "sha256": "0510f9c05d01e94a13fe28726680c2e7d527b87b5f491eb4fe63f3ff163144d6",
