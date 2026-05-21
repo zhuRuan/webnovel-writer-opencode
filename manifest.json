@@ -1,17 +1,17 @@
 {
-  "version": "v2.7.0-20260521.1439",
+  "version": "v2.7.0-20260521.1449",
   "tag": "v2.7.0",
-  "updated": "2026-05-21T14:39:24Z",
+  "updated": "2026-05-21T14:49:24Z",
   "changelog": [
     {
-      "hash": "4afe49d",
-      "type": "feat",
-      "message": "feat: \u884c\u4e1a\u6807\u6746\u7ea7\u67b6\u6784\u5b9e\u73b0 \u2014 SSOT/Override/Workflow/EntityClean"
+      "hash": "d6a5fcb",
+      "type": "refactor",
+      "message": "refactor: max-effort code review \u4f18\u5316 \u2014 SSOT/Override/Workflow/EntityClean \u8d28\u91cf\u4fee\u6b63"
     },
     {
-      "hash": "19bf827",
+      "hash": "7cf3401",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260521.1420 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260521.1439 [skip ci]"
     }
   ],
   "files": {
@@ -1216,8 +1216,8 @@
       "size": 2847
     },
     ".opencode/scripts/data_modules/ssot_enforcer.py": {
-      "sha256": "6b3be41a95f9ea55d71da3b80dc673d7b9c497759f6edcaec25fe0e38090aa72",
-      "size": 10208
+      "sha256": "7c597693ac9977cfa298777c75fc6bd8e6f6b223dd27fa1376395268a3b8a92d",
+      "size": 10257
     },
     ".opencode/scripts/data_modules/index_observability_mixin.py": {
       "sha256": "01f0e7f5c297d51f0bbf2501af96fd5d88f0a9fe735c7e93beb74dc0d6d373a7",
@@ -1228,8 +1228,8 @@
       "size": 1390
     },
     ".opencode/scripts/data_modules/entity_cleanup.py": {
-      "sha256": "2d97b13379b4f29592bf77dc3d15cb8008adf116dc316a2fb1e44e7fab078067",
-      "size": 4272
+      "sha256": "16819289ab0de159c95c71d92f9dd120a9a31ec8b35d5c644854a341bce27545",
+      "size": 4129
     },
     ".opencode/scripts/data_modules/chapter_commit_service.py": {
       "sha256": "cbfee2820f1f5e7fcdbcb7547b682346007016cb14a2fd3de30ee1b1d92645f5",
@@ -1272,12 +1272,12 @@
       "size": 2360
     },
     ".opencode/scripts/data_modules/workflow_checkpoint.py": {
-      "sha256": "7cc70e69a6efab284c639696f6b714212648bed241379931f49ba44817afff5d",
-      "size": 6442
+      "sha256": "d4313980a6478f29b9acf12fcfd8ec1f706ddf9c21f42e4400660f034e2128ef",
+      "size": 6587
     },
     ".opencode/scripts/data_modules/webnovel.py": {
-      "sha256": "84e7d880880fb0328a40ba74aceb1d73e9b07271e8884a472beff4f8fbd10e69",
-      "size": 33317
+      "sha256": "0026ea66b1a27f97f75ab558bb1e6f4b8701d3c377f5e9efbe5bd34e77a10f03",
+      "size": 33223
     },
     ".opencode/scripts/data_modules/__init__.py": {
       "sha256": "02e7701b523eb2cfab120e0f1cf9ff01a08dcef3a7da128d445c7020cb4a42bb",
