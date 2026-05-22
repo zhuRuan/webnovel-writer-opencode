@@ -73,6 +73,7 @@ class ContextManager:
         "runtime_status",
         "latest_commit",
         "prewrite_validation",
+        "override_hints",
     }
     SECTION_ORDER = [
         "core",
@@ -85,6 +86,7 @@ class ContextManager:
         "reader_signal",
         "genre_profile",
         "writing_guidance",
+        "override_hints",
         "plot_structure",
         "story_skeleton",
         "memory",
@@ -275,7 +277,8 @@ class ContextManager:
             from .override_contract_engine import build_context_hints
             hints = build_context_hints(self.config.project_root, chapter, max_rules=5)
             return hints
-        except Exception:
+        except Exception as exc:
+            logger.warning("override_hints load failed for chapter %s: %s", chapter, exc)
             return ""
 
     def _load_reader_signal(self, chapter: int) -> Dict[str, Any]:

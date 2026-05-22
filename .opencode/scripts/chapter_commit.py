@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from runtime_compat import enable_windows_utf8_stdio
 
 from data_modules.chapter_commit_service import ChapterCommitService
 from data_modules.cli_output import print_json
+
+logger = logging.getLogger(__name__)
 
 
 def _read_json(path: str) -> dict:
@@ -51,15 +54,15 @@ def main() -> None:
         try:
             from data_modules.workflow_checkpoint import checkpoint
             checkpoint(args.chapter, "COMMITTED", Path(args.project_root))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("workflow checkpoint failed for chapter %s: %s", args.chapter, exc)
         try:
             from data_modules.ssot_enforcer import publish_event
             publish_event(Path(args.project_root), "chapter_status_changed",
                           {"status": "committed", "score": payload["meta"].get("score", 0)},
                           chapter=args.chapter)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("SSOT publish_event failed for chapter %s: %s", args.chapter, exc)
     # Close aiohttp sessions opened by projection writers (embedding API)
     import asyncio
     try:

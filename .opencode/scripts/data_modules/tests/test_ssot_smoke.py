@@ -3,7 +3,7 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import pytest
 
@@ -69,7 +69,6 @@ class TestSSOTEventLog:
 
     def test_verify_consistency_clean(self, tmp_path):
         from data_modules.ssot_enforcer import publish_event, rebuild_state_json, verify_consistency
-        import json
 
         # Manually build state.json the same way rebuild does
         publish_event(tmp_path, "chapter_status_changed",
