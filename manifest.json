@@ -1,17 +1,17 @@
 {
-  "version": "v2.7.0-20260522.1041",
+  "version": "v2.7.0-20260522.1100",
   "tag": "v2.7.0",
-  "updated": "2026-05-22T10:41:59Z",
+  "updated": "2026-05-22T11:00:25Z",
   "changelog": [
     {
-      "hash": "5416150",
-      "type": "feat",
-      "message": "feat: \u67b6\u6784\u6a21\u5757\u63a5\u5165\u5199\u4f5c\u6d41\u7a0b + \u7a7f\u63d2\u6d4b\u8bd5"
+      "hash": "bd6ef5f",
+      "type": "fix",
+      "message": "fix: override_hints \u672a\u6295\u9012 + except passthrough + pytest.ini + \u6d4b\u8bd5\u6c61\u67d3"
     },
     {
-      "hash": "17dfdc9",
+      "hash": "bbc83c9",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260522.1019 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260522.1041 [skip ci]"
     }
   ],
   "files": {
@@ -976,8 +976,8 @@
       "size": 272
     },
     ".opencode/scripts/chapter_commit.py": {
-      "sha256": "2266791aed730dcbbc1d5c9cf5301d553d8aad9405b7aac90d2b33d98152c53c",
-      "size": 2859
+      "sha256": "2314c2bbb8a154c11636dba999fad4cfe645dfc09cd0899293c910e40234222a",
+      "size": 3081
     },
     ".opencode/scripts/update_master_outline.py": {
       "sha256": "f0ea98d6f8e1adb9194c488cb9aa5ba96b264f8e750318a5e932d41c5ed5a64d",
@@ -1312,8 +1312,8 @@
       "size": 11711
     },
     ".opencode/scripts/data_modules/context_manager.py": {
-      "sha256": "bb28f853ec8193d9a7db5916828d9e1ebd83e49c93fd4f0ed8647c72e563bc13",
-      "size": 35421
+      "sha256": "a59105f884b972393f22f11e05530dc210c103d95cafaa0a9b91df758cb00fc2",
+      "size": 35570
     },
     ".opencode/scripts/data_modules/config.py": {
       "sha256": "8e67d1290946ee7839799e532456ac849c1352d6b54e764ad7c3fe9c25c36333",
@@ -1420,8 +1420,8 @@
       "size": 3013
     },
     ".opencode/scripts/data_modules/tests/test_context_override_hints.py": {
-      "sha256": "8acd8ebe1be94b1c831daa40395686f962118b22e7a353d7ea9e9ac41ca69569",
-      "size": 2866
+      "sha256": "1b14f333fab23755ac497b49d5c595292d9fe8ee51ad831fdd99e7c56298ad1b",
+      "size": 2933
     },
     ".opencode/scripts/data_modules/tests/test_dashboard_watcher.py": {
       "sha256": "cb660be13a2332a74886ef334062081c83c84af62eec0ef18cdde4ebff1764b1",
@@ -1544,8 +1544,8 @@
       "size": 22284
     },
     ".opencode/scripts/data_modules/tests/test_ssot_smoke.py": {
-      "sha256": "bf92ef0e0226be1c440b51bc4776ff231927fb89810265801bdfca7525ba9d6b",
-      "size": 3303
+      "sha256": "59c7ec548662728d5a8871bb7cb4f28cfc4027e1a4929f798fe0fdf755cea835",
+      "size": 3283
     },
     ".opencode/scripts/data_modules/tests/test_context_ranker.py": {
       "sha256": "c2412be1fed180925deb69b23a99c1c46672784ce6fce0fd37833ab33b9e6e7f",
