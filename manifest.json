@@ -1,17 +1,17 @@
 {
-  "version": "v2.7.0-20260522.1100",
+  "version": "v2.7.0-20260522.1434",
   "tag": "v2.7.0",
-  "updated": "2026-05-22T11:00:25Z",
+  "updated": "2026-05-22T14:34:11Z",
   "changelog": [
     {
-      "hash": "bd6ef5f",
-      "type": "fix",
-      "message": "fix: override_hints \u672a\u6295\u9012 + except passthrough + pytest.ini + \u6d4b\u8bd5\u6c61\u67d3"
+      "hash": "2c970d7",
+      "type": "refactor",
+      "message": "refactor: \u89c4\u8303\u91cd\u6784 delete/rewrite skill\uff0c\u5bf9\u9f50 webnovel-write \u6807\u51c6"
     },
     {
-      "hash": "bbc83c9",
+      "hash": "2f066d2",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260522.1041 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260522.1100 [skip ci]"
     }
   ],
   "files": {
@@ -48,8 +48,8 @@
       "size": 948
     },
     ".opencode/skills/webnovel-delete/SKILL.md": {
-      "sha256": "ccd2c80737b4779097a4c8462c5da3f6124535c7f986976d180727d5679abcc1",
-      "size": 1204
+      "sha256": "fab865eb9bee3bf95ca7ea7bc86b23a50dfee04e31719e72611a0dde3b61ad14",
+      "size": 2006
     },
     ".opencode/skills/webnovel-plan/SKILL.md": {
       "sha256": "ca61dd298a527ce6f93a28ec233b6f7ca73f3d1abeff506f4abaf26f529c2d04",
@@ -176,8 +176,8 @@
       "size": 5583
     },
     ".opencode/skills/webnovel-rewrite/SKILL.md": {
-      "sha256": "0df7d06d681aa475e5f2cec375e0f8b12ccaeee006b5d5240ace896e231dc245",
-      "size": 1101
+      "sha256": "777da01bb64d055e0c20c1fbb3f82b159230fb1c32d18ac3880e25b5ac519b40",
+      "size": 2439
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
       "sha256": "8ab14088472271affe733b28c27a8b60d3595fc260602b27b46fccbb789345c5",
