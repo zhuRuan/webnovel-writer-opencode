@@ -1,17 +1,17 @@
 {
-  "version": "v2.7.0-20260521.1536",
+  "version": "v2.7.0-20260522.1019",
   "tag": "v2.7.0",
-  "updated": "2026-05-21T15:36:50Z",
+  "updated": "2026-05-22T10:19:32Z",
   "changelog": [
     {
-      "hash": "f88942a",
+      "hash": "e90153e",
       "type": "fix",
-      "message": "fix: batch_state \u8de8\u7ae0\u8fdb\u5ea6\u663e\u793a\u4f7f\u7528 total_in_batch \u800c\u975e\u5f53\u524d\u7ae0\u6570"
+      "message": "fix: BOM \u7f16\u7801/\u4e2d\u6587\u5f15\u53f7/Git \u6240\u6709\u6743 \u4e09\u4e2a\u7a0b\u5e8f\u7ea7 Bug"
     },
     {
-      "hash": "d755055",
+      "hash": "3ba0f31",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260521.1514 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260521.1536 [skip ci]"
     }
   ],
   "files": {
@@ -180,8 +180,8 @@
       "size": 1101
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
-      "sha256": "87672f8a4f5386a810ff53d5a4c962d259c488b69ed6fcc02795023348d05647",
-      "size": 20012
+      "sha256": "8ab14088472271affe733b28c27a8b60d3595fc260602b27b46fccbb789345c5",
+      "size": 20076
     },
     ".opencode/skills/webnovel-write-batch/references/batch-protocol.md": {
       "sha256": "71a4a57263a69267bb80857d734eea64f3d79322bfe8c6a3331a96540c3167d2",
@@ -936,8 +936,8 @@
       "size": 1251
     },
     ".opencode/scripts/backup_manager.py": {
-      "sha256": "b0c242798d0008afe96f1abc8722d5cf04cd2185ff9ef1b83044aeb8a98c7989",
-      "size": 15823
+      "sha256": "3ad05c88507f3b863f133e2b97ff66c09478e18526a506d84a44d8ee454cd11b",
+      "size": 17064
     },
     ".opencode/scripts/validate_csv.py": {
       "sha256": "775913a52731abcf6c0713e12ef79d416d0bb644c47ba043014e7d220fb132bd",
@@ -1008,8 +1008,8 @@
       "size": 23384
     },
     ".opencode/scripts/review_pipeline.py": {
-      "sha256": "3e332cc5e738faa7cd53da1597241128c7a451ce6f197db308668fc028ee83d6",
-      "size": 9308
+      "sha256": "802c41e54fdc7dc0595c41b7999dac9805b86785971af928e0f7f96a8fd108c7",
+      "size": 9822
     },
     ".opencode/scripts/publisher/browser.py": {
       "sha256": "cb3f60ed0f83c531b906fd03fe5f4d4d427fae3a2ff460dd9f5ad6ff685e9c9b",
