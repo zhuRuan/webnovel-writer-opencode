@@ -34,10 +34,17 @@ from data_modules.review_schema import (
 )
 
 
-def _sanitize_json_text(raw: str) -> str:
-    """Normalize curly quotes and strip BOM before JSON parse."""
-    sanitized = raw.replace("“", "「").replace("”", "」")
-    sanitized = sanitized.lstrip("﻿")  # UTF-8 BOM
+def _sanitize_json_text(raw: str, aggressive: bool = False) -> str:
+    """Normalize non-ASCII quotes and strip BOM before JSON parse.
+
+    In normal mode, curly quotes become corner brackets 「」 (safe content preservation).
+    In aggressive mode, all non-ASCII double quotes become ASCII \" (JSON delimiter fix).
+    """
+    sanitized = raw.replace("“", "「").replace("”", "」")  # curly → corner
+    if aggressive:
+        for ch in ("“", "”", "「", "」", "＂"):
+            sanitized = sanitized.replace(ch, '"')
+    sanitized = sanitized.lstrip("﻿")
     return sanitized
 
 
@@ -70,9 +77,13 @@ def clean_reviewer_output(raw: str) -> dict:
     json_str = _sanitize_json_text(json_str)
     try:
         return json.loads(json_str)
-    except json.JSONDecodeError as e:
-        preview = json_str[:500] + "..." if len(json_str) > 500 else json_str
-        raise ValueError(f"JSON解析失败，raw前500字符: {preview}") from e
+    except json.JSONDecodeError:
+        json_str = _sanitize_json_text(json_str, aggressive=True)
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            preview = json_str[:500] + "..." if len(json_str) > 500 else json_str
+            raise ValueError(f"JSON解析失败，raw前500字符: {preview}") from e
 
 
 def _resolve_report_path(project_root: Path, report_file: str) -> Path:

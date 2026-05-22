@@ -77,12 +77,12 @@ echo "最新章节: 第${LATEST}章"
 BATCH_STATE="${PROJECT_ROOT}/.webnovel/batch_state.json"
 
 if [ -f "$BATCH_STATE" ]; then
-  STATUS=$(python -c "import json; print(json.load(open('$BATCH_STATE')).get('status',''))")
+  STATUS=$(python -c "import json; print(json.load(open('$BATCH_STATE',encoding='utf-8-sig')).get('status',''))")
   if [ "$STATUS" = "running" ]; then
     echo "检测到未完成的批量任务"
     python -c "
 import json
-s = json.load(open('$BATCH_STATE'))
+s = json.load(open('$BATCH_STATE', encoding='utf-8-sig'))
 print(f'  已完成: 第{s[\"completed_chapters\"]}章')
 print(f'  待恢复: 第{s[\"current_chapter\"]}章')
 "
@@ -184,7 +184,7 @@ if [ "$N" -gt "$S" ]; then
     exit 1
   fi
 
-  IN_BATCH=$(python -c "import json; s=json.load(open('$BATCH_STATE')); print($PREV in s.get('completed_chapters',[]))")
+  IN_BATCH=$(python -c "import json; s=json.load(open('$BATCH_STATE',encoding='utf-8-sig')); print($PREV in s.get('completed_chapters',[]))")
   if [ "$IN_BATCH" != "True" ]; then
     echo "❌ 第${PREV}章未在 batch_state 中标记完成。立即停止。"
     exit 1

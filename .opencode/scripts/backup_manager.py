@@ -143,29 +143,54 @@ __pycache__/
             return False
 
     def _run_git_command(self, args: List[str], check: bool = True) -> Tuple[bool, str]:
-        """执行 Git 命令（支持优雅降级）"""
+        """执行 Git 命令（支持优雅降级）。
+
+        自动处理 dubious ownership 错误（Windows 下目录所有者不一致时触发），
+        检测到后自动执行 git config --global --add safe.directory 并重试。
+        """
         if not self.git_available:
             return False, "Git 不可用"
 
-        try:
-            result = subprocess.run(
-                ["git"] + args,
-                cwd=self.project_root,
-                check=check,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                timeout=60
-            )
+        for attempt in (1, 2):
+            try:
+                result = subprocess.run(
+                    ["git"] + args,
+                    cwd=self.project_root,
+                    check=check,
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    timeout=60
+                )
+                return True, result.stdout
 
-            return True, result.stdout
-
-        except subprocess.CalledProcessError as e:
-            return False, e.stderr
-        except subprocess.TimeoutExpired:
-            return False, "Git 命令超时"
-        except OSError as e:
-            return False, str(e)
+            except subprocess.CalledProcessError as e:
+                stderr = e.stderr or ""
+                if "dubious ownership" in stderr and attempt == 1:
+                    try:
+                        subprocess.run(
+                            ["git", "config", "--global", "--add", "safe.directory",
+                             str(self.project_root)],
+                            capture_output=True, timeout=10
+                        )
+                    except Exception:
+                        pass
+                    continue
+                return False, stderr
+            except subprocess.TimeoutExpired:
+                return False, "Git 命令超时"
+            except OSError as e:
+                if "dubious ownership" in str(e) and attempt == 1:
+                    try:
+                        subprocess.run(
+                            ["git", "config", "--global", "--add", "safe.directory",
+                             str(self.project_root)],
+                            capture_output=True, timeout=10
+                        )
+                    except Exception:
+                        pass
+                    continue
+                return False, str(e)
 
     def _local_backup(self, chapter_num: int) -> bool:
         """本地备份（Git 不可用时的降级方案）"""
