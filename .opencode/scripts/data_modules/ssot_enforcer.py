@@ -215,8 +215,8 @@ def verify_consistency(project_root: Path) -> list[dict]:
     expected = rebuild_state_json(project_root, events=events)
 
     # Compare chapter_status
-    actual_chs = set((actual_state.get("progress") or {}).get("chapter_status") or {}).keys()
-    expected_chs = set((expected.get("progress") or {}).get("chapter_status") or {}).keys()
+    actual_chs = set((actual_state.get("progress") or {}).get("chapter_status") or {})
+    expected_chs = set((expected.get("progress") or {}).get("chapter_status") or {})
 
     if actual_chs != expected_chs:
         drifts.append({

@@ -266,7 +266,17 @@ class ContextManager:
                     state.get("disambiguation_pending", [])[-alert_slice:] if alert_slice else []
                 ),
             },
+            "override_hints": self._load_override_hints(chapter),
         }
+
+    def _load_override_hints(self, chapter: int) -> str:
+        """Load active override contract hints for the target chapter."""
+        try:
+            from .override_contract_engine import build_context_hints
+            hints = build_context_hints(self.config.project_root, chapter, max_rules=5)
+            return hints
+        except Exception:
+            return ""
 
     def _load_reader_signal(self, chapter: int) -> Dict[str, Any]:
         if not getattr(self.config, "context_reader_signal_enabled", True):
