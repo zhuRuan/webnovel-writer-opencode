@@ -146,6 +146,12 @@ def settle(raw_facts_path: Path, project_root: Path, chapter: int) -> dict:
 
 data-agent 不再负责提取——仅产出 fulfillment（大纲履约 diff）和 disambiguation（消歧）。
 
+**data-agent 改造后的输入变化：**
+- 旧：正文 → data-agent → extraction + fulfillment + disambiguation
+- 新：正文 + settler 的 extraction_result.json → data-agent → fulfillment + disambiguation
+- data-agent 收到 settler 已提取的事实列表，只需做"大纲要求了什么 vs 实际提取了什么"的 diff
+- chapter-commit CLI 的 `--extraction-result` 参数改为指向 settler 的输出路径
+
 ### 兼容策略
 
 - data-agent 保留完整提取能力（`--fast` 模式或 observer 不可用时回退）
@@ -217,6 +223,7 @@ def render_all_projections(project_root: Path) -> dict[str, Path]:
 - 纯读操作，不修改 state.json 或 index.db
 - 渲染逻辑无 LLM 调用——纯 Python 字符串拼接
 - 不照搬 inkOS 的 7 文件（只渲染 webnovel-writer 实际有数据的维度）
+- 每个 renderer 接收 `(state: dict, project_root: Path)` 签名——`project_root` 参数允许个别 renderer 读 index.db 做补充查询（如伏笔面板读 debts 表、章节摘要索引 summaries/*.md 目录）
 
 ### 测试
 
