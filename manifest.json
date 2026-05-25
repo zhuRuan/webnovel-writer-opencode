@@ -1,17 +1,17 @@
 {
-  "version": "v2.7.0-20260522.1434",
+  "version": "v2.7.0-20260525.0745",
   "tag": "v2.7.0",
-  "updated": "2026-05-22T14:34:11Z",
+  "updated": "2026-05-25T07:45:34Z",
   "changelog": [
     {
-      "hash": "2c970d7",
-      "type": "refactor",
-      "message": "refactor: \u89c4\u8303\u91cd\u6784 delete/rewrite skill\uff0c\u5bf9\u9f50 webnovel-write \u6807\u51c6"
+      "hash": "530d25a",
+      "type": "fix",
+      "message": "fix: state.json \u5e76\u53d1\u5199\u5165\u5bfc\u81f4 JSON \u683c\u5f0f\u635f\u574f (issue #16)"
     },
     {
-      "hash": "2f066d2",
+      "hash": "06a4ea7",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260522.1100 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260522.1434 [skip ci]"
     }
   ],
   "files": {
@@ -1216,8 +1216,8 @@
       "size": 2847
     },
     ".opencode/scripts/data_modules/ssot_enforcer.py": {
-      "sha256": "4d4b89a82ba2cd10306568e77cb3fd58b55778374c6450c80e7eed6d639a957e",
-      "size": 10243
+      "sha256": "5cfbced26248c29995a5da32d6518e89572585836e37aa0b9ff6e640b26d3caa",
+      "size": 10135
     },
     ".opencode/scripts/data_modules/index_observability_mixin.py": {
       "sha256": "01f0e7f5c297d51f0bbf2501af96fd5d88f0a9fe735c7e93beb74dc0d6d373a7",
@@ -1240,8 +1240,8 @@
       "size": 15892
     },
     ".opencode/scripts/data_modules/chapter_delete_service.py": {
-      "sha256": "e7de4a2c456d193a0b5af3ee7692cb631efb321d5de45b184144529f7a8ab804",
-      "size": 5110
+      "sha256": "90c6f953fbac2a46c431d45c0068c80d0c68eff203968b9b767273a6d0ba656c",
+      "size": 5176
     },
     ".opencode/scripts/data_modules/orchestrate.py": {
       "sha256": "adfc5890517c436f60c3c039c0447cc6fedb6311fa99b90c6a444c13cdc1b4bf",
