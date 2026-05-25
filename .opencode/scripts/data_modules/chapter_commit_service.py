@@ -227,4 +227,12 @@ class ChapterCommitService:
                 payload["projection_status"][name] = f"failed:{exc}"
         self.persist_commit(payload)
         self._sync_foreshadowing(payload)
+
+        # Render markdown projections
+        try:
+            from .state_projection_renderer import render_all_projections
+            render_all_projections(self.project_root)
+        except Exception as exc:
+            logger.warning("Markdown projection render failed: %s", exc)
+
         return payload

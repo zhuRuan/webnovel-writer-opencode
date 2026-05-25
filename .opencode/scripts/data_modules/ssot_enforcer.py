@@ -346,6 +346,13 @@ def rebuild_projections(project_root: Path) -> dict:
         "event_count": event_count,
     })
 
+    # Render markdown projections after rebuild
+    try:
+        from .state_projection_renderer import render_all_projections
+        render_all_projections(project_root)
+    except Exception:
+        pass
+
     return {
         "projection": "state.json",
         "event_count": event_count,
