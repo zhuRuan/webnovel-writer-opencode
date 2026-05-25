@@ -41,7 +41,7 @@ def run_action(action: str, payload: dict | None = None):
     return {"stdout": result.stdout, "stderr": result.stderr, "code": result.returncode}
 ```
 
-`SCRIPTS_DIR` 在 `_ensure_scripts_dir_on_path()` 中已解析。
+`SCRIPTS_DIR` 需提升为模块级常量（当前在 `_ensure_scripts_dir_on_path()` 中是局部变量）：在 `app.py` 顶部增加 `SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"`。
 
 #### 1.2 SSE 事件扩展
 
@@ -99,19 +99,16 @@ OverviewPage 的章节趋势表中，每行增加操作图标（…菜单）：
 | `context-budget` | `chapter-NNN.trace.json` | 按章 |
 | `debt-due` | `chase_debt` 表 active/pending | 60s |
 
-实现：扩展现有 `_dispatch` 机制，新增一个定时轮询协程在 lifespan 中启动。
+实现：新增独立 `_polling_loop()` 协程在 lifespan 中启动（与文件监听 `_dispatch` 平级，不混入同一队列），定时查询数据源并通过 `_watcher._dispatch()` 推送带 `type` 字段的 JSON 事件。前端 SSE 监听器按 `type` 路由到各组件。
 
 #### 2.2 新增 API 端点
 
 ```python
 @app.get("/api/workflow/status")
 def workflow_status():
-    """返回所有章节的 5 阶段状态。"""
-    checkpoint_file = _webnovel_dir() / "workflow_checkpoints.json"
-    if not checkpoint_file.is_file():
-        return {"stages": {}, "interrupted": []}
-    data = json.loads(checkpoint_file.read_text(encoding="utf-8"))
-    return data
+    """返回所有章节的 5 阶段状态。复用已有的 workflow_checkpoint 模块。"""
+    from data_modules.workflow_checkpoint import all_chapters_progress
+    return all_chapters_progress(_get_project_root())
 
 @app.get("/api/context/budget/{chapter}")
 def context_budget(chapter: int):
@@ -174,7 +171,7 @@ def get_alerts():
                         "detail": f"连续{len(recent)}章审查分下降", "chapters": recent})
     
     # Debt: overdue foreshadowing
-    overdue = _get_overdue_debts(state)
+    overdue = _get_overdue_debts(project_root, current_chapter)
     for d in overdue:
         alerts.append({"type": "debt_overdue", "severity": "critical",
                         "detail": d["note"], "due_chapter": d["due_chapter"],
@@ -197,10 +194,10 @@ def get_alerts():
 
 #### 3.2 预警计算辅助函数
 
-- `_get_recent_review_scores(n)` — 从 `review_metrics` 表取最近 N 章 overall_score
+- `_get_recent_review_scores(project_root, n)` — 从 `review_metrics` 表取最近 N 章 overall_score
 - `_is_declining(scores, threshold)` — 连续 threshold 章单调递减
-- `_get_overdue_debts(state)` — 从 index.db `chase_debt` 表查 overdue
-- `_get_long_absent_characters(state, threshold)` — 遍历 entities_v3 找 last_appearance 与 current_chapter 差距
+- `_get_overdue_debts(project_root, current_chapter)` — 从 index.db `chase_debt` 表查 `due_chapter < current_chapter`
+- `_get_long_absent_characters(project_root, current_chapter, threshold=20)` — 从 index.db `entities` 表查 `last_appearance` 差距
 - `_check_strand_monotony(state, threshold)` — 从 strand_tracker.history 检测连续重复
 
 ### 前端改动
@@ -233,4 +230,4 @@ Phase 3 (质量预警)     → 依赖 Phase 2 的数据端点，~4h
 
 - POST 端点引入写操作，需确保 CSRF 保护（CORS 已限制 localhost，Dashboard 无 cookie 认证）
 - 轮询 SSE 在长时间空闲后需要心跳保活（已有 `_dispatch` QueueFull drain）
-- 预警阈值（连续 N 章下降、M 章未出场）需可配置，建议默认值可被 `dashboard_config.json` 覆盖
+- 预警阈值（连续 N 章下降、M 章未出场）需可配置，默认值可被 `.webnovel/dashboard_config.json` 覆盖。默认值：score_decline=3 章，character_absent=20 章，strand_monotony=5 章
