@@ -262,24 +262,69 @@ class ContextManager:
             "long_term_memory": long_term_memory,
             "alerts": {
                 "disambiguation_warnings": (
-                    state.get("disambiguation_warnings", [])[-alert_slice:] if alert_slice else []
+                    [w for w in state.get("disambiguation_warnings", [])[-alert_slice:]
+                     if not isinstance(w, dict) or w.get("confidence", 1.0) >= 0.7]
+                    if alert_slice else []
                 ),
                 "disambiguation_pending": (
-                    state.get("disambiguation_pending", [])[-alert_slice:] if alert_slice else []
+                    [p for p in state.get("disambiguation_pending", [])[-alert_slice:]
+                     if not isinstance(p, dict) or p.get("confidence", 1.0) >= 0.7]
+                    if alert_slice else []
                 ),
             },
             "override_hints": self._load_override_hints(chapter),
         }
 
     def _load_override_hints(self, chapter: int) -> str:
-        """Load active override contract hints for the target chapter."""
+        """Load active override contract hints for the target chapter.
+
+        Merges two sources:
+          1. World rule overrides (override_contract_engine) — setting evolution
+          2. Debt overrides (index.db.override_contracts) — active foreshadowing/pacing debts
+        """
+        lines: list[str] = []
+
+        # Source 1: world rule overrides
         try:
             from .override_contract_engine import build_context_hints
             hints = build_context_hints(self.config.project_root, chapter, max_rules=5)
-            return hints
+            if hints:
+                lines.append(hints)
         except Exception as exc:
             logger.warning("override_hints load failed for chapter %s: %s", chapter, exc)
+
+        # Source 2: active debt overrides (foreshadowing/pacing/reader_pull)
+        try:
+            debt_hints = self._load_debt_override_hints(chapter)
+            if debt_hints:
+                if lines:
+                    lines.append("")
+                lines.append(debt_hints)
+        except Exception as exc:
+            logger.warning("debt override_hints load failed for chapter %s: %s", chapter, exc)
+
+        return "\n".join(lines) if lines else ""
+
+    def _load_debt_override_hints(self, chapter: int) -> str:
+        """Build context hints from active debt overrides (index.db.override_contracts)."""
+        debts = self.index_manager.get_pending_overrides(before_chapter=chapter + 1)
+        if not debts:
             return ""
+
+        debt_lines = ["## 活跃追读力债务（Override Contracts）", ""]
+        shown = 0
+        for d in debts:
+            if shown >= 3:
+                break
+            ctype = d.get("constraint_type", "")
+            cid = d.get("constraint_id", "")
+            rationale = d.get("rationale_text", "")
+            due = d.get("due_chapter", 0)
+            if rationale:
+                debt_lines.append(f"- **{ctype}/{cid}**（偿还期限: 第{due}章）: {rationale}")
+                shown += 1
+
+        return "\n".join(debt_lines) if shown > 0 else ""
 
     def _load_reader_signal(self, chapter: int) -> Dict[str, Any]:
         if not getattr(self.config, "context_reader_signal_enabled", True):

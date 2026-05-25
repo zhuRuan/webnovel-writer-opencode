@@ -7,6 +7,8 @@ from typing import Any, Dict
 
 from chapter_outline_loader import volume_num_for_chapter_from_state
 
+import logging
+
 from .config import DataModulesConfig
 from .event_log_store import EventLogStore
 from .event_projection_router import EventProjectionRouter
@@ -17,6 +19,9 @@ from .override_ledger_service import (
     ensure_override_ledger_columns,
     persist_amend_proposals,
 )
+from .ssot_enforcer import publish_event, read_events
+
+logger = logging.getLogger(__name__)
 
 # 伏笔默认偿还章数：创建债务时默认要求 10 章内偿还
 _FORESHADOW_DUE_OFFSET = 10
@@ -40,9 +45,24 @@ class ChapterCommitService:
         disambiguation_result: Dict[str, Any],
         extraction_result: Dict[str, Any],
     ) -> Dict[str, Any]:
-        rejected = bool(review_result.get("blocking_count")) or bool(
-            fulfillment_result.get("missed_nodes")
-        ) or bool(disambiguation_result.get("pending"))
+        # Classify missed nodes: CBN → blocking, CPN → warning, CEN → warning.
+        # Non-dict nodes (plain strings) are treated as blocking for backward compat.
+        missed = list(fulfillment_result.get("missed_nodes") or [])
+        missed_raw = [n for n in missed if not isinstance(n, dict)]
+        missed_dicts = [n for n in missed if isinstance(n, dict)]
+        missed_cbn = [n for n in missed_dicts
+                      if str(n.get("type", "")).upper() == "CBN"]
+        missed_cpn = [n for n in missed_dicts
+                      if str(n.get("type", "")).upper() == "CPN"]
+        missed_cen = [n for n in missed_dicts
+                      if str(n.get("type", "")).upper() == "CEN"]
+        missed_other = [n for n in missed_dicts
+                        if str(n.get("type", "")).upper() not in ("CBN", "CPN", "CEN")]
+
+        # Plain strings or CBN-typed dicts → blocking
+        rejected = bool(review_result.get("blocking_count")) or bool(missed_raw) or bool(missed_cbn) or bool(
+            disambiguation_result.get("pending")
+        )
         status = "rejected" if rejected else "accepted"
         volume = volume_num_for_chapter_from_state(self.project_root, chapter) or 1
         return {
@@ -65,7 +85,11 @@ class ChapterCommitService:
             "outline_snapshot": {
                 "planned_nodes": fulfillment_result.get("planned_nodes", []),
                 "covered_nodes": fulfillment_result.get("covered_nodes", []),
-                "missed_nodes": fulfillment_result.get("missed_nodes", []),
+                "missed_nodes": missed,
+                "missed_cbn": missed_cbn,
+                "missed_cpn": missed_cpn,
+                "missed_cen": missed_cen,
+                "missed_other": missed_other,
                 "extra_nodes": fulfillment_result.get("extra_nodes", []),
             },
             "review_result": review_result,
@@ -129,7 +153,46 @@ class ChapterCommitService:
             return payload
 
         chapter = int((payload.get("meta") or {}).get("chapter") or 0)
-        EventLogStore(self.project_root).write_events(chapter, payload.get("accepted_events", []))
+        if chapter <= 0:
+            logger.warning("apply_projections: chapter fell back to %s (meta=%s)",
+                           chapter, payload.get("meta"))
+
+        # Guard: skip SSOT publishing if this chapter already has events
+        # (retry safety — prevents duplicate events in the immutable event log)
+        existing_events = read_events(self.project_root, chapter=chapter)
+        if not existing_events:
+            for event in payload.get("accepted_events", []):
+                if not isinstance(event, dict):
+                    continue
+                try:
+                    event_payload = dict(event.get("payload", {}))
+                    subject = event.get("subject", "")
+                    if subject:
+                        event_payload["_subject"] = subject
+                    publish_event(
+                        self.project_root,
+                        event.get("event_type", "unknown"),
+                        event_payload,
+                        chapter=chapter,
+                    )
+                except Exception as exc:
+                    logger.warning("SSOT publish_event failed for chapter %s event %s: %s",
+                                   chapter, event.get("event_type", ""), exc)
+
+            try:
+                publish_event(
+                    self.project_root,
+                    "chapter_status_changed",
+                    {"status": "committed"},
+                    chapter=chapter,
+                )
+            except Exception as exc:
+                logger.warning("SSOT chapter_status_changed failed for chapter %s: %s", chapter, exc)
+
+        try:
+            EventLogStore(self.project_root).write_events(chapter, payload.get("accepted_events", []))
+        except Exception as exc:
+            logger.warning("EventLogStore.write_events failed for chapter %s: %s", chapter, exc)
 
         proposals = AmendProposalTrigger().check(chapter, payload.get("accepted_events", []))
         if proposals:

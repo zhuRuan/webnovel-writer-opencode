@@ -50,19 +50,12 @@ def main() -> None:
     service.persist_commit(payload)
     if payload["meta"]["status"] == "accepted":
         payload = service.apply_projections(payload)
-        # Record workflow checkpoint + SSOT event
+        # Record workflow checkpoint (SSOT events are published inside apply_projections)
         try:
             from data_modules.workflow_checkpoint import checkpoint
             checkpoint(args.chapter, "COMMITTED", Path(args.project_root))
         except Exception as exc:
             logger.warning("workflow checkpoint failed for chapter %s: %s", args.chapter, exc)
-        try:
-            from data_modules.ssot_enforcer import publish_event
-            publish_event(Path(args.project_root), "chapter_status_changed",
-                          {"status": "committed", "score": payload["meta"].get("score", 0)},
-                          chapter=args.chapter)
-        except Exception as exc:
-            logger.warning("SSOT publish_event failed for chapter %s: %s", args.chapter, exc)
     # Close aiohttp sessions opened by projection writers (embedding API)
     import asyncio
     try:

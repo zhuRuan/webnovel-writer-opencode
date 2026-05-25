@@ -100,7 +100,7 @@ class IndexDebtMixin:
         """获取待偿还的Override Contracts"""
         with self._get_conn() as conn:
             cursor = conn.cursor()
-            if before_chapter:
+            if before_chapter is not None:
                 cursor.execute(
                     """
                     SELECT * FROM override_contracts

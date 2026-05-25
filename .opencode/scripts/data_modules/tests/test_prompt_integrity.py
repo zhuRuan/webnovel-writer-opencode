@@ -36,6 +36,8 @@ REGISTERED_CLI_SUBCOMMANDS = {
     "init", "extract-context", "memory-contract", "project-memory", "review-pipeline",
     "placeholder-scan", "master-outline-sync",
     "story-system", "chapter-commit", "story-events", "knowledge",
+    "export", "publish", "chapter-path",
+    "delete-chapters", "entity-clean", "ssot", "workflow", "override", "orchestrate",
 }
 
 

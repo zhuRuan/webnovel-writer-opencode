@@ -27,6 +27,8 @@ fi
 
 从章节正文提取结构化信息，生成 chapter-commit 所需 artifacts。不直接写 state/index/summaries/memory——这些由 commit 投影链完成。
 
+提取的 `accepted_events` 会先被记录到 SSOT 事件日志（`.story-system/events/*.event.json`，append-only 真理源），再由投影链写入 state/index/summary/memory/vector 五个读模型。
+
 ## 2. 工具
 
 ```bash

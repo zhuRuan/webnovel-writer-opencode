@@ -35,6 +35,7 @@ test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { e
 | 节奏/Strand | 节奏分析 | state.json + strand-weave-pattern.md |
 | 标签/实体格式 | 格式查询 | tag-specification.md |
 | 某角色在第N章时/历史状态/时间点状态 | 时序查询 | knowledge query-entity-state / query-relationships |
+| 规则变更/设定演进/Override | Override 查询 | webnovel override context |
 
 ## 引用加载策略
 
@@ -80,6 +81,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" kno
 
 # 查询某实体在指定章节时的所有关系
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" knowledge query-relationships --entity "{entity_id}" --at-chapter {N}
+
+# 查询当前生效的世界规则变更（Override Contracts）
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" override context --chapter {N}
 ```
 
 7. **格式化输出**：按下方模板输出

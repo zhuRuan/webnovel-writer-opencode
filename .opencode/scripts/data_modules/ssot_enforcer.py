@@ -53,6 +53,9 @@ def publish_event(project_root: Path, event_type: str, payload: dict,
     """Append an event to the immutable event log. Returns path to event file.
 
     This is the ONLY write path for state-changing operations.
+    SQLite mirroring is handled by EventLogStore for story content events;
+    SSOT-specific meta events (chapter_status_changed, override_rule_added, etc.)
+    exist only in the JSON event log and are consumed by rebuild_state_json.
 
     event_type examples:
       chapter_status_changed, entity_created, entity_updated,
@@ -64,10 +67,14 @@ def publish_event(project_root: Path, event_type: str, payload: dict,
     log_dir.mkdir(parents=True, exist_ok=True)
 
     seq = _next_event_seq(log_dir)
+    event_id = f"evt_{chapter}_{event_type}_{seq}"
+    subject = payload.get("_subject", "")
     event = {
         "seq": seq,
+        "event_id": event_id,
         "event_type": event_type,
         "chapter": chapter,
+        "subject": subject,
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "payload": payload,
     }
@@ -118,6 +125,13 @@ def rebuild_state_json(project_root: Path,
 
     This is deterministic: replaying the same events always produces the same state.
     Accepts pre-loaded events to avoid redundant I/O.
+
+    Handles all StoryEvent types (10) plus SSOT-specific events:
+      character_state_changed, relationship_changed, world_rule_revealed,
+      world_rule_broken, power_breakthrough, artifact_obtained,
+      promise_created, promise_paid_off, open_loop_created, open_loop_closed,
+      chapter_status_changed, entity_created, entity_updated,
+      chapter_deleted, override_rule_added, override_rule_superseded.
     """
     if events is None:
         events = read_events(project_root)
@@ -125,8 +139,9 @@ def rebuild_state_json(project_root: Path,
 
     for evt in events:
         etype = evt["event_type"]
-        payload = evt["payload"]
+        payload = evt.get("payload") or {}
         ch = str(evt["chapter"])
+        subject = payload.get("_subject", "")
 
         if etype == "chapter_status_changed":
             state.setdefault("progress", {}).setdefault("chapter_status", {})[ch] = {
@@ -137,12 +152,151 @@ def rebuild_state_json(project_root: Path,
                 state["progress"]["current_chapter"] = evt["chapter"]
                 state["progress"]["last_updated"] = evt["timestamp"]
 
+        elif etype == "chapter_deleted":
+            for c in payload.get("chapters", []):
+                state.setdefault("progress", {}).setdefault("chapter_status", {}).pop(str(c), None)
+
         elif etype == "entity_created":
-            state.setdefault("entities_v3", {})[payload["entity_id"]] = {
-                "entity_type": payload.get("entity_type", "unknown"),
-                "name": payload.get("entity_name", ""),
-                "first_seen_chapter": evt["chapter"],
-            }
+            eid = payload.get("entity_id", subject)
+            if eid:
+                state.setdefault("entities_v3", {})[eid] = {
+                    "entity_type": payload.get("entity_type", "unknown"),
+                    "name": payload.get("entity_name", payload.get("name", eid)),
+                    "first_seen_chapter": evt["chapter"],
+                }
+
+        elif etype == "entity_updated":
+            eid = payload.get("entity_id", subject)
+            if eid and eid in state.get("entities_v3", {}):
+                ent = state["entities_v3"][eid]
+                for key in ("name", "entity_type", "tier"):
+                    if key in payload:
+                        ent[key] = payload[key]
+
+        elif etype == "character_state_changed":
+            eid = payload.get("entity_id", subject)
+            field = payload.get("field", "")
+            new_val = payload.get("new") if "new" in payload else payload.get("new_value")
+            if eid and field and new_val is not None:
+                ent = state.setdefault("entities_v3", {}).setdefault(eid, {
+                    "entity_type": payload.get("entity_type", "unknown"),
+                    "name": payload.get("entity_name", eid),
+                    "first_seen_chapter": evt["chapter"],
+                })
+                ent.setdefault("current_state", {})[field] = new_val
+                # Sync to protagonist_state if applicable
+                ps = state.get("protagonist_state", {})
+                if ps.get("entity_id") == eid or ps.get("name") == ent.get("name"):
+                    state.setdefault("protagonist_state", {})[field] = new_val
+
+        elif etype == "power_breakthrough":
+            eid = payload.get("entity_id", subject)
+            realm = payload.get("new_realm") or payload.get("realm") or payload.get("new")
+            if eid and realm:
+                ent = state.setdefault("entities_v3", {}).setdefault(eid, {
+                    "entity_type": "角色",
+                    "name": payload.get("entity_name", eid),
+                    "first_seen_chapter": evt["chapter"],
+                })
+                ent.setdefault("current_state", {})["realm"] = realm
+                ps = state.get("protagonist_state", {})
+                if ps.get("entity_id") == eid or ps.get("name") == ent.get("name"):
+                    state.setdefault("protagonist_state", {})["realm"] = realm
+
+        elif etype == "relationship_changed":
+            from_e = payload.get("from_entity", "")
+            to_e = payload.get("to_entity", "")
+            rel_type = payload.get("relationship_type") or payload.get("type", "")
+            if from_e and to_e and rel_type:
+                existing = [r for r in state.get("relationships", [])
+                            if r.get("from") == from_e and r.get("to") == to_e and r.get("type") == rel_type]
+                if existing:
+                    existing[0]["last_seen_chapter"] = evt["chapter"]
+                else:
+                    state.setdefault("relationships", []).append({
+                        "from": from_e,
+                        "to": to_e,
+                        "type": rel_type,
+                        "description": payload.get("description", ""),
+                        "first_seen_chapter": evt["chapter"],
+                        "last_seen_chapter": evt["chapter"],
+                    })
+
+        elif etype == "artifact_obtained":
+            eid = payload.get("artifact_id") or payload.get("entity_id", subject)
+            owner = payload.get("owner") or payload.get("holder", "")
+            if eid:
+                artifacts = state.setdefault("artifacts", [])
+                if not any(a.get("artifact_id") == eid for a in artifacts):
+                    artifacts.append({
+                        "artifact_id": eid,
+                        "name": payload.get("name", eid),
+                        "owner": owner,
+                        "obtained_chapter": evt["chapter"],
+                    })
+
+        elif etype == "world_rule_revealed":
+            rule_id = payload.get("rule_id", f"rule_ch{evt['chapter']}")
+            rules = state.setdefault("world_rules", [])
+            if not any(r.get("rule_id") == rule_id for r in rules):
+                rules.append({
+                    "rule_id": rule_id,
+                    "description": payload.get("description", payload.get("rule", "")),
+                    "revealed_chapter": evt["chapter"],
+                    "status": "active",
+                })
+
+        elif etype == "world_rule_broken":
+            rule_id = payload.get("rule_id", "")
+            desc = payload.get("description", payload.get("rule", ""))
+            for rule in state.get("world_rules", []):
+                matched = (rule_id and rule.get("rule_id") == rule_id) or (desc and rule.get("description") == desc)
+                if matched:
+                    rule["status"] = "broken"
+                    rule["broken_chapter"] = evt["chapter"]
+                    rule["broken_reason"] = payload.get("reason", "")
+                    break
+
+        elif etype == "promise_created":
+            pid = payload.get("promise_id", f"promise_ch{evt['chapter']}")
+            promises = state.setdefault("reader_promises", [])
+            if not any(p.get("promise_id") == pid for p in promises):
+                promises.append({
+                    "promise_id": pid,
+                    "description": payload.get("description", ""),
+                    "created_chapter": evt["chapter"],
+                    "status": "active",
+                })
+
+        elif etype == "promise_paid_off":
+            pid = payload.get("promise_id", "")
+            desc = payload.get("description", "")
+            for p in state.get("reader_promises", []):
+                matched = False
+                if pid and p.get("promise_id") == pid:
+                    matched = True
+                elif desc and not pid and p.get("description") == desc:
+                    matched = True
+                if matched:
+                    p["status"] = "paid_off"
+                    p["paid_chapter"] = evt["chapter"]
+                    break
+
+        elif etype == "override_rule_added":
+            state.setdefault("override_rules", []).append({
+                "constraint_id": payload.get("constraint_id", ""),
+                "old_rule": payload.get("old_rule", ""),
+                "new_rule": payload.get("new_rule", ""),
+                "rationale": payload.get("rationale", ""),
+                "chapter": evt["chapter"],
+                "status": "active",
+            })
+
+        elif etype == "override_rule_superseded":
+            cid = payload.get("constraint_id", "")
+            for rule in state.get("override_rules", []):
+                if rule.get("constraint_id") == cid and rule.get("status") == "active":
+                    rule["status"] = "superseded"
 
         elif etype == "open_loop_created":
             loop = {
@@ -167,8 +321,13 @@ def _empty_state() -> dict:
         "schema_version": "5.1",
         "progress": {"current_chapter": 0, "chapter_status": {}, "last_updated": ""},
         "entities_v3": {},
+        "relationships": [],
         "foreshadowing": [],
         "protagonist_state": {},
+        "world_rules": [],
+        "reader_promises": [],
+        "artifacts": [],
+        "override_rules": [],
     }
 
 
@@ -223,6 +382,43 @@ def verify_consistency(project_root: Path) -> list[dict]:
             "expected": sorted(expected_chs),
             "detail": f"State has keys {sorted(actual_chs)}, event log projects {sorted(expected_chs)}",
         })
+
+    # Compare foreshadowing count
+    actual_fs = len(actual_state.get("foreshadowing") or [])
+    expected_fs = len(expected.get("foreshadowing") or [])
+    if actual_fs != expected_fs:
+        drifts.append({
+            "severity": "warning",
+            "field": "foreshadowing",
+            "actual": actual_fs,
+            "expected": expected_fs,
+            "detail": f"State has {actual_fs} loops, event log projects {expected_fs}",
+        })
+
+    # Compare entities_v3
+    actual_ent = set((actual_state.get("entities_v3") or {}).keys())
+    expected_ent = set((expected.get("entities_v3") or {}).keys())
+    if actual_ent != expected_ent:
+        drifts.append({
+            "severity": "warning",
+            "field": "entities_v3",
+            "actual_count": len(actual_ent),
+            "expected_count": len(expected_ent),
+            "detail": f"Entity key sets differ (state={len(actual_ent)}, log={len(expected_ent)})",
+        })
+
+    # Compare collection counts for fields rebuild_state_json now produces
+    for field in ("relationships", "world_rules", "reader_promises", "artifacts", "override_rules"):
+        actual_count = len(actual_state.get(field) or [])
+        expected_count = len(expected.get(field) or [])
+        if actual_count != expected_count:
+            drifts.append({
+                "severity": "warning",
+                "field": field,
+                "actual": actual_count,
+                "expected": expected_count,
+                "detail": f"State has {actual_count} {field}, event log projects {expected_count}",
+            })
 
     if not drifts:
         drifts.append({"severity": "info", "detail": "State is consistent with event log."})
