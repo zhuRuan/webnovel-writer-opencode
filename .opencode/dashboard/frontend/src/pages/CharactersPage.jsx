@@ -478,7 +478,7 @@ export default function CharactersPage() {
                             className="timeline-slider"
                             type="range"
                             min="1"
-                            max={String(latestChapter)}
+                            max={String(Math.max(1, latestChapter))}
                             value={graphChapter}
                             onChange={event => {
                                 const nextChapter = Number(event.target.value)

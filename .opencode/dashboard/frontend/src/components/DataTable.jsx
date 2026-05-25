@@ -19,7 +19,7 @@ export default function DataTable({
 
     useEffect(() => {
         setPage(1)
-    }, [rows, pageSize])
+    }, [pageSize])
 
     if (!rows?.length) {
         return (

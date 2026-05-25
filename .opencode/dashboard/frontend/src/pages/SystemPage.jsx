@@ -261,6 +261,7 @@ export default function SystemPage() {
                             setProbing(true)
                             probeEnvStatus()
                                 .then(payload => setProbeResult(payload))
+                                .catch(() => setProbeResult(null))
                                 .finally(() => setProbing(false))
                         }}
                     >

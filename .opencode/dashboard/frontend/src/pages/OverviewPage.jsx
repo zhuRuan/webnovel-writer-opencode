@@ -401,7 +401,7 @@ export default function OverviewPage() {
                             currentStart={currentStart}
                             currentEnd={currentEnd}
                             totalItems={trendWindow.total || latestWindow.total || 0}
-                            onPrevious={() => setWindowIndex(current => Math.min(totalPages - 1, current + 1))}
+                            onPrevious={() => setWindowIndex(current => Math.min(Math.max(1, totalPages) - 1, current + 1))}
                             onNext={() => setWindowIndex(current => Math.max(0, current - 1))}
                             onLatest={() => setWindowIndex(0)}
                             stepLabel={String(WINDOW_SIZE)}

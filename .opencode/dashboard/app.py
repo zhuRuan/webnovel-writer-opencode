@@ -54,7 +54,7 @@ def _ensure_scripts_dir_on_path() -> None:
     scripts_dir = Path(__file__).resolve().parents[1] / "scripts"
     scripts_entry = str(scripts_dir)
     if scripts_entry not in sys.path:
-        sys.path.insert(0, scripts_entry)
+        sys.path.append(scripts_entry)
 
 
 def _load_state_payload(*, required: bool = False) -> dict:
@@ -136,7 +136,7 @@ def _build_strand_map(state: dict) -> dict[int, str]:
         except (TypeError, ValueError):
             chapter = index
         strand = str(entry.get("strand") or entry.get("dominant") or "").strip().lower()
-        if chapter > 0 and strand:
+        if chapter > 0 and strand and chapter not in strand_map:
             strand_map[chapter] = strand
     return strand_map
 
@@ -225,6 +225,9 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     global _project_root
 
     if project_root:
+        if _project_root is not None:
+            import warnings
+            warnings.warn(f"Dashboard project_root 被覆盖: {_project_root} → {project_root}", stacklevel=2)
         _project_root = Path(project_root).resolve()
 
     _ensure_scripts_dir_on_path()
@@ -248,7 +251,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["http://127.0.0.1:8765", "http://localhost:8765"],
         allow_methods=["GET"],
         allow_headers=["*"],
     )
@@ -274,7 +277,8 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         db_path = _webnovel_dir() / "index.db"
         if not db_path.is_file():
             raise HTTPException(404, "index.db 不存在")
-        conn = sqlite3.connect(str(db_path))
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.row_factory = sqlite3.Row
         return conn
 
@@ -306,31 +310,26 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             if clauses:
                 q += " WHERE " + " AND ".join(clauses)
             q += " ORDER BY last_appearance DESC"
-            rows = conn.execute(q, params).fetchall()
+            rows = _fetchall_safe(conn, q, tuple(params))
             return [dict(r) for r in rows]
 
     @app.get("/api/entities/{entity_id}")
     def get_entity(entity_id: str):
         with closing(_get_db()) as conn:
-            row = conn.execute("SELECT * FROM entities WHERE id = ?", (entity_id,)).fetchone()
-            if not row:
+            rows = _fetchall_safe(conn, "SELECT * FROM entities WHERE id = ?", (entity_id,))
+            if not rows:
                 raise HTTPException(404, "实体不存在")
-            return dict(row)
+            return rows[0]
 
     @app.get("/api/relationships")
     def list_relationships(entity: Optional[str] = None, limit: int = 200):
         with closing(_get_db()) as conn:
             if entity:
-                rows = conn.execute(
+                return _fetchall_safe(conn,
                     "SELECT * FROM relationships WHERE from_entity = ? OR to_entity = ? ORDER BY chapter DESC LIMIT ?",
-                    (entity, entity, limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM relationships ORDER BY chapter DESC LIMIT ?",
-                    (limit,),
-                ).fetchall()
-            return [dict(r) for r in rows]
+                    (entity, entity, limit))
+            return _fetchall_safe(conn,
+                "SELECT * FROM relationships ORDER BY chapter DESC LIMIT ?", (limit,))
 
     @app.get("/api/relationship-events")
     def list_relationship_events(
@@ -356,55 +355,39 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 q += " WHERE " + " AND ".join(clauses)
             q += " ORDER BY chapter DESC, id DESC LIMIT ?"
             params.append(limit)
-            rows = conn.execute(q, params).fetchall()
-            return [dict(r) for r in rows]
+            return _fetchall_safe(conn, q, tuple(params))
 
     @app.get("/api/chapters")
     def list_chapters():
         with closing(_get_db()) as conn:
-            rows = conn.execute("SELECT * FROM chapters ORDER BY chapter ASC").fetchall()
-            normalized = []
-            for row in rows:
-                item = dict(row)
-                item["characters"] = _parse_json_value(item.get("characters"), [])
-                normalized.append(item)
-            return normalized
+            rows = _fetchall_safe(conn, "SELECT * FROM chapters ORDER BY chapter ASC")
+            return [{**r, "characters": _parse_json_value(r.get("characters"), [])} for r in rows]
 
     @app.get("/api/scenes")
     def list_scenes(chapter: Optional[int] = None, limit: int = 500):
         with closing(_get_db()) as conn:
             if chapter is not None:
-                rows = conn.execute(
-                    "SELECT * FROM scenes WHERE chapter = ? ORDER BY scene_index ASC", (chapter,)
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM scenes ORDER BY chapter ASC, scene_index ASC LIMIT ?", (limit,)
-                ).fetchall()
-            return [dict(r) for r in rows]
+                return _fetchall_safe(conn,
+                    "SELECT * FROM scenes WHERE chapter = ? ORDER BY scene_index ASC", (chapter,))
+            return _fetchall_safe(conn,
+                "SELECT * FROM scenes ORDER BY chapter ASC, scene_index ASC LIMIT ?", (limit,))
 
     @app.get("/api/reading-power")
     def list_reading_power(limit: int = 50):
         with closing(_get_db()) as conn:
-            rows = conn.execute(
-                "SELECT * FROM chapter_reading_power ORDER BY chapter DESC LIMIT ?", (limit,)
-            ).fetchall()
-            return [dict(r) for r in rows]
+            return _fetchall_safe(conn,
+                "SELECT * FROM chapter_reading_power ORDER BY chapter DESC LIMIT ?", (limit,))
 
     @app.get("/api/review-metrics")
     def list_review_metrics(limit: int = 20):
         with closing(_get_db()) as conn:
-            rows = conn.execute(
-                "SELECT * FROM review_metrics ORDER BY end_chapter DESC LIMIT ?", (limit,)
-            ).fetchall()
-            normalized = []
-            for row in rows:
-                item = dict(row)
-                item["dimension_scores"] = _parse_json_value(item.get("dimension_scores"), {})
-                item["severity_counts"] = _parse_json_value(item.get("severity_counts"), {})
-                item["critical_issues"] = _parse_json_value(item.get("critical_issues"), [])
-                normalized.append(item)
-            return normalized
+            rows = _fetchall_safe(conn,
+                "SELECT * FROM review_metrics ORDER BY end_chapter DESC LIMIT ?", (limit,))
+            return [{**r,
+                "dimension_scores": _parse_json_value(r.get("dimension_scores"), {}),
+                "severity_counts": _parse_json_value(r.get("severity_counts"), {}),
+                "critical_issues": _parse_json_value(r.get("critical_issues"), [])}
+                for r in rows]
 
     @app.get("/api/stats/chapter-trend")
     def chapter_trend(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0)):
@@ -598,26 +581,19 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     def list_state_changes(entity: Optional[str] = None, limit: int = 100):
         with closing(_get_db()) as conn:
             if entity:
-                rows = conn.execute(
+                return _fetchall_safe(conn,
                     "SELECT * FROM state_changes WHERE entity_id = ? ORDER BY chapter DESC LIMIT ?",
-                    (entity, limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM state_changes ORDER BY chapter DESC LIMIT ?", (limit,)
-                ).fetchall()
-            return [dict(r) for r in rows]
+                    (entity, limit))
+            return _fetchall_safe(conn,
+                "SELECT * FROM state_changes ORDER BY chapter DESC LIMIT ?", (limit,))
 
     @app.get("/api/aliases")
     def list_aliases(entity: Optional[str] = None):
         with closing(_get_db()) as conn:
             if entity:
-                rows = conn.execute(
-                    "SELECT * FROM aliases WHERE entity_id = ?", (entity,)
-                ).fetchall()
-            else:
-                rows = conn.execute("SELECT * FROM aliases").fetchall()
-            return [dict(r) for r in rows]
+                return _fetchall_safe(conn,
+                    "SELECT * FROM aliases WHERE entity_id = ?", (entity,))
+            return _fetchall_safe(conn, "SELECT * FROM aliases")
 
     # ===========================================================
     # API：扩展表（v5.3+ / v5.4+）
@@ -875,6 +851,8 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 def _walk_tree(folder: Path, root: Path) -> list[dict]:
     items = []
     for child in sorted(folder.iterdir()):
+        if child.is_symlink():
+            continue
         rel = str(child.relative_to(root)).replace("\\", "/")
         if child.is_dir():
             items.append({"name": child.name, "type": "dir", "path": rel, "children": _walk_tree(child, root)})

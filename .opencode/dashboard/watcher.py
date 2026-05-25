@@ -97,14 +97,19 @@ class FileWatcher:
             self._loop.call_soon_threadsafe(self._dispatch, msg)
 
     def _dispatch(self, msg: str):
-        dead: list[asyncio.Queue] = []
         for q in self._subscribers:
             try:
                 q.put_nowait(msg)
             except asyncio.QueueFull:
-                dead.append(q)
-        for dq in dead:
-            self.unsubscribe(dq)
+                # Drain oldest message to make room; keep client connected
+                try:
+                    q.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+                try:
+                    q.put_nowait(msg)
+                except asyncio.QueueFull:
+                    pass  # drop if still full after drain
 
     # --- 生命周期 ---
 
@@ -142,3 +147,4 @@ class FileWatcher:
             self._observer.stop()
             self._observer.join(timeout=3)
             self._observer = None
+        self._subscribers.clear()

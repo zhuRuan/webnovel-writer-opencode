@@ -1,8 +1,34 @@
-import React, { Suspense, lazy } from 'react'
+import React, { Suspense, lazy, Component } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import App from './App.jsx'
 import './index.css'
+
+class ErrorBoundary extends Component {
+    constructor(props) {
+        super(props)
+        this.state = { hasError: false, error: null }
+    }
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error }
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="loading-screen">
+                    <div className="loading-card">
+                        <div className="section-label">ERROR</div>
+                        <p>页面渲染出错，请刷新重试。</p>
+                        <button className="page-btn" onClick={() => { this.setState({ hasError: false }); window.location.reload() }}>
+                            刷新页面
+                        </button>
+                    </div>
+                </div>
+            )
+        }
+        return this.props.children
+    }
+}
 
 const OverviewPage = lazy(() => import('./pages/OverviewPage.jsx'))
 const CharactersPage = lazy(() => import('./pages/CharactersPage.jsx'))
@@ -25,6 +51,7 @@ function LoadingScreen() {
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
         <BrowserRouter>
+            <ErrorBoundary>
             <Suspense fallback={<LoadingScreen />}>
                 <Routes>
                     <Route path="/" element={<App />}>
@@ -38,6 +65,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                     </Route>
                 </Routes>
             </Suspense>
+            </ErrorBoundary>
         </BrowserRouter>
     </React.StrictMode>,
 )
