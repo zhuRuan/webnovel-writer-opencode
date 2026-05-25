@@ -72,6 +72,32 @@
 - 默认只读，不会修改项目文件
 - 前端构建产物已随插件发布，无需本地 `npm build`
 
+### `/webnovel-delete <章号>`
+
+安全删除章节（dry-run 预览 → 确认执行 → 清理投影）。
+
+```bash
+/webnovel-delete 12
+/webnovel-delete 12 --force
+```
+
+### `/webnovel-rewrite <章号>`
+
+重写指定章节，保持章节结构、保留已确认事实。
+
+```bash
+/webnovel-rewrite 5
+/webnovel-rewrite 5-8
+```
+
+### `/webnovel-heal`
+
+批量自动修复章节中的已知问题（伏笔断裂、状态不一致等）。
+
+```bash
+/webnovel-heal
+```
+
 ## 统一 CLI（命令行使用）
 
 所有 CLI 命令的入口都是 `webnovel.py`，格式：
@@ -123,7 +149,7 @@ python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_RO
 | 子命令 | 说明 |
 |--------|------|
 | `index` | 索引管理（`process-chapter`、`stats` 等） |
-| `state` | 状态管理 |
+| `state` | 状态管理（`render` 渲染 markdown 投影文件） |
 | `rag` | RAG 向量索引（`index-chapter`、`stats` 等） |
 | `entity` | 实体链接 |
 | `context` | 上下文管理 |
@@ -131,6 +157,9 @@ python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_RO
 | `migrate` | state.json → SQLite 迁移 |
 | `knowledge` | CSV 知识库管理 |
 | `checkers` | 审查器配置管理 |
+| `delete-chapters` | 安全删除章节（dry-run 预览 → 确认执行 → 清理投影） |
+| `orchestrate` | 批量编排（write/heal/nightly 模式） |
+| `entity-clean` | 扫描脏实体（`--mark-invalid` 标记无效） |
 
 ### 运维子命令
 
@@ -145,6 +174,7 @@ python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_RO
 | `master-outline-sync` | 将规划产物同步回写总纲 |
 | `export` | 正文导出（MD/TXT/EPUB/HTML/DOCX/PDF） |
 | `publish` | 番茄小说平台发布 |
+| `clean-tmp --keep <filename>` | 清理临时文件时保留指定文件 |
 
 ### 长期记忆子命令
 
@@ -191,3 +221,37 @@ python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_RO
 - `--emit-runtime-contracts` → `volumes/*.json` 与 `reviews/*.review.json`
 - `chapter-commit` → `commits/*.commit.json`
 - `story-events` → 读取 `events/*.events.json` 或 `index.db.story_events`
+
+### 架构管理子命令
+
+| 子命令 | 说明 |
+|--------|------|
+| `ssot verify` | 校验 state.json 与事件日志的一致性 |
+| `ssot rebuild` | 从事件日志重建所有投影 |
+| `ssot events` | 查看完整事件历史 |
+| `workflow checkpoint --chapter N --stage STAGE` | 记录章节工作流检查点 |
+| `workflow status` | 查看所有章节阶段状态 |
+| `workflow interrupted` | 查找中断未完成的章节 |
+| `override add` | 记录世界规则变更 |
+| `override list` | 查看生效的覆盖规则 |
+| `override context` | 生成当前章节的覆盖提示 |
+
+示例：
+
+```bash
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" ssot verify
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" ssot rebuild
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" workflow status
+python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" override list
+```
+
+### observer_settler.py CLI
+
+`observer_settler.py` 是事实提取脚本，位于 `data_modules/` 目录。CLI 参数：
+
+| 参数 | 说明 |
+|------|------|
+| `--raw-facts` | 输出原始事实数据 |
+| `--project-root <路径>` | 指定项目根目录 |
+| `--chapter <章号>` | 指定处理章节 |
+| `--output <路径>` | 输出文件路径 |

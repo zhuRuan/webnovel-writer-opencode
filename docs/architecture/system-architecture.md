@@ -428,3 +428,169 @@ graph LR
     CHAPTER_OUT -->|"load-context"| CTX_AGENT
     CTX_AGENT -->|"翻译为自然语言"| BRIEF
 ```
+
+## SSOT 事件溯源系统
+
+```mermaid
+graph TB
+    subgraph SSOT["SSOT 事件溯源"]
+        ENFORCER["ssot_enforcer.py"]
+        EVENTS["事件日志<br/>.story-system/events/*.event.json"]
+        PUBLISH["publish_event()<br/>单一写入路径"]
+        REBUILD["rebuild_state_json()<br/>确定性重放"]
+        VERIFY["verify_consistency()<br/>漂移检测"]
+    end
+
+    subgraph WORKFLOW["workflow_checkpoint.py"]
+        W_PLANNING["PLANNING"]
+        W_DRAFTING["DRAFTING"]
+        W_REVIEWING["REVIEWING"]
+        W_REVISING["REVISING"]
+        W_COMMITTED["COMMITTED"]
+    end
+
+    subgraph OVERRIDE["override_contract_engine.py"]
+        OV_VERSIONED["版本化世界观规则演化"]
+        OV_HINTS["上下文提示（context hints）"]
+    end
+
+    PUBLISH -->|"仅写入"| EVENTS
+    EVENTS -->|"重放"| REBUILD
+    REBUILD -->|"与 state.json 比对"| VERIFY
+
+    W_PLANNING --> W_DRAFTING --> W_REVIEWING --> W_REVISING --> W_COMMITTED
+    W_COMMITTED -->|"触发"| ENFORCER
+
+    ENFORCER --> PUBLISH
+    ENFORCER --> OV_VERSIONED
+    ENFORCER --> OV_HINTS
+```
+
+### ssot_enforcer.py
+
+- **追加式事件日志**：所有变更写入 `.story-system/events/*.event.json`，每条事件不可变
+- **publish_event()**：唯一写入路径，封装事件序列化与持久化
+- **rebuild_state_json()**：从事件日志确定性重放，重建当前 state.json
+- **verify_consistency()**：检测 state.json 与事件日志之间的漂移，发现不一致时告警
+
+### workflow_checkpoint.py
+
+- **5 阶段追踪**：`PLANNING → DRAFTING → REVIEWING → REVISING → COMMITTED`
+- 每个阶段记录 checkpoint，支持回滚到指定阶段
+- COMMITTED 状态触发 SSOT 事件发布
+
+### override_contract_engine.py
+
+- **版本化世界观规则演化**：支持世界规则的分版本演进，旧规则可追溯
+- **上下文提示**：为 context-agent 提供规则变更的摘要提示
+
+## Observer→Reflector 管道
+
+```mermaid
+graph LR
+    subgraph OBSERVER["Observer"]
+        OBS_AGENT["observer-agent.md<br/>自由文本事实提取"]
+        OBS_FREE["覆盖优先于精度<br/>无 schema 约束"]
+    end
+
+    subgraph SETTLER["Reflector / Settler"]
+        SET_PARSE["observer_settler.py<br/>正则/关键词解析"]
+        SET_VALIDATE["StoryEvent Pydantic 校验"]
+    end
+
+    subgraph OUTPUT["产出"]
+        OBS_FACTS["StoryEvent 列表<br/>结构化的章节事实"]
+    end
+
+    subgraph COMMIT["Commit"]
+        C_SVC["chapter-commit CLI"]
+    end
+
+    OBS_FREE --> SET_PARSE
+    SET_PARSE --> SET_VALIDATE
+    SET_VALIDATE --> OBS_FACTS
+    OBS_FACTS --> C_SVC
+```
+
+### observer-agent.md
+
+- **自由文本事实提取**：无 schema 约束，覆盖优先于精度
+- 作为 write 流程中 data-agent 提取角色的替代方案
+- 输出未结构化的原始观察文本
+
+### observer_settler.py
+
+- 通过正则/关键词解析原始提取文本
+- 将解析结果映射到 StoryEvent Pydantic 模型进行校验
+- 输出结构化的章节事实列表供 chapter-commit 使用
+
+## Markdown 投影渲染器
+
+```mermaid
+graph LR
+    subgraph TRIGGER["触发时机"]
+        T_COMMIT["chapter-commit 后"]
+        T_REBUILD["SSOT rebuild 后"]
+    end
+
+    subgraph RENDERER["state_projection_renderer.py"]
+        R_READ["读取 state.json + index.db"]
+        R_RENDER["渲染 5 份 Markdown 投影"]
+    end
+
+    subgraph OUTPUT["产出"]
+        O1["投影: 角色状态"]
+        O2["投影: 世界状态"]
+        O3["投影: 剧情进度"]
+        O4["投影: 关系网络"]
+        O5["投影: 债务追踪"]
+    end
+
+    T_COMMIT --> R_READ
+    T_REBUILD --> R_READ
+    R_READ --> R_RENDER
+    R_RENDER --> O1
+    R_RENDER --> O2
+    R_RENDER --> O3
+    R_RENDER --> O4
+    R_RENDER --> O5
+```
+
+### state_projection_renderer.py
+
+- 从 state.json + index.db 渲染 5 份 Markdown 投影
+- 触发时机：chapter-commit 完成后、SSOT rebuild 后
+- 投影内容包括：
+  - **角色状态**：各角色的当前状态、位置、关系变化
+  - **世界状态**：世界观关键要素的变更
+  - **剧情进度**：主线/支线推进情况
+  - **关系网络**：实体间关系图的 Markdown 呈现
+  - **债务追踪**：Foreshadowing 债务一览
+
+## 运行时产物
+
+```mermaid
+graph LR
+    subgraph RUNTIME["运行时产物（.webnovel/runtime/）"]
+        CTX["chapter-NNN.context.json<br/>完整上下文包快照"]
+        TRACE["chapter-NNN.trace.json<br/>段落包含/排除及权重"]
+    end
+
+    subgraph TRIGGERS["触发时机"]
+        TG_CTX["context-agent 执行时"]
+        TG_TRACE["上下文组装完成后"]
+    end
+
+    TG_CTX --> CTX
+    TG_TRACE --> TRACE
+```
+
+### .webnovel/runtime/chapter-NNN.context.json
+
+- **完整上下文包快照**：包含所有被选中的段落、实体状态、规则
+- 用于审计上下文包构成与调试上下文预算消耗
+
+### .webnovel/runtime/chapter-NNN.trace.json
+
+- 记录每个段落的**包含/排除决策**及**权重分配**
+- 用于分析上下文预算使用情况与调试权重配置

@@ -37,13 +37,15 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                      OpenCode                              │
 ├─────────────────────────────────────────────────────────────┤
-│  Skills (10个):                                            │
+│  Skills (13个):                                            │
 │    init / plan / write / write-batch / review / query       │
-│    export / publish / learn / dashboard                     │
+│    export / publish / learn / dashboard / webnovel-delete   │
+│    webnovel-rewrite / webnovel-heal                         │
 ├─────────────────────────────────────────────────────────────┤
-│  Agents (5个):                                             │
+│  Agents (6个):                                             │
 │    context-agent / data-agent / reviewer /                  │
-│    chapter-writer-agent / deconstruction-agent              │
+│    chapter-writer-agent / deconstruction-agent /            │
+│    observer-agent                                           │
 ├─────────────────────────────────────────────────────────────┤
 │  Data Layer:                                               │
 │    state.json / index.db (SQLite) / vectors.db             │
@@ -79,6 +81,16 @@
 | Continuity Checker | 场景与叙事连贯性 |
 | Reader-pull Checker | 钩子强度、期待管理、追读力 |
 
+### Observer Agent（提）
+
+- 文件：`.opencode/agents/observer-agent.md`
+- 职责：自由文本事实提取，覆盖优先（coverage-first），不设 schema 约束，捕获所有潜在实体与关系。输出经 `observer_settler.py` 沉降为结构化事实。
+
+### Chapter Writer Agent（写）
+
+- 文件：`.opencode/agents/chapter-writer-agent.md`
+- 职责：根据 Context Agent 生成的创作任务书，起草章节正文。
+
 ## Story System（合同驱动体系）
 
 Story System 以 `.story-system/` 为独立运行面，分五段递进：
@@ -108,3 +120,12 @@ preflight / dashboard
 实际执行入口仍是 `ChapterCommitService.apply_projections()`。
 
 Phase 5 文档见：`docs/architecture/story-system-phase5.md`
+
+## inkOS 启发改进
+
+受 inkOS 状态空间设计启发，近期引入以下改进：
+
+- **Observer→Reflector 双段提取**：observer-agent 做覆盖优先的无约束提取，observer_settler.py 做沉降消歧，分离"观察"与"反思"两阶段。
+- **SSOT 事件日志**：`ssot_enforcer.py` 统一所有状态变更路径，终结多头真理问题。
+- **运行时产物持久化**：`.webnovel/runtime/chapter-NNN.{context,trace}.json` 保留每次写作的上下文装配与推理轨迹。
+- **Markdown 投影**：`story/` 目录下 5 个自动渲染文件，将内部状态投影为人类可读的 Markdown 真相文件。

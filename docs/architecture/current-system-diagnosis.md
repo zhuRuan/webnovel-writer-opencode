@@ -7,6 +7,21 @@
 
 ---
 
+> **修复状态更新 (2026-05-25)**
+> 
+> 以下诊断问题已在 v2.8 中解决：
+> - **#1 多头真理** → SSOT 事件日志 (ssot_enforcer.py) 统一了状态变更路径
+> - **#2 Override Ledger 缺口** → override_contract_engine.py 扩展为版本化世界规则演进 + context_manager 合并双源
+> - **#7 事务割裂** → publish_event 集成到 apply_projections 主链路 + atomic_write_json 全局覆盖
+> - **#10 状态投影主导** → rebuild_state_json 支持全部 14 种事件类型 + verify_consistency 扩展至 8 个字段
+> - **上下文截断** → 死配置已清理（context_compact_text_*）；当前按 SECTION_ORDER 权重决定包含/排除，不做字符串切割
+> 
+> 新增能力：
+> - Observer→Reflector 双段提取（observer-agent + observer_settler.py）
+> - 运行时产物持久化（.webnovel/runtime/chapter-NNN.{context,trace}.json）
+> - 真相文件 Markdown 投影（story/ 下 5 个自动渲染文件）
+> - Workflow 状态机（PLANNING→DRAFTING→REVIEWING→REVISING→COMMITTED）
+
 ## 一、 核心架构与真理源缺陷 (Architecture & Single Source of Truth)
 
 ### 1. 多头真理（Multiple Sources of Truth）导致的认知撕裂

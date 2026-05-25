@@ -8,6 +8,7 @@
 
 - [`architecture/overview.md`](./architecture/overview.md)：系统架构、Agent 分工、Story System 设计
 - [`architecture/current-system-diagnosis.md`](./architecture/current-system-diagnosis.md)：当前系统状态诊断
+- [architecture/system-architecture.md](./architecture/system-architecture.md)：详细系统架构与模块说明
 
 ### 使用指南
 
@@ -17,7 +18,7 @@
 
 ### 运维
 
-`operations/` 目录中的修复计划均已落地实施，相关文档已随修复完成而归档。当前运维相关命令见 [guides/commands.md](./guides/commands.md) 中的"运维子命令"和"Story System 子命令"章节。
+- [operations/architecture-review-2026-05-25.md](./operations/architecture-review-2026-05-25.md)：2026-05 分层架构审查报告与修复计划
 
 ### 记忆系统
 
@@ -31,6 +32,11 @@
 ### Specs
 
 - [`superpowers/README.md`](./superpowers/README.md)：架构 spec 与设计文档导航
+- [superpowers/specs/2026-05-25-inkos-inspired-improvements-design.md](./superpowers/specs/2026-05-25-inkos-inspired-improvements-design.md)：inkOS 借鉴改进设计文档
+
+### Plans
+
+- [superpowers/plans/2026-05-25-inkos-inspired-improvements-plan.md](./superpowers/plans/2026-05-25-inkos-inspired-improvements-plan.md)：inkOS 借鉴改进实现计划
 
 ## 分类原则
 
