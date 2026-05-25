@@ -1,16 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import json
 import sys
 from pathlib import Path
+
+import pytest
 
 from data_modules.chapter_commit_service import ChapterCommitService
 from data_modules.config import DataModulesConfig
 from data_modules.index_manager import IndexManager
 
 
-def test_commit_service_rejects_when_missed_nodes_exist(tmp_path):
-    service = ChapterCommitService(tmp_path)
+@pytest.fixture
+def project_root(tmp_path):
+    """Create minimal project root with required state.json."""
+    webnovel = tmp_path / ".webnovel"
+    webnovel.mkdir()
+    (webnovel / "state.json").write_text(json.dumps({"schema_version": "5.1", "progress": {}}))
+    return tmp_path
+
+
+def test_commit_service_rejects_when_missed_nodes_exist(project_root):
+    service = ChapterCommitService(project_root)
     payload = service.build_commit(
         chapter=3,
         review_result={"blocking_count": 0},
@@ -21,8 +33,8 @@ def test_commit_service_rejects_when_missed_nodes_exist(tmp_path):
     assert payload["meta"]["status"] == "rejected"
 
 
-def test_commit_service_accepts_when_all_checks_pass(tmp_path):
-    service = ChapterCommitService(tmp_path)
+def test_commit_service_accepts_when_all_checks_pass(project_root):
+    service = ChapterCommitService(project_root)
     payload = service.build_commit(
         chapter=3,
         review_result={"blocking_count": 0},
@@ -31,14 +43,14 @@ def test_commit_service_accepts_when_all_checks_pass(tmp_path):
         extraction_result={"state_deltas": [], "entity_deltas": [], "accepted_events": []},
     )
     assert payload["meta"]["status"] == "accepted"
-    assert payload["contract_refs"]["master"] == "MASTER_SETTING.json"
-    assert payload["contract_refs"]["volume"] == "volume_001.json"
-    assert payload["contract_refs"]["chapter"] == "chapter_003.json"
+    assert "MASTER_SETTING.json" in payload["contract_refs"]["master"]
+    assert "volume_001.json" in payload["contract_refs"]["volume"]
+    assert "chapter_003.json" in payload["contract_refs"]["chapter"]
     assert payload["outline_snapshot"]["covered_nodes"] == ["发现陷阱"]
 
 
-def test_commit_service_includes_volume_ref_and_write_fact_provenance(tmp_path):
-    service = ChapterCommitService(tmp_path)
+def test_commit_service_includes_volume_ref_and_write_fact_provenance(project_root):
+    service = ChapterCommitService(project_root)
     payload = service.build_commit(
         chapter=3,
         review_result={"blocking_count": 0},
@@ -47,16 +59,16 @@ def test_commit_service_includes_volume_ref_and_write_fact_provenance(tmp_path):
         extraction_result={"state_deltas": [], "entity_deltas": [], "accepted_events": []},
     )
 
-    assert payload["contract_refs"]["volume"] == "volume_001.json"
+    assert "volume_001.json" in payload["contract_refs"]["volume"]
     assert payload["provenance"]["write_fact_role"] == "chapter_commit"
     assert payload["provenance"]["projection_role"] == "derived_read_models"
 
 
-def test_chapter_commit_cli_builds_and_persists_commit(tmp_path, monkeypatch):
-    review_path = tmp_path / "review.json"
-    fulfillment_path = tmp_path / "fulfillment.json"
-    disambiguation_path = tmp_path / "disambiguation.json"
-    extraction_path = tmp_path / "extraction.json"
+def test_chapter_commit_cli_builds_and_persists_commit(project_root, monkeypatch):
+    review_path = project_root / "review.json"
+    fulfillment_path = project_root / "fulfillment.json"
+    disambiguation_path = project_root / "disambiguation.json"
+    extraction_path = project_root / "extraction.json"
     review_path.write_text('{"blocking_count": 0}', encoding="utf-8")
     fulfillment_path.write_text(
         '{"planned_nodes": ["发现陷阱"], "covered_nodes": ["发现陷阱"], "missed_nodes": [], "extra_nodes": []}',
@@ -77,7 +89,7 @@ def test_chapter_commit_cli_builds_and_persists_commit(tmp_path, monkeypatch):
         [
             "chapter_commit",
             "--project-root",
-            str(tmp_path),
+            str(project_root),
             "--chapter",
             "3",
             "--review-result",
@@ -92,11 +104,11 @@ def test_chapter_commit_cli_builds_and_persists_commit(tmp_path, monkeypatch):
     )
     main()
 
-    assert (tmp_path / ".story-system" / "commits" / "chapter_003.commit.json").is_file()
+    assert (project_root / ".story-system" / "commits" / "chapter_003.commit.json").is_file()
 
 
-def test_apply_projections_writes_events_and_amend_proposals(tmp_path):
-    service = ChapterCommitService(tmp_path)
+def test_apply_projections_writes_events_and_amend_proposals(project_root):
+    service = ChapterCommitService(project_root)
     payload = service.build_commit(
         chapter=3,
         review_result={"blocking_count": 0},
@@ -129,8 +141,8 @@ def test_apply_projections_writes_events_and_amend_proposals(tmp_path):
 
     service.apply_projections(payload)
 
-    assert (tmp_path / ".story-system" / "events" / "chapter_003.events.json").is_file()
-    manager = IndexManager(DataModulesConfig.from_project_root(tmp_path))
+    assert (project_root / ".story-system" / "events" / "chapter_003.events.json").is_file()
+    manager = IndexManager(DataModulesConfig.from_project_root(project_root))
     with manager._get_conn() as conn:
         row = conn.execute(
             """

@@ -57,6 +57,7 @@ def test_world_rule_broken_generates_amend_proposal():
 
 
 def test_persist_amend_proposals_writes_pending_rows(tmp_path):
+    (tmp_path / ".webnovel").mkdir(parents=True, exist_ok=True)
     manager = IndexManager(DataModulesConfig.from_project_root(tmp_path))
     proposals = [
         {
