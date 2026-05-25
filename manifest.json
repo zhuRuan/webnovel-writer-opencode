@@ -1,17 +1,82 @@
 {
-  "version": "v2.7.0-20260525.0913",
+  "version": "v2.7.0-20260525.1224",
   "tag": "v2.7.0",
-  "updated": "2026-05-25T09:13:03Z",
+  "updated": "2026-05-25T12:24:17Z",
   "changelog": [
     {
-      "hash": "eadbaca",
-      "type": "feat",
-      "message": "feat: SSOT \u4e8b\u4ef6\u7cfb\u7edf\u96c6\u6210 + \u67b6\u6784\u5ba1\u67e5\u4fee\u590d"
+      "hash": "22ae9ad",
+      "type": "fix",
+      "message": "fix: import _sys \u6cc4\u6f0f + urgency bool \u7a7f\u900f + entities_appeared \u5197\u4f59\u5b88\u536b"
     },
     {
-      "hash": "1af798a",
+      "hash": "73a2f45",
+      "type": "fix",
+      "message": "fix: \u4ee3\u7801\u5ba1\u67e5 11 \u9879\u4fee\u590d \u2014 \u76f8\u5bf9\u5bfc\u5165/SKILL.md\u6a21\u677f/\u5b9d\u7269\u6bb5/\u6821\u9a8c\u65e5\u5fd7/\u6807\u70b9\u517c\u5bb9/urgency null/data-agent\u6f02\u79fb"
+    },
+    {
+      "hash": "bd996d5",
+      "type": "fix",
+      "message": "fix: observer-agent \u8df3\u8fc7 8 \u6bb5\u6a21\u677f\u68c0\u67e5\uff08\u7cbe\u7b80 5 \u6bb5\u8bbe\u8ba1\uff09"
+    },
+    {
+      "hash": "79f582e",
+      "type": "feat",
+      "message": "feat: \u65b0\u589e webnovel state render CLI \u547d\u4ee4"
+    },
+    {
+      "hash": "32021af",
+      "type": "feat",
+      "message": "feat: chapter-commit \u548c ssot rebuild \u540e\u81ea\u52a8\u6e32\u67d3 markdown \u6295\u5f71"
+    },
+    {
+      "hash": "07a60a7",
+      "type": "feat",
+      "message": "feat: \u65b0\u589e state_projection_renderer\u2014\u2014\u4ece state.json \u6e32\u67d3 5 \u4e2a markdown \u6295\u5f71"
+    },
+    {
+      "hash": "847be1c",
+      "type": "feat",
+      "message": "feat: webnovel-write Step 5.1 \u62c6\u6210 Observer\u2192Settler\u2192Data Agent \u4e09\u6bb5"
+    },
+    {
+      "hash": "f529297",
+      "type": "feat",
+      "message": "feat: \u65b0\u589e observer_settler\u2014\u2014\u89e3\u6790 observer \u8f93\u51fa \u2192 StoryEvent \u6821\u9a8c"
+    },
+    {
+      "hash": "f269959",
+      "type": "feat",
+      "message": "feat: \u65b0\u589e observer-agent\u2014\u2014\u81ea\u7531\u6587\u672c\u4e8b\u5b9e\u63d0\u53d6\uff0c\u65e0 schema \u7ea6\u675f"
+    },
+    {
+      "hash": "e358eda",
+      "type": "fix",
+      "message": "fix: add logger.warning for runtime artifact persistence failures"
+    },
+    {
+      "hash": "741cbe4",
+      "type": "feat",
+      "message": "feat: context runtime artifact persistence (chapter-NNN.context.json + trace.json)"
+    },
+    {
+      "hash": "e841ab8",
+      "type": "docs",
+      "message": "docs: inkOS \u501f\u9274\u6539\u8fdb\u5b9e\u73b0\u8ba1\u5212\u2014\u20148 \u4e2a task\uff0c3 \u9879\u72ec\u7acb\u4ea4\u4ed8"
+    },
+    {
+      "hash": "3b3e715",
+      "type": "docs",
+      "message": "docs: \u4fee\u590d spec \u81ea\u68c0\u53d1\u73b0\u7684 data-agent \u8f93\u5165\u4f9d\u8d56 + renderer \u7b7e\u540d\u6b67\u4e49"
+    },
+    {
+      "hash": "4c28e47",
+      "type": "docs",
+      "message": "docs: inkOS \u501f\u9274\u6539\u8fdb\u8bbe\u8ba1\u6587\u6863 \u2014 \u8fd0\u884c\u65f6\u4ea7\u7269\u6301\u4e45\u5316 + Observer\u2192Reflector + Markdown \u6295\u5f71"
+    },
+    {
+      "hash": "6b4e973",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260525.0745 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260525.0913 [skip ci]"
     }
   ],
   "files": {
@@ -196,8 +261,8 @@
       "size": 2729
     },
     ".opencode/skills/webnovel-write/SKILL.md": {
-      "sha256": "b35b90fad9beed24b09e8fc33387593ee295de0586cc2e7dd36080f75ceb3e50",
-      "size": 12821
+      "sha256": "3b3ebfddca127a52e8e2225bef88fde78ed44720d4b7f882cdd307cf1bd6a781",
+      "size": 13380
     },
     ".opencode/skills/webnovel-write/references/polish-guide.md": {
       "sha256": "21d7b821bd656cb477c6fb372719bebc949c332efb551739bff3cca29f71bc83",
@@ -843,13 +908,17 @@
       "sha256": "e5b4fa910c3e57210583987f8f0d83a927503da3e56974fad7f126dfc2d8865e",
       "size": 4193
     },
+    ".opencode/agents/observer-agent.md": {
+      "sha256": "74dd7ce22b111e4f788a3c33639e80e1048ebea196032668ae4cc024c4d6262d",
+      "size": 2626
+    },
     ".opencode/agents/context-agent.md": {
       "sha256": "b1dc12d83b0004579f696300d2bbc5eb043593e1f09cd2a494350a6322a0d2f1",
       "size": 10830
     },
     ".opencode/agents/data-agent.md": {
-      "sha256": "89675c09de05eb53e4312016e26c1dcc9cc50232d2bf7d36621f2cdd7adf3cab",
-      "size": 7580
+      "sha256": "8d168e9c1bcaff697b3b36d46a8079e52b4d04780b8046986bfe19fe29dfb0bb",
+      "size": 7723
     },
     ".opencode/agents/reviewer.md": {
       "sha256": "faa6f47dc66670038b13f42d5cd4641406c83eeebfb48d1e6c1a357f538eef00",
@@ -1135,6 +1204,10 @@
       "sha256": "a8f15da50ca44387585a76068514616aaa51df04133037052a2079ec50f2bbce",
       "size": 1273
     },
+    ".opencode/scripts/data_modules/observer_settler.py": {
+      "sha256": "f9712a99fc36fafddb18ec41286b8b1355ee3bbba93f52d48d18015e8d0a7be2",
+      "size": 13232
+    },
     ".opencode/scripts/data_modules/index_debt_mixin.py": {
       "sha256": "5bc6d6368b8a86d77a962851e432e69099e9687ab6ca276679637a8d5fdaabb5",
       "size": 20646
@@ -1142,6 +1215,10 @@
     ".opencode/scripts/data_modules/story_system_engine.py": {
       "sha256": "648e57f4a14cc69d90b15f713168d0b915fea0c374d937a9e4af1ebc0a1972ba",
       "size": 25995
+    },
+    ".opencode/scripts/data_modules/state_projection_renderer.py": {
+      "sha256": "4fb9eb46a483ad1d862a465ca5c8b11320792f19ae1a97fd04d50a9f55e9a7f4",
+      "size": 7819
     },
     ".opencode/scripts/data_modules/story_contracts.py": {
       "sha256": "ac702edb5322fbcb9a7a6981412564589727ffb200b81f2fc80f10813d72f028",
@@ -1220,8 +1297,8 @@
       "size": 2847
     },
     ".opencode/scripts/data_modules/ssot_enforcer.py": {
-      "sha256": "a376a142fc958b988e5366cdccf35f49c236512c53037907b75a385e931afa69",
-      "size": 19542
+      "sha256": "3fec50b7653dbac13f3ed371c4a59b8a83723131df6c1596ccd9547d2f093b2f",
+      "size": 19881
     },
     ".opencode/scripts/data_modules/index_observability_mixin.py": {
       "sha256": "01f0e7f5c297d51f0bbf2501af96fd5d88f0a9fe735c7e93beb74dc0d6d373a7",
@@ -1236,8 +1313,8 @@
       "size": 4129
     },
     ".opencode/scripts/data_modules/chapter_commit_service.py": {
-      "sha256": "d919b3b42fc192251a219a4fcb84e2eec6bd824e465cff46f66e29da336aa8c4",
-      "size": 10383
+      "sha256": "0cb9fe85fc3dd550c22eddbc1b810c5fc1583e5f378d09ea90cc4492a0f1f82c",
+      "size": 10670
     },
     ".opencode/scripts/data_modules/index_projection_writer.py": {
       "sha256": "26b6bf1db646923cde92bba48033fe78946ba6d29cff92cc58d375ea63d0d347",
@@ -1280,8 +1357,8 @@
       "size": 6587
     },
     ".opencode/scripts/data_modules/webnovel.py": {
-      "sha256": "0026ea66b1a27f97f75ab558bb1e6f4b8701d3c377f5e9efbe5bd34e77a10f03",
-      "size": 33223
+      "sha256": "0fb02b99309d6468d89e8a175e1ecf089ef096120ef0f07e36f102096e13ceae",
+      "size": 33585
     },
     ".opencode/scripts/data_modules/__init__.py": {
       "sha256": "02e7701b523eb2cfab120e0f1cf9ff01a08dcef3a7da128d445c7020cb4a42bb",
@@ -1316,8 +1393,8 @@
       "size": 11711
     },
     ".opencode/scripts/data_modules/context_manager.py": {
-      "sha256": "38915b24f6208f5cd99867f98930d1ab65f8b070ad00a17e851872b5b6d6a791",
-      "size": 37423
+      "sha256": "4c5c8e42d68bfbe006732ff71c26a2ab5cbd5f3c1da5c92c00235448a191a810",
+      "size": 38607
     },
     ".opencode/scripts/data_modules/config.py": {
       "sha256": "03f0f5858f1b1820f814250832c9953188fd91de7d6065e3be90d064b13375a2",
@@ -1535,6 +1612,10 @@
       "sha256": "fad52f6cf3aeffb64bc54956438677457ad2083d98a79f39a6c24fe7b90d7bf4",
       "size": 5687
     },
+    ".opencode/scripts/data_modules/tests/test_observer_settler.py": {
+      "sha256": "c6a173d348f78704883aecdb94132deee7261b861aa9b8f9ee1c03186c928446",
+      "size": 6632
+    },
     ".opencode/scripts/data_modules/tests/test_export_manager.py": {
       "sha256": "637596efeb95127752c6d3bdc23dd0b2bf0c58533facb06b9c903d61c05da5e3",
       "size": 18257
@@ -1560,8 +1641,8 @@
       "size": 2553
     },
     ".opencode/scripts/data_modules/tests/test_prompt_integrity.py": {
-      "sha256": "4749b78fde4ab96c694fd8ebee6b724b53e5c77868ba5e4956324006b1cdcc2e",
-      "size": 18940
+      "sha256": "1a8e0278c9e1d9eeaf99eb7f98b6710eb6aa68aa2ca566929a42c69692f3bfd4",
+      "size": 19095
     },
     ".opencode/scripts/data_modules/tests/test_rag_adapter.py": {
       "sha256": "d44d7c1a1744e5f870ff9a447f8b4c952dc94d4b4a8192fc8e3c0b175d7f24c5",
@@ -1638,6 +1719,10 @@
     ".opencode/scripts/data_modules/tests/test_memory_writer.py": {
       "sha256": "51bad9b054c6d0948975037f85d51f888c8f02bb9555ef87d6eaca5643435dc3",
       "size": 2320
+    },
+    ".opencode/scripts/data_modules/tests/test_state_projection_renderer.py": {
+      "sha256": "161906468b6c5e8ae4af2f06f239f6819912491c6dd870745ef1776c810510cc",
+      "size": 4129
     },
     ".opencode/scripts/data_modules/tests/test_extract_chapter_context.py": {
       "sha256": "35cec8447d414d01dbbdfee325f609f3b914b2ebb0becd378eec6bce7e5f9842",
