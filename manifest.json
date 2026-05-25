@@ -1,82 +1,27 @@
 {
-  "version": "v2.7.0-20260525.1224",
+  "version": "v2.7.0-20260525.1252",
   "tag": "v2.7.0",
-  "updated": "2026-05-25T12:24:17Z",
+  "updated": "2026-05-25T12:52:39Z",
   "changelog": [
     {
-      "hash": "22ae9ad",
+      "hash": "42510df",
       "type": "fix",
-      "message": "fix: import _sys \u6cc4\u6f0f + urgency bool \u7a7f\u900f + entities_appeared \u5197\u4f59\u5b88\u536b"
+      "message": "fix: \u4fee\u590d 6 \u4e2a\u9884\u5b58\u6d4b\u8bd5\u5931\u8d25 \u2014\u2014 chapter_commit_service + override_ledger"
     },
     {
-      "hash": "73a2f45",
-      "type": "fix",
-      "message": "fix: \u4ee3\u7801\u5ba1\u67e5 11 \u9879\u4fee\u590d \u2014 \u76f8\u5bf9\u5bfc\u5165/SKILL.md\u6a21\u677f/\u5b9d\u7269\u6bb5/\u6821\u9a8c\u65e5\u5fd7/\u6807\u70b9\u517c\u5bb9/urgency null/data-agent\u6f02\u79fb"
-    },
-    {
-      "hash": "bd996d5",
-      "type": "fix",
-      "message": "fix: observer-agent \u8df3\u8fc7 8 \u6bb5\u6a21\u677f\u68c0\u67e5\uff08\u7cbe\u7b80 5 \u6bb5\u8bbe\u8ba1\uff09"
-    },
-    {
-      "hash": "79f582e",
-      "type": "feat",
-      "message": "feat: \u65b0\u589e webnovel state render CLI \u547d\u4ee4"
-    },
-    {
-      "hash": "32021af",
-      "type": "feat",
-      "message": "feat: chapter-commit \u548c ssot rebuild \u540e\u81ea\u52a8\u6e32\u67d3 markdown \u6295\u5f71"
-    },
-    {
-      "hash": "07a60a7",
-      "type": "feat",
-      "message": "feat: \u65b0\u589e state_projection_renderer\u2014\u2014\u4ece state.json \u6e32\u67d3 5 \u4e2a markdown \u6295\u5f71"
-    },
-    {
-      "hash": "847be1c",
-      "type": "feat",
-      "message": "feat: webnovel-write Step 5.1 \u62c6\u6210 Observer\u2192Settler\u2192Data Agent \u4e09\u6bb5"
-    },
-    {
-      "hash": "f529297",
-      "type": "feat",
-      "message": "feat: \u65b0\u589e observer_settler\u2014\u2014\u89e3\u6790 observer \u8f93\u51fa \u2192 StoryEvent \u6821\u9a8c"
-    },
-    {
-      "hash": "f269959",
-      "type": "feat",
-      "message": "feat: \u65b0\u589e observer-agent\u2014\u2014\u81ea\u7531\u6587\u672c\u4e8b\u5b9e\u63d0\u53d6\uff0c\u65e0 schema \u7ea6\u675f"
-    },
-    {
-      "hash": "e358eda",
-      "type": "fix",
-      "message": "fix: add logger.warning for runtime artifact persistence failures"
-    },
-    {
-      "hash": "741cbe4",
-      "type": "feat",
-      "message": "feat: context runtime artifact persistence (chapter-NNN.context.json + trace.json)"
-    },
-    {
-      "hash": "e841ab8",
+      "hash": "2c126f5",
       "type": "docs",
-      "message": "docs: inkOS \u501f\u9274\u6539\u8fdb\u5b9e\u73b0\u8ba1\u5212\u2014\u20148 \u4e2a task\uff0c3 \u9879\u72ec\u7acb\u4ea4\u4ed8"
+      "message": "docs: \u5168\u9879\u76ee\u6587\u6863\u540c\u6b65\u66f4\u65b0 \u2014 \u547d\u4ee4\u901f\u67e5/\u7cfb\u7edf\u67b6\u6784/\u6982\u89c8/\u8bca\u65ad/\u7d22\u5f15"
     },
     {
-      "hash": "3b3e715",
+      "hash": "83d7318",
       "type": "docs",
-      "message": "docs: \u4fee\u590d spec \u81ea\u68c0\u53d1\u73b0\u7684 data-agent \u8f93\u5165\u4f9d\u8d56 + renderer \u7b7e\u540d\u6b67\u4e49"
+      "message": "docs: \u66f4\u65b0 README \u2014 \u81f4\u8c22 inkOS/\u793e\u533a + \u65b0 Skills + \u67b6\u6784\u5b50\u7cfb\u7edf"
     },
     {
-      "hash": "4c28e47",
-      "type": "docs",
-      "message": "docs: inkOS \u501f\u9274\u6539\u8fdb\u8bbe\u8ba1\u6587\u6863 \u2014 \u8fd0\u884c\u65f6\u4ea7\u7269\u6301\u4e45\u5316 + Observer\u2192Reflector + Markdown \u6295\u5f71"
-    },
-    {
-      "hash": "6b4e973",
+      "hash": "3a4fc1d",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260525.0913 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260525.1224 [skip ci]"
     }
   ],
   "files": {
@@ -1549,8 +1494,8 @@
       "size": 3823
     },
     ".opencode/scripts/data_modules/tests/test_override_ledger_service.py": {
-      "sha256": "bb0b74b2a24922669af0380e7589bb3e8f2e9371e4349e07dd223c8896c7518e",
-      "size": 2831
+      "sha256": "209b8d0831e8b05a51a36437f92563ce3f4cf4a92f5ede882f48034a6e528d2b",
+      "size": 2895
     },
     ".opencode/scripts/data_modules/tests/test_story_system_engine.py": {
       "sha256": "0bffe9b89889933cf9c156e29f57e74d765df869cb54f378b6e197985ddd4526",
@@ -1709,8 +1654,8 @@
       "size": 3993
     },
     ".opencode/scripts/data_modules/tests/test_chapter_commit_service.py": {
-      "sha256": "deb6c46af392f73f33e6b51f32770e3ab65e9ee0391cabec3497a0773c10c59c",
-      "size": 5563
+      "sha256": "0997b6629732f8bb62067f5c957a31ca71a70b7167adc57a185ed27166553af2",
+      "size": 5943
     },
     ".opencode/scripts/data_modules/tests/test_memory_contract.py": {
       "sha256": "37f0958160d8ba99de4f0cb1b0eafff264e5125cfad9a6f68cc997332192c2e2",
