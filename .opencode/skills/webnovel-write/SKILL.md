@@ -244,30 +244,50 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 
 ### Step 5：提交
 
-#### 5.1 Data Agent 提取事实
-
-必须使用 `Agent` 工具调用 `data-agent`，产出 fulfillment_result / disambiguation_result / extraction_result 三份 JSON，并复用 Step 3 的 review_results。
+#### 5.1 事实提取与校验
 
 ```bash
 # 清空旧 tmp 文件，保留 review_results.json（chapter-commit 仍需）
 python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" clean-tmp --project-root "${PROJECT_ROOT}" --keep review_results.json
 ```
 
+##### 5.1a Observer：自由提取
+
+必须使用 `Agent` 工具调用 `observer-agent`，产出自由文本 raw_facts.txt。
+
 ```text
 Agent(
-  subagent_type: "data-agent",
-  prompt: "chapter={chapter_num}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。从正文提取事实，生成 .webnovel/tmp/ 下的 fulfillment_result.json、disambiguation_result.json、extraction_result.json；不直接写 state/index/summaries/memory。"
+  subagent_type: "observer-agent",
+  prompt: "project_root={PROJECT_ROOT}; chapter={chapter_num}; chapter_file={CHAPTER_FILE}。输出 raw_facts 到 {PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num:03d}.raw_facts.txt。"
 )
 ```
 
-Data Agent 只提取事实+生成 artifacts，不直接写 state/index/summaries/memory。
+产物：`{PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num:03d}.raw_facts.txt`
+
+##### 5.1b Settler：Schema 校验落盘
 
 ```bash
-# 校验 data-agent 输出文件
-for f in fulfillment_result.json disambiguation_result.json extraction_result.json; do
-  test -s "${PROJECT_ROOT}/.webnovel/tmp/${f}" || { echo "❌ ${f} 缺失"; exit 1; }
-done
+python -X utf8 "${SCRIPTS_DIR}/data_modules/observer_settler.py" \
+  --raw-facts "${PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num:03d}.raw_facts.txt" \
+  --project-root "${PROJECT_ROOT}" \
+  --chapter {chapter_num} \
+  --output "${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json"
 ```
+
+产物：`{PROJECT_ROOT}/.webnovel/tmp/extraction_result.json`
+
+##### 5.1c Data Agent：契约校验与消歧
+
+必须使用 `Agent` 工具调用 `data-agent`。data-agent 不再提取事实——仅做大纲履约对比和实体消歧。
+
+```text
+Agent(
+  subagent_type: "data-agent",
+  prompt: "project_root={PROJECT_ROOT}; chapter={chapter_num}。extraction_result 已由 settler 生成在 {PROJECT_ROOT}/.webnovel/tmp/extraction_result.json。只产出 fulfillment_result.json 和 disambiguation_result.json。不重新提取事实。"
+)
+```
+
+产物：`fulfillment_result.json` + `disambiguation_result.json`
 
 #### 5.2 CHAPTER_COMMIT
 
