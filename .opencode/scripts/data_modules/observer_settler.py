@@ -19,8 +19,7 @@ try:
     from .story_event_schema import StoryEvent
 except ImportError:
     # __main__ fallback — add parent dir to path for sibling imports
-    import sys as _sys
-    _sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from runtime_compat import enable_windows_utf8_stdio  # noqa: F811
     from story_event_schema import StoryEvent  # noqa: F811
 else:
@@ -312,7 +311,7 @@ def settle(raw_facts_path: Path, project_root: Path, chapter: int) -> dict:
         logger.warning("settler: %d/%d events dropped by Pydantic validation",
                        dropped, len(all_events))
 
-    entities_appeared = list({e["subject"] for e in validated if e.get("subject")})
+    entities_appeared = list({e["subject"] for e in validated})
     return {
         "accepted_events": validated,
         "state_deltas": [],

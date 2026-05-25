@@ -64,7 +64,7 @@ def _render_foreshadowing_panel(state: dict, project_root: Path) -> str:
     lines.append(f"## 活跃伏笔（{len(active)}）\n")
     for f in active:
         urgency_raw = f.get("urgency")
-        urgency = urgency_raw if isinstance(urgency_raw, (int, float)) and urgency_raw is not None else 50
+        urgency = urgency_raw if isinstance(urgency_raw, (int, float)) and not isinstance(urgency_raw, bool) else 50
         bar = "█" * min(10, max(1, urgency // 10)) + "░" * (10 - min(10, max(1, urgency // 10)))
         lines.append(f"- **第{f.get('planted_chapter', '?')}章**: {f.get('content', '')}")
         lines.append(f"  - 紧迫度: [{bar}] {urgency}%")
