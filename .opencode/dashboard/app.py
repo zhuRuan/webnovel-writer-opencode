@@ -247,9 +247,32 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 watch_story_system_dir=story_system if story_system.is_dir() else None,
                 loop=asyncio.get_running_loop(),
             )
+
+        async def _polling_loop():
+            """Periodically push workflow and debt status to SSE clients."""
+            while True:
+                try:
+                    await asyncio.sleep(30)
+                    if not _watcher._subscribers:
+                        continue
+                    try:
+                        from data_modules.workflow_checkpoint import all_chapters_progress
+                        wf = all_chapters_progress(_get_project_root())
+                        _watcher._dispatch(json.dumps({"type": "workflow-status", "data": wf, "ts": time.time()}))
+                    except Exception:
+                        pass
+                except asyncio.CancelledError:
+                    break
+
+        poll_task = asyncio.create_task(_polling_loop())
         try:
             yield
         finally:
+            poll_task.cancel()
+            try:
+                await poll_task
+            except asyncio.CancelledError:
+                pass
             _watcher.stop()
 
     app = FastAPI(title="Webnovel Dashboard", version="0.1.0", lifespan=_lifespan)
@@ -820,6 +843,23 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 _watcher.unsubscribe(q)
 
         return StreamingResponse(_gen(), media_type="text/event-stream")
+
+    # ===========================================================
+    # API：写作进度与监控
+    # ===========================================================
+
+    @app.get("/api/workflow/status")
+    def workflow_status():
+        from data_modules.workflow_checkpoint import all_chapters_progress
+
+        return all_chapters_progress(_get_project_root())
+
+    @app.get("/api/context/budget/{chapter}")
+    def context_budget(chapter: int):
+        trace_file = _webnovel_dir() / "runtime" / f"chapter-{chapter:03d}.trace.json"
+        if not trace_file.is_file():
+            raise HTTPException(404, "trace 文件不存在")
+        return json.loads(trace_file.read_text(encoding="utf-8"))
 
     # ===========================================================
     # API：运维操作（安全写入口）

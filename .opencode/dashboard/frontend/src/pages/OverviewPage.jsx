@@ -208,6 +208,7 @@ export default function OverviewPage() {
     const [latestWindow, setLatestWindow] = useState({ items: [], total: 0, latest_chapter: 0 })
     const [windowIndex, setWindowIndex] = useState(0)
     const [loadingTrend, setLoadingTrend] = useState(true)
+    const [workflow, setWorkflow] = useState({})
 
     useEffect(() => {
         setWindowIndex(0)
@@ -220,11 +221,13 @@ export default function OverviewPage() {
             fetchStoryRuntimeHealth(),
             fetchChapters(),
             fetchChapterTrend({ limit: WINDOW_SIZE, offset: 0 }),
+            fetch('/api/workflow/status').then(r => r.json()).catch(() => ({})),
         ]).then(results => {
             if (cancelled) return
 
             setRuntimeHealth(results[0].status === 'fulfilled' ? results[0].value : null)
             setAllChapters(results[1].status === 'fulfilled' ? results[1].value : [])
+            setWorkflow(results[3].status === 'fulfilled' ? results[3].value : {})
 
             const latest = results[2].status === 'fulfilled'
                 ? results[2].value
@@ -381,6 +384,48 @@ export default function OverviewPage() {
                     sub={`总计 ${foreshadowSummary.total} 条伏笔`}
                 />
             </div>
+
+            {Object.keys(workflow).length > 0 && (
+                <article className="card">
+                    <div className="card-header">
+                        <div>
+                            <div className="section-label">WORKFLOW</div>
+                            <div className="card-title">写作进度</div>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '12px 0' }}>
+                        {Object.entries(workflow).sort(([a], [b]) => Number(a) - Number(b)).slice(-1).map(([ch, stages]) => (
+                            <div key={ch} style={{ width: '100%' }}>
+                                <div style={{ fontWeight: 600, marginBottom: 8 }}>第 {ch} 章</div>
+                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                    {['PLANNING', 'DRAFTING', 'REVIEWING', 'REVISING', 'COMMITTED'].map(stage => {
+                                        const done = stages[stage] !== undefined
+                                        const current = stages._current_stage === stage
+                                        return (
+                                            <React.Fragment key={stage}>
+                                                <div style={{
+                                                    width: 16, height: 16, borderRadius: '50%',
+                                                    background: current ? 'var(--accent)' : done ? '#4caf50' : '#555',
+                                                    boxShadow: current ? '0 0 8px var(--accent)' : 'none',
+                                                    transition: 'background 0.3s',
+                                                }} title={stage} />
+                                                {stage !== 'COMMITTED' && (
+                                                    <div style={{ flex: 1, height: 2, background: done ? '#4caf50' : '#333', minWidth: 16 }} />
+                                                )}
+                                            </React.Fragment>
+                                        )
+                                    })}
+                                </div>
+                                <div style={{ display: 'flex', gap: 4, marginTop: 4, fontSize: 10, color: '#888' }}>
+                                    {['PLANNING', 'DRAFTING', 'REVIEWING', 'REVISING', 'COMMITTED'].map(stage => (
+                                        <span key={stage} style={{ flex: 1, textAlign: 'center' }}>{stage === 'COMMITTED' ? 'DONE' : stage.slice(0, 4)}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </article>
+            )}
 
             <article className="card">
                 <div className="card-header">
