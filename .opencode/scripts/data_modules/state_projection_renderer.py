@@ -9,6 +9,7 @@ Triggered after chapter-commit, ssot rebuild, or manually via CLI.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 HEADER = "> 此文件由系统自动生成，请勿手动编辑。数据源: state.json + index.db\n\n"
@@ -62,7 +63,8 @@ def _render_foreshadowing_panel(state: dict, project_root: Path) -> str:
 
     lines.append(f"## 活跃伏笔（{len(active)}）\n")
     for f in active:
-        urgency = f.get("urgency", 50)
+        urgency_raw = f.get("urgency")
+        urgency = urgency_raw if isinstance(urgency_raw, (int, float)) and urgency_raw is not None else 50
         bar = "█" * min(10, max(1, urgency // 10)) + "░" * (10 - min(10, max(1, urgency // 10)))
         lines.append(f"- **第{f.get('planted_chapter', '?')}章**: {f.get('content', '')}")
         lines.append(f"  - 紧迫度: [{bar}] {urgency}%")
@@ -164,7 +166,7 @@ def render_all_projections(project_root: Path) -> dict[str, Path]:
 
     state = json.loads(state_path.read_text(encoding="utf-8"))
 
-    renderers: dict[str, callable] = {
+    renderers: dict[str, Callable[..., str]] = {
         "世界观状态.md": _render_world_state,
         "伏笔面板.md": _render_foreshadowing_panel,
         "角色关系矩阵.md": _render_character_matrix,

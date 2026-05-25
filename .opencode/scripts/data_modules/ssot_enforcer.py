@@ -19,10 +19,13 @@ Consistency check:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 # ── Event log ────────────────────────────────────────────────────────
@@ -350,8 +353,8 @@ def rebuild_projections(project_root: Path) -> dict:
     try:
         from .state_projection_renderer import render_all_projections
         render_all_projections(project_root)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Markdown projection render failed during rebuild: %s", exc)
 
     return {
         "projection": "state.json",

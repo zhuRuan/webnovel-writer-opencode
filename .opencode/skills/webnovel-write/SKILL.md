@@ -258,17 +258,17 @@ python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" clean-tmp --project-root "${PROJ
 ```text
 Agent(
   subagent_type: "observer-agent",
-  prompt: "project_root={PROJECT_ROOT}; chapter={chapter_num}; chapter_file={CHAPTER_FILE}。输出 raw_facts 到 {PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num:03d}.raw_facts.txt。"
+  prompt: "project_root={PROJECT_ROOT}; chapter={chapter_num}; chapter_file={CHAPTER_FILE}。输出 raw_facts 到 {PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num}.raw_facts.txt。"
 )
 ```
 
-产物：`{PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num:03d}.raw_facts.txt`
+产物：`{PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num}.raw_facts.txt`
 
 ##### 5.1b Settler：Schema 校验落盘
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/data_modules/observer_settler.py" \
-  --raw-facts "${PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num:03d}.raw_facts.txt" \
+  --raw-facts "${PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num}.raw_facts.txt" \
   --project-root "${PROJECT_ROOT}" \
   --chapter {chapter_num} \
   --output "${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json"

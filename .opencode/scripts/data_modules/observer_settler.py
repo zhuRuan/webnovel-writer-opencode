@@ -10,13 +10,23 @@ and validates via Pydantic StoryEvent schema.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import sys
 from pathlib import Path
 
-from runtime_compat import enable_windows_utf8_stdio
+try:
+    from .story_event_schema import StoryEvent
+except ImportError:
+    # __main__ fallback — add parent dir to path for sibling imports
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from runtime_compat import enable_windows_utf8_stdio  # noqa: F811
+    from story_event_schema import StoryEvent  # noqa: F811
+else:
+    from runtime_compat import enable_windows_utf8_stdio
 
-from .story_event_schema import StoryEvent
+logger = logging.getLogger(__name__)
 
 
 def _load_known_entities(project_root: Path) -> dict[str, dict]:
@@ -58,10 +68,11 @@ def _parse_markdown_sections(text: str) -> dict[str, list[str]]:
 def _extract_character_state_changes(lines: list[str], known: dict[str, dict], chapter: int) -> list[dict]:
     events: list[dict] = []
     for line in lines:
-        m = re.match(r'- (.+?)（entity_id:\s*(\S+?)）\s*：\s*(.+)', line)
+        m = re.match(r'- (.+?)（entity_id:\s*([^），]+?)）\s*[：:]\s*(.+)', line)
         if m:
             name, eid_raw, desc = m.groups()
-            eid = _resolve_entity(eid_raw if eid_raw != "未知" else name, known)
+            eid_raw = eid_raw.strip()
+            eid = _resolve_entity(name, known) if eid_raw in ("未知", "新") else _resolve_entity(eid_raw, known)
             events.append({
                 "event_id": f"evt-ch{chapter:03d}-state-{len(events):03d}",
                 "chapter": chapter,
@@ -100,10 +111,11 @@ def _extract_relationships(lines: list[str], known: dict[str, dict], chapter: in
 def _extract_power_breakthroughs(lines: list[str], known: dict[str, dict], chapter: int) -> list[dict]:
     events: list[dict] = []
     for line in lines:
-        m = re.match(r'- (.+?)（entity_id:\s*(\S+?)）\s*：从(.+?)突破至(.+)', line)
+        m = re.match(r'- (.+?)（entity_id:\s*([^），]+?)）\s*[：:]\s*从(.+?)突破至(.+)', line)
         if m:
             name, eid_raw, old_realm, new_realm = m.groups()
-            eid = _resolve_entity(eid_raw if eid_raw != "未知" else name, known)
+            eid_raw = eid_raw.strip()
+            eid = _resolve_entity(name, known) if eid_raw in ("未知", "新") else _resolve_entity(eid_raw, known)
             events.append({
                 "event_id": f"evt-ch{chapter:03d}-power-{len(events):03d}",
                 "chapter": chapter,
@@ -122,10 +134,10 @@ def _extract_power_breakthroughs(lines: list[str], known: dict[str, dict], chapt
 def _extract_entity_creations(lines: list[str], known: dict[str, dict], chapter: int) -> list[dict]:
     events: list[dict] = []
     for line in lines:
-        m = re.match(r'- (.+?)（类型：(\S+?)，entity_id:\s*(\S+?)）\s*：\s*(.*)', line)
+        m = re.match(r'- (.+?)（类型[：:]\s*(\S+?)[，,]\s*entity_id[：:]\s*(\S+?)）\s*[：:]\s*(.*)', line)
         if m:
             name, etype, eid_raw, desc = m.groups()
-            eid = eid_raw if eid_raw != "新" else name.strip()
+            eid = eid_raw.strip() if eid_raw.strip() != "新" else name.strip()
             events.append({
                 "event_id": f"evt-ch{chapter:03d}-entity-{len(events):03d}",
                 "chapter": chapter,
@@ -135,6 +147,27 @@ def _extract_entity_creations(lines: list[str], known: dict[str, dict], chapter:
                     "entity_id": eid,
                     "entity_type": etype.strip(),
                     "entity_name": name.strip(),
+                },
+            })
+    return events
+
+
+def _extract_artifact_acquisitions(lines: list[str], known: dict[str, dict], chapter: int) -> list[dict]:
+    events: list[dict] = []
+    for line in lines:
+        m = re.match(r'- (.+?)（entity_id:\s*([^），]+?)）\s*[：:]\s*被(\S+?)获得/使用', line)
+        if m:
+            item_name, eid_raw, owner = m.groups()
+            eid = eid_raw.strip() if eid_raw.strip() != "新" else item_name.strip()
+            events.append({
+                "event_id": f"evt-ch{chapter:03d}-artifact-{len(events):03d}",
+                "chapter": chapter,
+                "event_type": "artifact_obtained",
+                "subject": eid,
+                "payload": {
+                    "artifact_id": eid,
+                    "name": item_name.strip(),
+                    "owner": _resolve_entity(owner.strip(), known),
                 },
             })
     return events
@@ -251,32 +284,40 @@ def settle(raw_facts_path: Path, project_root: Path, chapter: int) -> dict:
         ("关系变化", _extract_relationships),
         ("力量突破", _extract_power_breakthroughs),
         ("新出场实体", _extract_entity_creations),
+        ("宝物/物品获得", _extract_artifact_acquisitions),
         ("世界规则揭示", _extract_world_rule_revealed),
         ("世界规则打破", _extract_world_rule_broken),
         ("对读者的承诺/伏笔", _extract_promises),
         ("伏笔创建与闭合", _extract_open_loops),
     ]
 
+    _NEEDS_KNOWN = {"角色状态变化", "关系变化", "力量突破", "新出场实体", "宝物/物品获得"}
+
     all_events: list[dict] = []
     for heading, extractor in heading_extractors:
         lines = sections.get(heading, [])
-        if heading in ("角色状态变化", "关系变化", "力量突破", "新出场实体"):
+        if heading in _NEEDS_KNOWN:
             all_events.extend(extractor(lines, known, chapter))
         else:
             all_events.extend(extractor(lines, chapter))
 
     validated: list[dict] = []
+    dropped = 0
     for evt in all_events:
         try:
             validated.append(StoryEvent.model_validate(evt).model_dump())
         except Exception:
-            pass
+            dropped += 1
+    if dropped:
+        logger.warning("settler: %d/%d events dropped by Pydantic validation",
+                       dropped, len(all_events))
 
+    entities_appeared = list({e["subject"] for e in validated if e.get("subject")})
     return {
         "accepted_events": validated,
         "state_deltas": [],
         "entity_deltas": [],
-        "entities_appeared": [],
+        "entities_appeared": entities_appeared,
         "scenes": [],
         "chapter_meta": {},
         "dominant_strand": "",
