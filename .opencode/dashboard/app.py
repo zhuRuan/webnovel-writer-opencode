@@ -862,6 +862,114 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         return json.loads(trace_file.read_text(encoding="utf-8"))
 
     # ===========================================================
+    # API：质量预警
+    # ===========================================================
+
+    def _get_recent_review_scores(project_root: Path, n: int = 5) -> list[dict]:
+        db_path = project_root / ".webnovel" / "index.db"
+        if not db_path.is_file():
+            return []
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(
+                "SELECT end_chapter, overall_score FROM review_metrics ORDER BY end_chapter DESC LIMIT ?",
+                (n,),
+            ).fetchall()
+            return [{"chapter": r["end_chapter"], "score": r["overall_score"]} for r in rows]
+        except sqlite3.Error:
+            return []
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _is_declining(scores: list[dict], threshold: int = 3) -> bool:
+        if len(scores) < threshold:
+            return False
+        recent = scores[:threshold]
+        return all(
+            recent[i]["score"] is not None and recent[i + 1]["score"] is not None
+            and (recent[i]["score"] or 0) < (recent[i + 1]["score"] or 0)
+            for i in range(len(recent) - 1)
+        )
+
+    def _get_overdue_debts(project_root: Path, current_chapter: int) -> list[dict]:
+        db_path = project_root / ".webnovel" / "index.db"
+        if not db_path.is_file():
+            return []
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(
+                "SELECT id, note, due_chapter, source_chapter FROM chase_debt WHERE status = 'pending' AND due_chapter < ?",
+                (current_chapter,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        except sqlite3.Error:
+            return []
+        finally:
+            conn.close()
+
+    def _get_long_absent_characters(project_root: Path, current_chapter: int, threshold: int = 20) -> list[dict]:
+        db_path = project_root / ".webnovel" / "index.db"
+        if not db_path.is_file():
+            return []
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(
+                "SELECT id, canonical_name, last_appearance FROM entities WHERE is_archived = 0 AND (? - last_appearance) > ?",
+                (current_chapter, threshold),
+            ).fetchall()
+            return [{"id": r["id"], "name": r["canonical_name"],
+                     "absent_chapters": current_chapter - int(r["last_appearance"] or 0)} for r in rows]
+        except sqlite3.Error:
+            return []
+        finally:
+            conn.close()
+
+    @app.get("/api/alerts")
+    def get_alerts():
+        state = _load_state_payload()
+        progress = state.get("progress") if isinstance(state, dict) else {}
+        current_chapter = int(progress.get("current_chapter") or 0)
+        project_root = _get_project_root()
+        alerts = []
+
+        # Score decline
+        recent = _get_recent_review_scores(project_root, 5)
+        if _is_declining(recent, threshold=3):
+            alerts.append({"type": "score_decline", "severity": "warning",
+                           "detail": f"连续{len(recent)}章审查分下降", "chapters": recent})
+
+        # Overdue debts
+        overdue = _get_overdue_debts(project_root, current_chapter)
+        for d in overdue:
+            alerts.append({"type": "debt_overdue", "severity": "critical",
+                           "detail": d.get("note", ""), "due_chapter": d.get("due_chapter", 0)})
+
+        # Long-absent characters
+        absent = _get_long_absent_characters(project_root, current_chapter)
+        for c in absent:
+            alerts.append({"type": "character_absent", "severity": "info",
+                           "detail": f"{c['name']} 已 {c['absent_chapters']} 章未出场"})
+
+        # Strand monotony
+        strand_map = _build_strand_map(state)
+        recent_chapters = sorted(strand_map.keys(), reverse=True)[:5]
+        if len(recent_chapters) >= 5:
+            recent_strands = [strand_map.get(ch, "") for ch in recent_chapters]
+            if len(set(recent_strands)) == 1 and recent_strands[0]:
+                alerts.append({"type": "strand_monotony", "severity": "info",
+                               "detail": f"连续 5 章同一主线: {recent_strands[0]}"})
+
+        # Sort by severity
+        sev_order = {"critical": 0, "warning": 1, "info": 2}
+        alerts.sort(key=lambda a: sev_order.get(a.get("severity", "info"), 2))
+
+        return {"alerts": alerts, "updated_at": datetime.now(timezone.utc).isoformat()}
+
+    # ===========================================================
     # API：运维操作（安全写入口）
     # ===========================================================
 

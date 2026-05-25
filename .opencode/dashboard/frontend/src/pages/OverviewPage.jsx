@@ -209,6 +209,7 @@ export default function OverviewPage() {
     const [windowIndex, setWindowIndex] = useState(0)
     const [loadingTrend, setLoadingTrend] = useState(true)
     const [workflow, setWorkflow] = useState({})
+    const [alerts, setAlerts] = useState([])
 
     useEffect(() => {
         setWindowIndex(0)
@@ -222,12 +223,14 @@ export default function OverviewPage() {
             fetchChapters(),
             fetchChapterTrend({ limit: WINDOW_SIZE, offset: 0 }),
             fetch('/api/workflow/status').then(r => r.json()).catch(() => ({})),
+            fetch('/api/alerts').then(r => r.json()).catch(() => ({ alerts: [] })),
         ]).then(results => {
             if (cancelled) return
 
             setRuntimeHealth(results[0].status === 'fulfilled' ? results[0].value : null)
             setAllChapters(results[1].status === 'fulfilled' ? results[1].value : [])
             setWorkflow(results[3].status === 'fulfilled' ? results[3].value : {})
+            setAlerts(results[4].status === 'fulfilled' ? (results[4].value.alerts || []) : [])
 
             const latest = results[2].status === 'fulfilled'
                 ? results[2].value
@@ -354,6 +357,20 @@ export default function OverviewPage() {
                 <h2>总览</h2>
                 <Badge tone="blue">{info.genre || '未知题材'}</Badge>
             </header>
+
+            {alerts.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
+                    {alerts.slice(0, 5).map((a, i) => {
+                        const bg = a.severity === 'critical' ? '#5c1a1a' : a.severity === 'warning' ? '#5c4a1a' : '#1a3a5c'
+                        return (
+                            <div key={i} style={{ padding: '8px 12px', background: bg, borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span>{a.severity === 'critical' ? '🔴' : a.severity === 'warning' ? '🟡' : '🔵'}</span>
+                                <span>{a.detail}</span>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
 
             <div className="stat-grid">
                 <StatCard
