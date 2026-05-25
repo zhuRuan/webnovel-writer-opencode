@@ -141,8 +141,8 @@ class ContextManager:
                 },
             }
             write_json(runtime_dir / f"chapter-{chapter:03d}.trace.json", trace)
-        except Exception:
-            pass  # runtime artifact persistence must not block context assembly
+        except Exception as exc:
+            logger.warning("runtime_artifact_persistence_failed: %s", exc)
 
         return payload
 
