@@ -117,7 +117,34 @@ class ContextManager:
         if getattr(self.config, "context_ranker_enabled", True):
             pack = self.context_ranker.rank_pack(pack, chapter)
 
-        return self._assemble_json_payload(pack, template=template)
+        payload = self._assemble_json_payload(pack, template=template)
+
+        # Persist runtime artifacts for post-hoc debugging
+        try:
+            from .story_contracts import write_json
+            runtime_dir = self.config.project_root / ".webnovel" / "runtime"
+            runtime_dir.mkdir(parents=True, exist_ok=True)
+
+            write_json(runtime_dir / f"chapter-{chapter:03d}.context.json", payload)
+
+            trace = {
+                "chapter": chapter,
+                "template": template,
+                "stage": self._resolve_context_stage(chapter),
+                "weights_used": self._resolve_template_weights(template=template, chapter=chapter),
+                "sections": {
+                    "included": [s for s in self.SECTION_ORDER if s in payload],
+                    "excluded": [s for s in self.SECTION_ORDER if s not in payload],
+                },
+                "ranker": {
+                    "enabled": getattr(self.config, "context_ranker_enabled", True),
+                },
+            }
+            write_json(runtime_dir / f"chapter-{chapter:03d}.trace.json", trace)
+        except Exception:
+            pass  # runtime artifact persistence must not block context assembly
+
+        return payload
 
     def _assemble_json_payload(self, pack: Dict[str, Any], template: str = DEFAULT_TEMPLATE) -> Dict[str, Any]:
         chapter = int((pack.get("meta") or {}).get("chapter") or 0)
