@@ -1,33 +1,32 @@
 # CLAUDE.md
 
-This file provides guidance to OpenCode when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project
 
-Webnovel Writer for OpenCode — a long-form Chinese web novel AI writing system built on the OpenCode framework. Combats AI "forgetting" and "hallucination" in serialized fiction through layered RAG, story contracts, and structured quality review.
+Webnovel Writer for OpenCode — a long-form Chinese web novel AI writing system built on the OpenCode framework. Combats AI "forgetting" and "hallucination" in serialized fiction through layered RAG, story contracts, and structured quality review. v2.8 incorporates inkOS-inspired Observer→Reflector fact extraction, SSOT event sourcing, and markdown truth-file projections. Forked from lingfengQAQ/webnovel-writer and heavily refactored for OpenCode architecture.
 
 ## Commands
 
 ### Testing
 
 ```bash
-# Full test suite (from repo root)
-python -m pytest .opencode/scripts/data_modules/tests -q --no-cov
+# Full test suite (from repo root) — pytest.ini requires -p no:cov -o "addopts="
+python -m pytest .opencode/scripts/data_modules/tests -q -p no:cov -o "addopts="
 
-# Smoke tests (rapid pre-commit check, 2 critical test files)
-pwsh .opencode/scripts/run_tests.ps1 -Mode smoke
-
-# Full tests via PowerShell (creates isolated temp dir)
-pwsh .opencode/scripts/run_tests.ps1 -Mode full
+# Exclude known-broken test files (network mocking, async issues)
+python -m pytest .opencode/scripts/data_modules/tests -q -p no:cov -o "addopts=" \
+  --ignore=.opencode/scripts/data_modules/tests/test_publisher.py \
+  --ignore=.opencode/scripts/data_modules/tests/test_rag_adapter.py
 
 # Single test file
-python -m pytest .opencode/scripts/data_modules/tests/test_config.py -q --no-cov
+python -m pytest .opencode/scripts/data_modules/tests/test_config.py -q -p no:cov -o "addopts="
 
 # Single test function
-python -m pytest .opencode/scripts/data_modules/tests/test_config.py::test_load_env -q --no-cov
+python -m pytest .opencode/scripts/data_modules/tests/test_config.py::test_load_env -q -p no:cov -o "addopts="
 ```
 
-Tests live in `.opencode/scripts/data_modules/tests/` (60 test files). The PowerShell runner creates isolated temp dirs under `.tmp/pytest/` to avoid Windows permission issues. `conftest.py` patches `tempfile.mkdtemp` and sets `sqlite3` journal mode for test safety.
+Tests live in `.opencode/scripts/data_modules/tests/`. `pytest.ini` enables `pytest-cov` by default — use `-p no:cov -o "addopts="` to disable. `conftest.py` patches `tempfile.mkdtemp` and sets `sqlite3` journal mode for test safety. 24 pre-existing failures in `test_api_client.py` (13, needs network mock), `test_memory_bootstrap.py` (1), `test_prompt_integrity.py` (4), and others (6) — these are known, not caused by recent changes.
 
 ### CLI
 
@@ -40,6 +39,23 @@ python .opencode/scripts/webnovel.py preflight       # validate runtime environm
 python .opencode/scripts/webnovel.py status          # project health report
 python .opencode/scripts/webnovel.py story-system    # story contract management
 python .opencode/scripts/webnovel.py review-pipeline # review pipeline management
+
+# SSOT / Event Sourcing
+python .opencode/scripts/webnovel.py ssot verify     # check state.json vs event log
+python .opencode/scripts/webnovel.py ssot rebuild    # rebuild all projections from events
+python .opencode/scripts/webnovel.py ssot events     # read event log
+
+# Workflow / Override / Ops
+python .opencode/scripts/webnovel.py workflow status              # chapter stage status
+python .opencode/scripts/webnovel.py workflow checkpoint --chapter N --stage STAGE
+python .opencode/scripts/webnovel.py override list                # active rule overrides
+python .opencode/scripts/webnovel.py override context --chapter N # hints for writer
+python .opencode/scripts/webnovel.py orchestrate write "1-5"      # batch write
+python .opencode/scripts/webnovel.py delete-chapters "5-8" --dry-run
+python .opencode/scripts/webnovel.py entity-clean                 # scan dirty entities
+python .opencode/scripts/webnovel.py state render                 # markdown projections
+
+# Others
 python .opencode/scripts/webnovel.py export          # export novel
 python .opencode/scripts/webnovel.py publish         # publish to platform
 python .opencode/scripts/webnovel.py memory          # memory system management
@@ -52,7 +68,7 @@ Most subcommands forward to `data_modules/<module>.py` via argparse dispatch. Wr
 ### Dashboard
 
 ```bash
-# Backend (FastAPI on port 8080)
+# Backend (FastAPI on port 8765)
 python -m .opencode.dashboard
 
 # Frontend dev server (React + Vite, separate terminal)
@@ -76,25 +92,43 @@ Code is organized as a pipeline — each layer feeds the next:
 
 ### Key Subsystems
 
-**Story Contract Engine** — MASTER_SETTING.json is the source of truth. Runtime contracts derive from it per chapter. Event sourcing records all mutations; projections materialize state/index/summary/memory/vector views. Core files: `story_system_engine.py`, `story_contracts.py`, `event_log_store.py`, `event_projection_router.py`, `chapter_commit_service.py`.
+**Story Contract Engine** — MASTER_SETTING.json is the source of truth. Runtime contracts derive from it per chapter. Core files: `story_system_engine.py`, `story_contracts.py`.
+
+**SSOT Event Sourcing** (v2.8) — Append-only event log (`.story-system/events/*.event.json`) as immutable truth. `publish_event()` is the single write path; `rebuild_state_json()` deterministically replays all 14 event types to rebuild projections. `verify_consistency()` detects drift between state.json and event log. File: `ssot_enforcer.py`.
+
+**Override Contract Engine** (v2.8) — Versioned world rule evolution (e.g., "金丹期不可飞行 → 获得混沌珠后可飞行"). `add_override()` creates new version and supersedes previous. `build_context_hints()` generates AI-injectable context. File: `override_contract_engine.py`.
+
+**Observer→Reflector Pipeline** (v2.8) — Two-stage fact extraction inspired by inkOS. Observer (`observer-agent.md`) extracts free-text facts with no schema constraint (coverage-first). Settler (`observer_settler.py`) parses markdown sections via regex, resolves entity references, validates via Pydantic `StoryEvent`, and outputs `extraction_result.json`. Wired into `webnovel-write` SKILL.md Step 5.1a/5.1b. **Important**: `observer_settler.py` uses try/except ImportError fallback for `__main__` execution — the SKILL.md calls it as `python observer_settler.py` directly.
+
+**Commit Chain** — `chapter_commit_service.py`: `build_commit()` → `apply_projections()` (publishes events to SSOT, then runs EventLogStore + AmendProposalTrigger + 5 projection writers). `event_projection_router.py` determines which writers to invoke. `event_log_store.py` mirrors events to per-chapter JSON + SQLite `story_events` table.
 
 **Memory System** — Three tiers: working (short-term), plot (mid-term), semantic (long-term). Modules in `data_modules/memory/`: orchestrator, compactor, store, writer, schema, bootstrap, budget.
 
 **DebtTracker** — Foreshadowing tracking with hard constraint blocking. Active debts > 2 triggers debt-aware context budget (auto-allocate 15% tokens to foreshadowing list). Implemented in `data_modules/index_debt_mixin.py` (mixed into `index_manager.py`).
 
-**Review Pipeline** — Two layers: Code Checkers (deterministic, run before LLM, block critical issues) → 6 parallel LLM reviewers (consistency, continuity, OOC, high-point, pacing, reader-pull). Reviewer output processed via `.opencode/scripts/review_pipeline.py` (CLI: `review-pipeline`), schema defined in `data_modules/review_schema.py`.
+**Review Pipeline** — Two layers: Code Checkers (deterministic, run before LLM, block critical issues) → 6 parallel LLM reviewers (consistency, continuity, OOC, high-point, pacing, reader-pull). Reviewer output processed via `.opencode/scripts/review_pipeline.py`, schema in `data_modules/review_schema.py`.
 
-**Graph-RAG** — Entity relationship graph with SQLite persistence. Located in `data_modules/` entity linking and index modules.
+**Markdown Projection Renderer** (v2.8) — Renders 5 human-readable markdown files from `state.json` + `index.db` into `story/` directory. Triggered after `chapter-commit` and `ssot rebuild`. File: `state_projection_renderer.py`.
 
-**Dashboard** — FastAPI backend (read-only GET endpoints serving project state) + React 19 frontend with ECharts visualization. Backend: `.opencode/dashboard/app.py`. Frontend: `.opencode/dashboard/frontend/`.
+**Runtime Artifacts** (v2.8) — `context_manager.build_context()` persists `.webnovel/runtime/chapter-NNN.context.json` (full context pack) and `.trace.json` (section inclusion/exclusion decisions) for post-hoc debugging.
+
+**Dashboard** — FastAPI backend (read-only GET endpoints serving project state) + React 19 frontend with ECharts visualization. Backend: `.opencode/dashboard/app.py`. Frontend: `.opencode/dashboard/frontend/`. All SQL queries use parameterized `?` placeholders. CORS restricted to localhost.
 
 ### OpenCode Integration
 
-11 skills (slash commands like `/webnovel-write`) and 4 agents (context-agent, data-agent, reviewer, deconstruction-agent) defined in `.opencode/skills/` and `.opencode/agents/`. The reviewer agent is instantiated 6 times in parallel for different review dimensions. The OpenCode runtime invokes these; this repo defines their behavior.
+13 skills and 6 agents defined in `.opencode/skills/` and `.opencode/agents/`.
+
+Skills: `webnovel-write`, `webnovel-write-batch`, `webnovel-delete`, `webnovel-rewrite`, `webnovel-heal`, `webnovel-review`, `webnovel-init`, `webnovel-plan`, `webnovel-query`, `webnovel-export`, `webnovel-publish`, `webnovel-dashboard`, `webnovel-learn`.
+
+Agents: `context-agent`, `observer-agent` (free-text extraction, coverage-first), `chapter-writer-agent`, `data-agent` (fulfillment + disambiguation only in default flow; fallback extraction in `--fast` mode), `reviewer` (instantiated 6× parallel), `deconstruction-agent`.
 
 ### Key Convention: Unified CLI
 
 All Python functionality routes through a single entry point: `.opencode/scripts/webnovel.py` → `data_modules/webnovel.py`. Subcommands are dispatched via argparse — most forward to `data_modules/<module>.py` via `_run_data_module()`. New subcommands should be added to the argparse subparser chain in `webnovel.py`.
+
+### Import Convention
+
+Modules in `data_modules/` use absolute imports for top-level scripts (`from runtime_compat import ...`) and relative imports for intra-package references (`from .config import ...`). When a module needs to support both `__main__` execution and package import, use the try/except ImportError pattern (see `observer_settler.py`). `scripts/` must be on `sys.path` — `_ensure_scripts_dir_on_path()` handles this for the dashboard; the test harness and CLI entry point handle it for other contexts.
 
 ## Commit Convention & Versioning
 
