@@ -589,6 +589,13 @@ def main() -> None:
     if tool == "index":
         raise SystemExit(_run_data_module("index_manager", [*forward_args, *rest]))
     if tool == "state":
+        if rest and rest[0] == "render":
+            from .state_projection_renderer import render_all_projections
+            results = render_all_projections(project_root)
+            for name, path in results.items():
+                print(f"  {name} -> {path}")
+            print(f"Rendered {len(results)} projection files.")
+            raise SystemExit(0)
         raise SystemExit(_run_data_module("state_manager", [*forward_args, *rest]))
     if tool == "rag":
         raise SystemExit(_run_data_module("rag_adapter", [*forward_args, *rest]))
