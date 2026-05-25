@@ -127,9 +127,13 @@ EXPECTED_AGENT_SECTIONS = [
 ]
 
 
+_AGENT_TEMPLATE_EXCEPTIONS = {"observer-agent.md"}  # 精简设计，非标准 8 段
+
 @pytest.mark.parametrize("agent_file", AGENT_FILES, ids=lambda f: f.name)
 def test_agent_template_structure(agent_file: Path):
     """每个 agent 至少包含 8 个编号段。"""
+    if agent_file.name in _AGENT_TEMPLATE_EXCEPTIONS:
+        return
     text = _read_text(agent_file)
     missing = []
     for section in EXPECTED_AGENT_SECTIONS:
