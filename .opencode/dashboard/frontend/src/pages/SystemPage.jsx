@@ -44,6 +44,8 @@ export default function SystemPage() {
     const [envStatus, setEnvStatus] = useState(null)
     const [probeResult, setProbeResult] = useState(null)
     const [probing, setProbing] = useState(false)
+    const [actionLoading, setActionLoading] = useState(null)
+    const [actionResult, setActionResult] = useState(null)
 
     useEffect(() => {
         let cancelled = false
@@ -289,6 +291,61 @@ export default function SystemPage() {
                     emptyText="暂无环境信息"
                     minWidth={680}
                 />
+            </article>
+
+            <article className="card">
+                <div className="card-header">
+                    <div>
+                        <div className="section-label">OPERATIONS</div>
+                        <div className="card-title">运维操作</div>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', padding: '8px 0' }}>
+                    {[
+                        { key: 'ssot-verify', label: 'SSOT 一致性检查', tone: 'default' },
+                        { key: 'ssot-rebuild', label: '重建投影（从事件日志）', tone: 'warning' },
+                        { key: 'entity-clean', label: '扫描脏实体', tone: 'default' },
+                    ].map(op => (
+                        <button
+                            key={op.key}
+                            type="button"
+                            className="page-btn"
+                            disabled={actionLoading === op.key}
+                            onClick={async () => {
+                                if (op.tone === 'warning' && !window.confirm(`确认执行「${op.label}」？`)) return
+                                setActionLoading(op.key)
+                                setActionResult(null)
+                                try {
+                                    const res = await fetch(`/api/actions/${op.key}`, { method: 'POST' })
+                                    const data = await res.json()
+                                    setActionResult({ key: op.key, label: op.label, ...data })
+                                } catch {
+                                    setActionResult({ key: op.key, label: op.label, code: -1, stderr: '网络错误' })
+                                } finally {
+                                    setActionLoading(null)
+                                }
+                            }}
+                        >
+                            {actionLoading === op.key ? '执行中…' : op.label}
+                        </button>
+                    ))}
+                </div>
+                {actionResult && (
+                    <div style={{ marginTop: 8, padding: 12, background: 'var(--bg-secondary)', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                            {actionResult.label}
+                            <Badge tone={actionResult.code === 0 ? 'green' : 'red'}>
+                                {actionResult.code === 0 ? '成功' : `退出码 ${actionResult.code}`}
+                            </Badge>
+                        </div>
+                        {(actionResult.stdout || actionResult.stderr) && (
+                            <pre style={{ fontSize: 12, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap', margin: 0 }}>
+                                {actionResult.stdout}
+                                {actionResult.stderr && `\n[stderr]\n${actionResult.stderr}`}
+                            </pre>
+                        )}
+                    </div>
+                )}
             </article>
         </section>
     )

@@ -7,7 +7,9 @@ Webnovel Dashboard - FastAPI 主应用
 import asyncio
 import json
 import sqlite3
+import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
@@ -27,7 +29,10 @@ from .watcher import FileWatcher
 _project_root: Path | None = None
 _watcher = FileWatcher()
 
+SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 STATIC_DIR = Path(__file__).parent / "frontend" / "dist"
+
+_ACTION_RATE_LIMIT: dict[str, float] = {}  # action → last invoke timestamp
 
 
 def _get_project_root() -> Path:
@@ -815,6 +820,56 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 _watcher.unsubscribe(q)
 
         return StreamingResponse(_gen(), media_type="text/event-stream")
+
+    # ===========================================================
+    # API：运维操作（安全写入口）
+    # ===========================================================
+
+    _ACTIONS = {
+        "ssot-verify": ["ssot", "verify"],
+        "ssot-rebuild": ["ssot", "rebuild"],
+        "entity-clean": ["entity-clean", "--mark-invalid"],
+    }
+
+    @app.post("/api/actions/{action}")
+    def run_action(action: str):
+        """Execute a low-risk CLI action and return output."""
+        if action not in _ACTIONS:
+            raise HTTPException(403, f"不允许的操作: {action}")
+
+        # Rate limit: 1 per second per action
+        now = time.time()
+        last = _ACTION_RATE_LIMIT.get(action, 0)
+        if now - last < 1.0:
+            raise HTTPException(429, "操作过于频繁，请稍后再试")
+        _ACTION_RATE_LIMIT[action] = now
+
+        cmd = [
+            sys.executable, "-X", "utf8",
+            str(SCRIPTS_DIR / "webnovel.py"),
+            "--project-root", str(_get_project_root()),
+            *_ACTIONS[action],
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired:
+            raise HTTPException(504, "操作超时（30s）")
+
+        # Push SSE event to notify frontend
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "action-done", "action": action,
+                "code": result.returncode, "ts": time.time(),
+            }))
+        except Exception:
+            pass
+
+        return {
+            "action": action,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "code": result.returncode,
+        }
 
     # ===========================================================
     # 前端静态文件托管
