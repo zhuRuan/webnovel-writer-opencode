@@ -1,27 +1,32 @@
 {
-  "version": "v2.7.0-20260525.1252",
+  "version": "v2.7.0-20260525.1321",
   "tag": "v2.7.0",
-  "updated": "2026-05-25T12:52:39Z",
+  "updated": "2026-05-25T13:21:36Z",
   "changelog": [
     {
-      "hash": "42510df",
+      "hash": "f5958b2",
+      "type": "docs",
+      "message": "docs: \u81ea\u68c0\u4fee\u590d \u2014 SCRIPTS_DIR \u4f5c\u7528\u57df/workflow \u590d\u7528\u6a21\u5757/\u51fd\u6570\u7b7e\u540d/\u9608\u503c\u914d\u7f6e"
+    },
+    {
+      "hash": "d0b79a8",
+      "type": "docs",
+      "message": "docs: \u770b\u677f\u6f14\u8fdb\u5b9e\u73b0\u8ba1\u5212 \u2014 Phase 1~3 \u64cd\u4f5c/\u76d1\u63a7/\u9884\u8b66"
+    },
+    {
+      "hash": "5e8c7d7",
+      "type": "docs",
+      "message": "docs: \u66f4\u65b0 CLAUDE.md \u2014 \u6d4b\u8bd5\u547d\u4ee4/\u65b0 CLI/SSOT+v2.8 \u67b6\u6784/\u6280\u80fd\u6570\u91cf/\u7aef\u53e3"
+    },
+    {
+      "hash": "7393eeb",
       "type": "fix",
-      "message": "fix: \u4fee\u590d 6 \u4e2a\u9884\u5b58\u6d4b\u8bd5\u5931\u8d25 \u2014\u2014 chapter_commit_service + override_ledger"
+      "message": "fix: \u770b\u677f 15 \u9879\u5ba1\u67e5\u4fee\u590d\u2014\u2014\u5b89\u5168\u6027/\u5f39\u6027/\u53ef\u89c2\u6d4b\u6027"
     },
     {
-      "hash": "2c126f5",
-      "type": "docs",
-      "message": "docs: \u5168\u9879\u76ee\u6587\u6863\u540c\u6b65\u66f4\u65b0 \u2014 \u547d\u4ee4\u901f\u67e5/\u7cfb\u7edf\u67b6\u6784/\u6982\u89c8/\u8bca\u65ad/\u7d22\u5f15"
-    },
-    {
-      "hash": "83d7318",
-      "type": "docs",
-      "message": "docs: \u66f4\u65b0 README \u2014 \u81f4\u8c22 inkOS/\u793e\u533a + \u65b0 Skills + \u67b6\u6784\u5b50\u7cfb\u7edf"
-    },
-    {
-      "hash": "3a4fc1d",
+      "hash": "d1fa67a",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260525.1224 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260525.1252 [skip ci]"
     }
   ],
   "files": {
@@ -382,8 +387,8 @@
       "size": 5274
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "8c37922b7c4c323e11cf015b1c939de6bce1283560555467272a84f6f4fc86be",
-      "size": 34235
+      "sha256": "ea0b4c8d7a85a7a14cdcc20e797e6f3455fada10b53f333572b44d9f0ed75d82",
+      "size": 33760
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
@@ -398,8 +403,8 @@
       "size": 2327
     },
     ".opencode/dashboard/watcher.py": {
-      "sha256": "5adafc243235a0941281557f143983f91ea657c0bf84178fb5ce77440872c9d4",
-      "size": 4577
+      "sha256": "996a429848580e105ed77aa03b5fdd5591dd3fc91e64536e92100b6c38c8e3d4",
+      "size": 4843
     },
     ".opencode/dashboard/__init__.py": {
       "sha256": "da93d7fff9f1679ab23ee25d09a428892798a0be9d15fd5a51072f15fbeac1c8",
@@ -446,8 +451,8 @@
       "size": 12722
     },
     ".opencode/dashboard/frontend/src/main.jsx": {
-      "sha256": "058d97138007f389b15a5e71971914eab8a68b1b5efe6c3aba940e28333a96ef",
-      "size": 1800
+      "sha256": "d2c8fa90adeafd3a0d5efc4907a4aa2d561f6202409daf27a9f2cd3972f6cb5b",
+      "size": 2743
     },
     ".opencode/dashboard/frontend/src/components/Badge.jsx": {
       "sha256": "dfdf540e2d7799c0c787335aa09650f1029e282cdd6ea29fc68d15f95c9fec24",
@@ -458,8 +463,8 @@
       "size": 737
     },
     ".opencode/dashboard/frontend/src/components/DataTable.jsx": {
-      "sha256": "e5fd88c7350afb604d5885892dd3b2aafc3c44aa74a14305eafc0e6cf9950954",
-      "size": 3263
+      "sha256": "07cf59e8861a84f111055e918e8e1e7e5c17627800b779d33e545a6244df7e04",
+      "size": 3257
     },
     ".opencode/dashboard/frontend/src/components/Pager.jsx": {
       "sha256": "0149f81f3622d36ae58a7d539384b7e773e5c15aef76ccab3758a9ccf5a29854",
@@ -490,12 +495,12 @@
       "size": 7556
     },
     ".opencode/dashboard/frontend/src/pages/SystemPage.jsx": {
-      "sha256": "8f027ce7c8a1f6e97d3358c141d841744786e7137beb6ac95b0f8dc31403058e",
-      "size": 12652
+      "sha256": "0d6f7fcfc65897bde4f89e16a39c8d2dac3405dfa34b0b811b2d6f40e09d178a",
+      "size": 12719
     },
     ".opencode/dashboard/frontend/src/pages/OverviewPage.jsx": {
-      "sha256": "9011cc669d1c4817b8f8370bfbbba0db457d8a5f5c38f7e7751c0f4ab2483c6f",
-      "size": 19530
+      "sha256": "f8fb880e5817e99d6725b95d06c95bdc490bfd9ea4781647bc49f49237a92069",
+      "size": 19543
     },
     ".opencode/dashboard/frontend/src/pages/ForeshadowingPage.jsx": {
       "sha256": "a27a16cb8c2096b4dd072a4351b0c396149b69ae6aec55cd089d5fdb8a3d9a40",
@@ -506,8 +511,8 @@
       "size": 11328
     },
     ".opencode/dashboard/frontend/src/pages/CharactersPage.jsx": {
-      "sha256": "73ce61976b6af741547230e222ebe937a04b942fd71e549b090cb95b574613b5",
-      "size": 19977
+      "sha256": "749e675261074cf9bb78eadf433fe8cad4ff719b8f04fd07f16c14aa3406ce77",
+      "size": 19990
     },
     ".opencode/templates/golden-finger-templates.md": {
       "sha256": "d528d5662c2bcd474dca4bc9be5b323889abf2738959f49d806b29ab8100307c",
