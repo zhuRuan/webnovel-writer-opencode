@@ -46,7 +46,8 @@ def _clean_state_json(project_root: Path, chapters: list[int], dry_run: bool) ->
     if removed:
         state.setdefault("progress", {})["chapter_status"] = chapter_status
         try:
-            state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+            from security_utils import atomic_write_json
+            atomic_write_json(state_path, state, use_lock=True, backup=True)
         except OSError as e:
             return [f"Failed to write state.json: {e}"]
         return [f"Removed {len(removed)} entries from state.json: {removed}"]
@@ -76,7 +77,8 @@ def _clean_memory(project_root: Path, chapters: list[int], dry_run: bool) -> lis
 
     if removed > 0:
         try:
-            scratchpad.write_text(json.dumps(keep, ensure_ascii=False, indent=2), encoding="utf-8")
+            from security_utils import atomic_write_json
+            atomic_write_json(scratchpad, keep, use_lock=True, backup=True)
         except OSError as e:
             return [f"Failed to write memory: {e}"]
         return [f"Removed {removed} memory entries ({original} → {len(keep)})"]

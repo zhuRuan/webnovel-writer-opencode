@@ -177,12 +177,9 @@ def rebuild_projections(project_root: Path) -> dict:
     state = rebuild_state_json(project_root)
     state_path = project_root / ".webnovel" / "state.json"
 
-    if state_path.is_file():
-        backup = state_path.with_suffix(".state.bak")
-        os.replace(str(state_path), str(backup))
-
+    from security_utils import atomic_write_json
     state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(state_path, state, use_lock=True, backup=True)
 
     event_count = sum(1 for _ in _event_log_dir(project_root).glob("*.event.json"))
     publish_event(project_root, "projection_rebuilt", {
