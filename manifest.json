@@ -1,32 +1,27 @@
 {
-  "version": "v2.7.0-20260525.1321",
+  "version": "v2.7.0-20260525.1326",
   "tag": "v2.7.0",
-  "updated": "2026-05-25T13:21:36Z",
+  "updated": "2026-05-25T13:26:08Z",
   "changelog": [
     {
-      "hash": "f5958b2",
-      "type": "docs",
-      "message": "docs: \u81ea\u68c0\u4fee\u590d \u2014 SCRIPTS_DIR \u4f5c\u7528\u57df/workflow \u590d\u7528\u6a21\u5757/\u51fd\u6570\u7b7e\u540d/\u9608\u503c\u914d\u7f6e"
+      "hash": "acb829e",
+      "type": "feat",
+      "message": "feat: \u770b\u677f Phase 3 \u2014 \u8d28\u91cf\u9884\u8b66\u7cfb\u7edf"
     },
     {
-      "hash": "d0b79a8",
-      "type": "docs",
-      "message": "docs: \u770b\u677f\u6f14\u8fdb\u5b9e\u73b0\u8ba1\u5212 \u2014 Phase 1~3 \u64cd\u4f5c/\u76d1\u63a7/\u9884\u8b66"
+      "hash": "dfc2344",
+      "type": "feat",
+      "message": "feat: \u770b\u677f Phase 2 \u2014 \u5199\u4f5c\u8fdb\u5ea6\u76d1\u63a7 + workflow API"
     },
     {
-      "hash": "5e8c7d7",
-      "type": "docs",
-      "message": "docs: \u66f4\u65b0 CLAUDE.md \u2014 \u6d4b\u8bd5\u547d\u4ee4/\u65b0 CLI/SSOT+v2.8 \u67b6\u6784/\u6280\u80fd\u6570\u91cf/\u7aef\u53e3"
+      "hash": "540c8e9",
+      "type": "feat",
+      "message": "feat: \u770b\u677f Phase 1 \u2014 POST \u8fd0\u7ef4\u64cd\u4f5c\u7aef\u70b9 + SystemPage \u9762\u677f"
     },
     {
-      "hash": "7393eeb",
-      "type": "fix",
-      "message": "fix: \u770b\u677f 15 \u9879\u5ba1\u67e5\u4fee\u590d\u2014\u2014\u5b89\u5168\u6027/\u5f39\u6027/\u53ef\u89c2\u6d4b\u6027"
-    },
-    {
-      "hash": "d1fa67a",
+      "hash": "c14add8",
       "type": "chore",
-      "message": "chore: update manifest to v2.7.0-20260525.1252 [skip ci]"
+      "message": "chore: update manifest to v2.7.0-20260525.1321 [skip ci]"
     }
   ],
   "files": {
@@ -387,8 +382,8 @@
       "size": 5274
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "ea0b4c8d7a85a7a14cdcc20e797e6f3455fada10b53f333572b44d9f0ed75d82",
-      "size": 33760
+      "sha256": "3908effe07e2ce09d8b6f11559895446ee012f4b20dc7a0a6a5b7c9105f28c43",
+      "size": 41984
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
@@ -495,12 +490,12 @@
       "size": 7556
     },
     ".opencode/dashboard/frontend/src/pages/SystemPage.jsx": {
-      "sha256": "0d6f7fcfc65897bde4f89e16a39c8d2dac3405dfa34b0b811b2d6f40e09d178a",
-      "size": 12719
+      "sha256": "798ef7a5a2c837604afed3657603e62a9f0f12a9fc8ed37fe0ee1f7f75866277",
+      "size": 15944
     },
     ".opencode/dashboard/frontend/src/pages/OverviewPage.jsx": {
-      "sha256": "f8fb880e5817e99d6725b95d06c95bdc490bfd9ea4781647bc49f49237a92069",
-      "size": 19543
+      "sha256": "dafee4830066fa40e81a804ff103b44aeb7cf464b4637dacda45cdcfb6d5584d",
+      "size": 23676
     },
     ".opencode/dashboard/frontend/src/pages/ForeshadowingPage.jsx": {
       "sha256": "a27a16cb8c2096b4dd072a4351b0c396149b69ae6aec55cd089d5fdb8a3d9a40",
