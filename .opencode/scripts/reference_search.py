@@ -57,20 +57,20 @@ def load_tables(csv_dir: Path, table: Optional[str] = None) -> Dict[str, List[Di
 # Filtering
 # ---------------------------------------------------------------------------
 
-_MULTI_VALUE_SPLIT_RE = re.compile(r"[|,，]+")
+_MULTI_VALUE_SPLIT_RE = re.compile(r"[|,，、；;]+")
 _INTERNAL_TABLE_ROLES = {"route", "reasoning"}
 
 
-def _split_multi_value(cell: str) -> List[str]:
+def split_multi_value(cell: Any) -> List[str]:
     """Split list-like cells while remaining compatible with legacy comma data."""
     if not cell:
         return []
-    return [part.strip() for part in _MULTI_VALUE_SPLIT_RE.split(cell) if part.strip()]
+    return [part.strip() for part in _MULTI_VALUE_SPLIT_RE.split(str(cell)) if part.strip()]
 
 
 def _skill_matches(row: Dict[str, str], skill: str) -> bool:
     """Return True if *skill* appears in the pipe-separated ``适用技能`` column."""
-    return skill in _split_multi_value(row.get("适用技能", ""))
+    return skill in split_multi_value(row.get("适用技能", ""))
 
 
 def _genre_matches(row: Dict[str, str], genre: Optional[str]) -> bool:
@@ -84,9 +84,14 @@ def _genre_matches(row: Dict[str, str], genre: Optional[str]) -> bool:
     cell = row.get("适用题材", "")
     if cell.strip() == "全部":
         return True
-    resolved_genre = resolve_genre(genre)
-    cell_genres = [resolve_genre(v) for v in _split_multi_value(cell)]
-    return resolved_genre in cell_genres
+    requested_genres = [
+        resolved
+        for raw in split_multi_value(genre)
+        for resolved in [resolve_genre(raw)]
+        if resolved
+    ]
+    cell_genres = [resolve_genre(v) for v in split_multi_value(cell)]
+    return any(resolved in cell_genres for resolved in requested_genres)
 
 
 def _table_visible_for_search(table_name: str, skill: str, explicit_table: bool) -> bool:

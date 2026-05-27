@@ -7,7 +7,13 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from reference_search import CSV_CONFIG, GENRE_CANONICAL, resolve_genre, search as search_reference
+from reference_search import (
+    CSV_CONFIG,
+    GENRE_CANONICAL,
+    resolve_genre,
+    search as search_reference,
+    split_multi_value,
+)
 
 from .story_contracts import merge_anti_patterns
 
@@ -169,9 +175,9 @@ class StorySystemEngine:
         route_source = ""
         for row in route_rows:
             aliases = (
-                self._split_multi_value(row.get("关键词"))
-                + self._split_multi_value(row.get("意图与同义词"))
-                + self._split_multi_value(row.get("题材别名"))
+                split_multi_value(row.get("关键词"))
+                + split_multi_value(row.get("意图与同义词"))
+                + split_multi_value(row.get("题材别名"))
             )
             if any(alias and self._normalize_text(alias) in query_text for alias in aliases):
                 matched = row
@@ -193,7 +199,7 @@ class StorySystemEngine:
         canonical_genre = str(matched.get("canonical_genre") or "").strip()
         row_canonicals = [
             resolved
-            for raw in self._split_multi_value(matched.get("适用题材"))
+            for raw in split_multi_value(matched.get("适用题材"))
             for resolved in [resolve_genre(raw) or str(raw or "").strip()]
             if resolved and resolved != "全部"
         ]
@@ -216,14 +222,14 @@ class StorySystemEngine:
                 "canonical_genre": canonical_genre,
                 "route_source": route_source,
                 "genre_filter": genre_filter,
-                "recommended_base_tables": self._split_multi_value(matched.get("推荐基础检索表")),
-                "recommended_dynamic_tables": self._split_multi_value(matched.get("推荐动态检索表")),
+                "recommended_base_tables": split_multi_value(matched.get("推荐基础检索表")),
+                "recommended_dynamic_tables": split_multi_value(matched.get("推荐动态检索表")),
             },
             "core_tone": str(matched.get("核心调性") or "").strip(),
             "pacing_strategy": str(matched.get("节奏策略") or "").strip(),
             "route_anti_patterns": self._extract_route_anti_patterns(matched),
-            "recommended_base_tables": self._split_multi_value(matched.get("推荐基础检索表")),
-            "recommended_dynamic_tables": self._split_multi_value(matched.get("推荐动态检索表")),
+            "recommended_base_tables": split_multi_value(matched.get("推荐基础检索表")),
+            "recommended_dynamic_tables": split_multi_value(matched.get("推荐动态检索表")),
             "genre_filter": genre_filter,
             "default_query": str(matched.get("默认查询词") or "").strip(),
             "source_trace": [{"table": "题材与调性推理", "id": matched.get("编号", ""), "reason": route_source}],
@@ -303,14 +309,23 @@ class StorySystemEngine:
     def _normalize_text(self, text: str) -> str:
         return str(text or "").strip().lower()
 
+    _GENRE_COMPOSITE_RE = re.compile(r"[+＋]")
+
+    _NARROW_SPLIT_RE = re.compile(r"[|；;]+")
+
     def _split_multi_value(self, raw: Any) -> List[str]:
-        return [item.strip() for item in re.split(r"[|；;]+", str(raw or "")) if item.strip()]
+        """Split on | ； ; only — for fields whose content may contain natural-language commas."""
+        return [item.strip() for item in self._NARROW_SPLIT_RE.split(str(raw or "")) if item.strip()]
 
     def _resolve_genre_values(self, raw: Any) -> List[str]:
+        tokens = []
+        for part in split_multi_value(raw):
+            tokens.extend(self._GENRE_COMPOSITE_RE.split(part))
         return [
             resolved
-            for token in self._split_multi_value(raw)
-            for resolved in [resolve_genre(token)]
+            for token in tokens
+            if token.strip()
+            for resolved in [resolve_genre(token.strip())]
             if resolved
         ]
 
@@ -323,7 +338,7 @@ class StorySystemEngine:
 
     def _expand_query(self, query: str, default_query: str, chapter_query: str = "") -> str:
         items: List[str] = []
-        for candidate in [query, chapter_query, *self._split_multi_value(default_query)]:
+        for candidate in [query, chapter_query, *split_multi_value(default_query)]:
             text = str(candidate or "").strip()
             if text and text not in items:
                 items.append(text)
@@ -342,39 +357,27 @@ class StorySystemEngine:
                     parts.append(text)
         return " ".join(parts)
 
-    def _match_row_by_genre_text(self, rows: List[Dict[str, Any]], genre_text: str) -> Dict[str, Any] | None:
-        """Find a row whose 适用题材/题材/流派/canonical_genre matches genre_text."""
+    def _fallback_row_for_genre(self, rows: List[Dict[str, Any]], genre: str) -> Dict[str, Any] | None:
+        genre_texts = {
+            self._normalize_text(value)
+            for value in self._resolve_genre_values(genre)
+            if value
+        }
+        if not genre_texts:
+            return None
         for row in rows:
             candidates = (
-                self._split_multi_value(row.get("适用题材"))
-                + self._split_multi_value(row.get("题材/流派"))
-                + self._split_multi_value(row.get("canonical_genre"))
+                split_multi_value(row.get("适用题材"))
+                + split_multi_value(row.get("题材/流派"))
+                + split_multi_value(row.get("canonical_genre"))
             )
-            if any(self._normalize_text(candidate) == genre_text for candidate in candidates):
+            resolved_candidates = {
+                self._normalize_text(resolve_genre(candidate) or candidate)
+                for candidate in candidates
+                if candidate
+            }
+            if genre_texts.intersection(resolved_candidates):
                 return row
-        return None
-
-    def _fallback_row_for_genre(self, rows: List[Dict[str, Any]], genre: str) -> Dict[str, Any] | None:
-        genre_text = self._normalize_text(resolve_genre(genre) or genre)
-        row = self._match_row_by_genre_text(rows, genre_text)
-        if row:
-            return row
-        # Try raw genre text before canonicalization (e.g. "末世" before "科幻")
-        raw_text = self._normalize_text(genre)
-        if raw_text != genre_text:
-            row = self._match_row_by_genre_text(rows, raw_text)
-            if row:
-                return row
-        # 复合题材拆解: "末世+异能" -> ["末世", "异能"] -> try each component
-        if "+" in genre:
-            for component in genre.split("+"):
-                component = component.strip()
-                if not component:
-                    continue
-                component_text = self._normalize_text(resolve_genre(component) or component)
-                row = self._match_row_by_genre_text(rows, component_text)
-                if row:
-                    return row
         return None
 
     def _infer_genre_from_text(self, text: str) -> str:
@@ -412,8 +415,8 @@ class StorySystemEngine:
             if self._normalize_text(row.get("题材")) == genre_norm:
                 return row
             aliases = (
-                self._split_multi_value(row.get("关键词"))
-                + self._split_multi_value(row.get("意图与同义词"))
+                split_multi_value(row.get("关键词"))
+                + split_multi_value(row.get("意图与同义词"))
             )
             if any(genre_norm == self._normalize_text(a) for a in aliases):
                 return row
