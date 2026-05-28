@@ -85,8 +85,23 @@ export PROJECT_ROOT="${PROJECT_ROOT//\\//}"
 test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { echo "错误: PROJECT_ROOT 解析失败，请用 --project-root 显式指定"; exit 1; }
 echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" preflight
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" placeholder-scan --format text | sort -u
+# 并行执行 preflight 和 placeholder-scan（两者无依赖，均为只读）
+preflight_out=$(mktemp)
+placeholder_raw=$(mktemp)
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" preflight > "$preflight_out" 2>&1 &
+PF_PID=$!
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" placeholder-scan --format text > "$placeholder_raw" 2>&1 &
+PS_PID=$!
+PF_EXIT=0; PS_EXIT=0
+wait $PF_PID || PF_EXIT=$?
+wait $PS_PID || PS_EXIT=$?
+cat "$preflight_out"
+sort -u "$placeholder_raw"
+rm -f "$preflight_out" "$placeholder_raw"
+if [ $PF_EXIT -ne 0 ]; then
+  echo "❌ preflight 失败（exit $PF_EXIT）"
+  exit 1
+fi
 ```
 
 ### 准备：刷新合同树

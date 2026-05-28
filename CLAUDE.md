@@ -224,5 +224,10 @@ For multi-step tasks, state a brief plan with verification per step. Strong succ
 
 **实际写小说的目录。**
 
-D:\workspace\凡尘之舞
-D:\workspace\webnovel
+E:\workspace\webnovel2
+E:\workspace\webnovel
+
+**外部参考项目的目录。**
+
+E:\workspace\webnovel-writer\外部参考\inkos
+E:\workspace\webnovel-writer\外部参考\webnovel-writer 原项目

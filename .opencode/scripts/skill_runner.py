@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-import subprocess
+
 import sys
 from pathlib import Path
 
@@ -48,14 +48,23 @@ def cmd_story_system(args: argparse.Namespace) -> int:
     s = json.loads((root / ".webnovel" / "state.json").read_text("utf-8"))
     genre = s.get("project_info", {}).get("genre", "")
 
-    scripts_dir = str(_scripts_root)
-    return subprocess.run([
-        sys.executable, "-X", "utf8",
-        f"{scripts_dir}/webnovel.py", "--project-root", str(root),
-        "story-system", goal, "--genre", genre,
-        "--chapter", str(args.chapter),
-        "--persist", "--emit-runtime-contracts", "--format", "both",
-    ], check=False).returncode
+    old_argv = sys.argv
+    try:
+        sys.argv = [
+            "story_system.py",
+            "--project-root", str(root),
+            goal,
+            "--genre", genre,
+            "--chapter", str(args.chapter),
+            "--persist", "--emit-runtime-contracts", "--format", "both",
+        ]
+        from story_system import main as story_main
+        story_main()
+        return 0
+    except SystemExit as e:
+        return int(e.code or 0)
+    finally:
+        sys.argv = old_argv
 
 
 def cmd_check_structural(args: argparse.Namespace) -> int:

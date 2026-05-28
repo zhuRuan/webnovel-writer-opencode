@@ -337,7 +337,7 @@ class RerankAPIClient:
         if self.config.rerank_api_type == "openai":
             if self._is_dashscope_native_rerank():
                 parameters: Dict[str, Any] = {"return_documents": True}
-                if top_n:
+                if top_n is not None:
                     parameters["top_n"] = top_n
 
                 if str(self.config.rerank_model or "").lower() == "qwen3-vl-rerank":
@@ -347,6 +347,7 @@ class RerankAPIClient:
                         for document in documents
                     ]
                 else:
+                    # gte-rerank-v2 等其他 native 模型使用纯文本格式
                     native_query = query
                     native_documents = documents
 
@@ -365,13 +366,13 @@ class RerankAPIClient:
                 "documents": documents,
                 "model": self.config.rerank_model
             }
-            if top_n:
+            if top_n is not None:
                 payload["top_n"] = top_n
             return payload
         else:
             # Modal 格式
             payload = {"query": query, "documents": documents}
-            if top_n:
+            if top_n is not None:
                 payload["top_n"] = top_n
             return payload
 

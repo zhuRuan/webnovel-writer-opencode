@@ -61,6 +61,7 @@ def _validate_explicit_genre_source(genre: Optional[str]) -> Optional[str]:
 class StorySystemEngine:
     def __init__(self, csv_dir: str | Path):
         self.csv_dir = Path(csv_dir)
+        self._csv_cache: Dict[str, List[Dict[str, Any]]] = {}
 
     def build(
         self,
@@ -300,11 +301,16 @@ class StorySystemEngine:
         return trace
 
     def _load_csv_rows(self, table_name: str) -> List[Dict[str, Any]]:
+        if table_name in self._csv_cache:
+            return list(self._csv_cache[table_name])
         csv_path = self.csv_dir / f"{table_name}.csv"
         if not csv_path.is_file():
+            self._csv_cache[table_name] = []
             return []
         with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
-            return list(csv.DictReader(f))
+            rows = list(csv.DictReader(f))
+        self._csv_cache[table_name] = rows
+        return list(rows)
 
     def _normalize_text(self, text: str) -> str:
         return str(text or "").strip().lower()
@@ -324,8 +330,8 @@ class StorySystemEngine:
         return [
             resolved
             for token in tokens
-            if token.strip()
-            for resolved in [resolve_genre(token.strip())]
+            if token
+            for resolved in [resolve_genre(token)]
             if resolved
         ]
 
