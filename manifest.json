@@ -1,17 +1,17 @@
 {
-  "version": "v2.8.0-20260528.1418",
+  "version": "v2.8.0-20260531.1016",
   "tag": "v2.8.0",
-  "updated": "2026-05-28T14:18:26Z",
+  "updated": "2026-05-31T10:16:07Z",
   "changelog": [
     {
-      "hash": "fdbc8bb",
-      "type": "perf",
-      "message": "perf: Step 1 \u524d\u9884\u68c0\u6d41\u7a0b\u4f18\u5316 \u2014 \u5b50\u8fdb\u7a0b\u5408\u5e76 + CSV \u7f13\u5b58 + \u5e76\u884c\u9884\u68c0"
+      "hash": "00f30cb",
+      "type": "fix",
+      "message": "fix: \u4fee\u590d\u6d41\u6c34\u7ebf\u591a\u9879 bug \u2014 projection \u7c7b\u578b\u9519\u8bef\u3001last_chapter \u540c\u6b65\u3001debt \u9608\u503c\u3001subagent \u7a7a\u8fd4\u56de"
     },
     {
-      "hash": "82c4c4d",
+      "hash": "56a0784",
       "type": "chore",
-      "message": "chore: update manifest to v2.8.0-20260527.1109 [skip ci]"
+      "message": "chore: update manifest to v2.8.0-20260528.1418 [skip ci]"
     }
   ],
   "files": {
@@ -88,8 +88,8 @@
       "size": 8695
     },
     ".opencode/skills/webnovel-dashboard/SKILL.md": {
-      "sha256": "fd0cf7a24ec44c6ddbf675d02eb53ad925b9e5ec716f0324e18bb32b0a30fe0e",
-      "size": 2753
+      "sha256": "2a681f625b6b2f3b1d105419c237623cafce28c2ea24acf2caf555c1cdb956fc",
+      "size": 2855
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
       "sha256": "8ab14088472271affe733b28c27a8b60d3595fc260602b27b46fccbb789345c5",
@@ -220,8 +220,8 @@
       "size": 5583
     },
     ".opencode/skills/webnovel-write/SKILL.md": {
-      "sha256": "d979cb856566d2a1902e554ef543e30058ec5f8c769f4860f96a52dc2125138b",
-      "size": 13830
+      "sha256": "9e1343bf980bc17bf64db84bc34a6fd2f42a209ea890bbab58a6111c6d6639b1",
+      "size": 14370
     },
     ".opencode/skills/webnovel-write/evals/evals.json": {
       "sha256": "d19b4b196c1637055371ad64899a74ae3d9b01d568bdb8e63c4f71835c8a16e3",
@@ -280,12 +280,12 @@
       "size": 2439
     },
     ".opencode/agents/reviewer.md": {
-      "sha256": "faa6f47dc66670038b13f42d5cd4641406c83eeebfb48d1e6c1a357f538eef00",
-      "size": 7223
+      "sha256": "e87973825313cf8b396293e95ff3d64f14eb2ce120539d4ede1550c34ad76066",
+      "size": 7225
     },
     ".opencode/agents/chapter-writer-agent.md": {
-      "sha256": "79f3293d21ec57542a193af8839bedf1d67c4644d1ad05e36a9496176dc817a5",
-      "size": 5508
+      "sha256": "089edd7d2c72a9d8d612c4fd79cca656e9dce3247a0829629cdfe98d5a428a0b",
+      "size": 6084
     },
     ".opencode/agents/deconstruction-agent.md": {
       "sha256": "1a5958fbed8be3334f7dca544978993d17e843599cc532d92e66da26204f3b20",
@@ -732,8 +732,8 @@
       "size": 1703
     },
     ".opencode/scripts/data_modules/state_projection_writer.py": {
-      "sha256": "09bc45f5abf89cd7666d3f57e934236ab0b2cfd4b6edd6e9268b8604a803807d",
-      "size": 12527
+      "sha256": "8eaba156f5646b3992d6b9b6c6b846da828d4b6104dffadd78c830e432c3b615",
+      "size": 12955
     },
     ".opencode/scripts/data_modules/genre_profile_builder.py": {
       "sha256": "566998c5d774737a441221152cfe82f152743cb01a72cfcb7a7b7169b0d1cd15",
@@ -784,8 +784,8 @@
       "size": 14850
     },
     ".opencode/scripts/data_modules/state_projection_renderer.py": {
-      "sha256": "4fb9eb46a483ad1d862a465ca5c8b11320792f19ae1a97fd04d50a9f55e9a7f4",
-      "size": 7819
+      "sha256": "830a3eeb751e4ca988207e7188ac003bdc229f58b543822026e48a0fdb47b417",
+      "size": 7910
     },
     ".opencode/scripts/data_modules/placeholder_scanner.py": {
       "sha256": "e087ae2bf9608f88a9e0c57ecca85828574ad2d03ace9fdc17bcce8f8ac882c1",
@@ -852,8 +852,8 @@
       "size": 7211
     },
     ".opencode/scripts/data_modules/structural_checker.py": {
-      "sha256": "246103e034c265c1dc29b7ab6675ed2155a37de1d4d9349b59e559f476c2c4ec",
-      "size": 11711
+      "sha256": "7bfa090e9450df8498a8bfa20fb53b5e00777675ea795a9631526c054e932128",
+      "size": 11808
     },
     ".opencode/scripts/data_modules/rag_adapter.py": {
       "sha256": "2f6ddb8b494f9413f56ca46a23c3337a855581e795a4c8896ce1fc2b8d992066",
@@ -952,8 +952,8 @@
       "size": 6133
     },
     ".opencode/scripts/data_modules/tests/test_structural_checker.py": {
-      "sha256": "ae4979cee010d73d793c2c6132067f0dc3abe7e5a75c5c851a4661b0307ea6c4",
-      "size": 10277
+      "sha256": "f01b071d18f16c169f12a58fa2caa9de180c1c7e996ac6b73b59a4493a536c64",
+      "size": 10389
     },
     ".opencode/scripts/data_modules/tests/test_style_sampler_cli.py": {
       "sha256": "ddaf9ca395eb05032c23652e084d6e8070d24b1ffbdee04a8c2312ab01332e73",
@@ -1228,8 +1228,8 @@
       "size": 533
     },
     ".opencode/scripts/data_modules/memory/store.py": {
-      "sha256": "b1fbceb3d80a244ca95bf03ed4bf795f704d33ac112be76948b633dc45ebee06",
-      "size": 8955
+      "sha256": "664e4048f64951532b6603f906d000c411fa4791d0cc0c44657ae6dadc8a7e8d",
+      "size": 9162
     },
     ".opencode/scripts/data_modules/memory/orchestrator.py": {
       "sha256": "844eac25052ee2438fbc5ff14913acc74e67cd9e0e0e4a7dce70b5b3ade33c26",
