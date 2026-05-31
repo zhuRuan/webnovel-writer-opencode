@@ -185,6 +185,7 @@ def _check_debt_burden(state: dict, project_root=None, chapter=0):
         "detail": "",
         "fix": "",
     }
+    threshold = max(10, chapter // 2) if chapter > 0 else 10
     # Prefer index.db if available
     if project_root:
         db_path = Path(project_root) / ".webnovel" / "index.db"
@@ -199,9 +200,9 @@ def _check_debt_burden(state: dict, project_root=None, chapter=0):
                     "SELECT COUNT(*) FROM chase_debt WHERE status='active' AND due_chapter < ?",
                     (chapter,)
                 ).fetchone()[0]
-                if total > 5:
+                if total > threshold:
                     result["passed"] = False
-                    result["detail"] = f"active debts {total} (threshold 5), {overdue} overdue"
+                    result["detail"] = f"active debts {total} (threshold {threshold}), {overdue} overdue"
                     result["fix"] = "resolve overdue foreshadowing in upcoming chapters"
                 elif overdue > 0:
                     result["passed"] = False
@@ -213,9 +214,9 @@ def _check_debt_burden(state: dict, project_root=None, chapter=0):
     # Fallback: read from state.json
     foreshadowing = (state.get("plot_threads") or {}).get("foreshadowing") or []
     unresolved = [f for f in foreshadowing if f.get("status") == "未回收"]
-    if len(unresolved) > 5:
+    if len(unresolved) > threshold:
         result["passed"] = False
-        result["detail"] = f"unresolved foreshadowing {len(unresolved)} (threshold 5)"
+        result["detail"] = f"unresolved foreshadowing {len(unresolved)} (threshold {threshold})"
         result["fix"] = "resolve or mark abandoned for overdue foreshadowing"
     return result
 

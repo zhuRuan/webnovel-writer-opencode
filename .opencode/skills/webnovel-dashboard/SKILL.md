@@ -56,6 +56,7 @@ PYTHONPATH="${PWD}/.opencode" python -X utf8 -m dashboard.server --project-root 
 
 ```bash
 curl -s http://127.0.0.1:8765/api/preflight || echo "服务未启动，请检查端口是否被占用"
+curl -s http://127.0.0.1:8765/api/story-runtime/health || echo "story-runtime/health 端点不可用"
 ```
 
 ## 注意事项

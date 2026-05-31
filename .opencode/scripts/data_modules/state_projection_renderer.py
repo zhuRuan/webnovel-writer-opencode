@@ -146,8 +146,12 @@ def _render_chapter_index(state: dict, project_root: Path) -> str:
     lines.append("| 章节 | 状态 |")
     lines.append("|------|------|")
     for ch in sorted(ch_status.keys(), key=lambda x: int(x) if x.isdigit() else 0):
-        status = ch_status[ch].get("status", "unknown")
-        icon = "✅" if status == "committed" else "\U0001f4dd" if status == "drafting" else "❓"
+        raw = ch_status[ch]
+        if isinstance(raw, dict):
+            status = raw.get("status", "unknown")
+        else:
+            status = str(raw)
+        icon = "✅" if "committed" in status else "📝" if "draft" in status else "❓"
         lines.append(f"| 第{ch}章 | {icon} {status} |")
 
     lines.append(f"\n共 {len(ch_status)} 章。")

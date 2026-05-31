@@ -76,10 +76,14 @@ class ScratchpadManager:
             for row in rows:
                 row_key = self._key_for(row)
                 if row_key == target_key and row.id != normalized.id:
-                    # 同 key 旧值直接丢弃
-                    outdated += 1
-                    replaced_existing = True
-                    continue  # skip old row entirely
+                    if row.status == normalized.status:
+                        # 同 key 同 status 旧值丢弃
+                        outdated += 1
+                        replaced_existing = True
+                        continue
+                    # 不同 status 的同 key 项保留（如 outdated vs active）
+                    new_rows.append(row)
+                    continue
                 elif row.id == normalized.id:
                     replaced_existing = True
                     continue

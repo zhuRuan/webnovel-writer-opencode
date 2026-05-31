@@ -47,6 +47,7 @@ class StateProjectionWriter:
         protagonist_ids = self._collect_protagonist_ids(commit_payload, state)
 
         applied_count = 0
+        protagonist_location_updated = False
         for delta in self._collect_state_deltas(commit_payload):
             entity_id = str(delta.get("entity_id") or "").strip()
             field = str(delta.get("field") or "").strip()
@@ -57,7 +58,15 @@ class StateProjectionWriter:
             self._set_path(entity_bucket, field, new_value)
             if entity_id in protagonist_ids:
                 self._set_path(state.setdefault("protagonist_state", {}), field, new_value)
+                if field == "location.current":
+                    protagonist_location_updated = True
             applied_count += 1
+
+        # 自动同步 last_chapter：当 location.current 被更新时
+        if protagonist_location_updated and chapter > 0:
+            ps = state.setdefault("protagonist_state", {})
+            loc = ps.setdefault("location", {})
+            loc["last_chapter"] = chapter
 
         if chapter > 0:
             old_current = self._safe_int(progress.get("current_chapter"))

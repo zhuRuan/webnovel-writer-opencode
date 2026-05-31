@@ -240,14 +240,15 @@ def test_memory_bloat_ok():
 
 
 def test_debt_burden():
-    """未回收伏笔超过 5 条应 warning"""
+    """未回收伏笔超过动态阈值应 warning（阈值 = max(10, chapter//2)）"""
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
+        # chapter=22 → threshold = max(10, 11) = 11，需要 >11 条
         state = _make_state({
             "plot_threads": {
                 "foreshadowing": [
                     {"id": f"f{i}", "status": "未回收", "planted_chapter": i}
-                    for i in range(1, 8)
+                    for i in range(1, 13)
                 ]
             }
         })

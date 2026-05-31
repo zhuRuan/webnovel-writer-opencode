@@ -6,6 +6,7 @@ tools:
   read: true
   grep: true
   bash: true
+  write: true
 ---
 
 # reviewer（统一审查 agent）
@@ -149,7 +150,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" ind
 
 ## 8. 输出格式
 
-**硬性输出约束**：你只能输出一段有效的 JSON。不得在 JSON 前后附加任何解释、对话、分析或其他文本。如果没有什么可说的，就输出 `{"issues": [], "summary": "无问题"}`。
+**硬性输出约束**：你必须使用 Write 工具将审查结果写入 `${REVIEW_OUTPUT}` 路径。写入内容必须是一段有效的 JSON，不得在 JSON 前后附加任何解释、对话或其他文本。如果没有什么可说的，就写入 `{"issues": [], "summary": "无问题"}`。写入后确认文件存在且非空再结束响应。
 
 ```json
 {
@@ -175,8 +176,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" ind
 
 ## 10. ⛔ 强制输出约束
 
-审查结果**必须**使用 Write 工具写入调用方指定的 `${REVIEW_OUTPUT}` 路径（通常为 `${PROJECT_ROOT}/.webnovel/tmp/review_results.json`）。
-不得写入 `.story-system/reviews/` 或其他路径。写入后确认文件存在且非空再结束响应。
+审查结果写入路径由第 8 节约束定义（`${REVIEW_OUTPUT}`）。不得写入 `.story-system/reviews/` 或其他路径。
 
 审查完成后，记录工作流检查点（workflow checkpoint）：
 
