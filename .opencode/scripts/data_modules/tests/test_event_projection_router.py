@@ -103,6 +103,7 @@ def test_required_writers_includes_index_for_accepted_commit():
 def test_router_ignores_unknown_and_non_dict_events():
     router = EventProjectionRouter()
     assert router.route({"event_type": "unknown"}) == []
+    # rejected 章节只走 state writer（更新 chapter_rejected 状态）
     writers = router.required_writers(
         {
             "meta": {"status": "rejected"},
@@ -111,4 +112,4 @@ def test_router_ignores_unknown_and_non_dict_events():
             "summary_text": "   ",
         }
     )
-    assert writers == []
+    assert writers == ["state"]

@@ -48,9 +48,9 @@ def main() -> None:
         print_json(payload)
         return
     service.persist_commit(payload)
+    payload = service.apply_projections(payload)
+    # Record workflow checkpoint for accepted chapters
     if payload["meta"]["status"] == "accepted":
-        payload = service.apply_projections(payload)
-        # Record workflow checkpoint (SSOT events are published inside apply_projections)
         try:
             from data_modules.workflow_checkpoint import checkpoint
             checkpoint(args.chapter, "COMMITTED", Path(args.project_root))

@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import threading
+from collections.abc import Coroutine
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -35,6 +37,20 @@ class VectorProjectionWriter:
         chapter = int(commit_payload.get("meta", {}).get("chapter") or 0)
 
         chunk_counts: Dict[str, int] = {}
+
+        # summary chunk
+        summary_text = str(commit_payload.get("summary_text") or "").strip()
+        summary_chunk_id = f"ch{chapter:04d}_summary" if chapter > 0 else ""
+        if chapter > 0 and summary_text:
+            chunks.append({
+                "chunk_id": summary_chunk_id,
+                "chapter": chapter,
+                "scene_index": 0,
+                "content": summary_text,
+                "chunk_type": "summary",
+                "parent_chunk_id": None,
+                "source_file": f"commit:chapter_{chapter:03d}",
+            })
 
         for event in commit_payload.get("accepted_events") or []:
             if not isinstance(event, dict):
@@ -71,6 +87,28 @@ class VectorProjectionWriter:
                     "parent_chunk_id": f"ch{d_chapter:04d}_summary",
                     "source_file": f"commit:chapter_{d_chapter:03d}",
                 })
+
+        # scene chunks
+        for idx, scene in enumerate(commit_payload.get("scenes") or [], start=1):
+            if not isinstance(scene, dict):
+                continue
+            scene_index = int(scene.get("scene_index") or scene.get("index") or idx)
+            text = str(scene.get("summary") or scene.get("content") or "").strip()
+            location = str(scene.get("location") or "").strip()
+            if location and text:
+                text = f"{location}：{text}"
+            if not text:
+                continue
+            chunk_id = self._chunk_id("scene", chapter, scene_index)
+            chunks.append({
+                "chunk_id": chunk_id,
+                "chapter": chapter,
+                "scene_index": scene_index,
+                "content": text,
+                "chunk_type": "scene",
+                "parent_chunk_id": summary_chunk_id or None,
+                "source_file": f"commit:chapter_{chapter:03d}",
+            })
 
         return chunks
 
@@ -167,6 +205,28 @@ class VectorProjectionWriter:
             return f"第{chapter}章：实体变更——{canonical}"
         return ""
 
+    def _run_store_coro(self, coro: Coroutine[Any, Any, int]) -> int:
+        """安全运行异步协程，处理嵌套事件循环场景。"""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return int(asyncio.run(coro) or 0)
+
+        result: Dict[str, Any] = {}
+
+        def runner() -> None:
+            try:
+                result["value"] = asyncio.run(coro)
+            except Exception as exc:
+                result["error"] = exc
+
+        thread = threading.Thread(target=runner, daemon=True)
+        thread.start()
+        thread.join()
+        if "error" in result:
+            raise result["error"]
+        return int(result.get("value") or 0)
+
     def _store_chunks(self, chunks: List[Dict[str, Any]]) -> int:
         from .config import DataModulesConfig
         from .rag_adapter import RAGAdapter
@@ -174,8 +234,7 @@ class VectorProjectionWriter:
         config = DataModulesConfig.from_project_root(self.project_root)
         adapter = RAGAdapter(config)
         try:
-            stored = asyncio.run(adapter.store_chunks(chunks))
-            return stored
+            return self._run_store_coro(adapter.store_chunks(chunks))
         except Exception as exc:
             logger.warning("vector_store_failed: %s", exc)
             return 0

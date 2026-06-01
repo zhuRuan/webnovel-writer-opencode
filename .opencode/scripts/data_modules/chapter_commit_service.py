@@ -152,7 +152,8 @@ class ChapterCommitService:
                 idx.resolve_debt_by_subject(subject=subject, chapter=chapter)
 
     def apply_projections(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        if payload["meta"]["status"] != "accepted":
+        status = str((payload.get("meta") or {}).get("status") or "")
+        if status not in {"accepted", "rejected"}:
             return payload
 
         chapter = int((payload.get("meta") or {}).get("chapter") or 0)
@@ -160,50 +161,52 @@ class ChapterCommitService:
             logger.warning("apply_projections: chapter fell back to %s (meta=%s)",
                            chapter, payload.get("meta"))
 
-        # Guard: skip SSOT publishing if this chapter already has events
-        # (retry safety — prevents duplicate events in the immutable event log)
-        existing_events = read_events(self.project_root, chapter=chapter)
-        if not existing_events:
-            for event in payload.get("accepted_events", []):
-                if not isinstance(event, dict):
-                    continue
+        # 只有 accepted 章节才写入事件日志和 SSOT
+        if status == "accepted":
+            # Guard: skip SSOT publishing if this chapter already has events
+            # (retry safety — prevents duplicate events in the immutable event log)
+            existing_events = read_events(self.project_root, chapter=chapter)
+            if not existing_events:
+                for event in payload.get("accepted_events", []):
+                    if not isinstance(event, dict):
+                        continue
+                    try:
+                        event_payload = dict(event.get("payload", {}))
+                        subject = event.get("subject", "")
+                        if subject:
+                            event_payload["_subject"] = subject
+                        publish_event(
+                            self.project_root,
+                            event.get("event_type", "unknown"),
+                            event_payload,
+                            chapter=chapter,
+                        )
+                    except Exception as exc:
+                        logger.warning("SSOT publish_event failed for chapter %s event %s: %s",
+                                       chapter, event.get("event_type", ""), exc)
+
                 try:
-                    event_payload = dict(event.get("payload", {}))
-                    subject = event.get("subject", "")
-                    if subject:
-                        event_payload["_subject"] = subject
                     publish_event(
                         self.project_root,
-                        event.get("event_type", "unknown"),
-                        event_payload,
+                        "chapter_status_changed",
+                        {"status": "committed"},
                         chapter=chapter,
                     )
                 except Exception as exc:
-                    logger.warning("SSOT publish_event failed for chapter %s event %s: %s",
-                                   chapter, event.get("event_type", ""), exc)
+                    logger.warning("SSOT chapter_status_changed failed for chapter %s: %s", chapter, exc)
 
             try:
-                publish_event(
-                    self.project_root,
-                    "chapter_status_changed",
-                    {"status": "committed"},
-                    chapter=chapter,
-                )
+                EventLogStore(self.project_root).write_events(chapter, payload.get("accepted_events", []))
             except Exception as exc:
-                logger.warning("SSOT chapter_status_changed failed for chapter %s: %s", chapter, exc)
+                logger.warning("EventLogStore.write_events failed for chapter %s: %s", chapter, exc)
 
-        try:
-            EventLogStore(self.project_root).write_events(chapter, payload.get("accepted_events", []))
-        except Exception as exc:
-            logger.warning("EventLogStore.write_events failed for chapter %s: %s", chapter, exc)
-
-        proposals = AmendProposalTrigger().check(chapter, payload.get("accepted_events", []))
-        if proposals:
-            manager = IndexManager(DataModulesConfig.from_project_root(self.project_root))
-            with manager._get_conn() as conn:
-                ensure_override_ledger_columns(conn)
-                persist_amend_proposals(conn, chapter, proposals)
-                conn.commit()
+            proposals = AmendProposalTrigger().check(chapter, payload.get("accepted_events", []))
+            if proposals:
+                manager = IndexManager(DataModulesConfig.from_project_root(self.project_root))
+                with manager._get_conn() as conn:
+                    ensure_override_ledger_columns(conn)
+                    persist_amend_proposals(conn, chapter, proposals)
+                    conn.commit()
 
         from .index_projection_writer import IndexProjectionWriter
         from .memory_projection_writer import MemoryProjectionWriter

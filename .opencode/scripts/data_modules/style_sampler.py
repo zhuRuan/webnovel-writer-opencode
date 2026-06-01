@@ -143,6 +143,16 @@ class StyleSampler:
 
             return [self._row_to_sample(row) for row in cursor.fetchall()]
 
+    def _safe_tags(self, raw) -> List[str]:
+        """容忍损坏的 tags JSON，返回空列表而非崩溃。"""
+        if not raw:
+            return []
+        try:
+            value = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            return []
+        return value if isinstance(value, list) else []
+
     def _row_to_sample(self, row) -> StyleSample:
         """将数据库行转换为样本对象"""
         return StyleSample(
@@ -151,7 +161,7 @@ class StyleSampler:
             scene_type=row[2],
             content=row[3],
             score=row[4],
-            tags=json.loads(row[5]) if row[5] else [],
+            tags=self._safe_tags(row[5]),
             created_at=row[6]
         )
 
