@@ -1,17 +1,22 @@
 {
-  "version": "v2.8.0-20260601.1436",
+  "version": "v2.8.0-20260601.1548",
   "tag": "v2.8.0",
-  "updated": "2026-06-01T14:36:33Z",
+  "updated": "2026-06-01T15:48:10Z",
   "changelog": [
     {
-      "hash": "cda2a3f",
+      "hash": "7d0c0e3",
       "type": "fix",
-      "message": "fix: \u540c\u6b65\u539f\u9879\u76ee\u589e\u5f3a \u2014 rejected \u7ae0\u8282\u5904\u7406\u3001vector \u5206\u5757\u3001style_sampler \u5bb9\u9519"
+      "message": "fix: \u4fee\u590d state_manager/state_projection_writer 6 \u9879\u95ee\u9898"
     },
     {
-      "hash": "7ae1009",
+      "hash": "9bb407a",
+      "type": "fix",
+      "message": "fix: state_manager pending \u673a\u5236 + state_projection_writer \u6587\u4ef6\u9501"
+    },
+    {
+      "hash": "933aa9c",
       "type": "chore",
-      "message": "chore: update manifest to v2.8.0-20260601.0958 [skip ci]"
+      "message": "chore: update manifest to v2.8.0-20260601.1436 [skip ci]"
     }
   ],
   "files": {
@@ -732,8 +737,8 @@
       "size": 1703
     },
     ".opencode/scripts/data_modules/state_projection_writer.py": {
-      "sha256": "8eaba156f5646b3992d6b9b6c6b846da828d4b6104dffadd78c830e432c3b615",
-      "size": 12955
+      "sha256": "63e94260f0d578561f3ad2e2181598ed426e2a9a7fe72237f39280e05fa5bff4",
+      "size": 15125
     },
     ".opencode/scripts/data_modules/genre_profile_builder.py": {
       "sha256": "566998c5d774737a441221152cfe82f152743cb01a72cfcb7a7b7169b0d1cd15",
@@ -888,8 +893,8 @@
       "size": 2918
     },
     ".opencode/scripts/data_modules/state_manager.py": {
-      "sha256": "b13ec0d3efb8ca916f4edf154df8a09cb098b7445ff5300fd265e56afbd4a609",
-      "size": 61387
+      "sha256": "2ec5d170b0000deb01935fe8920a9909e50d44ccfc96a9d1147eb88c936dbe9d",
+      "size": 63550
     },
     ".opencode/scripts/data_modules/review_schema.py": {
       "sha256": "eab4f7ad03478c237087202b7eb56a6e0dd5265529637ead50f2ff396ec7a637",
