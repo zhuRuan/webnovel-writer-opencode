@@ -1,17 +1,22 @@
 {
-  "version": "v2.8.0-20260531.1016",
+  "version": "v2.8.0-20260601.0958",
   "tag": "v2.8.0",
-  "updated": "2026-05-31T10:16:07Z",
+  "updated": "2026-06-01T09:58:41Z",
   "changelog": [
     {
-      "hash": "00f30cb",
+      "hash": "7a3a159",
       "type": "fix",
-      "message": "fix: \u4fee\u590d\u6d41\u6c34\u7ebf\u591a\u9879 bug \u2014 projection \u7c7b\u578b\u9519\u8bef\u3001last_chapter \u540c\u6b65\u3001debt \u9608\u503c\u3001subagent \u7a7a\u8fd4\u56de"
+      "message": "fix: \u5ba1\u67e5\u6d41\u7a0b\u4f18\u5316 \u2014 \u6536\u655b\u673a\u5236\u3001\u81ea\u67e5\u3001\u68c0\u67e5\u6e05\u5355\u3001blocking \u5f52\u4e00\u5316"
     },
     {
-      "hash": "56a0784",
+      "hash": "b5a1f74",
       "type": "chore",
-      "message": "chore: update manifest to v2.8.0-20260528.1418 [skip ci]"
+      "message": "chore: \u79fb\u9664\u610f\u5916\u63d0\u4ea4\u7684 .codegraph/ \u548c\u5916\u90e8\u53c2\u8003/inkos\uff0c\u6dfb\u52a0 .gitignore \u89c4\u5219"
+    },
+    {
+      "hash": "04a6f0a",
+      "type": "chore",
+      "message": "chore: update manifest to v2.8.0-20260531.1016 [skip ci]"
     }
   ],
   "files": {
@@ -220,8 +225,8 @@
       "size": 5583
     },
     ".opencode/skills/webnovel-write/SKILL.md": {
-      "sha256": "9e1343bf980bc17bf64db84bc34a6fd2f42a209ea890bbab58a6111c6d6639b1",
-      "size": 14370
+      "sha256": "0b95e69d9e8cced183f9fa24e58ac5df2e2a3fb523b751477f58b8a4a29a3197",
+      "size": 16462
     },
     ".opencode/skills/webnovel-write/evals/evals.json": {
       "sha256": "d19b4b196c1637055371ad64899a74ae3d9b01d568bdb8e63c4f71835c8a16e3",
@@ -280,8 +285,8 @@
       "size": 2439
     },
     ".opencode/agents/reviewer.md": {
-      "sha256": "e87973825313cf8b396293e95ff3d64f14eb2ce120539d4ede1550c34ad76066",
-      "size": 7225
+      "sha256": "8eeb54545910fd0cdab1e9193ba64f54443cf462add373f50006dda2eb0e8ee7",
+      "size": 12595
     },
     ".opencode/agents/chapter-writer-agent.md": {
       "sha256": "089edd7d2c72a9d8d612c4fd79cca656e9dce3247a0829629cdfe98d5a428a0b",
@@ -772,8 +777,8 @@
       "size": 1013
     },
     ".opencode/scripts/data_modules/chapter_commit_service.py": {
-      "sha256": "0cb9fe85fc3dd550c22eddbc1b810c5fc1583e5f378d09ea90cc4492a0f1f82c",
-      "size": 10670
+      "sha256": "06b5e3cbfac2ac50475709fac2c17d9bce5769739eedde6343188447fc83f07e",
+      "size": 10881
     },
     ".opencode/scripts/data_modules/memory_projection_writer.py": {
       "sha256": "3a3f4fd87cc530a2ea2fa4b3be836853e8bdc66d51b40fca5e1ecb7deaac0636",
@@ -892,8 +897,8 @@
       "size": 61387
     },
     ".opencode/scripts/data_modules/review_schema.py": {
-      "sha256": "09a8393ab31e1177bcf7012a302e7923f7f69d1863aa7f8d9f3b4dc085abb8a8",
-      "size": 7568
+      "sha256": "eab4f7ad03478c237087202b7eb56a6e0dd5265529637ead50f2ff396ec7a637",
+      "size": 7703
     },
     ".opencode/scripts/data_modules/context_ranker.py": {
       "sha256": "0de21e6fa2c94c9df7de88732662223577a1b9d33c14d65cf4110abe298283cd",
