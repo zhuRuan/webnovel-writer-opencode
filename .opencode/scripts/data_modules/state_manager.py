@@ -111,6 +111,7 @@ class StateManager:
 
     # 章节状态机（单调递进）
     CHAPTER_STATUS_ORDER = ["chapter_drafted", "chapter_reviewed", "chapter_committed"]
+    REJECTED_CHAPTER_STATUS = "chapter_rejected"
 
     def __init__(self, config=None, enable_sqlite_sync: bool = True):
         """
@@ -144,6 +145,7 @@ class StateManager:
         self._pending_disambiguation_pending: List[Dict[str, Any]] = []
         self._pending_progress_chapter: Optional[int] = None
         self._pending_progress_words_delta: int = 0
+        self._pending_chapter_status: Dict[str, str] = {}
         self._pending_chapter_meta: Dict[str, Any] = {}
 
         # v5.1 引入: 缓存待同步到 SQLite 的数据
@@ -246,6 +248,7 @@ class StateManager:
                 self._pending_chapter_meta,
                 self._pending_progress_chapter is not None,
                 self._pending_progress_words_delta != 0,
+                self._pending_chapter_status,
             ]
         )
         if not has_pending:
@@ -281,6 +284,26 @@ class StateManager:
                             total_words = 0
                         progress["total_words"] = total_words + int(self._pending_progress_words_delta)
 
+                    progress["last_updated"] = self._now_progress_timestamp()
+
+                # 章节状态合并（单调递进，不可回退）
+                if self._pending_chapter_status:
+                    progress = disk_state.get("progress", {})
+                    if not isinstance(progress, dict):
+                        progress = {}
+                        disk_state["progress"] = progress
+                    chapter_status = progress.get("chapter_status")
+                    if not isinstance(chapter_status, dict):
+                        chapter_status = {}
+                        progress["chapter_status"] = chapter_status
+
+                    for chapter_key, pending_status in self._pending_chapter_status.items():
+                        current_status = str(chapter_status.get(chapter_key) or "")
+                        if current_status == pending_status:
+                            continue
+                        if current_status and self._chapter_status_rank(pending_status) < self._chapter_status_rank(current_status):
+                            continue
+                        chapter_status[chapter_key] = pending_status
                     progress["last_updated"] = self._now_progress_timestamp()
 
                 # v5.1 引入: 强制使用 SQLite 模式，移除大数据字段
@@ -373,6 +396,7 @@ class StateManager:
                 self._pending_chapter_meta.clear()
                 self._pending_progress_chapter = None
                 self._pending_progress_words_delta = 0
+                self._pending_chapter_status.clear()
 
                 # SQLite 侧 pending：成功后清空，失败则恢复快照（避免静默丢数据）
                 if sqlite_sync_ok:
@@ -643,13 +667,16 @@ class StateManager:
 
     def set_chapter_status(self, chapter: int, status: str) -> None:
         """设置章节状态（单调递进，不可回退）。"""
-        if status not in self.CHAPTER_STATUS_ORDER:
-            raise ValueError(f"无效状态: {status}，有效值: {self.CHAPTER_STATUS_ORDER}")
+        valid_statuses = set(self.CHAPTER_STATUS_ORDER + [self.REJECTED_CHAPTER_STATUS])
+        if status not in valid_statuses:
+            raise ValueError(
+                f"无效状态: {status}，有效值: {self.CHAPTER_STATUS_ORDER + [self.REJECTED_CHAPTER_STATUS]}"
+            )
 
         current = self.get_chapter_status(chapter)
         if current is not None:
-            current_idx = self.CHAPTER_STATUS_ORDER.index(current)
-            new_idx = self.CHAPTER_STATUS_ORDER.index(status)
+            current_idx = self._chapter_status_rank(current)
+            new_idx = self._chapter_status_rank(status)
             if new_idx < current_idx:
                 raise ValueError(
                     f"章节 {chapter} 状态不可回退: {current} -> {status}"
@@ -657,10 +684,17 @@ class StateManager:
             if new_idx == current_idx:
                 return  # 幂等
 
-        progress = self._state.setdefault("progress", {})
-        chapter_status = progress.setdefault("chapter_status", {})
-        chapter_status[str(chapter)] = status
-        self._save_state()
+        self._pending_chapter_status[str(chapter)] = status
+        self.save_state()
+
+    def _chapter_status_rank(self, status: str) -> int:
+        """返回章节状态的排序等级（rejected=-1, drafted=0, reviewed=1, committed=2）。"""
+        if status == self.REJECTED_CHAPTER_STATUS:
+            return -1
+        try:
+            return self.CHAPTER_STATUS_ORDER.index(status)
+        except ValueError:
+            return -1
 
     def _save_state(self) -> None:
         """直接持久化当前内存状态到 state.json（轻量写入，不走 pending 合并）。"""
@@ -1328,7 +1362,7 @@ def main():
     status_set_parser = subparsers.add_parser("set-chapter-status")
     status_set_parser.add_argument("--chapter", type=int, required=True)
     status_set_parser.add_argument("--status", required=True,
-        choices=["chapter_drafted", "chapter_reviewed", "chapter_committed"])
+        choices=["chapter_rejected", "chapter_drafted", "chapter_reviewed", "chapter_committed"])
 
     argv = normalize_global_project_root(sys.argv[1:])
     args = parser.parse_args(argv)
