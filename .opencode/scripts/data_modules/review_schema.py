@@ -67,8 +67,11 @@ class ReviewIssue:
             self.severity = "medium"
         if self.category not in VALID_CATEGORIES:
             self.category = "other"
-        if self.blocking is None:
-            self.blocking = self.severity == "critical"
+        # critical 强制 blocking=True，不信任 LLM 输出的 blocking 字段
+        if self.severity == "critical":
+            self.blocking = True
+        elif self.blocking is None:
+            self.blocking = False
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

@@ -19,6 +19,7 @@ from .override_ledger_service import (
     ensure_override_ledger_columns,
     persist_amend_proposals,
 )
+from .review_schema import parse_review_output
 from .ssot_enforcer import publish_event, read_events
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,9 @@ class ChapterCommitService:
                         if str(n.get("type", "")).upper() not in ("CBN", "CPN", "CEN")]
 
         # Plain strings or CBN-typed dicts → blocking
-        rejected = bool(review_result.get("blocking_count")) or bool(missed_raw) or bool(missed_cbn) or bool(
+        # 通过 parse_review_output 归一化（含 severity→blocking 推导），不直接信任 LLM 原始值
+        _normalized = parse_review_output(chapter, review_result)
+        rejected = _normalized.has_blocking or bool(missed_raw) or bool(missed_cbn) or bool(
             disambiguation_result.get("pending")
         )
         status = "rejected" if rejected else "accepted"

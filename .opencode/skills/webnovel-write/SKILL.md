@@ -243,6 +243,59 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" rev
 
 blocking=true → 修复后重审，不进 Step 4。`--fast` 只检查 setting/timeline/continuity。`--minimal` 跳过。
 
+#### 修复-重审循环（最多 3 轮）
+
+审查发现 blocking issue 时，执行以下循环，**最多 3 轮**。目标是 1-2 轮内找全并修完所有问题，3 轮是安全兜底。
+
+**每轮流程：**
+
+1. **调用 chapter-writer-agent 修复**：将 blocking issue 列表传入，agent 逐条修复
+2. **修复后自查**（不调用 reviewer，直接检查 evidence 是否仍存在）：
+
+```bash
+# 修复后自查：检查上次审查的 evidence 是否仍在正文中
+SELF_CHECK_PASSED=$(python -c "
+import json, pathlib
+chapter_file = pathlib.Path('${CHAPTER_FILE}')
+review_file = pathlib.Path('${PROJECT_ROOT}/.webnovel/tmp/review_results.json')
+if not chapter_file.exists() or not review_file.exists():
+    print('false')
+    exit()
+text = chapter_file.read_text(encoding='utf-8')
+review = json.loads(review_file.read_text(encoding='utf-8'))
+issues = review.get('issues', [])
+blocking = [i for i in issues if i.get('blocking')]
+# 检查每个 blocking issue 的 evidence 是否仍在正文中
+remaining = 0
+for issue in blocking:
+    evidence = (issue.get('evidence') or '').strip()
+    if not evidence:
+        continue
+    # evidence 可能是 '原文引用 vs 数据记录' 格式，取 vs 左侧的原文引用部分
+    if ' vs ' in evidence:
+        evidence = evidence.split(' vs ')[0].strip()
+    if len(evidence) >= 3 and evidence[:80] in text:
+        remaining += 1
+# 如果所有 evidence 都已消失，自查通过
+print('true' if remaining == 0 else 'false')
+")
+```
+
+3. **如果自查通过**（所有 evidence 已消失），跳过 reviewer 重审，直接进 Step 4
+4. **如果自查未通过**，重新调用 reviewer-agent 重审
+5. **轮次检查**：如果达到 3 轮仍有 blocking issue → **停止循环，输出剩余问题清单，交给人工处理**。不自动降级、不强行放过。
+
+**收敛判断伪代码：**
+```
+for round in 1..3:
+    fix blocking issues
+    if self_check passes: break  # 所有 evidence 已消失
+    re-review
+    if no blocking: break
+else:
+    停止，输出剩余 blocking issue 清单，交人工决策
+```
+
 ```bash
 # 校验审查结果文件
 test -s "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" || { echo "❌ 审查结果未生成"; exit 1; }

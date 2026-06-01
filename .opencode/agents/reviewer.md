@@ -70,11 +70,39 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" ind
 ## 5. 执行流程（按顺序执行）
 
 ### 1. 设定一致性（category: setting）
+
+**必须先执行以下 bash 查询，再对比正文内容，不得凭记忆审查：**
+
+```bash
+# 查询主角当前状态（境界/位置/物品）
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" state get-entity --id "protagonist"
+
+# 查询最近状态变更（20 条）
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index get-recent-state-changes --limit 20
+```
+
 - 角色能力是否与当前境界匹配
 - 地点描述是否与世界观一致
 - 物品/货币使用是否符合已建立规则
 
 ### 2. 时间线（category: timeline）
+
+**必须先读取上章结尾，确认时间锚点：**
+
+```bash
+# 读取上章结尾 500 字（确认时间/场景衔接点）
+python -c "
+from pathlib import Path
+import re, glob
+text_dir = Path('${PROJECT_ROOT}') / '正文'
+files = sorted(glob.glob(str(text_dir / '第*章*.md')))
+if files:
+    prev = Path(files[-1]).read_text(encoding='utf-8')
+    # 取最后 500 字
+    print(prev[-500:])
+"
+```
+
 - 本章时间是否与上章衔接（无回跳或有合理解释）
 - 倒计时/截止日期是否正确推进
 - 角色同时出现在两个地点
@@ -130,6 +158,90 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" ind
 - 是否全员书面语、无口语特征、无个人口癖
 - 对白后是否跟解释性叙述（"他这么说是因为……"）
 - severity: 信息宣讲 `high`，其他 `medium`
+
+### 7. 项目规则（category: other）
+
+**必须用 python 统计，不得凭感觉判断：**
+
+```bash
+python -c "
+import re
+from pathlib import Path
+text = Path('${CHAPTER_FILE}').read_text(encoding='utf-8')
+cn_chars = len(re.findall(r'[一-鿿]', text))
+print(f'中文字数: {cn_chars}')
+
+# 破折号（——）
+dashes = len(re.findall(r'——', text))
+print(f'破折号: {dashes} 次 (上限 20)')
+
+# "但" 字计数
+but_count = len(re.findall(r'但(?!是)', text))
+print(f'但(非但是): {but_count} 次 (上限 6)')
+
+# "不是X是Y" 模式
+not_is = len(re.findall(r'不是.{1,10}是.{1,10}', text))
+print(f'不是X是Y: {not_is} 次 (上限 1)')
+
+# 句号密度
+periods = len(re.findall(r'。', text))
+per_1000 = periods / max(cn_chars, 1) * 1000
+print(f'句号密度: {per_1000:.1f}/千字 (上限 70)')
+
+# 系统【】格式
+brackets = re.findall(r'【[^】]{1,20}】', text)
+print(f'系统【】: {len(brackets)} 个')
+for b in brackets:
+    print(f'  {b}')
+"
+```
+
+- 破折号（——）≤ 20 次 → 超标 `medium`
+- "但"（非"但是"）≤ 6 次 → 超标 `medium`
+- "不是X是Y" ≤ 1 次 → 超标 `high`
+- 句号密度 ≤ 70/千字 → 超标 `medium`
+- 系统【】格式必须正确（如【系统提示】【任务更新】）→ 格式错误 `medium`
+
+### 8. 节奏（category: pacing）
+
+- 章首是否在前 200-400 字进入冲突/风险/强情绪（网文硬规则）
+- 章节中段是否有节奏脉冲（800-1400 字一波推进，短章至少一次）
+- 章末是否保留未闭合问题或下一步期待锚点（"安全着陆"检查）
+- 场景切换是否有信号（动作/声音/位置变化，而非硬切）
+- 段落长度是否有变化（连续 5 段以上长度相近 = 匀速节奏）
+- severity: 章首无钩子 `high`，其他 `medium`
+
+### 9. 毒点（category: other）
+
+以下 5 类毒点必须逐一检查，命中任一需标记 `high`：
+
+1. **降智推进**：角色忽略常识仅为推进剧情服务
+2. **强行误会**：可一句话说清却长期拖延
+3. **圣母无代价**：无边界原谅高风险对象，缺乏动机/阻力/代价
+4. **工具人配角**：只在功能节点出现，没有独立动机
+5. **双标裁决**：同类行为评价标准不一致且无叙事解释
+
+### 结构化检查清单（必须逐项输出结论）
+
+审查时**必须**逐项检查以下维度，每个维度输出一行结论。无问题也要输出 `pass`，不得跳过。此清单用于提升单次审查覆盖面，不替代 issues 列表。
+
+| 维度 | 检查内容 | 输出格式 |
+|------|----------|----------|
+| 设定一致性 | 角色状态/世界规则/物品属性是否与 state.json 一致（**必须先 bash 查询**） | `[设定]: pass` 或 `[设定]: 发现N个问题(简述)` |
+| 时间线 | 事件顺序/时间跨度是否合理（**必须先读上章结尾**） | `[时间线]: pass` 或 `[时间线]: 发现N个问题(简述)` |
+| 叙事连贯 | 视角是否统一/场景切换是否有过渡 | `[连贯]: pass` 或 `[连贯]: 发现N个问题(简述)` |
+| 角色一致性 | 对话风格/行为动机是否符合人设 | `[角色]: pass` 或 `[角色]: 发现N个问题(简述)` |
+| 逻辑 | 因果关系/行为后果是否合理 | `[逻辑]: pass` 或 `[逻辑]: 发现N个问题(简述)` |
+| AI味-词汇 | 缓缓/淡淡/微微/眸中/瞳孔 密度 | `[AI味-词汇]: pass` 或 `[AI味-词汇]: 发现N个问题(简述)` |
+| AI味-句式 | 三段闭环/同构句/总结句/碎片句 | `[AI味-句式]: pass` 或 `[AI味-句式]: 发现N个问题(简述)` |
+| AI味-叙事 | 匀速节奏/戏剧性反讽/安全着陆 | `[AI味-叙事]: pass` 或 `[AI味-叙事]: 发现N个问题(简述)` |
+| AI味-情感 | 标签化情绪/即时切换 | `[AI味-情感]: pass` 或 `[AI味-情感]: 发现N个问题(简述)` |
+| AI味-对话 | 信息宣讲/书面语 | `[AI味-对话]: pass` 或 `[AI味-对话]: 发现N个问题(简述)` |
+| 项目规则 | 破折号≤20、但≤6、不是X是Y≤1、句号≤70/千字、系统【】格式（**必须 python 统计**） | `[规则]: pass` 或 `[规则]: 发现N个问题(简述)` |
+| 节奏 | 章首钩子/中段脉冲/章末锚点/段长变化 | `[节奏]: pass` 或 `[节奏]: 发现N个问题(简述)` |
+| 毒点 | 降智推进/强行误会/圣母无代价/工具人配角/双标裁决 | `[毒点]: pass` 或 `[毒点]: 发现N个问题(简述)` |
+
+**重要**：检查清单结论输出在 issues 列表之前，作为审查报告的开头部分。清单中发现的问题必须同时体现在 issues 列表中。
 
 ## 6. 边界与禁区
 
