@@ -36,7 +36,12 @@ class _LockedState:
     def __enter__(self) -> dict[str, Any]:
         self._lock = filelock.FileLock(str(self.lock_path), timeout=10)
         self._lock.acquire()
-        self.state = read_json_if_exists(self.state_path) or {}
+        try:
+            self.state = read_json_if_exists(self.state_path) or {}
+        except Exception:
+            # 读取失败时必须释放锁，否则 __exit__ 不会被调用（Python 协议）
+            self._lock.release()
+            raise
         return self.state
 
     def __exit__(self, exc_type, exc, tb) -> bool:
@@ -67,11 +72,24 @@ class StateProjectionWriter:
                 with self._locked_state() as state:
                     progress = state.setdefault("progress", {})
                     chapter_status = progress.setdefault("chapter_status", {})
+                    current = str(chapter_status.get(str(chapter)) or "")
+                    # 已 committed 的章节不允许降级为 rejected（单调递进保护）
+                    if current == "chapter_committed":
+                        return {"applied": False, "writer": "state", "reason": "cannot_downgrade_committed"}
                     chapter_status[str(chapter)] = "chapter_rejected"
             return {"applied": True, "writer": "state", "reason": "commit_rejected_status_updated"}
 
         if status != "accepted":
             return {"applied": False, "writer": "state", "reason": f"unknown_status:{status}"}
+
+        # _project_total_words 读取章节文件，在锁外执行以减少持锁时间
+        # 先读取当前 chapter_status，预计算更新后的总字数
+        projected_total = 0
+        if chapter > 0:
+            disk_state = read_json_if_exists(self.state_path) or {}
+            preview_status = dict((disk_state.get("progress") or {}).get("chapter_status") or {})
+            preview_status[str(chapter)] = "chapter_committed"
+            projected_total = self._project_total_words(preview_status) or 0
 
         with self._locked_state() as state:
             entity_state = state.setdefault("entity_state", {})
@@ -111,7 +129,6 @@ class StateProjectionWriter:
                 progress["current_chapter"] = max(old_current, chapter)
                 progress["current_volume"] = max(1, (chapter - 1) // _CHAPTERS_PER_VOLUME + 1)
 
-                projected_total = self._project_total_words(chapter_status)
                 if projected_total > 0:
                     progress["total_words"] = projected_total
                 else:

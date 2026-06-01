@@ -304,7 +304,6 @@ class StateManager:
                         if current_status and self._chapter_status_rank(pending_status) < self._chapter_status_rank(current_status):
                             continue
                         chapter_status[chapter_key] = pending_status
-                    progress["last_updated"] = self._now_progress_timestamp()
 
                 # v5.1 引入: 强制使用 SQLite 模式，移除大数据字段
                 # 确保 state.json 中不存在这些膨胀字段
@@ -673,24 +672,28 @@ class StateManager:
                 f"无效状态: {status}，有效值: {self.CHAPTER_STATUS_ORDER + [self.REJECTED_CHAPTER_STATUS]}"
             )
 
+        # 注意：此处预检基于内存缓存，save_state() 会重新读取磁盘并做 rank 合并。
+        # 如果磁盘状态已被其他 writer 更新（rank 更高），合并会静默跳过本次变更。
+        # 这是设计行为：合并防止降级，不是 bug。预检只是快速失败优化。
         current = self.get_chapter_status(chapter)
         if current is not None:
             current_idx = self._chapter_status_rank(current)
             new_idx = self._chapter_status_rank(status)
-            if new_idx < current_idx:
+            # 未知/损坏状态（rank -1）允许被任何有效状态覆盖（视为数据修复）
+            if current_idx >= 0 and new_idx < current_idx:
                 raise ValueError(
                     f"章节 {chapter} 状态不可回退: {current} -> {status}"
                 )
-            if new_idx == current_idx:
+            if current_idx >= 0 and new_idx == current_idx:
                 return  # 幂等
 
         self._pending_chapter_status[str(chapter)] = status
         self.save_state()
 
     def _chapter_status_rank(self, status: str) -> int:
-        """返回章节状态的排序等级（rejected=-1, drafted=0, reviewed=1, committed=2）。"""
+        """返回章节状态的排序等级（rejected=-2, unknown=-1, drafted=0, reviewed=1, committed=2）。"""
         if status == self.REJECTED_CHAPTER_STATUS:
-            return -1
+            return -2
         try:
             return self.CHAPTER_STATUS_ORDER.index(status)
         except ValueError:
