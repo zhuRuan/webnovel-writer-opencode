@@ -23,7 +23,7 @@ def _is_valid_project(p: Path) -> bool:
 
 
 def _resolve_project_root(cli_root: str | None) -> Path:
-    """按优先级解析 PROJECT_ROOT：CLI > 环境变量 > 指针文件 > 向上搜索 > 智能搜索 > CWD。"""
+    """按优先级解析 PROJECT_ROOT：CLI > 环境变量 > CWD 向上搜索 > 指针文件 > 智能搜索。"""
     if cli_root:
         return Path(cli_root).resolve()
 
@@ -31,18 +31,9 @@ def _resolve_project_root(cli_root: str | None) -> Path:
     if env:
         return Path(env).resolve()
 
-    # 尝试从 .opencode 指针读取，兼容旧的 .claude 指针
     cwd = Path.cwd()
-    for pointer_dir in (cwd / ".opencode", cwd / ".claude"):
-        pointer = pointer_dir / ".webnovel-current-project"
-        if pointer.is_file():
-            target = pointer.read_text(encoding="utf-8").strip()
-            if target:
-                p = Path(target)
-                if _is_valid_project(p):
-                    return p.resolve()
 
-    # 向上搜索包含 .webnovel/state.json 的目录（最多 10 层）
+    # 优先：从 CWD 向上搜索（用户在书项目目录启动 dashboard 的场景）
     search = cwd
     for _ in range(10):
         if _is_valid_project(search):
@@ -52,8 +43,17 @@ def _resolve_project_root(cli_root: str | None) -> Path:
             break
         search = parent
 
-    # 智能搜索：检查常见书项目位置
-    # 如果 CWD 是 webnovel-writer 仓库，检查同级目录下的书项目
+    # 次选：指针文件（webnovel-writer 仓库内的全局指针）
+    for pointer_dir in (cwd / ".opencode", cwd / ".claude"):
+        pointer = pointer_dir / ".webnovel-current-project"
+        if pointer.is_file():
+            target = pointer.read_text(encoding="utf-8").strip()
+            if target:
+                p = Path(target)
+                if _is_valid_project(p):
+                    return p.resolve()
+
+    # 智能搜索：如果 CWD 是 webnovel-writer 仓库，检查同级目录下的书项目
     if (cwd / ".opencode" / "scripts" / "webnovel.py").is_file():
         for sibling in cwd.parent.iterdir():
             if sibling.name.startswith(".") or sibling.name == "webnovel-writer":
@@ -67,7 +67,7 @@ def _resolve_project_root(cli_root: str | None) -> Path:
                         if _is_valid_project(child):
                             return child.resolve()
 
-    # 最终兜底：当前目录
+    # 最终兜底
     if _is_valid_project(cwd):
         return cwd.resolve()
 
