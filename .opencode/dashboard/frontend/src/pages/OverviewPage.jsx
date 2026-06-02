@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useDashboardContext } from '../App.jsx'
 import { fetchChapterTrend, fetchChapters, fetchStoryRuntimeHealth } from '../api.js'
 import Badge from '../components/Badge.jsx'
@@ -419,7 +419,7 @@ export default function OverviewPage() {
                                         const done = stages[stage] !== undefined
                                         const current = stages._current_stage === stage
                                         return (
-                                            <React.Fragment key={stage}>
+                                            <Fragment key={stage}>
                                                 <div style={{
                                                     width: 16, height: 16, borderRadius: '50%',
                                                     background: current ? 'var(--accent)' : done ? '#4caf50' : '#555',
@@ -429,7 +429,7 @@ export default function OverviewPage() {
                                                 {stage !== 'COMMITTED' && (
                                                     <div style={{ flex: 1, height: 2, background: done ? '#4caf50' : '#333', minWidth: 16 }} />
                                                 )}
-                                            </React.Fragment>
+                                            </Fragment>
                                         )
                                     })}
                                 </div>
