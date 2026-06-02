@@ -1,22 +1,17 @@
 {
-  "version": "v2.8.0-20260602.1458",
+  "version": "v2.8.0-20260602.1512",
   "tag": "v2.8.0",
-  "updated": "2026-06-02T14:58:39Z",
+  "updated": "2026-06-02T15:12:08Z",
   "changelog": [
     {
-      "hash": "60863b6",
-      "type": "chore",
-      "message": "chore: \u79fb\u9664\u4e34\u65f6\u6587\u4ef6 tmp_comments.json"
+      "hash": "8b160ef",
+      "type": "fix",
+      "message": "fix: \u6587\u98ce\u7ea6\u675f\u7f16\u8f91\u5668 4 \u9879\u4fee\u590d \u2014 CSS \u53d8\u91cf\u3001\u5e76\u53d1\u9501\u3001\u7c7b\u578b\u4fdd\u7559\u3001\u6587\u672c\u5220\u9664"
     },
     {
-      "hash": "22704c9",
-      "type": "feat",
-      "message": "feat: \u6587\u98ce\u7ea6\u675f\u53ef\u89c6\u5316\u7f16\u8f91\u5668 \u2014 dashboard \u65b0\u589e /style \u9875\u9762"
-    },
-    {
-      "hash": "c24ede0",
+      "hash": "80c690d",
       "type": "chore",
-      "message": "chore: update manifest to v2.8.0-20260601.1548 [skip ci]"
+      "message": "chore: update manifest to v2.8.0-20260602.1458 [skip ci]"
     }
   ],
   "files": {
@@ -1573,8 +1568,8 @@
       "size": 8662
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "d78de4bbd876222ab3c571f0dbe2b7390e72a8bc8a231adf9cdf37a6a5bd1347",
-      "size": 46874
+      "sha256": "f28d8a84aaaf1c2c6768696b9bacbb0a294e60b7eee328567c3d61de0fa96e44",
+      "size": 47560
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
@@ -1629,8 +1624,8 @@
       "size": 2894
     },
     ".opencode/dashboard/frontend/src/api.js": {
-      "sha256": "e58d34fb8206decb79e0ce45238ecf1a170930b4e861a5c8f51126b5d0498b19",
-      "size": 4067
+      "sha256": "526090d5137fd2e5d1cd197e68e90ca5a0a4a3f32e964984fd3797d367d3783f",
+      "size": 4072
     },
     ".opencode/dashboard/frontend/src/App.jsx": {
       "sha256": "2d4a583cd98d2f3fc55b004506c0223a39c8a488f6763f8a241992a4756e2161",
@@ -1645,8 +1640,8 @@
       "size": 11328
     },
     ".opencode/dashboard/frontend/src/pages/StyleEditorPage.jsx": {
-      "sha256": "08a6d5b4856d0fa331e83f1abe4ec98180157bbd58e7511b03a80e3a23d32350",
-      "size": 12364
+      "sha256": "0debbb3bf28917a574f95e4084c4f23f6c418366408f88412ea6124470402269",
+      "size": 13220
     },
     ".opencode/dashboard/frontend/src/pages/FilesPage.jsx": {
       "sha256": "167257b9ffb6e4e58c3f0f8fd13ee435256645ee855d6f0cd9ff375300718917",
