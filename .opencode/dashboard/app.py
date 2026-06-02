@@ -987,6 +987,12 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             from scripts.security_utils import atomic_write_json as _aw
         _aw(path, data, backup=True)
 
+    def _locked_anti_patterns():
+        """返回 anti_patterns.json 的文件锁上下文管理器。"""
+        import filelock
+        lock_path = _anti_patterns_path().with_suffix(".json.lock")
+        return filelock.FileLock(str(lock_path), timeout=5)
+
     @app.get("/api/style/master-setting")
     def get_master_setting():
         """读取 MASTER_SETTING.json。"""
@@ -1037,30 +1043,31 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
     @app.post("/api/style/anti-patterns")
     def add_anti_pattern(request: dict):
-        """追加新反模式。"""
+        """追加新反模式（带文件锁防并发）。"""
         text = (request.get("text") or "").strip()
         if not text:
             raise HTTPException(400, "text 不能为空")
 
         path = _anti_patterns_path()
-        existing = []
-        if path.is_file():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            existing = data if isinstance(data, list) else []
+        with _locked_anti_patterns():
+            existing = []
+            if path.is_file():
+                data = json.loads(path.read_text(encoding="utf-8"))
+                existing = data if isinstance(data, list) else []
 
-        # 去重
-        seen = {str(item.get("text", "")).strip() for item in existing if isinstance(item, dict)}
-        if text in seen:
-            raise HTTPException(409, "该反模式已存在")
+            # 去重
+            seen = {str(item.get("text", "")).strip() for item in existing if isinstance(item, dict)}
+            if text in seen:
+                raise HTTPException(409, "该反模式已存在")
 
-        entry = {
-            "text": text,
-            "source_table": "dashboard_manual",
-            "source_id": f"manual_{int(time.time())}",
-            "added_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        }
-        existing.append(entry)
-        _atomic_write_json(path, existing)
+            entry = {
+                "text": text,
+                "source_table": "dashboard_manual",
+                "source_id": f"manual_{int(time.time())}",
+                "added_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            }
+            existing.append(entry)
+            _atomic_write_json(path, existing)
 
         try:
             _watcher._dispatch(json.dumps({
@@ -1071,20 +1078,25 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
         return {"ok": True, "entry": entry, "total": len(existing)}
 
-    @app.delete("/api/style/anti-patterns/{index}")
-    def delete_anti_pattern(index: int):
-        """删除指定索引的反模式。"""
+    @app.post("/api/style/anti-patterns/delete")
+    def delete_anti_pattern(request: dict):
+        """按文本内容删除反模式（带文件锁防并发）。"""
+        text = (request.get("text") or "").strip()
+        if not text:
+            raise HTTPException(400, "text 不能为空")
+
         path = _anti_patterns_path()
         if not path.is_file():
             raise HTTPException(404, "anti_patterns.json 不存在")
 
-        data = json.loads(path.read_text(encoding="utf-8"))
-        existing = data if isinstance(data, list) else []
-        if index < 0 or index >= len(existing):
-            raise HTTPException(404, f"索引 {index} 超出范围（共 {len(existing)} 条）")
-
-        removed = existing.pop(index)
-        _atomic_write_json(path, existing)
+        with _locked_anti_patterns():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            existing = data if isinstance(data, list) else []
+            new_list = [item for item in existing
+                        if not (isinstance(item, dict) and str(item.get("text", "")).strip() == text)]
+            if len(new_list) == len(existing):
+                raise HTTPException(404, f"未找到反模式: {text}")
+            _atomic_write_json(path, new_list)
 
         try:
             _watcher._dispatch(json.dumps({
@@ -1093,7 +1105,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         except Exception:
             pass
 
-        return {"ok": True, "removed": removed, "total": len(existing)}
+        return {"ok": True, "removed_text": text, "total": len(new_list)}
 
     # ===========================================================
     # API：运维操作（安全写入口）

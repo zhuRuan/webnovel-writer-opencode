@@ -126,8 +126,8 @@ export function addAntiPattern(text) {
     return apiPost('/api/style/anti-patterns', { text })
 }
 
-export function deleteAntiPattern(index) {
-    return apiDelete(`/api/style/anti-patterns/${index}`)
+export function deleteAntiPattern(text) {
+    return apiPost('/api/style/anti-patterns/delete', { text })
 }
 
 export function subscribeSSE(onMessage, handlers = {}) {
