@@ -1,17 +1,17 @@
 {
-  "version": "v2.8.0-20260602.1611",
+  "version": "v2.8.0-20260602.1620",
   "tag": "v2.8.0",
-  "updated": "2026-06-02T16:11:27Z",
+  "updated": "2026-06-02T16:20:31Z",
   "changelog": [
     {
-      "hash": "97c5770",
+      "hash": "da87cd9",
       "type": "fix",
-      "message": "fix: OverviewPage React.Fragment \u672a\u5bfc\u5165\u5bfc\u81f4 ReferenceError"
+      "message": "fix: dashboard \u9879\u76ee\u6839\u76ee\u5f55\u89e3\u6790\u4f18\u5148\u7ea7 \u2014 CWD \u5411\u4e0a\u641c\u7d22\u4f18\u5148\u4e8e\u6307\u9488\u6587\u4ef6"
     },
     {
-      "hash": "098e24d",
+      "hash": "1169c42",
       "type": "chore",
-      "message": "chore: update manifest to v2.8.0-20260602.1528 [skip ci]"
+      "message": "chore: update manifest to v2.8.0-20260602.1611 [skip ci]"
     }
   ],
   "files": {
@@ -1584,8 +1584,8 @@
       "size": 51
     },
     ".opencode/dashboard/server.py": {
-      "sha256": "3b46fc94186efa636216e38d343009a5cf41cef5980e252499e39750a8bf5d04",
-      "size": 3896
+      "sha256": "7374a17e30234daa77b1cc448858c38c0d90e62b70c4c42194648df42a6402c0",
+      "size": 3868
     },
     ".opencode/dashboard/path_guard.py": {
       "sha256": "6d15ad4b3e386476c64325df2f8141fc2566a281117b63e0eee3cc6a18ef3e44",
