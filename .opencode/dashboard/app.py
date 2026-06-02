@@ -279,8 +279,8 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://127.0.0.1:8765", "http://localhost:8765"],
-        allow_methods=["GET"],
+        allow_origins=["http://127.0.0.1:8765", "http://localhost:8765", "http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
     )
 
@@ -968,6 +968,132 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         alerts.sort(key=lambda a: sev_order.get(a.get("severity", "info"), 2))
 
         return {"alerts": alerts, "updated_at": datetime.now(timezone.utc).isoformat()}
+
+    # ===========================================================
+    # API：文风约束编辑（读写）
+    # ===========================================================
+
+    def _master_setting_path() -> Path:
+        return _get_project_root() / ".story-system" / "MASTER_SETTING.json"
+
+    def _anti_patterns_path() -> Path:
+        return _get_project_root() / ".story-system" / "anti_patterns.json"
+
+    def _atomic_write_json(path: Path, data: Any) -> None:
+        """原子写入 JSON 文件（带备份）。"""
+        try:
+            from security_utils import atomic_write_json as _aw
+        except ImportError:
+            from scripts.security_utils import atomic_write_json as _aw
+        _aw(path, data, backup=True)
+
+    @app.get("/api/style/master-setting")
+    def get_master_setting():
+        """读取 MASTER_SETTING.json。"""
+        path = _master_setting_path()
+        if not path.is_file():
+            raise HTTPException(404, "MASTER_SETTING.json 不存在")
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    @app.put("/api/style/master-setting")
+    def update_master_setting(request: dict):
+        """更新 master_constraints 字段。locked 字段不允许修改。"""
+        path = _master_setting_path()
+        if not path.is_file():
+            raise HTTPException(404, "MASTER_SETTING.json 不存在")
+
+        current = json.loads(path.read_text(encoding="utf-8"))
+        constraints = request.get("master_constraints")
+        if not isinstance(constraints, dict):
+            raise HTTPException(400, "缺少 master_constraints 字段")
+
+        # 检查 locked 字段
+        locked = (current.get("override_policy") or {}).get("locked") or []
+        for key in constraints:
+            if f"master_constraints.{key}" in locked:
+                raise HTTPException(403, f"字段 {key} 已锁定，不允许修改")
+
+        current.setdefault("master_constraints", {}).update(constraints)
+        _atomic_write_json(path, current)
+
+        # 触发 SSE 通知
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "style-updated", "layer": "master-setting", "ts": time.time(),
+            }))
+        except Exception:
+            pass
+
+        return {"ok": True, "master_constraints": current["master_constraints"]}
+
+    @app.get("/api/style/anti-patterns")
+    def get_anti_patterns():
+        """读取 anti_patterns.json。"""
+        path = _anti_patterns_path()
+        if not path.is_file():
+            return {"patterns": []}
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return {"patterns": data if isinstance(data, list) else []}
+
+    @app.post("/api/style/anti-patterns")
+    def add_anti_pattern(request: dict):
+        """追加新反模式。"""
+        text = (request.get("text") or "").strip()
+        if not text:
+            raise HTTPException(400, "text 不能为空")
+
+        path = _anti_patterns_path()
+        existing = []
+        if path.is_file():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            existing = data if isinstance(data, list) else []
+
+        # 去重
+        seen = {str(item.get("text", "")).strip() for item in existing if isinstance(item, dict)}
+        if text in seen:
+            raise HTTPException(409, "该反模式已存在")
+
+        entry = {
+            "text": text,
+            "source_table": "dashboard_manual",
+            "source_id": f"manual_{int(time.time())}",
+            "added_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        }
+        existing.append(entry)
+        _atomic_write_json(path, existing)
+
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "style-updated", "layer": "anti-patterns", "ts": time.time(),
+            }))
+        except Exception:
+            pass
+
+        return {"ok": True, "entry": entry, "total": len(existing)}
+
+    @app.delete("/api/style/anti-patterns/{index}")
+    def delete_anti_pattern(index: int):
+        """删除指定索引的反模式。"""
+        path = _anti_patterns_path()
+        if not path.is_file():
+            raise HTTPException(404, "anti_patterns.json 不存在")
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+        existing = data if isinstance(data, list) else []
+        if index < 0 or index >= len(existing):
+            raise HTTPException(404, f"索引 {index} 超出范围（共 {len(existing)} 条）")
+
+        removed = existing.pop(index)
+        _atomic_write_json(path, existing)
+
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "style-updated", "layer": "anti-patterns", "ts": time.time(),
+            }))
+        except Exception:
+            pass
+
+        return {"ok": True, "removed": removed, "total": len(existing)}
 
     # ===========================================================
     # API：运维操作（安全写入口）

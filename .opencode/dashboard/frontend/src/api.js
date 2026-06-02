@@ -71,6 +71,65 @@ export function fetchFileContent(path) {
     return fetchJSON('/api/files/read', { path })
 }
 
+// --- 写入 helper ---
+
+export async function apiPost(path, body = {}) {
+    const response = await fetch(`${BASE}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    })
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.detail || `${response.status} ${response.statusText}`)
+    }
+    return response.json()
+}
+
+export async function apiPut(path, body = {}) {
+    const response = await fetch(`${BASE}${path}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    })
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.detail || `${response.status} ${response.statusText}`)
+    }
+    return response.json()
+}
+
+export async function apiDelete(path) {
+    const response = await fetch(`${BASE}${path}`, { method: 'DELETE' })
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.detail || `${response.status} ${response.statusText}`)
+    }
+    return response.json()
+}
+
+// --- 文风约束 API ---
+
+export function fetchMasterSetting() {
+    return fetchJSON('/api/style/master-setting')
+}
+
+export function updateMasterSetting(masterConstraints) {
+    return apiPut('/api/style/master-setting', { master_constraints: masterConstraints })
+}
+
+export function fetchAntiPatterns() {
+    return fetchJSON('/api/style/anti-patterns')
+}
+
+export function addAntiPattern(text) {
+    return apiPost('/api/style/anti-patterns', { text })
+}
+
+export function deleteAntiPattern(index) {
+    return apiDelete(`/api/style/anti-patterns/${index}`)
+}
+
 export function subscribeSSE(onMessage, handlers = {}) {
     const { onOpen, onError } = handlers
     const eventSource = new EventSource(`${BASE}/api/events`)

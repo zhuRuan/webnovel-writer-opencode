@@ -5,6 +5,7 @@ import {
     BookmarkIcon,
     ChartBarIcon,
     FolderIcon,
+    PenIcon,
     SlidersIcon,
     TrendingUpIcon,
     UsersIcon,
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
     { to: '/pacing', label: '节奏雷达', icon: TrendingUpIcon },
     { to: '/foreshadowing', label: '伏笔追踪', icon: BookmarkIcon },
     { to: '/files', label: '文档浏览', icon: FolderIcon },
+    { to: '/style', label: '文风约束', icon: PenIcon },
     { to: '/system', label: '系统状态', icon: SlidersIcon },
 ]
 

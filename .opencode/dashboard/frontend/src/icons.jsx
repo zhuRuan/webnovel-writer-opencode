@@ -163,3 +163,15 @@ export function SearchIcon(props) {
         </IconBase>
     )
 }
+
+export function PenIcon(props) {
+    return (
+        <IconBase {...props}>
+            <rect x="3" y="17" width="18" height="2" />
+            <rect x="15" y="3" width="2" height="14" />
+            <rect x="13" y="5" width="2" height="10" />
+            <rect x="11" y="7" width="2" height="6" />
+            <rect x="9" y="9" width="2" height="4" />
+        </IconBase>
+    )
+}
