@@ -1,17 +1,17 @@
 {
-  "version": "v2.8.0-20260602.1528",
+  "version": "v2.8.0-20260602.1611",
   "tag": "v2.8.0",
-  "updated": "2026-06-02T15:28:52Z",
+  "updated": "2026-06-02T16:11:27Z",
   "changelog": [
     {
-      "hash": "9c45b55",
+      "hash": "97c5770",
       "type": "fix",
-      "message": "fix: dashboard \u9879\u76ee\u6839\u76ee\u5f55\u89e3\u6790 \u2014 \u5411\u4e0a\u641c\u7d22 + \u5d4c\u5957\u7ed3\u6784 + \u975e\u4ea4\u4e92\u73af\u5883"
+      "message": "fix: OverviewPage React.Fragment \u672a\u5bfc\u5165\u5bfc\u81f4 ReferenceError"
     },
     {
-      "hash": "891915e",
+      "hash": "098e24d",
       "type": "chore",
-      "message": "chore: update manifest to v2.8.0-20260602.1512 [skip ci]"
+      "message": "chore: update manifest to v2.8.0-20260602.1528 [skip ci]"
     }
   ],
   "files": {
@@ -1652,8 +1652,8 @@
       "size": 19990
     },
     ".opencode/dashboard/frontend/src/pages/OverviewPage.jsx": {
-      "sha256": "dafee4830066fa40e81a804ff103b44aeb7cf464b4637dacda45cdcfb6d5584d",
-      "size": 23676
+      "sha256": "763f12f0be6eadb4b58e6907c61f616d7f9a9ccec54ef1a7db95d5602cfd816d",
+      "size": 23674
     },
     ".opencode/dashboard/frontend/src/pages/SystemPage.jsx": {
       "sha256": "798ef7a5a2c837604afed3657603e62a9f0f12a9fc8ed37fe0ee1f7f75866277",
