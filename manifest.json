@@ -1,22 +1,22 @@
 {
-  "version": "v2.8.0-20260601.1548",
+  "version": "v2.8.0-20260602.1458",
   "tag": "v2.8.0",
-  "updated": "2026-06-01T15:48:10Z",
+  "updated": "2026-06-02T14:58:39Z",
   "changelog": [
     {
-      "hash": "7d0c0e3",
-      "type": "fix",
-      "message": "fix: \u4fee\u590d state_manager/state_projection_writer 6 \u9879\u95ee\u9898"
-    },
-    {
-      "hash": "9bb407a",
-      "type": "fix",
-      "message": "fix: state_manager pending \u673a\u5236 + state_projection_writer \u6587\u4ef6\u9501"
-    },
-    {
-      "hash": "933aa9c",
+      "hash": "60863b6",
       "type": "chore",
-      "message": "chore: update manifest to v2.8.0-20260601.1436 [skip ci]"
+      "message": "chore: \u79fb\u9664\u4e34\u65f6\u6587\u4ef6 tmp_comments.json"
+    },
+    {
+      "hash": "22704c9",
+      "type": "feat",
+      "message": "feat: \u6587\u98ce\u7ea6\u675f\u53ef\u89c6\u5316\u7f16\u8f91\u5668 \u2014 dashboard \u65b0\u589e /style \u9875\u9762"
+    },
+    {
+      "hash": "c24ede0",
+      "type": "chore",
+      "message": "chore: update manifest to v2.8.0-20260601.1548 [skip ci]"
     }
   ],
   "files": {
@@ -1573,8 +1573,8 @@
       "size": 8662
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "3908effe07e2ce09d8b6f11559895446ee012f4b20dc7a0a6a5b7c9105f28c43",
-      "size": 41984
+      "sha256": "d78de4bbd876222ab3c571f0dbe2b7390e72a8bc8a231adf9cdf37a6a5bd1347",
+      "size": 46874
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
@@ -1621,20 +1621,20 @@
       "size": 8580
     },
     ".opencode/dashboard/frontend/src/icons.jsx": {
-      "sha256": "fb25716643b36ffb1707828c34d77c306fe99c9e661df3db2ff4114a14dee4ee",
-      "size": 4699
+      "sha256": "7a3a6541e1b7fe27863a43bf49e72bd5555d8e30ecb78375ad142723599f9919",
+      "size": 5081
     },
     ".opencode/dashboard/frontend/src/main.jsx": {
-      "sha256": "d2c8fa90adeafd3a0d5efc4907a4aa2d561f6202409daf27a9f2cd3972f6cb5b",
-      "size": 2743
+      "sha256": "6ea97c76aff0ad89ce3aaac3ecff6cd83d210d17b7475da0238ec3953b81e295",
+      "size": 2894
     },
     ".opencode/dashboard/frontend/src/api.js": {
-      "sha256": "5645fbb250bdc8d0db00189674488aa237f4787186585ec12d8cbcfab7570066",
-      "size": 2305
+      "sha256": "e58d34fb8206decb79e0ce45238ecf1a170930b4e861a5c8f51126b5d0498b19",
+      "size": 4067
     },
     ".opencode/dashboard/frontend/src/App.jsx": {
-      "sha256": "6bb7de4d06fa372285f28443b325af42edf28a759f7a53fc496cb48785c80888",
-      "size": 3445
+      "sha256": "2d4a583cd98d2f3fc55b004506c0223a39c8a488f6763f8a241992a4756e2161",
+      "size": 3518
     },
     ".opencode/dashboard/frontend/src/index.css": {
       "sha256": "7f9ffcf2db2af27e4848c5f912dd58dae3b02ec188dd3ac33806bd3243bc0fda",
@@ -1643,6 +1643,10 @@
     ".opencode/dashboard/frontend/src/pages/PacingPage.jsx": {
       "sha256": "27f994a2b23ded446d8e21614c745419120779d5fa6f3c9ae42da59a9c40f1aa",
       "size": 11328
+    },
+    ".opencode/dashboard/frontend/src/pages/StyleEditorPage.jsx": {
+      "sha256": "08a6d5b4856d0fa331e83f1abe4ec98180157bbd58e7511b03a80e3a23d32350",
+      "size": 12364
     },
     ".opencode/dashboard/frontend/src/pages/FilesPage.jsx": {
       "sha256": "167257b9ffb6e4e58c3f0f8fd13ee435256645ee855d6f0cd9ff375300718917",
