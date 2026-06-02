@@ -76,12 +76,47 @@ def _resolve_project_root(cli_root: str | None) -> Path:
     sys.exit(1)
 
 
+def _kill_process_on_port(port: int) -> None:
+    """杀掉占用指定端口的进程。"""
+    import subprocess
+    try:
+        if sys.platform == "win32":
+            # Windows: netstat -ano | findstr :port
+            result = subprocess.run(
+                ["netstat", "-ano"], capture_output=True, text=True, timeout=5
+            )
+            for line in result.stdout.splitlines():
+                if f":{port}" in line and "LISTENING" in line:
+                    parts = line.split()
+                    pid = parts[-1]
+                    if pid.isdigit():
+                        print(f"正在终止占用端口 {port} 的进程 PID={pid}...")
+                        subprocess.run(["taskkill", "/PID", pid, "/F"], capture_output=True)
+                        print(f"已终止进程 PID={pid}")
+                        return
+        else:
+            # Linux/Mac: lsof -i :port
+            result = subprocess.run(
+                ["lsof", "-i", f":{port}", "-t"], capture_output=True, text=True, timeout=5
+            )
+            pid = result.stdout.strip()
+            if pid:
+                print(f"正在终止占用端口 {port} 的进程 PID={pid}...")
+                subprocess.run(["kill", pid], capture_output=True)
+                print(f"已终止进程 PID={pid}")
+                return
+        print(f"未找到占用端口 {port} 的进程", file=sys.stderr)
+    except Exception as e:
+        print(f"终止进程失败: {e}", file=sys.stderr)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Webnovel Dashboard Server")
     parser.add_argument("--project-root", type=str, default=None, help="小说项目根目录")
     parser.add_argument("--host", default="127.0.0.1", help="监听地址")
     parser.add_argument("--port", type=int, default=8765, help="监听端口")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
+    parser.add_argument("--kill-existing", action="store_true", help="自动杀掉占用端口的旧进程")
     args = parser.parse_args()
 
     project_root = _resolve_project_root(args.project_root)
@@ -90,6 +125,27 @@ def main():
     # 非交互环境（如 OpenCode CLI）自动禁用浏览器弹出
     if not sys.stdin.isatty():
         args.no_browser = True
+
+    # 检测端口占用
+    import socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind((args.host, args.port))
+        sock.close()
+    except OSError:
+        sock.close()
+        if args.kill_existing:
+            _kill_process_on_port(args.port)
+        else:
+            print(f"ERROR: 端口 {args.port} 已被占用", file=sys.stderr)
+            print(f"", file=sys.stderr)
+            print(f"可能原因：另一个 dashboard 实例正在运行", file=sys.stderr)
+            print(f"", file=sys.stderr)
+            print(f"解决方案：", file=sys.stderr)
+            print(f"  1. 使用 --kill-existing 自动关闭旧进程", file=sys.stderr)
+            print(f"  2. 手动关闭: netstat -ano | findstr :{args.port}", file=sys.stderr)
+            print(f"  3. 使用其他端口: --port 8766", file=sys.stderr)
+            sys.exit(1)
 
     # 延迟导入，以便先处理路径
     import uvicorn
