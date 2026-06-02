@@ -1,17 +1,17 @@
 {
-  "version": "v2.8.0-20260602.1620",
+  "version": "v2.8.0-20260602.1628",
   "tag": "v2.8.0",
-  "updated": "2026-06-02T16:20:31Z",
+  "updated": "2026-06-02T16:28:05Z",
   "changelog": [
     {
-      "hash": "da87cd9",
+      "hash": "1799000",
       "type": "fix",
-      "message": "fix: dashboard \u9879\u76ee\u6839\u76ee\u5f55\u89e3\u6790\u4f18\u5148\u7ea7 \u2014 CWD \u5411\u4e0a\u641c\u7d22\u4f18\u5148\u4e8e\u6307\u9488\u6587\u4ef6"
+      "message": "fix: dashboard \u7aef\u53e3\u51b2\u7a81\u68c0\u6d4b + --kill-existing \u81ea\u52a8\u5173\u95ed\u65e7\u8fdb\u7a0b"
     },
     {
-      "hash": "1169c42",
+      "hash": "f4b382e",
       "type": "chore",
-      "message": "chore: update manifest to v2.8.0-20260602.1611 [skip ci]"
+      "message": "chore: update manifest to v2.8.0-20260602.1620 [skip ci]"
     }
   ],
   "files": {
@@ -1584,8 +1584,8 @@
       "size": 51
     },
     ".opencode/dashboard/server.py": {
-      "sha256": "7374a17e30234daa77b1cc448858c38c0d90e62b70c4c42194648df42a6402c0",
-      "size": 3868
+      "sha256": "cfd45aa489f1a53fcf1e89026ba886c2300c695d6a3c02035fec0bc6dba8c2db",
+      "size": 6360
     },
     ".opencode/dashboard/path_guard.py": {
       "sha256": "6d15ad4b3e386476c64325df2f8141fc2566a281117b63e0eee3cc6a18ef3e44",
