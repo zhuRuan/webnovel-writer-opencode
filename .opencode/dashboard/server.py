@@ -13,8 +13,17 @@ import webbrowser
 from pathlib import Path
 
 
+def _is_valid_project(p: Path) -> bool:
+    """检查是否为有效的书项目目录（排除测试临时目录）。"""
+    if not p.is_dir():
+        return False
+    if ".tmp" in str(p) or "pytest" in str(p) or "test_" in str(p):
+        return False
+    return (p / ".webnovel" / "state.json").is_file()
+
+
 def _resolve_project_root(cli_root: str | None) -> Path:
-    """按优先级解析 PROJECT_ROOT：CLI > 环境变量 > .opencode/.claude 指针 > CWD。"""
+    """按优先级解析 PROJECT_ROOT：CLI > 环境变量 > 指针文件 > 向上搜索 > 智能搜索 > CWD。"""
     if cli_root:
         return Path(cli_root).resolve()
 
@@ -24,21 +33,46 @@ def _resolve_project_root(cli_root: str | None) -> Path:
 
     # 尝试从 .opencode 指针读取，兼容旧的 .claude 指针
     cwd = Path.cwd()
-    pointer = cwd / ".opencode" / ".webnovel-current-project"
-    if not pointer.is_file():
-        pointer = cwd / ".claude" / ".webnovel-current-project"
-    if pointer.is_file():
-        target = pointer.read_text(encoding="utf-8").strip()
-        if target:
-            p = Path(target)
-            if p.is_dir() and (p / ".webnovel" / "state.json").is_file():
-                return p.resolve()
+    for pointer_dir in (cwd / ".opencode", cwd / ".claude"):
+        pointer = pointer_dir / ".webnovel-current-project"
+        if pointer.is_file():
+            target = pointer.read_text(encoding="utf-8").strip()
+            if target:
+                p = Path(target)
+                if _is_valid_project(p):
+                    return p.resolve()
+
+    # 向上搜索包含 .webnovel/state.json 的目录（最多 10 层）
+    search = cwd
+    for _ in range(10):
+        if _is_valid_project(search):
+            return search.resolve()
+        parent = search.parent
+        if parent == search:
+            break
+        search = parent
+
+    # 智能搜索：检查常见书项目位置
+    # 如果 CWD 是 webnovel-writer 仓库，检查同级目录下的书项目
+    if (cwd / ".opencode" / "scripts" / "webnovel.py").is_file():
+        for sibling in cwd.parent.iterdir():
+            if sibling.name.startswith(".") or sibling.name == "webnovel-writer":
+                continue
+            if _is_valid_project(sibling):
+                return sibling.resolve()
+            # 检查嵌套结构：sibling/书名/.webnovel/state.json
+            if sibling.is_dir():
+                for child in sibling.iterdir():
+                    if child.is_dir() and not child.name.startswith("."):
+                        if _is_valid_project(child):
+                            return child.resolve()
 
     # 最终兜底：当前目录
-    if (cwd / ".webnovel" / "state.json").is_file():
+    if _is_valid_project(cwd):
         return cwd.resolve()
 
     print("ERROR: 无法定位 PROJECT_ROOT（需要包含 .webnovel/state.json 的目录）", file=sys.stderr)
+    print("提示: 使用 --project-root 指定路径，或设置 WEBNOVEL_PROJECT_ROOT 环境变量", file=sys.stderr)
     sys.exit(1)
 
 
@@ -52,6 +86,10 @@ def main():
 
     project_root = _resolve_project_root(args.project_root)
     print(f"项目路径: {project_root}")
+
+    # 非交互环境（如 OpenCode CLI）自动禁用浏览器弹出
+    if not sys.stdin.isatty():
+        args.no_browser = True
 
     # 延迟导入，以便先处理路径
     import uvicorn
