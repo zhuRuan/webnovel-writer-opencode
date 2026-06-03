@@ -77,20 +77,22 @@ function MasterSettingTab() {
     const allKeys = Object.keys(constraints)
     const hasChanges = Object.keys(editing).length > 0
 
+    if (!data) return <div className="empty-state">加载中...</div>
+    if (data._error) return <div className="empty-state" style={{ color: 'var(--accent-red)' }}>加载失败: {data._error}</div>
+    if (allKeys.length === 0) return <div className="empty-state">暂无 master_constraints 配置</div>
+
     return (
-        <div>
-            <p style={{ marginBottom: 16, color: 'var(--text-sub)' }}>
-                编辑 <code>master_constraints</code> 字段，对所有章节生效。
-                locked 字段不可修改。
-            </p>
-            {allKeys.length === 0 && !data && <p>加载中...</p>}
-            {allKeys.length === 0 && data?._error && <p style={{ color: 'var(--accent-red)' }}>加载失败: {data._error}</p>}
-            {allKeys.length === 0 && data && !data._error && <p>暂无 master_constraints 配置</p>}
+        <div className="card">
+            <div className="card-header">
+                <span className="card-title">master_constraints</span>
+                <span className="mini-label">对所有章节生效</span>
+            </div>
+            <div className="section-label">字段编辑</div>
             {allKeys.map(key => (
-                <div key={key} style={{ marginBottom: 12 }}>
-                    <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
+                <div key={key} style={{ marginBottom: 10 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontWeight: 700, fontSize: 13 }}>
                         {key}
-                        {locked.includes(key) && <Badge tone="red" style={{ marginLeft: 8 }}>锁定</Badge>}
+                        {locked.includes(key) && <Badge tone="red">锁定</Badge>}
                     </label>
                     <input
                         type="text"
@@ -99,24 +101,21 @@ function MasterSettingTab() {
                         disabled={locked.includes(key)}
                         style={{
                             width: '100%', maxWidth: 480, padding: '6px 10px',
-                            border: '1px solid var(--border-main)', borderRadius: 4,
-                            background: locked.includes(key) ? 'var(--bg-card-2)' : 'var(--bg-card)',
-                            color: 'var(--text-main)',
+                            border: '2px solid var(--border-main)', borderRadius: 0,
+                            background: locked.includes(key) ? 'var(--bg-card-2)' : '#fffef8',
+                            color: 'var(--text-main)', fontWeight: 500,
+                            boxShadow: locked.includes(key) ? 'none' : 'var(--shadow-soft)',
                         }}
                     />
                 </div>
             ))}
             {hasChanges && (
-                <button onClick={handleSave} disabled={saving} style={{
-                    marginTop: 12, padding: '8px 20px', borderRadius: 4,
-                    border: 'none', background: 'var(--accent-blue)', color: '#fff',
-                    cursor: saving ? 'wait' : 'pointer', fontWeight: 500,
-                }}>
+                <button onClick={handleSave} disabled={saving} className="page-btn" style={{ marginTop: 12 }}>
                     {saving ? '保存中...' : '保存'}
                 </button>
             )}
             {msg && (
-                <p style={{ marginTop: 8, color: msg.type === 'error' ? 'var(--accent-red)' : 'var(--accent-green)' }}>
+                <p style={{ marginTop: 8, color: msg.type === 'error' ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 600 }}>
                     {msg.text}
                 </p>
             )}
@@ -167,10 +166,11 @@ function AntiPatternsTab() {
     }
 
     return (
-        <div>
-            <p style={{ marginBottom: 16, color: 'var(--text-sub)' }}>
-                定义绝对不能出现的写法。审查阶段 reviewer agent 会自动检查。
-            </p>
+        <div className="card">
+            <div className="card-header">
+                <span className="card-title">禁止模式</span>
+                <span className="mini-label">审查阶段 reviewer 自动检查</span>
+            </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 <input
                     type="text"
@@ -180,60 +180,55 @@ function AntiPatternsTab() {
                     placeholder="输入新的反模式..."
                     style={{
                         flex: 1, padding: '6px 10px',
-                        border: '1px solid var(--border-main)', borderRadius: 4,
-                        background: 'var(--bg-card)', color: 'var(--text-main)',
+                        border: '2px solid var(--border-main)', borderRadius: 0,
+                        background: '#fffef8', color: 'var(--text-main)', fontWeight: 500,
+                        boxShadow: 'var(--shadow-soft)',
                     }}
                 />
-                <button onClick={handleAdd} disabled={loading || !newText.trim()} style={{
-                    padding: '6px 16px', borderRadius: 4,
-                    border: 'none', background: 'var(--accent-blue)', color: '#fff',
-                    cursor: loading ? 'wait' : 'pointer',
-                }}>
-                    添加
+                <button onClick={handleAdd} disabled={loading || !newText.trim()} className="page-btn">
+                    {loading ? '...' : '添加'}
                 </button>
             </div>
             {msg && (
-                <p style={{ marginBottom: 8, color: msg.type === 'error' ? 'var(--accent-red)' : 'var(--accent-green)' }}>
+                <p style={{ marginBottom: 8, color: msg.type === 'error' ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 600 }}>
                     {msg.text}
                 </p>
             )}
             {patterns.length === 0 ? (
-                <p style={{ color: 'var(--text-sub)' }}>暂无反模式</p>
+                <div className="empty-state compact">暂无反模式</div>
             ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-main)' }}>
-                            <th style={{ textAlign: 'left', padding: '8px 4px' }}>#</th>
-                            <th style={{ textAlign: 'left', padding: '8px 4px' }}>反模式内容</th>
-                            <th style={{ textAlign: 'left', padding: '8px 4px' }}>来源</th>
-                            <th style={{ textAlign: 'right', padding: '8px 4px' }}>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {patterns.map((p, i) => (
-                            <tr key={p.text} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                                <td style={{ padding: '8px 4px', color: 'var(--text-sub)' }}>{i + 1}</td>
-                                <td style={{ padding: '8px 4px' }}>{p.text}</td>
-                                <td style={{ padding: '8px 4px' }}>
-                                    <Badge tone={p.source_table === 'dashboard_manual' ? 'cyan' : 'neutral'}>
-                                        {p.source_table || '手动'}
-                                    </Badge>
-                                </td>
-                                <td style={{ padding: '8px 4px', textAlign: 'right' }}>
-                                    <button onClick={() => handleDelete(p.text)} style={{
-                                        padding: '2px 8px', borderRadius: 3,
-                                        border: '1px solid var(--accent-red)', background: 'transparent',
-                                        color: 'var(--accent-red)', cursor: 'pointer', fontSize: 12,
-                                    }}>
-                                        删除
-                                    </button>
-                                </td>
+                <div className="table-wrap">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>反模式内容</th>
+                                <th>来源</th>
+                                <th style={{ textAlign: 'right' }}>操作</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {patterns.map((p, i) => (
+                                <tr key={p.text}>
+                                    <td style={{ color: 'var(--text-mute)', fontSize: 13 }}>{i + 1}</td>
+                                    <td>{p.text}</td>
+                                    <td>
+                                        <Badge tone={p.source_table === 'dashboard_manual' ? 'cyan' : 'neutral'}>
+                                            {p.source_table || '手动'}
+                                        </Badge>
+                                    </td>
+                                    <td style={{ textAlign: 'right' }}>
+                                        <button onClick={() => handleDelete(p.text)} className="page-btn" style={{ padding: '2px 8px', minHeight: 24, fontSize: 12 }}>
+                                            删除
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
-            <p style={{ marginTop: 12, color: 'var(--text-sub)', fontSize: 13 }}>
+            <p style={{ marginTop: 10, color: 'var(--text-mute)', fontSize: 13, fontWeight: 600 }}>
                 共 {patterns.length} 条反模式
             </p>
         </div>
@@ -276,107 +271,111 @@ function TechniquesTab() {
     }, [techniques, search, categoryFilter])
 
     return (
-        <div>
-            <p style={{ marginBottom: 16, color: 'var(--text-sub)' }}>
-                题材级技法库，写作时通过 BM25 检索自动匹配。共 {techniques.length} 条技法。
-            </p>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div className="card">
+            <div className="card-header">
+                <span className="card-title">写作技法库</span>
+                <Badge tone="blue">{techniques.length} 条技法</Badge>
+            </div>
+            <div className="filter-group">
                 <input
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="搜索技法名称/关键词/摘要..."
                     style={{
-                        flex: 1, padding: '6px 10px',
-                        border: '1px solid var(--border-main)', borderRadius: 4,
-                        background: 'var(--bg-card)', color: 'var(--text-main)',
+                        flex: 1, minWidth: 200, padding: '6px 10px',
+                        border: '2px solid var(--border-main)', borderRadius: 0,
+                        background: '#fffef8', color: 'var(--text-main)', fontWeight: 500,
+                        boxShadow: 'var(--shadow-soft)',
                     }}
                 />
                 <select
                     value={categoryFilter}
-                    onChange={e => setCategoryFilter(e.target.value)}
+                    onChange={e => { setCategoryFilter(e.target.value); setExpanded(-1) }}
                     style={{
-                        padding: '6px 10px', borderRadius: 4,
-                        border: '1px solid var(--border-main)',
-                        background: 'var(--bg-card)', color: 'var(--text-main)',
+                        padding: '6px 10px',
+                        border: '2px solid var(--border-main)', borderRadius: 0,
+                        background: '#fff8e6', color: 'var(--text-main)', fontWeight: 700,
                     }}
                 >
                     <option value="">全部分类</option>
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
             </div>
-            {error && <p style={{ marginBottom: 8, color: 'var(--accent-red)' }}>加载失败: {error}</p>}
-            <p style={{ marginBottom: 8, color: 'var(--text-sub)', fontSize: 13 }}>
+            {error && <p style={{ marginBottom: 8, color: 'var(--accent-red)', fontWeight: 600 }}>加载失败: {error}</p>}
+            <p style={{ marginBottom: 8, color: 'var(--text-mute)', fontSize: 13, fontWeight: 600 }}>
                 {filtered.length} 条结果
             </p>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-main)' }}>
-                        <th style={{ textAlign: 'left', padding: '8px 4px', width: 80 }}>编号</th>
-                        <th style={{ textAlign: 'left', padding: '8px 4px', width: 80 }}>分类</th>
-                        <th style={{ textAlign: 'left', padding: '8px 4px', width: 120 }}>技法名称</th>
-                        <th style={{ textAlign: 'left', padding: '8px 4px' }}>核心摘要</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {filtered.map((t, idx) => (
-                        <tr
-                            key={idx}
-                            onClick={() => setExpanded(expanded === idx ? -1 : idx)}
-                            style={{
-                                cursor: 'pointer',
-                                borderBottom: '1px solid var(--border-soft)',
-                                background: expanded === idx ? 'var(--bg-card-2)' : 'transparent',
-                            }}
-                        >
-                            <td style={{ padding: '8px 4px', fontFamily: 'var(--font-body)', fontSize: 13 }}>{t.id}</td>
-                            <td style={{ padding: '8px 4px' }}>
-                                <Badge tone={CATEGORY_COLORS[t.category] || 'neutral'}>{t.category}</Badge>
-                            </td>
-                            <td style={{ padding: '8px 4px', fontWeight: 500 }}>{t.name}</td>
-                            <td style={{ padding: '8px 4px', color: 'var(--text-sub)', fontSize: 13 }}>
-                                {t.summary}
-                                {expanded === idx && (
-                                    <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-card)', borderRadius: 4, border: '1px solid var(--border-soft)' }}>
-                                        {t.instruction && (
-                                            <div style={{ marginBottom: 8 }}>
-                                                <strong>大模型指令：</strong>
-                                                <p style={{ margin: '4px 0', color: 'var(--text-main)' }}>{t.instruction}</p>
+            {filtered.length === 0 ? (
+                <div className="empty-state compact">无匹配技法</div>
+            ) : (
+                <div className="table-wrap">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: 80 }}>编号</th>
+                                <th style={{ width: 80 }}>分类</th>
+                                <th style={{ width: 120 }}>技法名称</th>
+                                <th>核心摘要</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.map((t, idx) => (
+                                <tr
+                                    key={idx}
+                                    onClick={() => setExpanded(expanded === idx ? -1 : idx)}
+                                    className={expanded === idx ? 'entity-row selected' : 'entity-row'}
+                                >
+                                    <td style={{ fontFamily: 'var(--font-display)', fontSize: 8 }}>{t.id}</td>
+                                    <td><Badge tone={CATEGORY_COLORS[t.category] || 'neutral'}>{t.category}</Badge></td>
+                                    <td style={{ fontWeight: 700 }}>{t.name}</td>
+                                    <td style={{ color: 'var(--text-sub)', fontSize: 13 }}>
+                                        {t.summary}
+                                        {expanded === idx && (
+                                            <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-panel)', border: '2px solid var(--border-soft)', boxShadow: 'var(--shadow-soft)' }}>
+                                                {t.instruction && (
+                                                    <div style={{ marginBottom: 8 }}>
+                                                        <div className="mini-label">大模型指令</div>
+                                                        <p style={{ margin: '4px 0', color: 'var(--text-main)', fontWeight: 500 }}>{t.instruction}</p>
+                                                    </div>
+                                                )}
+                                                {t.keywords && (
+                                                    <div style={{ marginBottom: 8 }}>
+                                                        <div className="mini-label">关键词</div>
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                                                            {t.keywords.split('|').filter(Boolean).map((kw, i) => (
+                                                                <Badge key={i} tone="neutral">{kw.trim()}</Badge>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {t.pitfalls && (
+                                                    <div style={{ marginBottom: 8 }}>
+                                                        <div className="mini-label" style={{ color: 'var(--accent-red)' }}>毒点</div>
+                                                        <p style={{ margin: '4px 0', color: 'var(--accent-red)', fontWeight: 500 }}>{t.pitfalls}</p>
+                                                    </div>
+                                                )}
+                                                {t.positive_example && (
+                                                    <div style={{ marginBottom: 8 }}>
+                                                        <div className="mini-label" style={{ color: 'var(--accent-green)' }}>正例</div>
+                                                        <p style={{ margin: '4px 0', whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{t.positive_example}</p>
+                                                    </div>
+                                                )}
+                                                {t.negative_example && (
+                                                    <div>
+                                                        <div className="mini-label" style={{ color: 'var(--accent-red)' }}>反例</div>
+                                                        <p style={{ margin: '4px 0', whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{t.negative_example}</p>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
-                                        {t.keywords && (
-                                            <div style={{ marginBottom: 8 }}>
-                                                <strong>关键词：</strong>
-                                                {t.keywords.split('|').map((kw, i) => (
-                                                    <Badge key={i} tone="neutral" style={{ marginLeft: 4 }}>{kw.trim()}</Badge>
-                                                ))}
-                                            </div>
-                                        )}
-                                        {t.pitfalls && (
-                                            <div style={{ marginBottom: 8 }}>
-                                                <strong style={{ color: 'var(--accent-red)' }}>毒点：</strong>
-                                                <p style={{ margin: '4px 0', color: 'var(--accent-red)' }}>{t.pitfalls}</p>
-                                            </div>
-                                        )}
-                                        {t.positive_example && (
-                                            <div style={{ marginBottom: 8 }}>
-                                                <strong style={{ color: 'var(--accent-green)' }}>正例：</strong>
-                                                <p style={{ margin: '4px 0', whiteSpace: 'pre-wrap', fontSize: 13 }}>{t.positive_example}</p>
-                                            </div>
-                                        )}
-                                        {t.negative_example && (
-                                            <div>
-                                                <strong style={{ color: 'var(--accent-red)' }}>反例：</strong>
-                                                <p style={{ margin: '4px 0', whiteSpace: 'pre-wrap', fontSize: 13 }}>{t.negative_example}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     )
 }
@@ -414,19 +413,21 @@ function ChapterContractTab() {
     const dynamicContext = detail?.dynamic_context || []
 
     return (
-        <div>
-            <p style={{ marginBottom: 16, color: 'var(--text-sub)' }}>
-                查看章级合同详情，包括写作指令、禁止区域、注入的写作技法。共 {chapters.length} 章。
-            </p>
-            {error && <p style={{ marginBottom: 16, color: 'var(--accent-red)' }}>加载失败: {error}</p>}
+        <div className="card">
+            <div className="card-header">
+                <span className="card-title">章级合同查看器</span>
+                <Badge tone="blue">{chapters.length} 章</Badge>
+            </div>
+            {error && <p style={{ marginBottom: 12, color: 'var(--accent-red)', fontWeight: 600 }}>加载失败: {error}</p>}
             <div style={{ marginBottom: 16 }}>
                 <select
                     value={selected ?? ''}
                     onChange={e => setSelected(Number(e.target.value))}
                     style={{
-                        padding: '6px 10px', borderRadius: 4,
-                        border: '1px solid var(--border-main)',
-                        background: 'var(--bg-card)', color: 'var(--text-main)',
+                        padding: '6px 10px',
+                        border: '2px solid var(--border-main)', borderRadius: 0,
+                        background: '#fff8e6', color: 'var(--text-main)', fontWeight: 700,
+                        minWidth: 280,
                     }}
                 >
                     {chapters.map(ch => (
@@ -437,28 +438,28 @@ function ChapterContractTab() {
                 </select>
             </div>
             {!detail ? (
-                <p style={{ color: 'var(--text-sub)' }}>选择章节查看详情</p>
+                <div className="empty-state compact">选择章节查看详情</div>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* 基本信息 */}
-                    <section style={sectionStyle}>
-                        <h4 style={sectionTitleStyle}>写作指令</h4>
-                        <Field label="目标" value={directive.goal} />
-                        <Field label="时间锚点" value={directive.time_anchor} />
-                        <Field label="时间跨度" value={directive.chapter_span} />
-                        <Field label="故事线" value={directive.strand} />
-                        <Field label="钩子类型" value={directive.hook_type} />
-                        <Field label="钩子强度" value={directive.hook_strength} />
-                        <Field label="章末悬念" value={directive.chapter_end_open_question} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <section className="summary-card">
+                        <div className="mini-label">写作指令</div>
+                        <div className="entity-detail">
+                            <DetailField label="目标" value={directive.goal} />
+                            <DetailField label="时间锚点" value={directive.time_anchor} />
+                            <DetailField label="时间跨度" value={directive.chapter_span} />
+                            <DetailField label="故事线" value={directive.strand} />
+                            <DetailField label="钩子类型" value={directive.hook_type} />
+                            <DetailField label="钩子强度" value={directive.hook_strength} />
+                            <DetailField label="章末悬念" value={directive.chapter_end_open_question} />
+                        </div>
                     </section>
 
-                    {/* 必须覆盖节点 */}
                     {directive.must_cover_nodes?.length > 0 && (
-                        <section style={sectionStyle}>
-                            <h4 style={sectionTitleStyle}>必须覆盖节点</h4>
-                            <ul style={{ margin: 0, paddingLeft: 20 }}>
+                        <section className="summary-card">
+                            <div className="mini-label">必须覆盖节点</div>
+                            <ul style={{ margin: 0, paddingLeft: 18 }}>
                                 {directive.must_cover_nodes.map((node, i) => (
-                                    <li key={i} style={{ marginBottom: 4 }}>
+                                    <li key={i} style={{ marginBottom: 4, fontWeight: 500 }}>
                                         {typeof node === 'object' ? JSON.stringify(node) : String(node)}
                                     </li>
                                 ))}
@@ -466,13 +467,12 @@ function ChapterContractTab() {
                         </section>
                     )}
 
-                    {/* 禁止区域 */}
                     {directive.forbidden_zones?.length > 0 && (
-                        <section style={sectionStyle}>
-                            <h4 style={{ ...sectionTitleStyle, color: 'var(--accent-red)' }}>禁止区域</h4>
-                            <ul style={{ margin: 0, paddingLeft: 20 }}>
+                        <section className="summary-card" style={{ borderColor: 'var(--accent-red)' }}>
+                            <div className="mini-label" style={{ color: 'var(--accent-red)' }}>禁止区域</div>
+                            <ul style={{ margin: 0, paddingLeft: 18 }}>
                                 {directive.forbidden_zones.map((z, i) => (
-                                    <li key={i} style={{ marginBottom: 4, color: 'var(--accent-red)' }}>
+                                    <li key={i} style={{ marginBottom: 4, color: 'var(--accent-red)', fontWeight: 600 }}>
                                         {typeof z === 'object' ? JSON.stringify(z) : String(z)}
                                     </li>
                                 ))}
@@ -480,42 +480,40 @@ function ChapterContractTab() {
                         </section>
                     )}
 
-                    {/* 推理 */}
                     {Object.keys(reasoning).length > 0 && (
-                        <section style={sectionStyle}>
-                            <h4 style={sectionTitleStyle}>推理策略</h4>
-                            <Field label="题材" value={reasoning.genre} />
-                            <Field label="风格优先级" value={reasoning.style_priority} />
-                            <Field label="节奏策略" value={reasoning.pacing_strategy} />
+                        <section className="summary-card">
+                            <div className="mini-label">推理策略</div>
+                            <div className="entity-detail">
+                                <DetailField label="题材" value={reasoning.genre} />
+                                <DetailField label="风格优先级" value={reasoning.style_priority} />
+                                <DetailField label="节奏策略" value={reasoning.pacing_strategy} />
+                            </div>
                         </section>
                     )}
 
-                    {/* 注入的写作技法 */}
                     {dynamicContext.length > 0 && (
-                        <section style={sectionStyle}>
-                            <h4 style={sectionTitleStyle}>注入的写作技法 ({dynamicContext.length})</h4>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '1px solid var(--border-main)' }}>
-                                        <th style={{ textAlign: 'left', padding: '6px 4px' }}>编号</th>
-                                        <th style={{ textAlign: 'left', padding: '6px 4px' }}>分类</th>
-                                        <th style={{ textAlign: 'left', padding: '6px 4px' }}>核心摘要</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {dynamicContext.map((ctx, i) => (
-                                        <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                                            <td style={{ padding: '6px 4px', fontSize: 13 }}>{ctx.编号 || ctx.id || ''}</td>
-                                            <td style={{ padding: '6px 4px' }}>
-                                                <Badge tone={CATEGORY_COLORS[ctx.分类] || 'neutral'}>{ctx.分类 || ctx._table || ''}</Badge>
-                                            </td>
-                                            <td style={{ padding: '6px 4px', fontSize: 13, color: 'var(--text-sub)' }}>
-                                                {ctx.核心摘要 || ctx.summary || ''}
-                                            </td>
+                        <section className="summary-card">
+                            <div className="mini-label">注入的写作技法 ({dynamicContext.length})</div>
+                            <div className="table-wrap" style={{ marginTop: 8 }}>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>编号</th>
+                                            <th>分类</th>
+                                            <th>核心摘要</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {dynamicContext.map((ctx, i) => (
+                                            <tr key={i}>
+                                                <td style={{ fontFamily: 'var(--font-display)', fontSize: 8 }}>{ctx.编号 || ctx.id || ''}</td>
+                                                <td><Badge tone={CATEGORY_COLORS[ctx.分类] || 'neutral'}>{ctx.分类 || ctx._table || ''}</Badge></td>
+                                                <td style={{ fontSize: 13, color: 'var(--text-sub)' }}>{ctx.核心摘要 || ctx.summary || ''}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </section>
                     )}
                 </div>
@@ -524,93 +522,100 @@ function ChapterContractTab() {
     )
 }
 
-function Field({ label, value }) {
+function DetailField({ label, value }) {
     if (value == null || value === '') return null
     return (
-        <div style={{ marginBottom: 6 }}>
-            <span style={{ fontWeight: 500, marginRight: 8 }}>{label}：</span>
-            <span style={{ color: 'var(--text-sub)' }}>{value}</span>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+            <span style={{ fontWeight: 700, fontSize: 13, minWidth: 80, color: 'var(--text-mute)' }}>{label}</span>
+            <span style={{ fontWeight: 500, fontSize: 13 }}>{value}</span>
         </div>
     )
-}
-
-const sectionStyle = {
-    padding: 16, borderRadius: 6,
-    border: '1px solid var(--border-soft)', background: 'var(--bg-card)',
-}
-
-const sectionTitleStyle = {
-    margin: '0 0 12px', fontSize: 14, fontWeight: 600,
 }
 
 /* ── Tab 5: 审查维度 ── */
 
 function ReviewerTab() {
     const [data, setData] = useState(null)
+    const [error, setError] = useState(null)
 
     useEffect(() => {
-        fetchReviewerChecklist().then(setData).catch(() => {})
+        fetchReviewerChecklist().then(setData).catch(e => setError(e.message))
     }, [])
 
     const checklist = data?.checklist || []
     const antiPatterns = data?.anti_patterns || []
 
     return (
-        <div>
-            <p style={{ marginBottom: 16, color: 'var(--text-sub)' }}>
-                审查阶段 reviewer agent 的 13 维度检查清单。每个维度必须逐项输出结论。
-            </p>
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-                <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-main)' }}>
-                        <th style={{ textAlign: 'left', padding: '8px 4px' }}>维度</th>
-                        <th style={{ textAlign: 'left', padding: '8px 4px' }}>检查内容</th>
-                        <th style={{ textAlign: 'left', padding: '8px 4px' }}>输出格式</th>
-                        <th style={{ textAlign: 'center', padding: '8px 4px' }}>必须查询</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {checklist.map((item, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                            <td style={{ padding: '8px 4px', fontWeight: 500, whiteSpace: 'nowrap' }}>{item.dimension}</td>
-                            <td style={{ padding: '8px 4px', fontSize: 13 }}>{item.content}</td>
-                            <td style={{ padding: '8px 4px', fontSize: 13, fontFamily: 'var(--font-body)' }}>
-                                <code style={{ fontSize: 12 }}>{item.format}</code>
-                            </td>
-                            <td style={{ padding: '8px 4px', textAlign: 'center' }}>
-                                {item.must_bash && <Badge tone="amber">bash</Badge>}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-title">审查维度清单</span>
+                    <Badge tone="blue">{checklist.length} 维度</Badge>
+                </div>
+                {error && <p style={{ marginBottom: 8, color: 'var(--accent-red)', fontWeight: 600 }}>加载失败: {error}</p>}
+                {checklist.length === 0 ? (
+                    <div className="empty-state compact">暂无数据</div>
+                ) : (
+                    <div className="table-wrap">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>维度</th>
+                                    <th>检查内容</th>
+                                    <th>输出格式</th>
+                                    <th style={{ textAlign: 'center' }}>查询</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {checklist.map((item, i) => (
+                                    <tr key={i}>
+                                        <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{item.dimension}</td>
+                                        <td style={{ fontSize: 13 }}>{item.content}</td>
+                                        <td style={{ fontFamily: 'var(--font-display)', fontSize: 8 }}>{item.format}</td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            {item.must_bash && <Badge tone="amber">bash</Badge>}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
 
-            <h4 style={{ marginBottom: 12 }}>反模式列表 ({antiPatterns.length})</h4>
-            {antiPatterns.length === 0 ? (
-                <p style={{ color: 'var(--text-sub)' }}>暂无反模式</p>
-            ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-main)' }}>
-                            <th style={{ textAlign: 'left', padding: '8px 4px' }}>#</th>
-                            <th style={{ textAlign: 'left', padding: '8px 4px' }}>反模式内容</th>
-                            <th style={{ textAlign: 'left', padding: '8px 4px' }}>来源</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {antiPatterns.map((p, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                                <td style={{ padding: '8px 4px', color: 'var(--text-sub)' }}>{i + 1}</td>
-                                <td style={{ padding: '8px 4px' }}>{p.text}</td>
-                                <td style={{ padding: '8px 4px' }}>
-                                    <Badge tone="neutral">{p.source_table || '手动'}</Badge>
-                                    {p.source_id && <span style={{ marginLeft: 4, fontSize: 12, color: 'var(--text-sub)' }}>({p.source_id})</span>}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-title">反模式列表</span>
+                    <Badge tone="red">{antiPatterns.length} 条</Badge>
+                </div>
+                {antiPatterns.length === 0 ? (
+                    <div className="empty-state compact">暂无反模式</div>
+                ) : (
+                    <div className="table-wrap">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>反模式内容</th>
+                                    <th>来源</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {antiPatterns.map((p, i) => (
+                                    <tr key={i}>
+                                        <td style={{ color: 'var(--text-mute)', fontSize: 13 }}>{i + 1}</td>
+                                        <td>{p.text}</td>
+                                        <td>
+                                            <Badge tone="neutral">{p.source_table || '手动'}</Badge>
+                                            {p.source_id && <span style={{ marginLeft: 4, fontSize: 12, color: 'var(--text-mute)' }}>({p.source_id})</span>}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }
@@ -621,26 +626,21 @@ export default function StyleEditorPage() {
     const [activeTab, setActiveTab] = useState('master')
 
     return (
-        <div>
-            <h2 style={{ marginBottom: 20 }}>文风约束编辑器</h2>
-            <p style={{ marginBottom: 20, color: 'var(--text-sub)' }}>
+        <div className="dashboard-page">
+            <div className="page-header">
+                <h2>文风约束编辑器</h2>
+            </div>
+            <p style={{ color: 'var(--text-sub)', fontSize: 13 }}>
                 系统有 5 个层级可以插入文风约束，从全局到局部逐级细化。
             </p>
 
             {/* Tab 栏 */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border-main)', paddingBottom: 0 }}>
+            <div className="tab-strip">
                 {TABS.map(tab => (
                     <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
-                        style={{
-                            padding: '8px 16px', border: 'none', borderRadius: '4px 4px 0 0',
-                            background: activeTab === tab.key ? 'var(--accent-blue)' : 'transparent',
-                            color: activeTab === tab.key ? '#fff' : 'var(--text-main)',
-                            cursor: 'pointer', fontWeight: activeTab === tab.key ? 600 : 400,
-                            borderBottom: activeTab === tab.key ? '2px solid var(--accent-blue)' : '2px solid transparent',
-                            marginBottom: -1,
-                        }}
+                        className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
                     >
                         {tab.label}
                     </button>
