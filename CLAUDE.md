@@ -94,25 +94,25 @@ Code is organized as a pipeline — each layer feeds the next:
 
 **Story Contract Engine** — MASTER_SETTING.json is the source of truth. Runtime contracts derive from it per chapter. Core files: `story_system_engine.py`, `story_contracts.py`.
 
-**SSOT Event Sourcing** (v2.8) — Append-only event log (`.story-system/events/*.event.json`) as immutable truth. `publish_event()` is the single write path; `rebuild_state_json()` deterministically replays all 14 event types to rebuild projections. `verify_consistency()` detects drift between state.json and event log. File: `ssot_enforcer.py`.
+**SSOT Event Sourcing** (v2.8) — Append-only event log (`.story-system/events/*.event.json`) as immutable truth. `publish_event()` is the single write path; `rebuild_state_json()` deterministically replays all 14 event types to rebuild projections. `verify_consistency()` detects drift between state.json and event log. File: `ssot_enforcer.py`. `state_manager.py` uses pending queue + filelock + snapshot rollback for atomic writes. `state_projection_writer.py` uses `filelock` to protect state.json read-modify-write.
 
 **Override Contract Engine** (v2.8) — Versioned world rule evolution (e.g., "金丹期不可飞行 → 获得混沌珠后可飞行"). `add_override()` creates new version and supersedes previous. `build_context_hints()` generates AI-injectable context. File: `override_contract_engine.py`.
 
 **Observer→Reflector Pipeline** (v2.8) — Two-stage fact extraction inspired by inkOS. Observer (`observer-agent.md`) extracts free-text facts with no schema constraint (coverage-first). Settler (`observer_settler.py`) parses markdown sections via regex, resolves entity references, validates via Pydantic `StoryEvent`, and outputs `extraction_result.json`. Wired into `webnovel-write` SKILL.md Step 5.1a/5.1b. **Important**: `observer_settler.py` uses try/except ImportError fallback for `__main__` execution — the SKILL.md calls it as `python observer_settler.py` directly.
 
-**Commit Chain** — `chapter_commit_service.py`: `build_commit()` → `apply_projections()` (publishes events to SSOT, then runs EventLogStore + AmendProposalTrigger + 5 projection writers). `event_projection_router.py` determines which writers to invoke. `event_log_store.py` mirrors events to per-chapter JSON + SQLite `story_events` table.
+**Commit Chain** — `chapter_commit_service.py`: `build_commit()` (blocking_count 从 issues 列表自算，通过 `parse_review_output` 归一化，不信任 LLM 原始值) → `apply_projections()` (accepted 章节发布事件到 SSOT + 运行 5 路 projection；rejected 章节只走 state writer 更新 chapter_rejected 状态). `event_projection_router.py` determines which writers to invoke. `event_log_store.py` mirrors events to per-chapter JSON + SQLite `story_events` table.
 
 **Memory System** — Three tiers: working (short-term), plot (mid-term), semantic (long-term). Modules in `data_modules/memory/`: orchestrator, compactor, store, writer, schema, bootstrap, budget.
 
 **DebtTracker** — Foreshadowing tracking with hard constraint blocking. Active debts > 2 triggers debt-aware context budget (auto-allocate 15% tokens to foreshadowing list). Implemented in `data_modules/index_debt_mixin.py` (mixed into `index_manager.py`).
 
-**Review Pipeline** — Two layers: Code Checkers (deterministic, run before LLM, block critical issues) → 6 parallel LLM reviewers (consistency, continuity, OOC, high-point, pacing, reader-pull). Reviewer output processed via `.opencode/scripts/review_pipeline.py`, schema in `data_modules/review_schema.py`.
+**Review Pipeline** — Two layers: Code Checkers (deterministic, run before LLM, block critical issues) → 13-dimension LLM reviewer (设定一致性、时间线、叙事连贯、角色一致性、逻辑、AI味×5、项目规则、节奏、毒点). 结构化检查清单强制逐项输出 pass/问题结论. Reviewer output processed via `.opencode/scripts/review_pipeline.py`, schema in `data_modules/review_schema.py`. 写-修循环最多 3 轮，修复后自查 evidence 子串匹配可跳过重审.
 
 **Markdown Projection Renderer** (v2.8) — Renders 5 human-readable markdown files from `state.json` + `index.db` into `story/` directory. Triggered after `chapter-commit` and `ssot rebuild`. File: `state_projection_renderer.py`.
 
 **Runtime Artifacts** (v2.8) — `context_manager.build_context()` persists `.webnovel/runtime/chapter-NNN.context.json` (full context pack) and `.trace.json` (section inclusion/exclusion decisions) for post-hoc debugging.
 
-**Dashboard** — FastAPI backend (read-only GET endpoints serving project state) + React 19 frontend with ECharts visualization. Backend: `.opencode/dashboard/app.py`. Frontend: `.opencode/dashboard/frontend/`. All SQL queries use parameterized `?` placeholders. CORS restricted to localhost.
+**Dashboard** — FastAPI backend (GET 查询 + 文风约束编辑 PUT/POST/DELETE) + React 19 frontend with ECharts visualization. Backend: `.opencode/dashboard/app.py`. Frontend: `.opencode/dashboard/frontend/`. 文风约束编辑器（`/style`）支持 5 层约束的可视化编辑：全局文风、禁止模式、写作技法、章级合同、审查维度。All SQL queries use parameterized `?` placeholders. CORS restricted to localhost. 项目根目录解析支持 5 级优先级（CLI > 环境变量 > CWD 向上搜索 > 指针文件 > 智能搜索）。
 
 ### OpenCode Integration
 

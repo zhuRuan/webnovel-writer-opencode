@@ -28,7 +28,7 @@
 |----------|------|------|
 | **故事合约引擎** | 维护世界规则的"法律体系" | 总编辑 |
 | **上下文管理** | 每章组装最相关的设定和伏笔 | 责任编辑 |
-| **分层审查** | 6 个维度并行检查章节质量 | 审校团队 |
+| **分层审查** | 13 维度结构化检查章节质量 | 审校团队 |
 | **记忆系统** | 三层记忆压缩和检索 | 资料管理员 |
 | **知识库** | CSV 结构化写作技法和命名规则 | 风格指南 |
 
@@ -124,7 +124,7 @@ RERANK_API_KEY=your_api_key
 | `/webnovel-heal` | 修复问题章节 | 诊断修复 |
 | `/webnovel-export` | 导出正文 | 分发备份 |
 | `/webnovel-publish` | 发布番茄小说 | 平台上线 |
-| `/webnovel-dashboard` | 可视化看板 | 全局监控 |
+| `/webnovel-dashboard` | 可视化看板 + 文风约束编辑 | 全局监控 + 文风管理 |
 | `/webnovel-query` | 查询设定 | 快速检索 |
 
 正如《C++编程思想》中所说："代码的清晰是优秀软件的基石。" 每个命令都设计为自解释的——你只需要告诉系统"做什么"，它会自动处理"怎么做"。
@@ -155,7 +155,7 @@ webnovel-writer/                  # 仓库根目录（OpenCode 工作区）
 │   ├── agents/                   # Agent 定义
 │   │   ├── context-agent.md      # 上下文搜集 Agent
 │   │   ├── data-agent.md         # 数据处理 Agent
-│   │   ├── reviewer.md           # 审查 Agent（6 维度并行）
+│   │   ├── reviewer.md           # 审查 Agent（13 维度结构化检查）
 │   │   └── deconstruction-agent.md # 作品解构 Agent
 │   │
 │   ├── skills/                   # 13 个 Skills（webnovel-*）
@@ -208,7 +208,7 @@ webnovel-writer/                  # 仓库根目录（OpenCode 工作区）
 | **Override 合约引擎** | `override_contract_engine.py` | 世界规则版本化演进 + 上下文提示生成 |
 | **Observer→Reflector** | `observer_settler.py` | 双段事实提取——自由文本提取+Pydantic Schema 校验 |
 | **记忆系统** | `memory/orchestrator.py` | 三层记忆（工作/情节/语义）+ 压缩编排 |
-| **审查管线** | `review_pipeline.py` | Code Checker 预处理 → 6 个并行 LLM 审查 |
+| **审查管线** | `review_pipeline.py` | Code Checker 预处理 → 13 维度结构化审查（最多 3 轮收敛） |
 | **Graph-RAG** | `entity_linker.py` | 实体关系图谱 + SQLite 持久化 |
 | **DebtTracker** | `index_debt_mixin.py` | 伏笔创建 → 偿还 → 硬约束阻塞 |
 | **发布模块** | `publisher/` | Playwright 浏览器自动化 + HTTP API |
