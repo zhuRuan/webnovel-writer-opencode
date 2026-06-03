@@ -1,22 +1,17 @@
 {
-  "version": "v2.8.0-20260603.1427",
+  "version": "v2.8.0-20260603.1453",
   "tag": "v2.8.0",
-  "updated": "2026-06-03T14:27:57Z",
+  "updated": "2026-06-03T14:53:04Z",
   "changelog": [
     {
-      "hash": "33e6a82",
-      "type": "fix",
-      "message": "fix: StyleEditorPage UI \u7edf\u4e00 \u2014 \u5e94\u7528\u770b\u677f CSS \u7c7b"
+      "hash": "7346768",
+      "type": "docs",
+      "message": "docs: \u66f4\u65b0\u6587\u6863 \u2014 Dashboard \u6587\u98ce\u7f16\u8f91\u5668\u300113 \u7ef4\u5ea6\u5ba1\u67e5\u3001pending \u673a\u5236"
     },
     {
-      "hash": "b707baa",
-      "type": "fix",
-      "message": "fix: \u6587\u98ce\u7f16\u8f91\u5668\u5269\u4f59\u95ee\u9898 \u2014 CSV \u5f02\u5e38\u5904\u7406\u3001\u7ae0\u8282\u6392\u5e8f\u3001\u9519\u8bef\u72b6\u6001"
-    },
-    {
-      "hash": "5f5aab8",
+      "hash": "5a2478a",
       "type": "chore",
-      "message": "chore: update manifest to v2.8.0-20260603.1412 [skip ci]"
+      "message": "chore: update manifest to v2.8.0-20260603.1427 [skip ci]"
     }
   ],
   "files": {
@@ -93,8 +88,8 @@
       "size": 8695
     },
     ".opencode/skills/webnovel-dashboard/SKILL.md": {
-      "sha256": "2a681f625b6b2f3b1d105419c237623cafce28c2ea24acf2caf555c1cdb956fc",
-      "size": 2855
+      "sha256": "7bfec0cd802e6a504a57cc79d66d43bba097130281f9fbca03d663a5e84e0b8d",
+      "size": 5001
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
       "sha256": "8ab14088472271affe733b28c27a8b60d3595fc260602b27b46fccbb789345c5",
