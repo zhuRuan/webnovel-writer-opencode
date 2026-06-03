@@ -1126,26 +1126,29 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                     csv_path = candidate
                     break
         if not csv_path.is_file():
-            return {"techniques": []}
+            return {"techniques": [], "error": f"CSV 文件不存在: {csv_path.name}"}
 
         import csv as csv_mod
         techniques = []
-        with open(csv_path, "r", encoding="utf-8-sig") as f:
-            reader = csv_mod.DictReader(f)
-            for row in reader:
-                techniques.append({
-                    "id": row.get("编号", ""),
-                    "category": row.get("分类", ""),
-                    "name": row.get("技法名称", ""),
-                    "summary": row.get("核心摘要", ""),
-                    "instruction": row.get("大模型指令", ""),
-                    "keywords": row.get("关键词", ""),
-                    "pitfalls": row.get("毒点", ""),
-                    "positive_example": row.get("正例", ""),
-                    "negative_example": row.get("反例", ""),
-                    "applicable_genre": row.get("适用题材", ""),
-                    "scene": row.get("适用场景", ""),
-                })
+        try:
+            with open(csv_path, "r", encoding="utf-8-sig") as f:
+                reader = csv_mod.DictReader(f)
+                for row in reader:
+                    techniques.append({
+                        "id": row.get("编号", ""),
+                        "category": row.get("分类", ""),
+                        "name": row.get("技法名称", ""),
+                        "summary": row.get("核心摘要", ""),
+                        "instruction": row.get("大模型指令", ""),
+                        "keywords": row.get("关键词", ""),
+                        "pitfalls": row.get("毒点", ""),
+                        "positive_example": row.get("正例", ""),
+                        "negative_example": row.get("反例", ""),
+                        "applicable_genre": row.get("适用题材", ""),
+                        "scene": row.get("适用场景", ""),
+                    })
+        except Exception as e:
+            return {"techniques": [], "error": f"CSV 读取失败: {e}"}
         return {"techniques": techniques}
 
     @app.get("/api/style/chapters")
@@ -1157,7 +1160,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
         import re as re_mod
         result = []
-        for f in sorted(chapters_dir.glob("chapter_*.json")):
+        for f in sorted(chapters_dir.glob("chapter_*.json"), key=lambda p: int(re_mod.search(r"(\d+)", p.name).group(1)) if re_mod.search(r"(\d+)", p.name) else 0):
             m = re_mod.search(r"chapter_(\d+)\.json$", f.name)
             if not m:
                 continue

@@ -244,12 +244,15 @@ function AntiPatternsTab() {
 
 function TechniquesTab() {
     const [techniques, setTechniques] = useState([])
+    const [error, setError] = useState(null)
     const [search, setSearch] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('')
-    const [expanded, setExpanded] = useState(null)
+    const [expanded, setExpanded] = useState(-1)
 
     useEffect(() => {
-        fetchTechniques().then(d => setTechniques(d.techniques || [])).catch(() => {})
+        fetchTechniques()
+            .then(d => { setTechniques(d.techniques || []); if (d.error) setError(d.error) })
+            .catch(e => setError(e.message))
     }, [])
 
     const categories = useMemo(() => {
@@ -302,6 +305,7 @@ function TechniquesTab() {
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
             </div>
+            {error && <p style={{ marginBottom: 8, color: 'var(--accent-red)' }}>加载失败: {error}</p>}
             <p style={{ marginBottom: 8, color: 'var(--text-sub)', fontSize: 13 }}>
                 {filtered.length} 条结果
             </p>
@@ -315,14 +319,14 @@ function TechniquesTab() {
                     </tr>
                 </thead>
                 <tbody>
-                    {filtered.map(t => (
+                    {filtered.map((t, idx) => (
                         <tr
-                            key={t.id}
-                            onClick={() => setExpanded(expanded === t.id ? null : t.id)}
+                            key={idx}
+                            onClick={() => setExpanded(expanded === idx ? -1 : idx)}
                             style={{
                                 cursor: 'pointer',
                                 borderBottom: '1px solid var(--border-soft)',
-                                background: expanded === t.id ? 'var(--bg-card-2)' : 'transparent',
+                                background: expanded === idx ? 'var(--bg-card-2)' : 'transparent',
                             }}
                         >
                             <td style={{ padding: '8px 4px', fontFamily: 'var(--font-body)', fontSize: 13 }}>{t.id}</td>
@@ -332,7 +336,7 @@ function TechniquesTab() {
                             <td style={{ padding: '8px 4px', fontWeight: 500 }}>{t.name}</td>
                             <td style={{ padding: '8px 4px', color: 'var(--text-sub)', fontSize: 13 }}>
                                 {t.summary}
-                                {expanded === t.id && (
+                                {expanded === idx && (
                                     <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-card)', borderRadius: 4, border: '1px solid var(--border-soft)' }}>
                                         {t.instruction && (
                                             <div style={{ marginBottom: 8 }}>
@@ -383,13 +387,16 @@ function ChapterContractTab() {
     const [chapters, setChapters] = useState([])
     const [selected, setSelected] = useState(null)
     const [detail, setDetail] = useState(null)
+    const [error, setError] = useState(null)
 
     useEffect(() => {
-        fetchChapterContracts().then(d => {
-            const list = d.chapters || []
-            setChapters(list)
-            if (list.length > 0) setSelected(list[list.length - 1].chapter)
-        }).catch(() => {})
+        fetchChapterContracts()
+            .then(d => {
+                const list = d.chapters || []
+                setChapters(list)
+                if (list.length > 0) setSelected(list[list.length - 1].chapter)
+            })
+            .catch(e => setError(e.message))
     }, [])
 
     useEffect(() => {
@@ -411,6 +418,7 @@ function ChapterContractTab() {
             <p style={{ marginBottom: 16, color: 'var(--text-sub)' }}>
                 查看章级合同详情，包括写作指令、禁止区域、注入的写作技法。共 {chapters.length} 章。
             </p>
+            {error && <p style={{ marginBottom: 16, color: 'var(--accent-red)' }}>加载失败: {error}</p>}
             <div style={{ marginBottom: 16 }}>
                 <select
                     value={selected ?? ''}
