@@ -130,6 +130,22 @@ export function deleteAntiPattern(text) {
     return apiPost('/api/style/anti-patterns/delete', { text })
 }
 
+export function fetchTechniques() {
+    return fetchJSON('/api/style/techniques')
+}
+
+export function fetchChapterContracts() {
+    return fetchJSON('/api/style/chapters')
+}
+
+export function fetchChapterContract(chapter) {
+    return fetchJSON(`/api/style/chapters/${chapter}`)
+}
+
+export function fetchReviewerChecklist() {
+    return fetchJSON('/api/style/reviewer-checklist')
+}
+
 export function subscribeSSE(onMessage, handlers = {}) {
     const { onOpen, onError } = handlers
     const eventSource = new EventSource(`${BASE}/api/events`)

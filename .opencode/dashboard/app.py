@@ -1108,6 +1108,119 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         return {"ok": True, "removed_text": text, "total": len(new_list)}
 
     # ===========================================================
+    # API：文风约束只读数据
+    # ===========================================================
+
+    @app.get("/api/style/techniques")
+    def get_techniques():
+        """读取写作技法 CSV。"""
+        csv_path = _get_project_root().parent.parent / ".opencode" / "references" / "csv" / "写作技法.csv"
+        # 也检查仓库根目录下的路径
+        if not csv_path.is_file():
+            for candidate in [
+                _get_project_root() / ".opencode" / "references" / "csv" / "写作技法.csv",
+                Path.cwd() / ".opencode" / "references" / "csv" / "写作技法.csv",
+            ]:
+                if candidate.is_file():
+                    csv_path = candidate
+                    break
+        if not csv_path.is_file():
+            return {"techniques": []}
+
+        import csv as csv_mod
+        techniques = []
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv_mod.DictReader(f)
+            for row in reader:
+                techniques.append({
+                    "id": row.get("编号", ""),
+                    "category": row.get("分类", ""),
+                    "name": row.get("技法名称", ""),
+                    "summary": row.get("核心摘要", ""),
+                    "instruction": row.get("大模型指令", ""),
+                    "keywords": row.get("关键词", ""),
+                    "pitfalls": row.get("毒点", ""),
+                    "positive_example": row.get("正例", ""),
+                    "negative_example": row.get("反例", ""),
+                    "applicable_genre": row.get("适用题材", ""),
+                    "scene": row.get("适用场景", ""),
+                })
+        return {"techniques": techniques}
+
+    @app.get("/api/style/chapters")
+    def list_chapter_contracts():
+        """列出所有章级合同摘要。"""
+        chapters_dir = _get_project_root() / ".story-system" / "chapters"
+        if not chapters_dir.is_dir():
+            return {"chapters": []}
+
+        import re as re_mod
+        result = []
+        for f in sorted(chapters_dir.glob("chapter_*.json")):
+            m = re_mod.search(r"chapter_(\d+)\.json$", f.name)
+            if not m:
+                continue
+            ch_num = int(m.group(1))
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                directive = data.get("chapter_directive") or {}
+                result.append({
+                    "chapter": ch_num,
+                    "goal": str(directive.get("goal", ""))[:100],
+                    "time_anchor": directive.get("time_anchor", ""),
+                    "strand": directive.get("strand", ""),
+                    "hook_type": directive.get("hook_type", ""),
+                    "hook_strength": directive.get("hook_strength", ""),
+                })
+            except Exception:
+                result.append({"chapter": ch_num, "goal": "(读取失败)", "time_anchor": "", "strand": "", "hook_type": "", "hook_strength": ""})
+        return {"chapters": result}
+
+    @app.get("/api/style/chapters/{chapter}")
+    def get_chapter_contract(chapter: int):
+        """读取单章合同详情。"""
+        chapters_dir = _get_project_root() / ".story-system" / "chapters"
+        if not chapters_dir.is_dir():
+            raise HTTPException(404, "章级合同目录不存在")
+
+        # 尝试多种格式
+        for pattern in [f"chapter_{chapter:03d}.json", f"chapter_{chapter:04d}.json", f"chapter_{chapter}.json"]:
+            path = chapters_dir / pattern
+            if path.is_file():
+                return json.loads(path.read_text(encoding="utf-8"))
+
+        raise HTTPException(404, f"第 {chapter} 章合同不存在")
+
+    @app.get("/api/style/reviewer-checklist")
+    def get_reviewer_checklist():
+        """读取审查维度清单。"""
+        checklist = [
+            {"dimension": "设定一致性", "content": "角色状态/世界规则/物品属性是否与 state.json 一致", "format": "[设定]: pass 或 发现N个问题(简述)", "must_bash": True},
+            {"dimension": "时间线", "content": "事件顺序/时间跨度是否合理", "format": "[时间线]: pass 或 发现N个问题(简述)", "must_bash": True},
+            {"dimension": "叙事连贯", "content": "视角是否统一/场景切换是否有过渡", "format": "[连贯]: pass 或 发现N个问题(简述)", "must_bash": False},
+            {"dimension": "角色一致性", "content": "对话风格/行为动机是否符合人设", "format": "[角色]: pass 或 发现N个问题(简述)", "must_bash": False},
+            {"dimension": "逻辑", "content": "因果关系/行为后果是否合理", "format": "[逻辑]: pass 或 发现N个问题(简述)", "must_bash": False},
+            {"dimension": "AI味-词汇", "content": "缓缓/淡淡/微微/眸中/瞳孔 密度", "format": "[AI味-词汇]: pass 或 发现N个问题(简述)", "must_bash": False},
+            {"dimension": "AI味-句式", "content": "三段闭环/同构句/总结句/碎片句", "format": "[AI味-句式]: pass 或 发现N个问题(简述)", "must_bash": False},
+            {"dimension": "AI味-叙事", "content": "匀速节奏/戏剧性反讽/安全着陆", "format": "[AI味-叙事]: pass 或 发现N个问题(简述)", "must_bash": False},
+            {"dimension": "AI味-情感", "content": "标签化情绪/即时切换", "format": "[AI味-情感]: pass 或 发现N个问题(简述)", "must_bash": False},
+            {"dimension": "AI味-对话", "content": "信息宣讲/书面语", "format": "[AI味-对话]: pass 或 发现N个问题(简述)", "must_bash": False},
+            {"dimension": "项目规则", "content": "破折号≤20、但≤6、不是X是Y≤1、句号≤70/千字、系统【】格式", "format": "[规则]: pass 或 发现N个问题(简述)", "must_bash": True},
+            {"dimension": "节奏", "content": "章首钩子/中段脉冲/章末锚点/段长变化", "format": "[节奏]: pass 或 发现N个问题(简述)", "must_bash": False},
+            {"dimension": "毒点", "content": "降智推进/强行误会/圣母无代价/工具人配角/双标裁决", "format": "[毒点]: pass 或 发现N个问题(简述)", "must_bash": False},
+        ]
+        # 也返回 anti_patterns
+        ap_path = _anti_patterns_path()
+        anti_patterns = []
+        if ap_path.is_file():
+            try:
+                data = json.loads(ap_path.read_text(encoding="utf-8"))
+                anti_patterns = data if isinstance(data, list) else []
+            except Exception:
+                pass
+        return {"checklist": checklist, "anti_patterns": anti_patterns}
+
+    # ===========================================================
     # API：运维操作（安全写入口）
     # ===========================================================
 

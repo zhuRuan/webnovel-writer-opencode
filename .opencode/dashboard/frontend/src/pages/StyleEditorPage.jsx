@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useDashboardContext } from '../App.jsx'
 import Badge from '../components/Badge.jsx'
 import {
@@ -7,6 +7,10 @@ import {
     fetchAntiPatterns,
     addAntiPattern,
     deleteAntiPattern,
+    fetchTechniques,
+    fetchChapterContracts,
+    fetchChapterContract,
+    fetchReviewerChecklist,
 } from '../api.js'
 
 const TABS = [
@@ -16,6 +20,11 @@ const TABS = [
     { key: 'chapter', label: '章级合同' },
     { key: 'reviewer', label: '审查维度' },
 ]
+
+const CATEGORY_COLORS = {
+    '对话': 'blue', '情感': 'purple', '场景': 'green',
+    '节奏': 'amber', '战斗': 'red', '叙事': 'cyan',
+}
 
 /* ── Tab 1: 全局文风 ── */
 
@@ -33,7 +42,6 @@ function MasterSettingTab() {
     const locked = (data?.override_policy?.locked || []).map(s => s.replace('master_constraints.', ''))
 
     const handleChange = (key, rawValue) => {
-        // 保留原始类型：数字/布尔/对象尝试 JSON.parse，失败则存字符串
         const original = constraints[key]
         let parsed = rawValue
         if (typeof original === 'number' || typeof original === 'boolean') {
@@ -99,15 +107,11 @@ function MasterSettingTab() {
                 </div>
             ))}
             {hasChanges && (
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    style={{
-                        marginTop: 12, padding: '8px 20px', borderRadius: 4,
-                        border: 'none', background: 'var(--accent-blue)', color: '#fff',
-                        cursor: saving ? 'wait' : 'pointer', fontWeight: 500,
-                    }}
-                >
+                <button onClick={handleSave} disabled={saving} style={{
+                    marginTop: 12, padding: '8px 20px', borderRadius: 4,
+                    border: 'none', background: 'var(--accent-blue)', color: '#fff',
+                    cursor: saving ? 'wait' : 'pointer', fontWeight: 500,
+                }}>
                     {saving ? '保存中...' : '保存'}
                 </button>
             )}
@@ -180,15 +184,11 @@ function AntiPatternsTab() {
                         background: 'var(--bg-card)', color: 'var(--text-main)',
                     }}
                 />
-                <button
-                    onClick={handleAdd}
-                    disabled={loading || !newText.trim()}
-                    style={{
-                        padding: '6px 16px', borderRadius: 4,
-                        border: 'none', background: 'var(--accent-blue)', color: '#fff',
-                        cursor: loading ? 'wait' : 'pointer',
-                    }}
-                >
+                <button onClick={handleAdd} disabled={loading || !newText.trim()} style={{
+                    padding: '6px 16px', borderRadius: 4,
+                    border: 'none', background: 'var(--accent-blue)', color: '#fff',
+                    cursor: loading ? 'wait' : 'pointer',
+                }}>
                     添加
                 </button>
             </div>
@@ -220,14 +220,11 @@ function AntiPatternsTab() {
                                     </Badge>
                                 </td>
                                 <td style={{ padding: '8px 4px', textAlign: 'right' }}>
-                                    <button
-                                        onClick={() => handleDelete(p.text)}
-                                        style={{
-                                            padding: '2px 8px', borderRadius: 3,
-                                            border: '1px solid var(--accent-red)', background: 'transparent',
-                                            color: 'var(--accent-red)', cursor: 'pointer', fontSize: 12,
-                                        }}
-                                    >
+                                    <button onClick={() => handleDelete(p.text)} style={{
+                                        padding: '2px 8px', borderRadius: 3,
+                                        border: '1px solid var(--accent-red)', background: 'transparent',
+                                        color: 'var(--accent-red)', cursor: 'pointer', fontSize: 12,
+                                    }}>
                                         删除
                                     </button>
                                 </td>
@@ -243,15 +240,364 @@ function AntiPatternsTab() {
     )
 }
 
-/* ── Tab 3-5: 只读展示 ── */
+/* ── Tab 3: 写作技法 ── */
 
-function ReadOnlyTab({ title, description }) {
+function TechniquesTab() {
+    const [techniques, setTechniques] = useState([])
+    const [search, setSearch] = useState('')
+    const [categoryFilter, setCategoryFilter] = useState('')
+    const [expanded, setExpanded] = useState(null)
+
+    useEffect(() => {
+        fetchTechniques().then(d => setTechniques(d.techniques || [])).catch(() => {})
+    }, [])
+
+    const categories = useMemo(() => {
+        const cats = new Set(techniques.map(t => t.category).filter(Boolean))
+        return Array.from(cats).sort()
+    }, [techniques])
+
+    const filtered = useMemo(() => {
+        let list = techniques
+        if (categoryFilter) list = list.filter(t => t.category === categoryFilter)
+        if (search) {
+            const q = search.toLowerCase()
+            list = list.filter(t =>
+                (t.name || '').toLowerCase().includes(q) ||
+                (t.summary || '').toLowerCase().includes(q) ||
+                (t.keywords || '').toLowerCase().includes(q) ||
+                (t.id || '').toLowerCase().includes(q)
+            )
+        }
+        return list
+    }, [techniques, search, categoryFilter])
+
     return (
         <div>
-            <p style={{ marginBottom: 12, color: 'var(--text-sub)' }}>{description}</p>
-            <p style={{ color: 'var(--text-sub)', fontStyle: 'italic' }}>
-                此层级暂不支持在线编辑，请通过 CLI 或直接编辑文件。
+            <p style={{ marginBottom: 16, color: 'var(--text-sub)' }}>
+                题材级技法库，写作时通过 BM25 检索自动匹配。共 {techniques.length} 条技法。
             </p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="搜索技法名称/关键词/摘要..."
+                    style={{
+                        flex: 1, padding: '6px 10px',
+                        border: '1px solid var(--border-main)', borderRadius: 4,
+                        background: 'var(--bg-card)', color: 'var(--text-main)',
+                    }}
+                />
+                <select
+                    value={categoryFilter}
+                    onChange={e => setCategoryFilter(e.target.value)}
+                    style={{
+                        padding: '6px 10px', borderRadius: 4,
+                        border: '1px solid var(--border-main)',
+                        background: 'var(--bg-card)', color: 'var(--text-main)',
+                    }}
+                >
+                    <option value="">全部分类</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+            </div>
+            <p style={{ marginBottom: 8, color: 'var(--text-sub)', fontSize: 13 }}>
+                {filtered.length} 条结果
+            </p>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-main)' }}>
+                        <th style={{ textAlign: 'left', padding: '8px 4px', width: 80 }}>编号</th>
+                        <th style={{ textAlign: 'left', padding: '8px 4px', width: 80 }}>分类</th>
+                        <th style={{ textAlign: 'left', padding: '8px 4px', width: 120 }}>技法名称</th>
+                        <th style={{ textAlign: 'left', padding: '8px 4px' }}>核心摘要</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {filtered.map(t => (
+                        <tr
+                            key={t.id}
+                            onClick={() => setExpanded(expanded === t.id ? null : t.id)}
+                            style={{
+                                cursor: 'pointer',
+                                borderBottom: '1px solid var(--border-soft)',
+                                background: expanded === t.id ? 'var(--bg-card-2)' : 'transparent',
+                            }}
+                        >
+                            <td style={{ padding: '8px 4px', fontFamily: 'var(--font-body)', fontSize: 13 }}>{t.id}</td>
+                            <td style={{ padding: '8px 4px' }}>
+                                <Badge tone={CATEGORY_COLORS[t.category] || 'neutral'}>{t.category}</Badge>
+                            </td>
+                            <td style={{ padding: '8px 4px', fontWeight: 500 }}>{t.name}</td>
+                            <td style={{ padding: '8px 4px', color: 'var(--text-sub)', fontSize: 13 }}>
+                                {t.summary}
+                                {expanded === t.id && (
+                                    <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-card)', borderRadius: 4, border: '1px solid var(--border-soft)' }}>
+                                        {t.instruction && (
+                                            <div style={{ marginBottom: 8 }}>
+                                                <strong>大模型指令：</strong>
+                                                <p style={{ margin: '4px 0', color: 'var(--text-main)' }}>{t.instruction}</p>
+                                            </div>
+                                        )}
+                                        {t.keywords && (
+                                            <div style={{ marginBottom: 8 }}>
+                                                <strong>关键词：</strong>
+                                                {t.keywords.split('|').map((kw, i) => (
+                                                    <Badge key={i} tone="neutral" style={{ marginLeft: 4 }}>{kw.trim()}</Badge>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {t.pitfalls && (
+                                            <div style={{ marginBottom: 8 }}>
+                                                <strong style={{ color: 'var(--accent-red)' }}>毒点：</strong>
+                                                <p style={{ margin: '4px 0', color: 'var(--accent-red)' }}>{t.pitfalls}</p>
+                                            </div>
+                                        )}
+                                        {t.positive_example && (
+                                            <div style={{ marginBottom: 8 }}>
+                                                <strong style={{ color: 'var(--accent-green)' }}>正例：</strong>
+                                                <p style={{ margin: '4px 0', whiteSpace: 'pre-wrap', fontSize: 13 }}>{t.positive_example}</p>
+                                            </div>
+                                        )}
+                                        {t.negative_example && (
+                                            <div>
+                                                <strong style={{ color: 'var(--accent-red)' }}>反例：</strong>
+                                                <p style={{ margin: '4px 0', whiteSpace: 'pre-wrap', fontSize: 13 }}>{t.negative_example}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    )
+}
+
+/* ── Tab 4: 章级合同 ── */
+
+function ChapterContractTab() {
+    const [chapters, setChapters] = useState([])
+    const [selected, setSelected] = useState(null)
+    const [detail, setDetail] = useState(null)
+
+    useEffect(() => {
+        fetchChapterContracts().then(d => {
+            const list = d.chapters || []
+            setChapters(list)
+            if (list.length > 0) setSelected(list[list.length - 1].chapter)
+        }).catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        if (selected == null) return
+        fetchChapterContract(selected).then(setDetail).catch(() => setDetail(null))
+    }, [selected])
+
+    const directive = detail?.chapter_directive || {}
+    const reasoning = detail?.reasoning || {}
+    const dynamicContext = detail?.dynamic_context || []
+
+    return (
+        <div>
+            <p style={{ marginBottom: 16, color: 'var(--text-sub)' }}>
+                查看章级合同详情，包括写作指令、禁止区域、注入的写作技法。共 {chapters.length} 章。
+            </p>
+            <div style={{ marginBottom: 16 }}>
+                <select
+                    value={selected ?? ''}
+                    onChange={e => setSelected(Number(e.target.value))}
+                    style={{
+                        padding: '6px 10px', borderRadius: 4,
+                        border: '1px solid var(--border-main)',
+                        background: 'var(--bg-card)', color: 'var(--text-main)',
+                    }}
+                >
+                    {chapters.map(ch => (
+                        <option key={ch.chapter} value={ch.chapter}>
+                            第{ch.chapter}章 {ch.goal ? `— ${ch.goal.slice(0, 30)}` : ''}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            {!detail ? (
+                <p style={{ color: 'var(--text-sub)' }}>选择章节查看详情</p>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* 基本信息 */}
+                    <section style={sectionStyle}>
+                        <h4 style={sectionTitleStyle}>写作指令</h4>
+                        <Field label="目标" value={directive.goal} />
+                        <Field label="时间锚点" value={directive.time_anchor} />
+                        <Field label="时间跨度" value={directive.chapter_span} />
+                        <Field label="故事线" value={directive.strand} />
+                        <Field label="钩子类型" value={directive.hook_type} />
+                        <Field label="钩子强度" value={directive.hook_strength} />
+                        <Field label="章末悬念" value={directive.chapter_end_open_question} />
+                    </section>
+
+                    {/* 必须覆盖节点 */}
+                    {directive.must_cover_nodes?.length > 0 && (
+                        <section style={sectionStyle}>
+                            <h4 style={sectionTitleStyle}>必须覆盖节点</h4>
+                            <ul style={{ margin: 0, paddingLeft: 20 }}>
+                                {directive.must_cover_nodes.map((node, i) => (
+                                    <li key={i} style={{ marginBottom: 4 }}>
+                                        {typeof node === 'object' ? JSON.stringify(node) : String(node)}
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    )}
+
+                    {/* 禁止区域 */}
+                    {directive.forbidden_zones?.length > 0 && (
+                        <section style={sectionStyle}>
+                            <h4 style={{ ...sectionTitleStyle, color: 'var(--accent-red)' }}>禁止区域</h4>
+                            <ul style={{ margin: 0, paddingLeft: 20 }}>
+                                {directive.forbidden_zones.map((z, i) => (
+                                    <li key={i} style={{ marginBottom: 4, color: 'var(--accent-red)' }}>
+                                        {typeof z === 'object' ? JSON.stringify(z) : String(z)}
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    )}
+
+                    {/* 推理 */}
+                    {Object.keys(reasoning).length > 0 && (
+                        <section style={sectionStyle}>
+                            <h4 style={sectionTitleStyle}>推理策略</h4>
+                            <Field label="题材" value={reasoning.genre} />
+                            <Field label="风格优先级" value={reasoning.style_priority} />
+                            <Field label="节奏策略" value={reasoning.pacing_strategy} />
+                        </section>
+                    )}
+
+                    {/* 注入的写作技法 */}
+                    {dynamicContext.length > 0 && (
+                        <section style={sectionStyle}>
+                            <h4 style={sectionTitleStyle}>注入的写作技法 ({dynamicContext.length})</h4>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid var(--border-main)' }}>
+                                        <th style={{ textAlign: 'left', padding: '6px 4px' }}>编号</th>
+                                        <th style={{ textAlign: 'left', padding: '6px 4px' }}>分类</th>
+                                        <th style={{ textAlign: 'left', padding: '6px 4px' }}>核心摘要</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {dynamicContext.map((ctx, i) => (
+                                        <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                                            <td style={{ padding: '6px 4px', fontSize: 13 }}>{ctx.编号 || ctx.id || ''}</td>
+                                            <td style={{ padding: '6px 4px' }}>
+                                                <Badge tone={CATEGORY_COLORS[ctx.分类] || 'neutral'}>{ctx.分类 || ctx._table || ''}</Badge>
+                                            </td>
+                                            <td style={{ padding: '6px 4px', fontSize: 13, color: 'var(--text-sub)' }}>
+                                                {ctx.核心摘要 || ctx.summary || ''}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </section>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+function Field({ label, value }) {
+    if (!value) return null
+    return (
+        <div style={{ marginBottom: 6 }}>
+            <span style={{ fontWeight: 500, marginRight: 8 }}>{label}：</span>
+            <span style={{ color: 'var(--text-sub)' }}>{value}</span>
+        </div>
+    )
+}
+
+const sectionStyle = {
+    padding: 16, borderRadius: 6,
+    border: '1px solid var(--border-soft)', background: 'var(--bg-card)',
+}
+
+const sectionTitleStyle = {
+    margin: '0 0 12px', fontSize: 14, fontWeight: 600,
+}
+
+/* ── Tab 5: 审查维度 ── */
+
+function ReviewerTab() {
+    const [data, setData] = useState(null)
+
+    useEffect(() => {
+        fetchReviewerChecklist().then(setData).catch(() => {})
+    }, [])
+
+    const checklist = data?.checklist || []
+    const antiPatterns = data?.anti_patterns || []
+
+    return (
+        <div>
+            <p style={{ marginBottom: 16, color: 'var(--text-sub)' }}>
+                审查阶段 reviewer agent 的 13 维度检查清单。每个维度必须逐项输出结论。
+            </p>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
+                <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-main)' }}>
+                        <th style={{ textAlign: 'left', padding: '8px 4px' }}>维度</th>
+                        <th style={{ textAlign: 'left', padding: '8px 4px' }}>检查内容</th>
+                        <th style={{ textAlign: 'left', padding: '8px 4px' }}>输出格式</th>
+                        <th style={{ textAlign: 'center', padding: '8px 4px' }}>必须查询</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {checklist.map((item, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                            <td style={{ padding: '8px 4px', fontWeight: 500, whiteSpace: 'nowrap' }}>{item.dimension}</td>
+                            <td style={{ padding: '8px 4px', fontSize: 13 }}>{item.content}</td>
+                            <td style={{ padding: '8px 4px', fontSize: 13, fontFamily: 'var(--font-body)' }}>
+                                <code style={{ fontSize: 12 }}>{item.format}</code>
+                            </td>
+                            <td style={{ padding: '8px 4px', textAlign: 'center' }}>
+                                {item.must_bash && <Badge tone="amber">bash</Badge>}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+
+            <h4 style={{ marginBottom: 12 }}>反模式列表 ({antiPatterns.length})</h4>
+            {antiPatterns.length === 0 ? (
+                <p style={{ color: 'var(--text-sub)' }}>暂无反模式</p>
+            ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-main)' }}>
+                            <th style={{ textAlign: 'left', padding: '8px 4px' }}>#</th>
+                            <th style={{ textAlign: 'left', padding: '8px 4px' }}>反模式内容</th>
+                            <th style={{ textAlign: 'left', padding: '8px 4px' }}>来源</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {antiPatterns.map((p, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                                <td style={{ padding: '8px 4px', color: 'var(--text-sub)' }}>{i + 1}</td>
+                                <td style={{ padding: '8px 4px' }}>{p.text}</td>
+                                <td style={{ padding: '8px 4px' }}>
+                                    <Badge tone="neutral">{p.source_table || '手动'}</Badge>
+                                    {p.source_id && <span style={{ marginLeft: 4, fontSize: 12, color: 'var(--text-sub)' }}>({p.source_id})</span>}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
         </div>
     )
 }
@@ -266,7 +612,6 @@ export default function StyleEditorPage() {
             <h2 style={{ marginBottom: 20 }}>文风约束编辑器</h2>
             <p style={{ marginBottom: 20, color: 'var(--text-sub)' }}>
                 系统有 5 个层级可以插入文风约束，从全局到局部逐级细化。
-                此页面支持编辑前两层，其余层级请通过 CLI 操作。
             </p>
 
             {/* Tab 栏 */}
@@ -292,24 +637,9 @@ export default function StyleEditorPage() {
             {/* Tab 内容 */}
             {activeTab === 'master' && <MasterSettingTab />}
             {activeTab === 'anti' && <AntiPatternsTab />}
-            {activeTab === 'techniques' && (
-                <ReadOnlyTab
-                    title="写作技法"
-                    description="题材级技法存储在 写作技法.csv 中，写作时通过 BM25 检索自动匹配。"
-                />
-            )}
-            {activeTab === 'chapter' && (
-                <ReadOnlyTab
-                    title="章级合同"
-                    description="单章覆盖存储在 .story-system/chapters/chapter_NNN.json 的 forbidden_zones 和 override_allowed 字段中。"
-                />
-            )}
-            {activeTab === 'reviewer' && (
-                <ReadOnlyTab
-                    title="审查维度"
-                    description="审查维度定义在 .opencode/agents/reviewer.md 中，包含设定一致性、AI味、节奏等 13 个检查维度。"
-                />
-            )}
+            {activeTab === 'techniques' && <TechniquesTab />}
+            {activeTab === 'chapter' && <ChapterContractTab />}
+            {activeTab === 'reviewer' && <ReviewerTab />}
         </div>
     )
 }
