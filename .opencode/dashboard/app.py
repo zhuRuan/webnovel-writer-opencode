@@ -1114,8 +1114,9 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     @app.get("/api/style/techniques")
     def get_techniques():
         """读取写作技法 CSV。"""
-        csv_path = _get_project_root().parent.parent / ".opencode" / "references" / "csv" / "写作技法.csv"
-        # 也检查仓库根目录下的路径
+        # 从 dashboard 模块位置推导仓库根目录（.opencode/dashboard/app.py → .opencode/）
+        opencode_dir = Path(__file__).resolve().parent.parent
+        csv_path = opencode_dir / "references" / "csv" / "写作技法.csv"
         if not csv_path.is_file():
             for candidate in [
                 _get_project_root() / ".opencode" / "references" / "csv" / "写作技法.csv",
@@ -1129,7 +1130,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
         import csv as csv_mod
         techniques = []
-        with open(csv_path, "r", encoding="utf-8") as f:
+        with open(csv_path, "r", encoding="utf-8-sig") as f:
             reader = csv_mod.DictReader(f)
             for row in reader:
                 techniques.append({

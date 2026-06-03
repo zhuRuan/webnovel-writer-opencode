@@ -394,7 +394,12 @@ function ChapterContractTab() {
 
     useEffect(() => {
         if (selected == null) return
-        fetchChapterContract(selected).then(setDetail).catch(() => setDetail(null))
+        const ctrl = new AbortController()
+        fetch(`/api/style/chapters/${selected}`)
+            .then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)))
+            .then(d => { if (!ctrl.signal.aborted) setDetail(d) })
+            .catch(() => { if (!ctrl.signal.aborted) setDetail(null) })
+        return () => ctrl.abort()
     }, [selected])
 
     const directive = detail?.chapter_directive || {}
@@ -512,7 +517,7 @@ function ChapterContractTab() {
 }
 
 function Field({ label, value }) {
-    if (!value) return null
+    if (value == null || value === '') return null
     return (
         <div style={{ marginBottom: 6 }}>
             <span style={{ fontWeight: 500, marginRight: 8 }}>{label}：</span>
