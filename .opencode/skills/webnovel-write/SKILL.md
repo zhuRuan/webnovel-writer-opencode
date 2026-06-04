@@ -271,17 +271,25 @@ issues = review.get('issues', [])
 blocking = [i for i in issues if i.get('blocking')]
 # 检查每个 blocking issue 的 evidence 是否仍在正文中
 remaining = 0
+no_evidence = 0
 for issue in blocking:
     evidence = (issue.get('evidence') or '').strip()
     if not evidence:
+        no_evidence += 1
         continue
     # evidence 可能是 '原文引用 vs 数据记录' 格式，取 vs 左侧的原文引用部分
     if ' vs ' in evidence:
         evidence = evidence.split(' vs ')[0].strip()
     if len(evidence) >= 3 and evidence[:80] in text:
         remaining += 1
+# 有 blocking issue 但全部无 evidence（如空正文），自查不通过
+if blocking and no_evidence == len(blocking):
+    print('false')
 # 如果所有 evidence 都已消失，自查通过
-print('true' if remaining == 0 else 'false')
+elif remaining == 0:
+    print('true')
+else:
+    print('false')
 ")
 ```
 
@@ -302,7 +310,22 @@ AskUserQuestion(
 )
 ```
 
-- **接受当前版本**：修改 `review_results.json`，将剩余 blocking issue 的 `blocking` 设为 `false`、`severity` 降为 `medium`，然后进 Step 4
+- **接受当前版本**：执行以下脚本清除 blocking，然后进 Step 4：
+
+```bash
+python -X utf8 -c "
+import json, pathlib
+f = pathlib.Path('${PROJECT_ROOT}/.webnovel/tmp/review_results.json')
+data = json.loads(f.read_text(encoding='utf-8'))
+for issue in data.get('issues', []):
+    if isinstance(issue, dict) and issue.get('blocking'):
+        issue['blocking'] = False
+        issue['severity'] = 'medium'
+data['blocking_count'] = 0
+f.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+print(f'已清除 {sum(1 for i in data[\"issues\"] if i.get(\"severity\")==\"medium\")} 个 blocking issue')
+"
+```
 - **手动修复**：停止流程，用户修改后重新运行
 - **放弃本章**：停止流程，不生成正文
 
