@@ -11,9 +11,14 @@ import {
     fetchChapterContracts,
     fetchChapterContract,
     fetchReviewerChecklist,
+    fetchPrompts,
+    createPrompt,
+    updatePrompt,
+    deletePrompt,
 } from '../api.js'
 
 const TABS = [
+    { key: 'prompts', label: '自定义文风' },
     { key: 'master', label: '全局文风' },
     { key: 'anti', label: '禁止模式' },
     { key: 'techniques', label: '写作技法' },
@@ -24,6 +29,172 @@ const TABS = [
 const CATEGORY_COLORS = {
     '对话': 'blue', '情感': 'purple', '场景': 'green',
     '节奏': 'amber', '战斗': 'red', '叙事': 'cyan',
+}
+
+/* ── Tab 0: 自定义文风 ── */
+
+function PromptsTab() {
+    const [prompts, setPrompts] = useState([])
+    const [error, setError] = useState(null)
+    const [editing, setEditing] = useState(null) // {name, content} | null
+    const [creating, setCreating] = useState(false)
+    const [newName, setNewName] = useState('')
+    const [newContent, setNewContent] = useState('')
+    const [msg, setMsg] = useState(null)
+
+    const reload = useCallback(() => {
+        fetchPrompts().then(d => setPrompts(d.prompts || [])).catch(e => setError(e.message))
+    }, [])
+
+    useEffect(() => { reload() }, [reload])
+
+    const handleCreate = async () => {
+        if (!newName.trim() || !newContent.trim()) return
+        setMsg(null)
+        try {
+            await createPrompt(newName.trim(), newContent.trim())
+            setNewName(''); setNewContent(''); setCreating(false)
+            setMsg({ type: 'success', text: '创建成功' })
+            reload()
+        } catch (e) {
+            setMsg({ type: 'error', text: e.message })
+        }
+    }
+
+    const handleSave = async () => {
+        if (!editing) return
+        setMsg(null)
+        try {
+            await updatePrompt(editing.filename, editing.content)
+            setEditing(null)
+            setMsg({ type: 'success', text: '保存成功' })
+            reload()
+        } catch (e) {
+            setMsg({ type: 'error', text: e.message })
+        }
+    }
+
+    const handleDelete = async (filename) => {
+        if (!confirm(`确认删除提示词文件 ${filename}？`)) return
+        setMsg(null)
+        try {
+            await deletePrompt(filename)
+            if (editing?.filename === filename) setEditing(null)
+            setMsg({ type: 'success', text: '已删除' })
+            reload()
+        } catch (e) {
+            setMsg({ type: 'error', text: e.message })
+        }
+    }
+
+    return (
+        <div className="card">
+            <div className="card-header">
+                <span className="card-title">自定义文风提示词</span>
+                <Badge tone="cyan">{prompts.length} 个文件</Badge>
+            </div>
+            <p style={{ marginBottom: 12, color: 'var(--text-sub)', fontSize: 13 }}>
+                在 <code>设定集/prompts/</code> 下放置 <code>.md</code> 文件，系统写作时自动加载。
+                详见 <a href="https://github.com/lujih/webnovel-writer-opencode/blob/master/docs/guides/custom-style-prompts.md" target="_blank" style={{ color: 'var(--accent-blue)' }}>自定义文风指南</a>。
+            </p>
+
+            {error && <p style={{ marginBottom: 8, color: 'var(--accent-red)', fontWeight: 600 }}>加载失败: {error}</p>}
+            {msg && (
+                <p style={{ marginBottom: 8, color: msg.type === 'error' ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 600 }}>
+                    {msg.text}
+                </p>
+            )}
+
+            {/* 文件列表 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                {prompts.map(p => (
+                    <div key={p.filename} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 12px', border: '2px solid var(--border-soft)',
+                        background: editing?.filename === p.filename ? 'var(--bg-card-2)' : 'var(--bg-panel)',
+                        cursor: 'pointer',
+                    }} onClick={() => setEditing({ ...p })}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Badge tone="blue">{p.filename}</Badge>
+                            <span style={{ fontSize: 13, color: 'var(--text-sub)' }}>
+                                {p.content.slice(0, 60)}{p.content.length > 60 ? '...' : ''}
+                            </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="page-btn" style={{ padding: '2px 8px', minHeight: 24, fontSize: 12 }}
+                                onClick={e => { e.stopPropagation(); handleDelete(p.filename) }}>
+                                删除
+                            </button>
+                        </div>
+                    </div>
+                ))}
+                {prompts.length === 0 && !creating && (
+                    <div className="empty-state compact">暂无自定义提示词。点击下方按钮创建。</div>
+                )}
+            </div>
+
+            {/* 编辑区 */}
+            {editing && (
+                <div style={{ marginBottom: 16, padding: 12, border: '2px solid var(--accent-blue)', background: 'var(--bg-card)' }}>
+                    <div className="mini-label">编辑: {editing.filename}</div>
+                    <textarea
+                        value={editing.content}
+                        onChange={e => setEditing({ ...editing, content: e.target.value })}
+                        rows={10}
+                        style={{
+                            width: '100%', padding: 8, fontFamily: 'var(--font-body)', fontSize: 13,
+                            border: '2px solid var(--border-main)', borderRadius: 0,
+                            background: '#fffef8', color: 'var(--text-main)', resize: 'vertical',
+                            lineHeight: 1.6,
+                        }}
+                    />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <button className="page-btn" onClick={handleSave}>保存</button>
+                        <button className="page-btn" style={{ background: '#fff8e6' }} onClick={() => setEditing(null)}>取消</button>
+                    </div>
+                </div>
+            )}
+
+            {/* 新建区 */}
+            {creating ? (
+                <div style={{ padding: 12, border: '2px solid var(--accent-green)', background: 'var(--bg-card)' }}>
+                    <div className="mini-label">新建提示词文件</div>
+                    <input
+                        type="text"
+                        value={newName}
+                        onChange={e => setNewName(e.target.value)}
+                        placeholder="文件名（如：文风、对话风格、禁忌）"
+                        style={{
+                            width: '100%', maxWidth: 300, padding: '6px 10px', marginBottom: 8,
+                            border: '2px solid var(--border-main)', borderRadius: 0,
+                            background: '#fffef8', color: 'var(--text-main)', fontWeight: 500,
+                            boxShadow: 'var(--shadow-soft)',
+                        }}
+                    />
+                    <textarea
+                        value={newContent}
+                        onChange={e => setNewContent(e.target.value)}
+                        rows={8}
+                        placeholder="写你对文风的具体要求。&#10;&#10;示例：&#10;- 对话要口语化，像真人说话&#10;- 动作描写要短促有力&#10;- 每段不超过 3 句话&#10;- 禁止使用'缓缓''淡淡''微微'"
+                        style={{
+                            width: '100%', padding: 8, fontFamily: 'var(--font-body)', fontSize: 13,
+                            border: '2px solid var(--border-main)', borderRadius: 0,
+                            background: '#fffef8', color: 'var(--text-main)', resize: 'vertical',
+                            lineHeight: 1.6,
+                        }}
+                    />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <button className="page-btn" onClick={handleCreate} disabled={!newName.trim() || !newContent.trim()}>创建</button>
+                        <button className="page-btn" style={{ background: '#fff8e6' }} onClick={() => { setCreating(false); setNewName(''); setNewContent('') }}>取消</button>
+                    </div>
+                </div>
+            ) : (
+                !editing && (
+                    <button className="page-btn" onClick={() => setCreating(true)}>+ 新建提示词</button>
+                )
+            )}
+        </div>
+    )
 }
 
 /* ── Tab 1: 全局文风 ── */
@@ -648,6 +819,7 @@ export default function StyleEditorPage() {
             </div>
 
             {/* Tab 内容 */}
+            {activeTab === 'prompts' && <PromptsTab />}
             {activeTab === 'master' && <MasterSettingTab />}
             {activeTab === 'anti' && <AntiPatternsTab />}
             {activeTab === 'techniques' && <TechniquesTab />}

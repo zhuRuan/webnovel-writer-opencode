@@ -28,11 +28,12 @@ compatibility: opencode
 
 | Tab | 数据源 | 读写 |
 |-----|--------|------|
+| **自定义文风** | `设定集/prompts/*.md` | **读写（新建+编辑+删除）** |
 | 全局文风 | `MASTER_SETTING.json` → `master_constraints` | 读写（locked 字段不可改） |
 | 禁止模式 | `anti_patterns.json` | 读写（增删） |
 | 写作技法 | `写作技法.csv`（104 条） | 只读（搜索+筛选+展开详情） |
 | 章级合同 | `.story-system/chapters/chapter_*.json` | 只读（章节选择+详情查看） |
-| 审查维度 | `reviewer.md` 13 维度 + `anti_patterns.json` | 只读 |
+| 审查维度 | `reviewer.md` 6 维度 + `anti_patterns.json` | 只读 |
 
 ### 写入 API
 

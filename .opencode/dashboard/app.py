@@ -1195,6 +1195,94 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
         raise HTTPException(404, f"第 {chapter} 章合同不存在")
 
+    @app.get("/api/style/prompts")
+    def get_prompts():
+        """读取设定集/prompts/ 下的所有 .md 文件。"""
+        prompts_dir = _get_project_root() / "设定集" / "prompts"
+        if not prompts_dir.is_dir():
+            return {"prompts": []}
+        result = []
+        for f in sorted(prompts_dir.glob("*.md")):
+            try:
+                content = f.read_text(encoding="utf-8").strip()
+                result.append({"name": f.stem, "filename": f.name, "content": content})
+            except Exception:
+                result.append({"name": f.stem, "filename": f.name, "content": "", "error": "读取失败"})
+        return {"prompts": result}
+
+    @app.post("/api/style/prompts")
+    def create_prompt(request: dict):
+        """创建新的提示词文件。"""
+        name = (request.get("name") or "").strip()
+        content = (request.get("content") or "").strip()
+        if not name:
+            raise HTTPException(400, "name 不能为空")
+        if not content:
+            raise HTTPException(400, "content 不能为空")
+        # 文件名安全检查
+        safe_name = "".join(c for c in name if c.isalnum() or c in "_- ")
+        if not safe_name:
+            raise HTTPException(400, "文件名包含非法字符")
+
+        prompts_dir = _get_project_root() / "设定集" / "prompts"
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+        path = prompts_dir / f"{safe_name}.md"
+        if path.is_file():
+            raise HTTPException(409, f"文件已存在: {path.name}")
+
+        path.write_text(content + "\n", encoding="utf-8")
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "style-updated", "layer": "prompts", "ts": time.time(),
+            }))
+        except Exception:
+            pass
+        return {"ok": True, "filename": path.name}
+
+    @app.put("/api/style/prompts/{filename}")
+    def update_prompt(filename: str, request: dict):
+        """更新提示词文件内容。"""
+        content = (request.get("content") or "").strip()
+        if not content:
+            raise HTTPException(400, "content 不能为空")
+        # 安全检查：禁止路径穿越
+        if "/" in filename or "\\" in filename or ".." in filename:
+            raise HTTPException(400, "非法文件名")
+
+        prompts_dir = _get_project_root() / "设定集" / "prompts"
+        path = prompts_dir / filename
+        if not path.is_file():
+            raise HTTPException(404, f"文件不存在: {filename}")
+
+        path.write_text(content + "\n", encoding="utf-8")
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "style-updated", "layer": "prompts", "ts": time.time(),
+            }))
+        except Exception:
+            pass
+        return {"ok": True, "filename": filename}
+
+    @app.delete("/api/style/prompts/{filename}")
+    def delete_prompt(filename: str):
+        """删除提示词文件。"""
+        if "/" in filename or "\\" in filename or ".." in filename:
+            raise HTTPException(400, "非法文件名")
+
+        prompts_dir = _get_project_root() / "设定集" / "prompts"
+        path = prompts_dir / filename
+        if not path.is_file():
+            raise HTTPException(404, f"文件不存在: {filename}")
+
+        path.unlink()
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "style-updated", "layer": "prompts", "ts": time.time(),
+            }))
+        except Exception:
+            pass
+        return {"ok": True, "deleted": filename}
+
     @app.get("/api/style/reviewer-checklist")
     def get_reviewer_checklist():
         """读取审查维度清单。"""

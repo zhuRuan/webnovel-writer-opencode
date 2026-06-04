@@ -146,6 +146,22 @@ export function fetchReviewerChecklist() {
     return fetchJSON('/api/style/reviewer-checklist')
 }
 
+export function fetchPrompts() {
+    return fetchJSON('/api/style/prompts')
+}
+
+export function createPrompt(name, content) {
+    return apiPost('/api/style/prompts', { name, content })
+}
+
+export function updatePrompt(filename, content) {
+    return apiPut(`/api/style/prompts/${encodeURIComponent(filename)}`, { content })
+}
+
+export function deletePrompt(filename) {
+    return apiDelete(`/api/style/prompts/${encodeURIComponent(filename)}`)
+}
+
 export function subscribeSSE(onMessage, handlers = {}) {
     const { onOpen, onError } = handlers
     const eventSource = new EventSource(`${BASE}/api/events`)
