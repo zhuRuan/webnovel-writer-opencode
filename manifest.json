@@ -1,17 +1,22 @@
 {
-  "version": "v2.9.0-20260604.1126",
+  "version": "v2.9.0-20260604.1515",
   "tag": "v2.9.0",
-  "updated": "2026-06-04T11:26:47Z",
+  "updated": "2026-06-04T15:15:04Z",
   "changelog": [
     {
-      "hash": "e7e76c9",
+      "hash": "03ce288",
       "type": "fix",
-      "message": "fix: user_prompts \u6ce8\u5165\u4fee\u590d \u2014 \u72ec\u7acb section \u800c\u975e global \u5b50\u5b57\u6bb5"
+      "message": "fix: \u5ba1\u67e5\u91cd\u6784 3 \u9879\u4fee\u590d \u2014 \u63a5\u53d7\u811a\u672c\u3001\u5f3a\u5236\u6267\u884c\u3001\u7a7a\u6b63\u6587\u81ea\u67e5"
     },
     {
-      "hash": "f9eeca4",
+      "hash": "355b239",
+      "type": "refactor",
+      "message": "refactor: \u5ba1\u67e5-\u6da6\u8272\u804c\u8d23\u5206\u79bb \u2014 reviewer 13\u7ef4\u21926\u7ef4\uff0c\u5ba1\u67e5\u6700\u591a 2 \u8f6e"
+    },
+    {
+      "hash": "32807af",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260604.1120 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260604.1126 [skip ci]"
     }
   ],
   "files": {
@@ -220,8 +225,8 @@
       "size": 5583
     },
     ".opencode/skills/webnovel-write/SKILL.md": {
-      "sha256": "15251c76b1948b213bf608fec566eec70e9c046d99cbabda6d54bf9c212f330a",
-      "size": 16724
+      "sha256": "652fbfc5b5d87eead42e702616b7264f81369b98e749b791e9278db6226cd99a",
+      "size": 18039
     },
     ".opencode/skills/webnovel-write/evals/evals.json": {
       "sha256": "d19b4b196c1637055371ad64899a74ae3d9b01d568bdb8e63c4f71835c8a16e3",
@@ -232,8 +237,8 @@
       "size": 1776
     },
     ".opencode/skills/webnovel-write/references/polish-guide.md": {
-      "sha256": "21d7b821bd656cb477c6fb372719bebc949c332efb551739bff3cca29f71bc83",
-      "size": 16698
+      "sha256": "8ba21d32517598a80a083416225cacbce2f25cedfda6a91aea12a2b35437c87a",
+      "size": 17905
     },
     ".opencode/skills/webnovel-write/references/anti-ai-guide.md": {
       "sha256": "fa60601e0080c47bbac1cf33e6d9372a3aa0725e9a005f155618820b1ce36685",
@@ -280,8 +285,8 @@
       "size": 2439
     },
     ".opencode/agents/reviewer.md": {
-      "sha256": "8eeb54545910fd0cdab1e9193ba64f54443cf462add373f50006dda2eb0e8ee7",
-      "size": 12595
+      "sha256": "a2e92bed582cd8aec15cf43d88ce7b308db09c85e97dee24b146a743c814e724",
+      "size": 8700
     },
     ".opencode/agents/chapter-writer-agent.md": {
       "sha256": "089edd7d2c72a9d8d612c4fd79cca656e9dce3247a0829629cdfe98d5a428a0b",
@@ -1568,8 +1573,8 @@
       "size": 8662
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "836110e6998a452cb1fe19b0d3039126aab1566b4ba39db475e0ddb2bd23bc78",
-      "size": 54716
+      "sha256": "b92c5aabb71a89487b0b4484c0b223ff5e66939f841e02f4bb2ddbdba0ea142a",
+      "size": 53458
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
