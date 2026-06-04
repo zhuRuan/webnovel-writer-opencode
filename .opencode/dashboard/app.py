@@ -1204,14 +1204,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             {"dimension": "叙事连贯", "content": "视角是否统一/场景切换是否有过渡", "format": "[连贯]: pass 或 发现N个问题(简述)", "must_bash": False},
             {"dimension": "角色一致性", "content": "对话风格/行为动机是否符合人设", "format": "[角色]: pass 或 发现N个问题(简述)", "must_bash": False},
             {"dimension": "逻辑", "content": "因果关系/行为后果是否合理", "format": "[逻辑]: pass 或 发现N个问题(简述)", "must_bash": False},
-            {"dimension": "AI味-词汇", "content": "缓缓/淡淡/微微/眸中/瞳孔 密度", "format": "[AI味-词汇]: pass 或 发现N个问题(简述)", "must_bash": False},
-            {"dimension": "AI味-句式", "content": "三段闭环/同构句/总结句/碎片句", "format": "[AI味-句式]: pass 或 发现N个问题(简述)", "must_bash": False},
-            {"dimension": "AI味-叙事", "content": "匀速节奏/戏剧性反讽/安全着陆", "format": "[AI味-叙事]: pass 或 发现N个问题(简述)", "must_bash": False},
-            {"dimension": "AI味-情感", "content": "标签化情绪/即时切换", "format": "[AI味-情感]: pass 或 发现N个问题(简述)", "must_bash": False},
-            {"dimension": "AI味-对话", "content": "信息宣讲/书面语", "format": "[AI味-对话]: pass 或 发现N个问题(简述)", "must_bash": False},
             {"dimension": "项目规则", "content": "破折号≤20、但≤6、不是X是Y≤1、句号≤70/千字、系统【】格式", "format": "[规则]: pass 或 发现N个问题(简述)", "must_bash": True},
-            {"dimension": "节奏", "content": "章首钩子/中段脉冲/章末锚点/段长变化", "format": "[节奏]: pass 或 发现N个问题(简述)", "must_bash": False},
-            {"dimension": "毒点", "content": "降智推进/强行误会/圣母无代价/工具人配角/双标裁决", "format": "[毒点]: pass 或 发现N个问题(简述)", "must_bash": False},
         ]
         # 也返回 anti_patterns
         ap_path = _anti_patterns_path()

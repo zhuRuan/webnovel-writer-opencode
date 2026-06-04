@@ -2,7 +2,7 @@
 name: webnovel-write
 description: 产出可发布章节，完整执行上下文→起草→审查→润色→提交→备份。
 compatibility: opencode
-allowed-tools: Agent
+allowed-tools: Agent AskUserQuestion
 ---
 
 # 写章流程
@@ -247,9 +247,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" rev
 
 blocking=true → 修复后重审，不进 Step 4。`--fast` 只检查 setting/timeline/continuity。`--minimal` 跳过。
 
-#### 修复-重审循环（最多 3 轮）
+#### 修复-重审循环（最多 2 轮）
 
-审查发现 blocking issue 时，执行以下循环，**最多 3 轮**。目标是 1-2 轮内找全并修完所有问题，3 轮是安全兜底。
+审查发现 blocking issue 时，执行以下循环，**最多 2 轮**。目标是 1 轮内找全并修完所有问题。
 
 **每轮流程：**
 
@@ -287,17 +287,34 @@ print('true' if remaining == 0 else 'false')
 
 3. **如果自查通过**（所有 evidence 已消失），跳过 reviewer 重审，直接进 Step 4
 4. **如果自查未通过**，重新调用 reviewer-agent 重审
-5. **轮次检查**：如果达到 3 轮仍有 blocking issue → **停止循环，输出剩余问题清单，交给人工处理**。不自动降级、不强行放过。
+5. **轮次检查**：如果达到 2 轮仍有 blocking issue → 调用 AskUserQuestion 让用户裁决
+
+**第 2 轮后仍有 blocking 时的处理：**
+
+```text
+AskUserQuestion(
+  question: "第 {chapter_num} 章经 2 轮审查仍有 blocking issue。请选择：",
+  options: [
+    { label: "接受当前版本", description: "忽略剩余 blocking，强制进 Step 4" },
+    { label: "手动修复", description: "暂停流程，你手动修改后重新运行" },
+    { label: "放弃本章", description: "跳过本章，不生成正文" }
+  ]
+)
+```
+
+- **接受当前版本**：修改 `review_results.json`，将剩余 blocking issue 的 `blocking` 设为 `false`、`severity` 降为 `medium`，然后进 Step 4
+- **手动修复**：停止流程，用户修改后重新运行
+- **放弃本章**：停止流程，不生成正文
 
 **收敛判断伪代码：**
 ```
-for round in 1..3:
+for round in 1..2:
     fix blocking issues
     if self_check passes: break  # 所有 evidence 已消失
     re-review
     if no blocking: break
 else:
-    停止，输出剩余 blocking issue 清单，交人工决策
+    AskUserQuestion → 接受/手动/放弃
 ```
 
 ```bash

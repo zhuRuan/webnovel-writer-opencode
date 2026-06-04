@@ -293,6 +293,31 @@ purpose: 章节生成后的润色阶段加载，基于审查报告修复问题 +
 - 不删除关键伏笔
 - 不强行改写角色关系基线
 
+## 6A. 强制执行检查（Anti-AI 终检之后，输出之前）
+
+以下检查必须执行，不通过则继续修改：
+
+- [ ] **节奏**：章首 200-400 字内有冲突/悬念
+- [ ] **节奏**：中段有至少一次节奏脉冲（800-1400 字一波推进）
+- [ ] **节奏**：章末有未闭合问题或下一步期待
+- [ ] **毒点**：无降智推进/强行误会/圣母无代价/工具人配角/双标裁决（见第 5 节）
+- [ ] **项目规则**：破折号≤20、但≤6、句号密度≤70/千字（python 统计验证）
+
+```bash
+python -X utf8 -c "
+import re
+from pathlib import Path
+text = Path('${CHAPTER_FILE}').read_text(encoding='utf-8-sig')
+cn_chars = len(re.findall(r'[一-鿿]', text))
+dashes = len(re.findall(r'——', text))
+but_count = len(re.findall(r'但(?!是)', text))
+periods = len(re.findall(r'。', text))
+per_1000 = periods / max(cn_chars, 1) * 1000
+ok = dashes <= 20 and but_count <= 6 and per_1000 <= 70
+print(f'破折号:{dashes}(≤20) 但:{but_count}(≤6) 句号:{per_1000:.1f}/千字(≤70) → {\"PASS\" if ok else \"FAIL\"}'  )
+"
+```
+
 ## 7. 输出格式（润色完成后）
 
 必须输出：
