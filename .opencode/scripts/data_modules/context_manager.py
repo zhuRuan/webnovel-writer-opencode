@@ -69,6 +69,7 @@ class ContextManager:
         "genre_profile",
         "writing_guidance",
         "plot_structure",
+        "user_prompts",
         "story_contract",
         "runtime_status",
         "latest_commit",
@@ -83,6 +84,7 @@ class ContextManager:
         "prewrite_validation",
         "scene",
         "global",
+        "user_prompts",
         "reader_signal",
         "genre_profile",
         "writing_guidance",
@@ -254,8 +256,6 @@ class ContextManager:
             "power_system_skeleton": self._load_setting("力量体系"),
             "style_contract_ref": self._load_setting("风格契约"),
         }
-        if user_prompts:
-            global_ctx["user_prompts"] = user_prompts
 
         preferences = self._load_json_optional(self.config.webnovel_dir / "preferences.json")
         memory = self._load_json_optional(self.config.webnovel_dir / "project_memory.json")
@@ -282,6 +282,7 @@ class ContextManager:
             "prewrite_validation": prewrite_validation,
             "scene": scene,
             "global": global_ctx,
+            "user_prompts": user_prompts,
             "reader_signal": reader_signal,
             "genre_profile": genre_profile,
             "writing_guidance": writing_guidance,
