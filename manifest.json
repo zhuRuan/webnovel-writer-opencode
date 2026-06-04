@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260604.1118",
+  "version": "v2.9.0-20260604.1120",
   "tag": "v2.9.0",
-  "updated": "2026-06-04T11:18:40Z",
+  "updated": "2026-06-04T11:20:55Z",
   "changelog": [
     {
-      "hash": "e94cb4c",
-      "type": "docs",
-      "message": "docs: \u81ea\u5b9a\u4e49\u6587\u98ce\u63d0\u793a\u8bcd\u6307\u5357 + \u67b6\u6784\u89c4\u8303"
+      "hash": "74080aa",
+      "type": "feat",
+      "message": "feat: \u81ea\u5b9a\u4e49\u6587\u98ce\u63d0\u793a\u8bcd \u2014 \u8bbe\u5b9a\u96c6/prompts/ \u81ea\u52a8\u52a0\u8f7d"
     },
     {
-      "hash": "a832710",
+      "hash": "84f2864",
       "type": "chore",
-      "message": "chore: release v2.9.0 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260604.1118 [skip ci]"
     }
   ],
   "files": {
@@ -792,8 +792,8 @@
       "size": 3322
     },
     ".opencode/scripts/data_modules/context_manager.py": {
-      "sha256": "4c5c8e42d68bfbe006732ff71c26a2ab5cbd5f3c1da5c92c00235448a191a810",
-      "size": 38607
+      "sha256": "372a4a53d52db58e90a95bdc4cd16da7135237d54ca741e16f9ed680075ed499",
+      "size": 39316
     },
     ".opencode/scripts/data_modules/migrate_state_to_sqlite.py": {
       "sha256": "4411243b3087307c80dde453ee8a753bd4d3a050fcfe6b4552d5217a96ecab85",
