@@ -34,6 +34,10 @@ allowed-tools: Agent
 
 用户要求 > 状态机硬门槛 > 项目约束（总纲/设定/记忆）> skill 流程 > reference 建议
 
+## 自定义文风提示词
+
+用户可在 `设定集/prompts/` 文件夹中放置 `.md` 文件，系统自动加载并注入写作上下文（优先级高于 master_constraints，低于章级 forbidden_zones）。详见 `docs/guides/custom-style-prompts.md`。
+
 ## CSV 检索（Step 2 按需）
 
 ```bash
