@@ -1,22 +1,17 @@
 {
-  "version": "v2.9.0-20260604.1515",
+  "version": "v2.9.0-20260604.1547",
   "tag": "v2.9.0",
-  "updated": "2026-06-04T15:15:04Z",
+  "updated": "2026-06-04T15:47:50Z",
   "changelog": [
     {
-      "hash": "03ce288",
-      "type": "fix",
-      "message": "fix: \u5ba1\u67e5\u91cd\u6784 3 \u9879\u4fee\u590d \u2014 \u63a5\u53d7\u811a\u672c\u3001\u5f3a\u5236\u6267\u884c\u3001\u7a7a\u6b63\u6587\u81ea\u67e5"
+      "hash": "8138e23",
+      "type": "feat",
+      "message": "feat: Dashboard \u6587\u98ce\u7f16\u8f91\u5668\u65b0\u589e'\u81ea\u5b9a\u4e49\u6587\u98ce'Tab"
     },
     {
-      "hash": "355b239",
-      "type": "refactor",
-      "message": "refactor: \u5ba1\u67e5-\u6da6\u8272\u804c\u8d23\u5206\u79bb \u2014 reviewer 13\u7ef4\u21926\u7ef4\uff0c\u5ba1\u67e5\u6700\u591a 2 \u8f6e"
-    },
-    {
-      "hash": "32807af",
+      "hash": "0c265d9",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260604.1126 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260604.1515 [skip ci]"
     }
   ],
   "files": {
@@ -93,8 +88,8 @@
       "size": 8695
     },
     ".opencode/skills/webnovel-dashboard/SKILL.md": {
-      "sha256": "7bfec0cd802e6a504a57cc79d66d43bba097130281f9fbca03d663a5e84e0b8d",
-      "size": 5001
+      "sha256": "ad313d6d7bc59e14e1da2456e9b32afeaf0dcb8e155115e47e0ab137b36536b9",
+      "size": 5090
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
       "sha256": "8ab14088472271affe733b28c27a8b60d3595fc260602b27b46fccbb789345c5",
@@ -1573,8 +1568,8 @@
       "size": 8662
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "b92c5aabb71a89487b0b4484c0b223ff5e66939f841e02f4bb2ddbdba0ea142a",
-      "size": 53458
+      "sha256": "bd0493240d583b18c3fcd21e95918456d08f7d2698d892a3a2ac59c68e6d9020",
+      "size": 56995
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
@@ -1629,8 +1624,8 @@
       "size": 2894
     },
     ".opencode/dashboard/frontend/src/api.js": {
-      "sha256": "4f83bbacc7d6055f33a124fab02595ba9a9211d44d8c5cc83f950104a348a3df",
-      "size": 4452
+      "sha256": "40ea461b86756326cd82908092eccf7925ed4853321600df951994be53ccd2d5",
+      "size": 4897
     },
     ".opencode/dashboard/frontend/src/App.jsx": {
       "sha256": "2d4a583cd98d2f3fc55b004506c0223a39c8a488f6763f8a241992a4756e2161",
@@ -1645,8 +1640,8 @@
       "size": 11328
     },
     ".opencode/dashboard/frontend/src/pages/StyleEditorPage.jsx": {
-      "sha256": "e493baa641ca1d47425023961ade74731e0d097efd908a64ff409fbdd7c479b4",
-      "size": 30825
+      "sha256": "f89973ea357831d072e24a46ab8b8cb30096227e070a9fa5f77ffffc04e8939b",
+      "size": 39255
     },
     ".opencode/dashboard/frontend/src/pages/FilesPage.jsx": {
       "sha256": "167257b9ffb6e4e58c3f0f8fd13ee435256645ee855d6f0cd9ff375300718917",
