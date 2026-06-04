@@ -248,11 +248,14 @@ class ContextManager:
         runtime_status = runtime_sources.to_dict()
         latest_commit = runtime_sources.latest_commit or {}
 
+        user_prompts = self._load_user_prompts()
         global_ctx = {
             "worldview_skeleton": self._load_setting("世界观"),
             "power_system_skeleton": self._load_setting("力量体系"),
             "style_contract_ref": self._load_setting("风格契约"),
         }
+        if user_prompts:
+            global_ctx["user_prompts"] = user_prompts
 
         preferences = self._load_json_optional(self.config.webnovel_dir / "preferences.json")
         memory = self._load_json_optional(self.config.webnovel_dir / "project_memory.json")
@@ -818,6 +821,21 @@ class ContextManager:
         if matches:
             return matches[0].read_text(encoding="utf-8")
         return f"[{keyword}设定未找到]"
+
+    def _load_user_prompts(self) -> str:
+        """加载设定集/prompts/ 下的所有 .md 文件，按文件名排序拼接。"""
+        prompts_dir = self.config.settings_dir / "prompts"
+        if not prompts_dir.is_dir():
+            return ""
+        parts = []
+        for f in sorted(prompts_dir.glob("*.md")):
+            try:
+                text = f.read_text(encoding="utf-8").strip()
+                if text:
+                    parts.append(f"## {f.stem}\n\n{text}")
+            except Exception:
+                continue
+        return "\n\n---\n\n".join(parts)
 
     def _extract_summary_excerpt(self, text: str, max_chars: int) -> str:
         if not text:
