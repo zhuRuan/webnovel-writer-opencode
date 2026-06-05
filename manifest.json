@@ -1,22 +1,17 @@
 {
-  "version": "v2.9.0-20260605.1501",
+  "version": "v2.9.0-20260605.1507",
   "tag": "v2.9.0",
-  "updated": "2026-06-05T15:01:08Z",
+  "updated": "2026-06-05T15:07:21Z",
   "changelog": [
     {
-      "hash": "5aa51ac",
+      "hash": "4c0fcf0",
       "type": "feat",
-      "message": "feat: \u9636\u6bb5 1 \u5199\u5165\u9632\u62a4 \u2014 OpenCode write guard + artifact validator"
+      "message": "feat: \u9636\u6bb5 2 \u5199\u5165\u95e8\u7981 \u2014 prewrite/precommit/postcommit gates"
     },
     {
-      "hash": "f81329b",
-      "type": "docs",
-      "message": "docs: Plugin Runtime Hardening \u5408\u5e76\u8ba1\u5212"
-    },
-    {
-      "hash": "050b50f",
+      "hash": "5167d8c",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260605.1112 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260605.1501 [skip ci]"
     }
   ],
   "files": {
@@ -1168,6 +1163,10 @@
       "sha256": "51bad9b054c6d0948975037f85d51f888c8f02bb9555ef87d6eaca5643435dc3",
       "size": 2320
     },
+    ".opencode/scripts/data_modules/tests/test_write_gates.py": {
+      "sha256": "9c87e1e1c12df4b39540e0996a97a28e8c808f5e0ccc4ad112a8b1d35f653376",
+      "size": 3089
+    },
     ".opencode/scripts/data_modules/tests/test_csv_config.py": {
       "sha256": "3eb8cb979ff9f8702bcfe049157ba0570778cbb5325e03be3e541cd6a3ac17c9",
       "size": 2707
@@ -1223,6 +1222,22 @@
     ".opencode/scripts/data_modules/tests/test_memory_schema_compat.py": {
       "sha256": "0d40e167be3794f3e5599d6847a46662a27a515894e994855567f60a61649c86",
       "size": 1295
+    },
+    ".opencode/scripts/data_modules/write_gates/postcommit.py": {
+      "sha256": "188e93b29fe8f305114f11c056fc5ac86a6fc62010306204e891ce85a1cb591e",
+      "size": 3934
+    },
+    ".opencode/scripts/data_modules/write_gates/prewrite.py": {
+      "sha256": "c6c6df0f7c42118ed836e602804fcf27b62f3467d8ba6497797352cb809cfe8b",
+      "size": 4219
+    },
+    ".opencode/scripts/data_modules/write_gates/__init__.py": {
+      "sha256": "8fe38ab67b93033ec477c2e321e9d438a4c277e729000acc88e8284b6c6b88df",
+      "size": 2967
+    },
+    ".opencode/scripts/data_modules/write_gates/precommit.py": {
+      "sha256": "32a997835e684c6c7bc617767589bc7a461789b5f2f6bdb4299919c2e9f53ad9",
+      "size": 2444
     },
     ".opencode/scripts/data_modules/memory/schema.py": {
       "sha256": "6b68ef11ef9827d2b69244991a65e7d82a6b0c572a6827a6b23961cb99da3ceb",
