@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260604.1547",
+  "version": "v2.9.0-20260605.1112",
   "tag": "v2.9.0",
-  "updated": "2026-06-04T15:47:50Z",
+  "updated": "2026-06-05T11:12:11Z",
   "changelog": [
     {
-      "hash": "8138e23",
-      "type": "feat",
-      "message": "feat: Dashboard \u6587\u98ce\u7f16\u8f91\u5668\u65b0\u589e'\u81ea\u5b9a\u4e49\u6587\u98ce'Tab"
+      "hash": "7afbdf8",
+      "type": "fix",
+      "message": "fix: \u81ea\u5b9a\u4e49\u6587\u98ce\u7f16\u8f91\u5668 3 \u9879\u4fee\u590d \u2014 loading \u5b88\u536b + \u6587\u4ef6\u540d\u9a8c\u8bc1\u4e00\u81f4\u6027"
     },
     {
-      "hash": "0c265d9",
+      "hash": "1573468",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260604.1515 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260604.1547 [skip ci]"
     }
   ],
   "files": {
@@ -1568,8 +1568,8 @@
       "size": 8662
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "bd0493240d583b18c3fcd21e95918456d08f7d2698d892a3a2ac59c68e6d9020",
-      "size": 56995
+      "sha256": "08a1e34a5982b04d4c0d3ad585e9c93c31d15a92d65d75bb8e850192ea0555da",
+      "size": 57129
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
@@ -1640,8 +1640,8 @@
       "size": 11328
     },
     ".opencode/dashboard/frontend/src/pages/StyleEditorPage.jsx": {
-      "sha256": "f89973ea357831d072e24a46ab8b8cb30096227e070a9fa5f77ffffc04e8939b",
-      "size": 39255
+      "sha256": "15fd4c5baab8ee841ccfbbd69e5d2cca90db4616f31fd854d1e7c72dc558841e",
+      "size": 39629
     },
     ".opencode/dashboard/frontend/src/pages/FilesPage.jsx": {
       "sha256": "167257b9ffb6e4e58c3f0f8fd13ee435256645ee855d6f0cd9ff375300718917",
