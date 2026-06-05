@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260605.1517",
+  "version": "v2.9.0-20260605.1523",
   "tag": "v2.9.0",
-  "updated": "2026-06-05T15:17:05Z",
+  "updated": "2026-06-05T15:23:37Z",
   "changelog": [
     {
-      "hash": "942597a",
-      "type": "feat",
-      "message": "feat: \u9636\u6bb5 3 \u8bca\u65ad\u5de5\u5177 \u2014 doctor.py + webnovel-doctor skill"
+      "hash": "550fae9",
+      "type": "fix",
+      "message": "fix: doctor.py 3 \u9879\u4fee\u590d \u2014 integrity_check \u8fd4\u56de\u503c\u3001deep \u53c2\u6570\u3001\u5f02\u5e38\u541e\u6ca1"
     },
     {
-      "hash": "f8dbd30",
+      "hash": "1694896",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260605.1507 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260605.1517 [skip ci]"
     }
   ],
   "files": {
@@ -700,8 +700,8 @@
       "size": 2847
     },
     ".opencode/scripts/data_modules/doctor.py": {
-      "sha256": "634467322fd47e3494d35ce2bfcec37bf2a5b209bbadd15d28aaaa490cc0a39d",
-      "size": 11172
+      "sha256": "e1dc6713450daabfec0c2ed98f4f53dd11899651955378599f574bf2b75554ee",
+      "size": 11814
     },
     ".opencode/scripts/data_modules/memory_contract_adapter.py": {
       "sha256": "a206a37c859f69077f16aa8a311f6047991bc97dfaa2a9b78d54c72c607e71f3",
