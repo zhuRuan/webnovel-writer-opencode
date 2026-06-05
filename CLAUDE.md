@@ -231,3 +231,7 @@ E:\workspace\webnovel
 
 E:\workspace\webnovel-writer\外部参考\inkos
 E:\workspace\webnovel-writer\外部参考\webnovel-writer 原项目
+
+**opencode官方文档。**
+
+https://opencode.ai/docs/zh-cn/
