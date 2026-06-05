@@ -427,6 +427,10 @@ def main() -> None:
     p_status = sub.add_parser("status", help="转发到 status_reporter.py")
     p_status.add_argument("args", nargs=argparse.REMAINDER)
 
+    p_doctor = sub.add_parser("doctor", help="项目健康诊断")
+    p_doctor.add_argument("--format", choices=["json", "text"], default="text")
+    p_doctor.add_argument("--deep", action="store_true", help="深度检查")
+
     p_update_state = sub.add_parser("update-state", help="转发到 update_state.py")
     p_update_state.add_argument("args", nargs=argparse.REMAINDER)
 
@@ -612,6 +616,8 @@ def main() -> None:
 
     if tool == "status":
         raise SystemExit(_run_script("status_reporter.py", [*forward_args, *rest]))
+    if tool == "doctor":
+        raise SystemExit(_run_data_module("doctor", forward_args))
     if tool == "update-state":
         raise SystemExit(_run_script("update_state.py", [*forward_args, *rest]))
     if tool == "backup":

@@ -32,7 +32,7 @@ ALL_PROMPT_FILES = AGENT_FILES + SKILL_FILES
 REGISTERED_CLI_SUBCOMMANDS = {
     "where", "preflight", "use",
     "index", "state", "rag", "style", "entity", "context", "memory",
-    "migrate", "status", "update-state", "backup", "archive",
+    "migrate", "status", "update-state", "backup", "archive", "doctor",
     "init", "extract-context", "memory-contract", "project-memory", "review-pipeline",
     "placeholder-scan", "master-outline-sync",
     "story-system", "chapter-commit", "story-events", "knowledge",
