@@ -171,10 +171,21 @@ def _sqlite_checks(project_root: Path) -> List[Dict[str, Any]]:
                         f"运行 webnovel.py migrate 创建表",
                     ))
 
-            # 检查索引完整性
+            # 检查索引完整性（PRAGMA integrity_check 返回结果集，需检查内容）
             try:
-                conn.execute("PRAGMA integrity_check")
-                checks.append(_check("index.db 完整性", True, "info", "通过"))
+                integrity_result = conn.execute("PRAGMA integrity_check").fetchall()
+                is_ok = len(integrity_result) == 1 and integrity_result[0][0] == "ok"
+                if is_ok:
+                    checks.append(_check("index.db 完整性", True, "info", "通过"))
+                else:
+                    detail = "; ".join(str(row[0]) for row in integrity_result[:3])
+                    checks.append(_check(
+                        "index.db 完整性",
+                        False,
+                        "blocking",
+                        f"完整性检查未通过: {detail}",
+                        "运行 webnovel.py migrate 修复",
+                    ))
             except Exception as e:
                 checks.append(_check(
                     "index.db 完整性",
@@ -234,8 +245,13 @@ def _projection_checks(project_root: Path) -> List[Dict[str, Any]]:
                 "info",
                 f"committed: {committed}, rejected: {rejected}",
             ))
-        except Exception:
-            pass
+        except Exception as e:
+            checks.append(_check(
+                "章节状态",
+                False,
+                "warning",
+                f"读取失败: {e}",
+            ))
 
     return checks
 
@@ -275,7 +291,7 @@ def _python_checks() -> List[Dict[str, Any]]:
     return checks
 
 
-def build_doctor_report(project_root: Path, deep: bool = False) -> Dict[str, Any]:
+def build_doctor_report(project_root: Path) -> Dict[str, Any]:
     """构建完整诊断报告。"""
     all_checks = []
 
@@ -326,7 +342,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="项目健康诊断")
     parser.add_argument("--project-root", required=True)
     parser.add_argument("--format", choices=["json", "text"], default="text")
-    parser.add_argument("--deep", action="store_true", help="深度检查（含 dashboard）")
     args = parser.parse_args()
 
     project_root = Path(args.project_root).expanduser().resolve()
@@ -334,7 +349,7 @@ def main() -> None:
         print(f"错误: 项目目录不存在: {project_root}", file=sys.stderr)
         raise SystemExit(1)
 
-    report = build_doctor_report(project_root, deep=args.deep)
+    report = build_doctor_report(project_root)
     print(format_doctor_report(report, args.format))
 
     raise SystemExit(0 if report["ok"] else 1)
