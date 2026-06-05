@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260605.1507",
+  "version": "v2.9.0-20260605.1517",
   "tag": "v2.9.0",
-  "updated": "2026-06-05T15:07:21Z",
+  "updated": "2026-06-05T15:17:05Z",
   "changelog": [
     {
-      "hash": "4c0fcf0",
+      "hash": "942597a",
       "type": "feat",
-      "message": "feat: \u9636\u6bb5 2 \u5199\u5165\u95e8\u7981 \u2014 prewrite/precommit/postcommit gates"
+      "message": "feat: \u9636\u6bb5 3 \u8bca\u65ad\u5de5\u5177 \u2014 doctor.py + webnovel-doctor skill"
     },
     {
-      "hash": "5167d8c",
+      "hash": "f8dbd30",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260605.1501 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260605.1507 [skip ci]"
     }
   ],
   "files": {
@@ -274,6 +274,10 @@
     ".opencode/skills/webnovel-write/references/writing/desire-description.md": {
       "sha256": "9998184cc6044263afe110abd7b342d972ba95cd3829b7ebc00b47298595d9c5",
       "size": 7128
+    },
+    ".opencode/skills/webnovel-doctor/SKILL.md": {
+      "sha256": "5bb5a1fd45165545c2fb5a65cd1adc92f2a3cd60aa60897fd20f15df5848f615",
+      "size": 1810
     },
     ".opencode/skills/webnovel-delete/SKILL.md": {
       "sha256": "fab865eb9bee3bf95ca7ea7bc86b23a50dfee04e31719e72611a0dde3b61ad14",
@@ -695,6 +699,10 @@
       "sha256": "cb530504a2bc129453777d56a3b13af2e01fefdfb86148dacac66d48636f2d31",
       "size": 2847
     },
+    ".opencode/scripts/data_modules/doctor.py": {
+      "sha256": "634467322fd47e3494d35ce2bfcec37bf2a5b209bbadd15d28aaaa490cc0a39d",
+      "size": 11172
+    },
     ".opencode/scripts/data_modules/memory_contract_adapter.py": {
       "sha256": "a206a37c859f69077f16aa8a311f6047991bc97dfaa2a9b78d54c72c607e71f3",
       "size": 13816
@@ -828,8 +836,8 @@
       "size": 8674
     },
     ".opencode/scripts/data_modules/webnovel.py": {
-      "sha256": "0fb02b99309d6468d89e8a175e1ecf089ef096120ef0f07e36f102096e13ceae",
-      "size": 33585
+      "sha256": "63899febae37d90cd746dcb36b6977a37d0af6e46ce6c7d42d3ca85c0c49562a",
+      "size": 33903
     },
     ".opencode/scripts/data_modules/amend_proposal_schema.py": {
       "sha256": "809c9d24c2863535c4e55f604c295dea23556fce7805f20e250b792cf67f1691",
@@ -1056,8 +1064,8 @@
       "size": 2634
     },
     ".opencode/scripts/data_modules/tests/test_prompt_integrity.py": {
-      "sha256": "1a8e0278c9e1d9eeaf99eb7f98b6710eb6aa68aa2ca566929a42c69692f3bfd4",
-      "size": 19095
+      "sha256": "c43f625a368a5f113217facb4b53e41b917baaf89e8dcedad08864ba73580386",
+      "size": 19105
     },
     ".opencode/scripts/data_modules/tests/test_review_schema.py": {
       "sha256": "fad52f6cf3aeffb64bc54956438677457ad2083d98a79f39a6c24fe7b90d7bf4",
