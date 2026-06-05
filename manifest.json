@@ -1,17 +1,22 @@
 {
-  "version": "v2.9.0-20260605.1112",
+  "version": "v2.9.0-20260605.1501",
   "tag": "v2.9.0",
-  "updated": "2026-06-05T11:12:11Z",
+  "updated": "2026-06-05T15:01:08Z",
   "changelog": [
     {
-      "hash": "7afbdf8",
-      "type": "fix",
-      "message": "fix: \u81ea\u5b9a\u4e49\u6587\u98ce\u7f16\u8f91\u5668 3 \u9879\u4fee\u590d \u2014 loading \u5b88\u536b + \u6587\u4ef6\u540d\u9a8c\u8bc1\u4e00\u81f4\u6027"
+      "hash": "5aa51ac",
+      "type": "feat",
+      "message": "feat: \u9636\u6bb5 1 \u5199\u5165\u9632\u62a4 \u2014 OpenCode write guard + artifact validator"
     },
     {
-      "hash": "1573468",
+      "hash": "f81329b",
+      "type": "docs",
+      "message": "docs: Plugin Runtime Hardening \u5408\u5e76\u8ba1\u5212"
+    },
+    {
+      "hash": "050b50f",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260604.1547 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260605.1112 [skip ci]"
     }
   ],
   "files": {
@@ -58,6 +63,10 @@
     ".opencode/installer/ui.py": {
       "sha256": "2e77fbd5d1131214668717f8cc900ea04d8d82a996af71184102786673e99699",
       "size": 4501
+    },
+    ".opencode/plugins/write-guard.js": {
+      "sha256": "275b8c56369d470b165a4f9ece5d5f8beb6ed94032c994cf9e98d171b24c6ee0",
+      "size": 2944
     },
     ".opencode/skills/webnovel-heal/SKILL.md": {
       "sha256": "96a3a92881168c108110436e9054ee3d41e11c3586158bff6feb37533e2498f2",
@@ -831,6 +840,10 @@
       "sha256": "809c9d24c2863535c4e55f604c295dea23556fce7805f20e250b792cf67f1691",
       "size": 318
     },
+    ".opencode/scripts/data_modules/artifact_validator.py": {
+      "sha256": "d76c81649ae0f1aaa8567df1b98e8a4110c58126bb83aef2fefb02dedc6cdd91",
+      "size": 8715
+    },
     ".opencode/scripts/data_modules/query_router.py": {
       "sha256": "dd507f4c92f707f0226ed8f8b05f5d108705cd3490775ad0eac43dd9b732be7c",
       "size": 4683
@@ -966,6 +979,10 @@
     ".opencode/scripts/data_modules/tests/test_event_projection_router.py": {
       "sha256": "2d85a8681a3614b7660ac59a1efda8379d43fed7e124e3ced937a4dfc2320fe3",
       "size": 3531
+    },
+    ".opencode/scripts/data_modules/tests/test_artifact_validator.py": {
+      "sha256": "fc476a380387804add8524a066d77d3d414957c88adf1d0cf13c1c1958a16571",
+      "size": 4342
     },
     ".opencode/scripts/data_modules/tests/test_extract_chapter_context.py": {
       "sha256": "35cec8447d414d01dbbdfee325f609f3b914b2ebb0becd378eec6bce7e5f9842",
