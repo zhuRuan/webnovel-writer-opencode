@@ -220,6 +220,19 @@ Before implementing:
 
 For multi-step tasks, state a brief plan with verification per step. Strong success criteria enable independent iteration.
 
+### 5. OpenCode 文档优先
+
+修改 OpenCode 相关目录前，必须先阅读对应文档：
+
+| 目录 | 文档 |
+|------|------|
+| `.opencode/agents/` | https://opencode.ai/docs/zh-cn/agents/ |
+| `.opencode/skills/` | https://opencode.ai/docs/zh-cn/skills/ |
+| `.opencode/plugins/` | https://opencode.ai/docs/zh-cn/plugins/ |
+| 其他 OpenCode 相关 | https://opencode.ai/docs/zh-cn/ |
+
+原因：OpenCode 的 agent/skill/plugin 有特定的 frontmatter 格式、生命周期 hook、权限模型。不了解规范就修改会导致功能异常或兼容性问题。
+
 ## 外置
 
 **实际写小说的目录。**
