@@ -1219,10 +1219,12 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             raise HTTPException(400, "name 不能为空")
         if not content:
             raise HTTPException(400, "content 不能为空")
-        # 文件名安全检查
-        safe_name = "".join(c for c in name if c.isalnum() or c in "_- ")
-        if not safe_name:
+        # 文件名安全检查：禁止路径穿越，允许中文/英文/数字/空格
+        if "/" in name or "\\" in name or ".." in name:
             raise HTTPException(400, "文件名包含非法字符")
+        safe_name = name.strip()
+        if not safe_name:
+            raise HTTPException(400, "文件名不能为空")
 
         prompts_dir = _get_project_root() / "设定集" / "prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)

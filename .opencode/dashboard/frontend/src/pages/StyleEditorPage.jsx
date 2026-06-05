@@ -41,6 +41,7 @@ function PromptsTab() {
     const [newName, setNewName] = useState('')
     const [newContent, setNewContent] = useState('')
     const [msg, setMsg] = useState(null)
+    const [loading, setLoading] = useState(false)
 
     const reload = useCallback(() => {
         fetchPrompts().then(d => setPrompts(d.prompts || [])).catch(e => setError(e.message))
@@ -49,8 +50,8 @@ function PromptsTab() {
     useEffect(() => { reload() }, [reload])
 
     const handleCreate = async () => {
-        if (!newName.trim() || !newContent.trim()) return
-        setMsg(null)
+        if (!newName.trim() || !newContent.trim() || loading) return
+        setLoading(true); setMsg(null)
         try {
             await createPrompt(newName.trim(), newContent.trim())
             setNewName(''); setNewContent(''); setCreating(false)
@@ -58,12 +59,12 @@ function PromptsTab() {
             reload()
         } catch (e) {
             setMsg({ type: 'error', text: e.message })
-        }
+        } finally { setLoading(false) }
     }
 
     const handleSave = async () => {
-        if (!editing) return
-        setMsg(null)
+        if (!editing || loading) return
+        setLoading(true); setMsg(null)
         try {
             await updatePrompt(editing.filename, editing.content)
             setEditing(null)
@@ -71,12 +72,13 @@ function PromptsTab() {
             reload()
         } catch (e) {
             setMsg({ type: 'error', text: e.message })
-        }
+        } finally { setLoading(false) }
     }
 
     const handleDelete = async (filename) => {
+        if (loading) return
         if (!confirm(`确认删除提示词文件 ${filename}？`)) return
-        setMsg(null)
+        setLoading(true); setMsg(null)
         try {
             await deletePrompt(filename)
             if (editing?.filename === filename) setEditing(null)
@@ -84,7 +86,7 @@ function PromptsTab() {
             reload()
         } catch (e) {
             setMsg({ type: 'error', text: e.message })
-        }
+        } finally { setLoading(false) }
     }
 
     return (
@@ -149,8 +151,8 @@ function PromptsTab() {
                         }}
                     />
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                        <button className="page-btn" onClick={handleSave}>保存</button>
-                        <button className="page-btn" style={{ background: '#fff8e6' }} onClick={() => setEditing(null)}>取消</button>
+                        <button className="page-btn" onClick={handleSave} disabled={loading}>{loading ? '保存中...' : '保存'}</button>
+                        <button className="page-btn" style={{ background: '#fff8e6' }} onClick={() => setEditing(null)} disabled={loading}>取消</button>
                     </div>
                 </div>
             )}
@@ -184,8 +186,8 @@ function PromptsTab() {
                         }}
                     />
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                        <button className="page-btn" onClick={handleCreate} disabled={!newName.trim() || !newContent.trim()}>创建</button>
-                        <button className="page-btn" style={{ background: '#fff8e6' }} onClick={() => { setCreating(false); setNewName(''); setNewContent('') }}>取消</button>
+                        <button className="page-btn" onClick={handleCreate} disabled={!newName.trim() || !newContent.trim() || loading}>{loading ? '创建中...' : '创建'}</button>
+                        <button className="page-btn" style={{ background: '#fff8e6' }} onClick={() => { setCreating(false); setNewName(''); setNewContent('') }} disabled={loading}>取消</button>
                     </div>
                 </div>
             ) : (
