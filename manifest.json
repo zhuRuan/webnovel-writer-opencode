@@ -1,17 +1,22 @@
 {
-  "version": "v2.9.0-20260605.1523",
+  "version": "v2.9.0-20260606.1623",
   "tag": "v2.9.0",
-  "updated": "2026-06-05T15:23:37Z",
+  "updated": "2026-06-06T16:23:10Z",
   "changelog": [
     {
-      "hash": "550fae9",
-      "type": "fix",
-      "message": "fix: doctor.py 3 \u9879\u4fee\u590d \u2014 integrity_check \u8fd4\u56de\u503c\u3001deep \u53c2\u6570\u3001\u5f02\u5e38\u541e\u6ca1"
+      "hash": "0a989f3",
+      "type": "feat",
+      "message": "feat: dashboard Phase 4-10 \u5b9e\u73b0 \u2014 \u4e0a\u4e0b\u6587\u5065\u5eb7\u3001\u5b9e\u4f53\u65f6\u95f4\u7ebf\u3001\u5ba1\u67e5\u5206\u6790\u3001\u4f0f\u7b14\u63d0\u9192\u3001\u6697\u8272\u6a21\u5f0f\u3001\u6279\u91cf\u64cd\u4f5c"
     },
     {
-      "hash": "1694896",
+      "hash": "018a4d5",
+      "type": "docs",
+      "message": "docs: \u6dfb\u52a0 OpenCode \u6587\u6863\u4f18\u5148\u89c4\u5219"
+    },
+    {
+      "hash": "0d9ad96",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260605.1517 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260605.1523 [skip ci]"
     }
   ],
   "files": {
@@ -92,8 +97,8 @@
       "size": 8695
     },
     ".opencode/skills/webnovel-dashboard/SKILL.md": {
-      "sha256": "ad313d6d7bc59e14e1da2456e9b32afeaf0dcb8e155115e47e0ab137b36536b9",
-      "size": 5090
+      "sha256": "4422bd119ee6940abbb847a3c759307e6d07abac916939cc8754986859d2e2da",
+      "size": 6894
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
       "sha256": "8ab14088472271affe733b28c27a8b60d3595fc260602b27b46fccbb789345c5",
@@ -1608,8 +1613,8 @@
       "size": 8662
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "08a1e34a5982b04d4c0d3ad585e9c93c31d15a92d65d75bb8e850192ea0555da",
-      "size": 57129
+      "sha256": "978934e1fa772b0dd059bd8399e43afe85d3557b03ba1c555e1d2978b13a1016",
+      "size": 69816
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
@@ -1656,48 +1661,56 @@
       "size": 8580
     },
     ".opencode/dashboard/frontend/src/icons.jsx": {
-      "sha256": "7a3a6541e1b7fe27863a43bf49e72bd5555d8e30ecb78375ad142723599f9919",
-      "size": 5081
+      "sha256": "d6d26715870b66e11cd0a6deff2a71453f6e02cf0ed60fdff497a446d6658431",
+      "size": 5740
     },
     ".opencode/dashboard/frontend/src/main.jsx": {
-      "sha256": "6ea97c76aff0ad89ce3aaac3ecff6cd83d210d17b7475da0238ec3953b81e295",
-      "size": 2894
+      "sha256": "168ce71b9c4e2d3e9351149c16f75f2a6846b22d5939e94b2cb60eb59fc13e09",
+      "size": 3217
     },
     ".opencode/dashboard/frontend/src/api.js": {
-      "sha256": "40ea461b86756326cd82908092eccf7925ed4853321600df951994be53ccd2d5",
-      "size": 4897
+      "sha256": "3466e154341d68fe280d85aeb8e811290dda931bbe88bdf2af987887deac73d9",
+      "size": 5799
     },
     ".opencode/dashboard/frontend/src/App.jsx": {
-      "sha256": "2d4a583cd98d2f3fc55b004506c0223a39c8a488f6763f8a241992a4756e2161",
-      "size": 3518
+      "sha256": "7147c4576a3b44cd287cf38a50d4f3e5137285367e6262df948c5ccbbd5cb830",
+      "size": 4830
     },
     ".opencode/dashboard/frontend/src/index.css": {
-      "sha256": "7f9ffcf2db2af27e4848c5f912dd58dae3b02ec188dd3ac33806bd3243bc0fda",
-      "size": 12722
+      "sha256": "1d79c2950911b0b2ba544e7dd080d4dd5e06b721ad12403d20e5bba4feee3504",
+      "size": 14260
     },
     ".opencode/dashboard/frontend/src/pages/PacingPage.jsx": {
       "sha256": "27f994a2b23ded446d8e21614c745419120779d5fa6f3c9ae42da59a9c40f1aa",
       "size": 11328
     },
     ".opencode/dashboard/frontend/src/pages/StyleEditorPage.jsx": {
-      "sha256": "15fd4c5baab8ee841ccfbbd69e5d2cca90db4616f31fd854d1e7c72dc558841e",
-      "size": 39629
+      "sha256": "27613da8f14bfb1cef922e4e5dc9c9d60a129fbd8aa97f459f8a0c20461c7990",
+      "size": 39784
     },
     ".opencode/dashboard/frontend/src/pages/FilesPage.jsx": {
       "sha256": "167257b9ffb6e4e58c3f0f8fd13ee435256645ee855d6f0cd9ff375300718917",
       "size": 7556
     },
+    ".opencode/dashboard/frontend/src/pages/ReviewAnalyticsPage.jsx": {
+      "sha256": "7db2c718bb8a23baf67533339d452d72d383996da8483061f18c461f42b76c45",
+      "size": 8894
+    },
     ".opencode/dashboard/frontend/src/pages/CharactersPage.jsx": {
-      "sha256": "749e675261074cf9bb78eadf433fe8cad4ff719b8f04fd07f16c14aa3406ce77",
-      "size": 19990
+      "sha256": "84b28dda2386dc7bcb71650f523f8cef758ec11e9209a79591bec2c0b0c69a5a",
+      "size": 28091
+    },
+    ".opencode/dashboard/frontend/src/pages/ContextHealthPage.jsx": {
+      "sha256": "7ceeac57105b66cb231f599872f31f6f36e1deadc74636230d088c3ae269367a",
+      "size": 14630
     },
     ".opencode/dashboard/frontend/src/pages/OverviewPage.jsx": {
-      "sha256": "763f12f0be6eadb4b58e6907c61f616d7f9a9ccec54ef1a7db95d5602cfd816d",
-      "size": 23674
+      "sha256": "bb40f109bcfe56176471f079d1e971e5a8ff201023f0c904afd67299db79c6e7",
+      "size": 24997
     },
     ".opencode/dashboard/frontend/src/pages/SystemPage.jsx": {
-      "sha256": "798ef7a5a2c837604afed3657603e62a9f0f12a9fc8ed37fe0ee1f7f75866277",
-      "size": 15944
+      "sha256": "a11d350137eea1d9ecc40ea0ad68932ada3a3987e521e8ace30f457a01eed30a",
+      "size": 21364
     },
     ".opencode/dashboard/frontend/src/pages/ForeshadowingPage.jsx": {
       "sha256": "a27a16cb8c2096b4dd072a4351b0c396149b69ae6aec55cd089d5fdb8a3d9a40",
