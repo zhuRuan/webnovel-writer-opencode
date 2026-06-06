@@ -4,7 +4,9 @@ import { fetchProjectInfo, subscribeSSE } from './api.js'
 import {
     BookmarkIcon,
     ChartBarIcon,
+    ClipboardIcon,
     FolderIcon,
+    LayersIcon,
     PenIcon,
     SlidersIcon,
     TrendingUpIcon,
@@ -15,13 +17,42 @@ import {
 
 const NAV_ITEMS = [
     { to: '/', label: '总览', icon: ChartBarIcon, end: true },
+    { to: '/context', label: '上下文健康', icon: LayersIcon },
     { to: '/characters', label: '角色图鉴', icon: UsersIcon },
+    { to: '/review', label: '审查分析', icon: ClipboardIcon },
     { to: '/pacing', label: '节奏雷达', icon: TrendingUpIcon },
     { to: '/foreshadowing', label: '伏笔追踪', icon: BookmarkIcon },
     { to: '/files', label: '文档浏览', icon: FolderIcon },
     { to: '/style', label: '文风约束', icon: PenIcon },
     { to: '/system', label: '系统状态', icon: SlidersIcon },
 ]
+
+function ThemeToggle() {
+    const [theme, setTheme] = useState(() => {
+        try { return localStorage.getItem('theme') || 'light' } catch { return 'light' }
+    })
+
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme)
+        try { localStorage.setItem('theme', theme) } catch {}
+    }, [theme])
+
+    return (
+        <button
+            className="theme-toggle"
+            onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+            title={theme === 'light' ? '切换到暗色模式' : '切换到亮色模式'}
+            style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 32, height: 32, border: '2px solid var(--border-main)',
+                background: 'transparent', cursor: 'pointer', fontSize: 16,
+                borderRadius: 0,
+            }}
+        >
+            {theme === 'light' ? '🌙' : '☀️'}
+        </button>
+    )
+}
 
 export default function App() {
     const [projectInfo, setProjectInfo] = useState(null)
@@ -62,9 +93,12 @@ export default function App() {
     return (
         <div className="app-layout">
             <aside className="sidebar">
-                <div className="sidebar-header">
+                <div className="sidebar-header" style={{ position: 'relative' }}>
                     <h1>PIXEL WRITER HUB</h1>
                     <div className="subtitle" title={title}>{title}</div>
+                    <div style={{ position: 'absolute', top: 12, right: 12 }}>
+                        <ThemeToggle />
+                    </div>
                 </div>
                 <nav className="sidebar-nav">
                     {NAV_ITEMS.map(item => {

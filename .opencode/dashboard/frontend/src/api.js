@@ -127,7 +127,7 @@ export function addAntiPattern(text) {
 }
 
 export function deleteAntiPattern(text) {
-    return apiPost('/api/style/anti-patterns/delete', { text })
+    return apiDelete(`/api/style/anti-patterns?text=${encodeURIComponent(text)}`)
 }
 
 export function fetchTechniques() {
@@ -160,6 +160,35 @@ export function updatePrompt(filename, content) {
 
 export function deletePrompt(filename) {
     return apiDelete(`/api/style/prompts/${encodeURIComponent(filename)}`)
+}
+
+export function fetchContextHealth(chapter) {
+    return fetchJSON(`/api/context/health/${chapter}`)
+}
+
+export function fetchContextHistory(limit = 20) {
+    return fetchJSON('/api/context/history', { limit })
+}
+
+export function fetchEntityTimeline(entityId) {
+    return fetchJSON(`/api/entities/${encodeURIComponent(entityId)}/timeline`)
+}
+
+export function fetchConsistencyAnomalies(chapter) {
+    const params = chapter ? { chapter } : {}
+    return fetchJSON('/api/consistency/anomalies', params)
+}
+
+export function fetchReviewAnalytics(limit = 50) {
+    return fetchJSON('/api/review/analytics', { limit })
+}
+
+export function fetchForeshadowingReminders(threshold = 5) {
+    return fetchJSON('/api/foreshadowing/reminders', { threshold })
+}
+
+export function runBatchAction(action, chapters, confirm = false) {
+    return apiPost(`/api/batch/${action}`, { chapters, confirm })
 }
 
 export function subscribeSSE(onMessage, handlers = {}) {

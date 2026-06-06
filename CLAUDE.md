@@ -112,7 +112,7 @@ Code is organized as a pipeline — each layer feeds the next:
 
 **Runtime Artifacts** (v2.8) — `context_manager.build_context()` persists `.webnovel/runtime/chapter-NNN.context.json` (full context pack) and `.trace.json` (section inclusion/exclusion decisions) for post-hoc debugging.
 
-**Dashboard** — FastAPI backend (GET 查询 + 文风约束编辑 PUT/POST/DELETE) + React 19 frontend with ECharts visualization. Backend: `.opencode/dashboard/app.py`. Frontend: `.opencode/dashboard/frontend/`. 文风约束编辑器（`/style`）支持 5 层约束的可视化编辑：全局文风、禁止模式、写作技法、章级合同、审查维度。All SQL queries use parameterized `?` placeholders. CORS restricted to localhost. 项目根目录解析支持 5 级优先级（CLI > 环境变量 > CWD 向上搜索 > 指针文件 > 智能搜索）。
+**Dashboard** — FastAPI backend (GET 查询 + 文风约束编辑 PUT/POST/DELETE + 批量操作) + React 19 frontend with ECharts visualization. Backend: `.opencode/dashboard/app.py`. Frontend: `.opencode/dashboard/frontend/`. 9 个页面：总览、上下文健康、角色图鉴（含时间线）、审查分析、节奏雷达、伏笔追踪、文档浏览、文风约束（6 Tab）、系统状态（含批量操作）。支持亮色/暗色主题切换。文风约束编辑器（`/style`）支持 6 层约束的可视化编辑：自定义提示词、全局文风、禁止模式、写作技法、章级合同、审查维度。批量操作使用 `asyncio.create_subprocess_exec` 避免阻塞。关键 Section 列表可通过 `.webnovel/dashboard_config.json` 自定义。All SQL queries use parameterized `?` placeholders. CORS restricted to localhost. 项目根目录解析支持 5 级优先级（CLI > 环境变量 > CWD 向上搜索 > 指针文件 > 智能搜索）。
 
 ### OpenCode Integration
 

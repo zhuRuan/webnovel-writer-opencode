@@ -9,7 +9,6 @@ import {
     deleteAntiPattern,
     fetchTechniques,
     fetchChapterContracts,
-    fetchChapterContract,
     fetchReviewerChecklist,
     fetchPrompts,
     createPrompt,
@@ -206,9 +205,14 @@ function MasterSettingTab() {
     const [editing, setEditing] = useState({})
     const [saving, setSaving] = useState(false)
     const [msg, setMsg] = useState(null)
+    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        fetchMasterSetting().then(setData).catch(e => setData({ _error: e.message }))
+        setLoading(true)
+        fetchMasterSetting()
+            .then(setData)
+            .catch(e => setData({ _error: e.message }))
+            .finally(() => setLoading(false))
     }, [])
 
     const constraints = data?.master_constraints || {}
@@ -250,7 +254,7 @@ function MasterSettingTab() {
     const allKeys = Object.keys(constraints)
     const hasChanges = Object.keys(editing).length > 0
 
-    if (!data) return <div className="empty-state">加载中...</div>
+    if (loading) return <div className="empty-state">加载中...</div>
     if (data._error) return <div className="empty-state" style={{ color: 'var(--accent-red)' }}>加载失败: {data._error}</div>
     if (allKeys.length === 0) return <div className="empty-state">暂无 master_constraints 配置</div>
 
@@ -495,7 +499,7 @@ function TechniquesTab() {
                         <tbody>
                             {filtered.map((t, idx) => (
                                 <tr
-                                    key={idx}
+                                    key={t.id || idx}
                                     onClick={() => setExpanded(expanded === idx ? -1 : idx)}
                                     className={expanded === idx ? 'entity-row selected' : 'entity-row'}
                                 >
@@ -574,7 +578,7 @@ function ChapterContractTab() {
     useEffect(() => {
         if (selected == null) return
         const ctrl = new AbortController()
-        fetch(`/api/style/chapters/${selected}`)
+        fetch(`/api/style/chapters/${selected}`, { signal: ctrl.signal })
             .then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)))
             .then(d => { if (!ctrl.signal.aborted) setDetail(d) })
             .catch(() => { if (!ctrl.signal.aborted) setDetail(null) })

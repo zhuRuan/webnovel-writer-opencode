@@ -6,6 +6,7 @@ Webnovel Dashboard - FastAPI 主应用
 
 import asyncio
 import json
+import re
 import sqlite3
 import subprocess
 import sys
@@ -338,8 +339,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             if clauses:
                 q += " WHERE " + " AND ".join(clauses)
             q += " ORDER BY last_appearance DESC"
-            rows = _fetchall_safe(conn, q, tuple(params))
-            return [dict(r) for r in rows]
+            return _fetchall_safe(conn, q, tuple(params))
 
     @app.get("/api/entities/{entity_id}")
     def get_entity(entity_id: str):
@@ -348,6 +348,73 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             if not rows:
                 raise HTTPException(404, "实体不存在")
             return rows[0]
+
+    @app.get("/api/entities/{entity_id}/timeline")
+    def entity_timeline(entity_id: str):
+        """返回实体的完整状态变化时间线。"""
+        with closing(_get_db()) as conn:
+            changes = _fetchall_safe(conn,
+                "SELECT * FROM state_changes WHERE entity_id = ? ORDER BY chapter ASC",
+                (entity_id,))
+
+            # 使用 SQLite json_each 在 SQL 层过滤
+            appearances = _fetchall_safe(conn,
+                """SELECT DISTINCT s.chapter, s.scene_index, s.location, s.summary
+                   FROM scenes s, json_each(s.characters) je
+                   WHERE je.value = ?
+                   ORDER BY s.chapter ASC""",
+                (entity_id,))
+
+        return {"changes": changes, "appearances": appearances}
+
+    @app.get("/api/consistency/anomalies")
+    def consistency_anomalies(chapter: Optional[int] = None):
+        """检测实体状态异常跳变。"""
+        with closing(_get_db()) as conn:
+            if chapter is not None:
+                rows = _fetchall_safe(conn,
+                    "SELECT * FROM state_changes WHERE chapter <= ? ORDER BY chapter ASC, id ASC",
+                    (chapter,))
+            else:
+                rows = _fetchall_safe(conn,
+                    "SELECT * FROM state_changes ORDER BY chapter ASC, id ASC", ())
+
+        anomalies = []
+        entity_states = {}  # entity_id → {field: last_value}
+
+        for row in rows:
+            eid = row.get("entity_id")
+            field = row.get("field")
+            old_val = row.get("old_value")
+            new_val = row.get("new_value")
+            row_chapter = row.get("chapter")
+
+            if eid not in entity_states:
+                entity_states[eid] = {}
+            prev = entity_states[eid].get(field)
+
+            # 检测异常：值未实际改变
+            if prev is not None and new_val == prev:
+                anomalies.append({
+                    "type": "no_change",
+                    "entity_id": eid,
+                    "field": field,
+                    "chapter": row_chapter,
+                    "detail": f"{field} 从 {old_val} 变为 {new_val}，但值未实际改变",
+                })
+            # 检测异常：值回退到之前的状态
+            elif prev is not None and old_val is not None and new_val == old_val and new_val != prev:
+                anomalies.append({
+                    "type": "value_reverted",
+                    "entity_id": eid,
+                    "field": field,
+                    "chapter": row_chapter,
+                    "detail": f"{field} 回退到 {new_val}（之前是 {prev}）",
+                })
+
+            entity_states[eid][field] = new_val
+
+        return {"anomalies": anomalies, "total": len(anomalies)}
 
     @app.get("/api/relationships")
     def list_relationships(entity: Optional[str] = None, limit: int = 200):
@@ -416,6 +483,51 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 "severity_counts": _parse_json_value(r.get("severity_counts"), {}),
                 "critical_issues": _parse_json_value(r.get("critical_issues"), [])}
                 for r in rows]
+
+    @app.get("/api/review/analytics")
+    def review_analytics(limit: int = Query(50, ge=1, le=200)):
+        """返回审查结果的深度分析。"""
+        with closing(_get_db()) as conn:
+            rows = _fetchall_safe(conn,
+                "SELECT * FROM review_metrics ORDER BY end_chapter DESC LIMIT ?", (limit,))
+
+        if not rows:
+            return {"items": [], "summary": {}}
+
+        dimension_trends = {}
+        severity_totals = {}
+        all_critical_issues = []
+
+        for row in rows:
+            chapter = row.get("end_chapter", 0)
+            scores = _parse_json_value(row.get("dimension_scores"), {})
+            for dim, score in scores.items():
+                if dim not in dimension_trends:
+                    dimension_trends[dim] = []
+                dimension_trends[dim].append({"chapter": chapter, "score": score})
+
+            sev = _parse_json_value(row.get("severity_counts"), {})
+            for s, count in sev.items():
+                severity_totals[s] = severity_totals.get(s, 0) + count
+
+            issues = _parse_json_value(row.get("critical_issues"), [])
+            all_critical_issues.extend(issues)
+
+        dimension_averages = {}
+        for dim, points in dimension_trends.items():
+            valid_scores = [p["score"] for p in points if p["score"] is not None]
+            dimension_averages[dim] = sum(valid_scores) / len(valid_scores) if valid_scores else 0
+
+        weakest = sorted(dimension_averages.items(), key=lambda x: x[1])[:3]
+
+        return {
+            "dimension_trends": dimension_trends,
+            "dimension_averages": dimension_averages,
+            "weakest_dimensions": [{"dimension": d, "avg_score": s} for d, s in weakest],
+            "severity_totals": severity_totals,
+            "critical_issues": all_critical_issues[:20],
+            "total_reviews": len(rows),
+        }
 
     @app.get("/api/stats/chapter-trend")
     def chapter_trend(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0)):
@@ -672,6 +784,20 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 (limit,),
             )
 
+    @app.get("/api/foreshadowing/reminders")
+    def foreshadowing_reminders(threshold: int = Query(5, ge=1, le=20)):
+        """返回即将到期的伏笔提醒。"""
+        state = _load_state_payload()
+        current_chapter = int((state.get("progress") or {}).get("current_chapter") or 0)
+        with closing(_get_db()) as conn:
+            rows = _fetchall_safe(conn,
+                """SELECT * FROM chase_debt
+                   WHERE status IN ('active', 'overdue')
+                   AND due_chapter <= ? AND due_chapter >= ?
+                   ORDER BY due_chapter ASC""",
+                (current_chapter + threshold, current_chapter))
+        return {"reminders": rows, "current_chapter": current_chapter}
+
     @app.get("/api/invalid-facts")
     def list_invalid_facts(status: Optional[str] = None, limit: int = 100):
         with closing(_get_db()) as conn:
@@ -861,6 +987,93 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             raise HTTPException(404, "trace 文件不存在")
         return json.loads(trace_file.read_text(encoding="utf-8"))
 
+    # 关键 section 列表（被排除时应告警，可通过 dashboard_config.json 覆盖）
+    _DEFAULT_CRITICAL_SECTIONS = {"core", "scene", "story_contract", "user_prompts"}
+
+    def _get_critical_sections() -> set:
+        """每次调用重新读取配置，支持运行时修改。"""
+        config_path = _get_project_root() / ".webnovel" / "dashboard_config.json"
+        if config_path.is_file():
+            try:
+                cfg = json.loads(config_path.read_text(encoding="utf-8"))
+                if isinstance(cfg.get("critical_sections"), list):
+                    return set(cfg["critical_sections"])
+            except (OSError, json.JSONDecodeError):
+                pass
+        return _DEFAULT_CRITICAL_SECTIONS
+
+    @app.get("/api/context/health/{chapter}")
+    def context_health(chapter: int):
+        """返回指定章的上下文健康度报告。"""
+        runtime_dir = _webnovel_dir() / "runtime"
+        trace_file = runtime_dir / f"chapter-{chapter:03d}.trace.json"
+        context_file = runtime_dir / f"chapter-{chapter:03d}.context.json"
+
+        if not trace_file.is_file():
+            raise HTTPException(404, "trace 文件不存在")
+
+        trace = json.loads(trace_file.read_text(encoding="utf-8"))
+        sections = trace.get("sections", {})
+        included = sections.get("included", [])
+        excluded = sections.get("excluded", [])
+
+        # 从 context.json 估算 token 数（粗略：len/2，中文偏低约 30%）
+        total_tokens = 0
+        section_tokens = {}
+        if context_file.is_file():
+            try:
+                ctx = json.loads(context_file.read_text(encoding="utf-8"))
+                for name, content in ctx.items():
+                    text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+                    tokens = len(text) // 2
+                    section_tokens[name] = tokens
+                    total_tokens += tokens
+            except (OSError, json.JSONDecodeError):
+                pass
+
+        critical_excluded = [s for s in excluded if s in _get_critical_sections()]
+        health_score = 100 - len(critical_excluded) * 20
+
+        return {
+            "chapter": chapter,
+            "stage": trace.get("stage", "unknown"),
+            "template": trace.get("template", "default"),
+            "included": included,
+            "excluded": excluded,
+            "critical_excluded": critical_excluded,
+            "section_tokens": section_tokens,
+            "total_tokens": total_tokens,
+            "health_score": max(0, health_score),
+            "weights_used": trace.get("weights_used", {}),
+            "ranker_enabled": trace.get("ranker", {}).get("enabled", False),
+        }
+
+    @app.get("/api/context/history")
+    def context_history(limit: int = Query(20, ge=1, le=100)):
+        """返回最近 N 章的上下文健康度趋势。"""
+        runtime_dir = _webnovel_dir() / "runtime"
+        if not runtime_dir.is_dir():
+            return {"items": []}
+
+        items = []
+        for trace_file in sorted(runtime_dir.glob("chapter-*.trace.json"), reverse=True)[:limit]:
+            try:
+                trace = json.loads(trace_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            sections = trace.get("sections", {})
+            excluded = sections.get("excluded", [])
+            critical_excluded = [s for s in excluded if s in _get_critical_sections()]
+            items.append({
+                "chapter": trace.get("chapter", 0),
+                "stage": trace.get("stage", "unknown"),
+                "template": trace.get("template", "default"),
+                "included_count": len(sections.get("included", [])),
+                "excluded_count": len(excluded),
+                "critical_excluded_count": len(critical_excluded),
+            })
+        return {"items": list(reversed(items))}
+
     # ===========================================================
     # API：质量预警
     # ===========================================================
@@ -869,20 +1082,18 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         db_path = project_root / ".webnovel" / "index.db"
         if not db_path.is_file():
             return []
-        conn = sqlite3.connect(str(db_path), timeout=5)
-        conn.row_factory = sqlite3.Row
         try:
-            rows = conn.execute(
-                "SELECT end_chapter, overall_score FROM review_metrics ORDER BY end_chapter DESC LIMIT ?",
-                (n,),
-            ).fetchall()
-            return [{"chapter": r["end_chapter"], "score": r["overall_score"]} for r in rows]
+            with closing(sqlite3.connect(str(db_path), timeout=5)) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    "SELECT end_chapter, overall_score FROM review_metrics ORDER BY end_chapter DESC LIMIT ?",
+                    (n,),
+                ).fetchall()
+                return [{"chapter": r["end_chapter"], "score": r["overall_score"]} for r in rows]
         except sqlite3.Error:
             return []
-        finally:
-            conn.close()
 
-    @staticmethod
     def _is_declining(scores: list[dict], threshold: int = 3) -> bool:
         if len(scores) < threshold:
             return False
@@ -897,36 +1108,34 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         db_path = project_root / ".webnovel" / "index.db"
         if not db_path.is_file():
             return []
-        conn = sqlite3.connect(str(db_path), timeout=5)
-        conn.row_factory = sqlite3.Row
         try:
-            rows = conn.execute(
-                "SELECT id, note, due_chapter, source_chapter FROM chase_debt WHERE status = 'pending' AND due_chapter < ?",
-                (current_chapter,),
-            ).fetchall()
-            return [dict(r) for r in rows]
+            with closing(sqlite3.connect(str(db_path), timeout=5)) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    "SELECT id, debt_type, due_chapter, source_chapter FROM chase_debt WHERE status IN ('active', 'overdue') AND due_chapter < ?",
+                    (current_chapter,),
+                ).fetchall()
+                return [dict(r) for r in rows]
         except sqlite3.Error:
             return []
-        finally:
-            conn.close()
 
     def _get_long_absent_characters(project_root: Path, current_chapter: int, threshold: int = 20) -> list[dict]:
         db_path = project_root / ".webnovel" / "index.db"
         if not db_path.is_file():
             return []
-        conn = sqlite3.connect(str(db_path), timeout=5)
-        conn.row_factory = sqlite3.Row
         try:
-            rows = conn.execute(
-                "SELECT id, canonical_name, last_appearance FROM entities WHERE is_archived = 0 AND (? - last_appearance) > ?",
-                (current_chapter, threshold),
-            ).fetchall()
-            return [{"id": r["id"], "name": r["canonical_name"],
-                     "absent_chapters": current_chapter - int(r["last_appearance"] or 0)} for r in rows]
+            with closing(sqlite3.connect(str(db_path), timeout=5)) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    "SELECT id, canonical_name, last_appearance FROM entities WHERE is_archived = 0 AND (? - last_appearance) > ?",
+                    (current_chapter, threshold),
+                ).fetchall()
+                return [{"id": r["id"], "name": r["canonical_name"],
+                         "absent_chapters": current_chapter - int(r["last_appearance"] or 0)} for r in rows]
         except sqlite3.Error:
             return []
-        finally:
-            conn.close()
 
     @app.get("/api/alerts")
     def get_alerts():
@@ -946,7 +1155,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         overdue = _get_overdue_debts(project_root, current_chapter)
         for d in overdue:
             alerts.append({"type": "debt_overdue", "severity": "critical",
-                           "detail": d.get("note", ""), "due_chapter": d.get("due_chapter", 0)})
+                           "detail": d.get("debt_type", ""), "due_chapter": d.get("due_chapter", 0)})
 
         # Long-absent characters
         absent = _get_long_absent_characters(project_root, current_chapter)
@@ -1078,10 +1287,10 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
         return {"ok": True, "entry": entry, "total": len(existing)}
 
-    @app.post("/api/style/anti-patterns/delete")
-    def delete_anti_pattern(request: dict):
+    @app.delete("/api/style/anti-patterns")
+    def delete_anti_pattern(text: str = Query(..., min_length=1)):
         """按文本内容删除反模式（带文件锁防并发）。"""
-        text = (request.get("text") or "").strip()
+        text = text.strip()
         if not text:
             raise HTTPException(400, "text 不能为空")
 
@@ -1158,10 +1367,9 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         if not chapters_dir.is_dir():
             return {"chapters": []}
 
-        import re as re_mod
         result = []
-        for f in sorted(chapters_dir.glob("chapter_*.json"), key=lambda p: int(re_mod.search(r"(\d+)", p.name).group(1)) if re_mod.search(r"(\d+)", p.name) else 0):
-            m = re_mod.search(r"chapter_(\d+)\.json$", f.name)
+        for f in sorted(chapters_dir.glob("chapter_*.json"), key=lambda p: int(re.search(r"(\d+)", p.name).group(1)) if re.search(r"(\d+)", p.name) else 0):
+            m = re.search(r"chapter_(\d+)\.json$", f.name)
             if not m:
                 continue
             ch_num = int(m.group(1))
@@ -1219,12 +1427,14 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             raise HTTPException(400, "name 不能为空")
         if not content:
             raise HTTPException(400, "content 不能为空")
-        # 文件名安全检查：禁止路径穿越，允许中文/英文/数字/空格
-        if "/" in name or "\\" in name or ".." in name:
-            raise HTTPException(400, "文件名包含非法字符")
+        # 文件名安全检查：先 strip 再检查路径穿越
         safe_name = name.strip()
         if not safe_name:
             raise HTTPException(400, "文件名不能为空")
+        if "/" in safe_name or "\\" in safe_name or safe_name == "..":
+            raise HTTPException(400, "文件名包含非法字符")
+        if re.search(r'[:*?"<>|]', safe_name):
+            raise HTTPException(400, "文件名包含 Windows 保留字符: :*?\"<>|")
 
         prompts_dir = _get_project_root() / "设定集" / "prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)
@@ -1247,9 +1457,14 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         content = (request.get("content") or "").strip()
         if not content:
             raise HTTPException(400, "content 不能为空")
-        # 安全检查：禁止路径穿越
-        if "/" in filename or "\\" in filename or ".." in filename:
+        # 安全检查：先 strip 再检查路径穿越
+        filename = filename.strip()
+        if not filename:
             raise HTTPException(400, "非法文件名")
+        if "/" in filename or "\\" in filename or filename == "..":
+            raise HTTPException(400, "非法文件名")
+        if re.search(r'[:*?"<>|]', filename):
+            raise HTTPException(400, "文件名包含 Windows 保留字符")
 
         prompts_dir = _get_project_root() / "设定集" / "prompts"
         path = prompts_dir / filename
@@ -1268,8 +1483,13 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     @app.delete("/api/style/prompts/{filename}")
     def delete_prompt(filename: str):
         """删除提示词文件。"""
-        if "/" in filename or "\\" in filename or ".." in filename:
+        filename = filename.strip()
+        if not filename:
             raise HTTPException(400, "非法文件名")
+        if "/" in filename or "\\" in filename or filename == "..":
+            raise HTTPException(400, "非法文件名")
+        if re.search(r'[:*?"<>|]', filename):
+            raise HTTPException(400, "文件名包含 Windows 保留字符")
 
         prompts_dir = _get_project_root() / "设定集" / "prompts"
         path = prompts_dir / filename
@@ -1355,6 +1575,82 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             "stdout": result.stdout,
             "stderr": result.stderr,
             "code": result.returncode,
+        }
+
+    # ===========================================================
+    # API：批量操作
+    # ===========================================================
+
+    _BATCH_ACTIONS = {
+        "write": {
+            "cmd": ["orchestrate", "write"],
+            "timeout": 300,
+            "desc": "批量写入章节",
+        },
+        "delete": {
+            "cmd": ["delete-chapters"],
+            "timeout": 60,
+            "desc": "批量删除章节",
+        },
+    }
+
+    @app.post("/api/batch/{action}")
+    async def batch_action(action: str, request: dict):
+        """批量操作（write/delete），使用 async subprocess 避免阻塞。"""
+        if action not in _BATCH_ACTIONS:
+            raise HTTPException(403, f"不允许的批量操作: {action}")
+
+        chapters = request.get("chapters")
+        if not chapters:
+            raise HTTPException(400, "chapters 不能为空")
+        chapters = str(chapters).strip()
+        if not re.match(r'^[\d,\-\s]+$', chapters):
+            raise HTTPException(400, "chapters 格式无效，只允许数字、逗号、连字符")
+
+        spec = _BATCH_ACTIONS[action]
+        cmd = [
+            sys.executable, "-X", "utf8",
+            str(SCRIPTS_DIR / "webnovel.py"),
+            "--project-root", str(_get_project_root()),
+            *spec["cmd"], chapters,
+        ]
+
+        if action == "delete" and not request.get("confirm", False):
+            cmd.append("--dry-run")
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=spec["timeout"],
+            )
+        except asyncio.TimeoutError:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            raise HTTPException(504, f"批量操作超时（{spec['timeout']}s）")
+
+        result_stdout = stdout.decode("utf-8", errors="replace")
+        result_stderr = stderr.decode("utf-8", errors="replace")
+        result_code = proc.returncode or 0
+
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "batch-done", "action": action,
+                "code": result_code, "ts": time.time(),
+            }))
+        except Exception:
+            pass
+
+        return {
+            "action": action,
+            "desc": spec["desc"],
+            "stdout": result_stdout,
+            "stderr": result_stderr,
+            "code": result_code,
+            "dry_run": action == "delete" and not request.get("confirm", False),
         }
 
     # ===========================================================

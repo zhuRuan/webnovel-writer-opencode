@@ -14,13 +14,19 @@ compatibility: opencode
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
-| 总览 | `/` | 统计卡片、章节趋势、告警 |
-| 角色图鉴 | `/characters` | 实体列表、关系图谱 |
+| 总览 | `/` | 统计卡片、章节趋势、告警、伏笔提醒 |
+| 上下文健康 | `/context` | Token 预算、Section 状态、权重分布、历史趋势 |
+| 角色图鉴 | `/characters` | 实体列表、关系图谱、**时间线（状态变化+出场记录+异常检测）** |
+| 审查分析 | `/review` | 维度雷达图、严重程度分布、趋势折线图、Critical Issues |
 | 节奏雷达 | `/pacing` | 钩子强度、strand 分布、字数箱线图 |
 | 伏笔追踪 | `/foreshadowing` | 伏笔甘特图、债务表 |
 | 文档浏览 | `/files` | 文件树、正文预览 |
-| **文风约束** | `/style` | **编辑文风约束（5 Tab）** |
-| 系统状态 | `/system` | 合同树、提交历史、RAG 环境、运维操作 |
+| **文风约束** | `/style` | **编辑文风约束（6 Tab：自定义文风+全局+禁止+技法+合同+审查维度）** |
+| 系统状态 | `/system` | 合同树、提交历史、RAG 环境、运维操作、**批量操作** |
+
+### 主题
+
+支持亮色/暗色模式切换（侧边栏右上角 🌙/☀️ 按钮），偏好持久化到 localStorage。
 
 ## 文风约束编辑器（/style）
 
@@ -41,9 +47,37 @@ compatibility: opencode
 |----------|--------|------|
 | `/api/style/master-setting` | PUT | 更新 `master_constraints` |
 | `/api/style/anti-patterns` | POST | 追加反模式（自动去重） |
-| `/api/style/anti-patterns/delete` | POST | 按文本删除反模式 |
+| `/api/style/anti-patterns` | DELETE | 按文本删除反模式 |
+| `/api/style/prompts` | POST | 创建提示词文件 |
+| `/api/style/prompts/{filename}` | PUT | 更新提示词内容 |
+| `/api/style/prompts/{filename}` | DELETE | 删除提示词文件 |
+| `/api/actions/{action}` | POST | 运维操作（ssot-verify/rebuild, entity-clean） |
+| `/api/batch/{action}` | POST | 批量操作（write/delete，async 不阻塞） |
 
-写入操作通过 `atomic_write_json` 原子写入，带文件锁防并发。
+写入操作通过 `atomic_write_json` 原子写入，带文件锁防并发。批量操作使用 `asyncio.create_subprocess_exec` 避免阻塞 FastAPI 线程。
+
+### 只读 API
+
+| Endpoint | 功能 |
+|----------|------|
+| `/api/context/health/{chapter}` | 上下文健康度报告（Section 状态、Token 估算、关键排除告警） |
+| `/api/context/history` | 最近 N 章上下文健康趋势 |
+| `/api/entities/{id}/timeline` | 实体状态变化时间线 + 出场记录 |
+| `/api/consistency/anomalies` | 实体状态异常检测（值回退、无变化） |
+| `/api/review/analytics` | 审查维度分析（8 维度趋势、严重程度、weakest 3） |
+| `/api/foreshadowing/reminders` | 即将到期的伏笔提醒 |
+
+### 配置
+
+可通过 `.webnovel/dashboard_config.json` 自定义关键 Section 列表：
+
+```json
+{
+  "critical_sections": ["core", "scene", "story_contract", "user_prompts", "memory"]
+}
+```
+
+不配置时默认使用 `{"core", "scene", "story_contract", "user_prompts"}`。支持运行时修改（无需重启）。
 
 ## 环境设置
 

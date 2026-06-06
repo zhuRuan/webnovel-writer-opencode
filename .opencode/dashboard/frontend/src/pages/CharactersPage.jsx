@@ -5,6 +5,8 @@ import {
     fetchRelationships,
     fetchRelationshipEvents,
     fetchStateChanges,
+    fetchEntityTimeline,
+    fetchConsistencyAnomalies,
 } from '../api.js'
 import Badge from '../components/Badge.jsx'
 import ChartWrapper from '../components/ChartWrapper.jsx'
@@ -249,6 +251,8 @@ export default function CharactersPage() {
     const [typeFilter, setTypeFilter] = useState('')
     const [selected, setSelected] = useState(null)
     const [changes, setChanges] = useState([])
+    const [timeline, setTimeline] = useState(null)
+    const [anomalies, setAnomalies] = useState([])
     const [playing, setPlaying] = useState(false)
     const latestChapter = getLatestChapter(projectInfo)
     const [graphChapter, setGraphChapter] = useState(latestChapter)
@@ -264,6 +268,7 @@ export default function CharactersPage() {
             fetchEntities(),
             fetchRelationships({ limit: 1000 }),
             fetchRelationshipEvents({ limit: 5000 }),
+            fetchConsistencyAnomalies(),
         ]).then(results => {
             if (cancelled) return
 
@@ -271,6 +276,7 @@ export default function CharactersPage() {
             setEntities(entityRows)
             setRelationships(results[1].status === 'fulfilled' ? results[1].value : [])
             setRelationshipEvents(results[2].status === 'fulfilled' ? results[2].value : [])
+            setAnomalies(results[3].status === 'fulfilled' ? (results[3].value.anomalies || []) : [])
 
             if (entityRows.length) {
                 setSelected(current => current || entityRows[0])
@@ -285,20 +291,25 @@ export default function CharactersPage() {
     useEffect(() => {
         if (!selected?.id) {
             setChanges([])
+            setTimeline(null)
             return
         }
 
         let cancelled = false
         fetchStateChanges({ entity: selected.id, limit: 30 })
             .then(payload => {
-                if (!cancelled) {
-                    setChanges(payload)
-                }
+                if (!cancelled) setChanges(payload)
             })
             .catch(() => {
-                if (!cancelled) {
-                    setChanges([])
-                }
+                if (!cancelled) setChanges([])
+            })
+
+        fetchEntityTimeline(selected.id)
+            .then(payload => {
+                if (!cancelled) setTimeline(payload)
+            })
+            .catch(() => {
+                if (!cancelled) setTimeline(null)
             })
 
         return () => {
@@ -363,6 +374,14 @@ export default function CharactersPage() {
                     onClick={() => setTab('graph')}
                 >
                     关系图谱
+                </button>
+                <button
+                    type="button"
+                    className={`tab-btn ${tab === 'timeline' ? 'active' : ''}`.trim()}
+                    onClick={() => setTab('timeline')}
+                >
+                    时间线
+                    {anomalies.length > 0 && <Badge tone="red" style={{ marginLeft: 4 }}>{anomalies.length}</Badge>}
                 </button>
             </div>
 
@@ -446,7 +465,7 @@ export default function CharactersPage() {
                         </article>
                     </div>
                 </div>
-            ) : (
+            ) : tab === 'graph' ? (
                 <article className="card">
                     <div className="card-header">
                         <div>
@@ -505,6 +524,120 @@ export default function CharactersPage() {
                         </div>
                     )}
                 </article>
+            ) : (
+                /* 时间线 Tab */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* 异常告警 */}
+                    {anomalies.length > 0 && (
+                        <article className="card" style={{ borderColor: 'var(--accent-red)' }}>
+                            <div className="card-header">
+                                <span className="card-title" style={{ color: 'var(--accent-red)' }}>⚠ 状态异常检测</span>
+                                <Badge tone="red">{anomalies.length} 个异常</Badge>
+                            </div>
+                            <div className="table-wrap">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>实体</th>
+                                            <th>字段</th>
+                                            <th>章节</th>
+                                            <th>详情</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {anomalies.slice(0, 20).map((a, i) => (
+                                            <tr key={i}>
+                                                <td style={{ fontWeight: 700 }}>{a.entity_id}</td>
+                                                <td><Badge tone="amber">{a.field}</Badge></td>
+                                                <td>{formatChapterLabel(a.chapter)}</td>
+                                                <td style={{ fontSize: 13, color: 'var(--accent-red)' }}>{a.detail}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </article>
+                    )}
+
+                    {/* 实体时间线 */}
+                    {selected && timeline ? (
+                        <>
+                            <article className="card">
+                                <div className="card-header">
+                                    <span className="card-title">{selected.canonical_name} — 状态变化时间线</span>
+                                    <Badge tone="blue">{timeline.changes.length} 次变化</Badge>
+                                </div>
+                                {timeline.changes.length === 0 ? (
+                                    <div className="empty-state compact">暂无状态变化记录</div>
+                                ) : (
+                                    <div className="table-wrap">
+                                        <table className="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>章节</th>
+                                                    <th>字段</th>
+                                                    <th>旧值</th>
+                                                    <th>新值</th>
+                                                    <th>原因</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {timeline.changes.map((c, i) => (
+                                                    <tr key={i}>
+                                                        <td style={{ fontWeight: 700 }}>{formatChapterLabel(c.chapter)}</td>
+                                                        <td><Badge tone="neutral">{c.field}</Badge></td>
+                                                        <td style={{ color: 'var(--text-sub)' }}>{c.old_value ?? '—'}</td>
+                                                        <td style={{ fontWeight: 600 }}>{c.new_value ?? '—'}</td>
+                                                        <td style={{ fontSize: 13, color: 'var(--text-mute)' }}>{c.reason || '—'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </article>
+
+                            <article className="card">
+                                <div className="card-header">
+                                    <span className="card-title">{selected.canonical_name} — 出场记录</span>
+                                    <Badge tone="green">{timeline.appearances.length} 个场景</Badge>
+                                </div>
+                                {timeline.appearances.length === 0 ? (
+                                    <div className="empty-state compact">暂无出场记录</div>
+                                ) : (
+                                    <div className="table-wrap">
+                                        <table className="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>章节</th>
+                                                    <th>场景</th>
+                                                    <th>地点</th>
+                                                    <th>概要</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {timeline.appearances.map((a, i) => (
+                                                    <tr key={i}>
+                                                        <td style={{ fontWeight: 700 }}>{formatChapterLabel(a.chapter)}</td>
+                                                        <td>#{a.scene_index}</td>
+                                                        <td>{a.location || '—'}</td>
+                                                        <td style={{ fontSize: 13, color: 'var(--text-sub)' }}>
+                                                            {(a.summary || '').slice(0, 60)}{(a.summary || '').length > 60 ? '...' : ''}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </article>
+                        </>
+                    ) : selected ? (
+                        <div className="empty-state">加载时间线数据中...</div>
+                    ) : (
+                        <div className="empty-state">请先选择一个实体</div>
+                    )}
+                </div>
             )}
         </section>
     )

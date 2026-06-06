@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useDashboardContext } from '../App.jsx'
-import { fetchChapterTrend, fetchChapters, fetchStoryRuntimeHealth } from '../api.js'
+import { fetchChapterTrend, fetchChapters, fetchStoryRuntimeHealth, fetchForeshadowingReminders } from '../api.js'
 import Badge from '../components/Badge.jsx'
 import ChartWrapper from '../components/ChartWrapper.jsx'
 import DataTable from '../components/DataTable.jsx'
@@ -210,6 +210,7 @@ export default function OverviewPage() {
     const [loadingTrend, setLoadingTrend] = useState(true)
     const [workflow, setWorkflow] = useState({})
     const [alerts, setAlerts] = useState([])
+    const [reminders, setReminders] = useState([])
 
     useEffect(() => {
         setWindowIndex(0)
@@ -224,6 +225,7 @@ export default function OverviewPage() {
             fetchChapterTrend({ limit: WINDOW_SIZE, offset: 0 }),
             fetch('/api/workflow/status').then(r => r.json()).catch(() => ({})),
             fetch('/api/alerts').then(r => r.json()).catch(() => ({ alerts: [] })),
+            fetchForeshadowingReminders(5).catch(() => ({ reminders: [] })),
         ]).then(results => {
             if (cancelled) return
 
@@ -231,6 +233,7 @@ export default function OverviewPage() {
             setAllChapters(results[1].status === 'fulfilled' ? results[1].value : [])
             setWorkflow(results[3].status === 'fulfilled' ? results[3].value : {})
             setAlerts(results[4].status === 'fulfilled' ? (results[4].value.alerts || []) : [])
+            setReminders(results[5].status === 'fulfilled' ? (results[5].value.reminders || []) : [])
 
             const latest = results[2].status === 'fulfilled'
                 ? results[2].value
@@ -369,6 +372,21 @@ export default function OverviewPage() {
                             </div>
                         )
                     })}
+                </div>
+            )}
+
+            {reminders.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
+                    <div style={{ padding: '8px 12px', background: 'var(--bg-card-2)', border: '2px solid var(--accent-amber)', borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>📌</span>
+                        <span style={{ fontWeight: 700 }}>即将到期的伏笔 ({reminders.length})</span>
+                    </div>
+                    {reminders.slice(0, 3).map(r => (
+                        <div key={r.id} style={{ padding: '6px 12px', background: 'var(--bg-panel)', border: '1px solid var(--border-soft)', borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Badge tone="amber">{formatChapterLabel(r.due_chapter)}</Badge>
+                            <span>{r.debt_type || '未命名伏笔'}</span>
+                        </div>
+                    ))}
                 </div>
             )}
 
