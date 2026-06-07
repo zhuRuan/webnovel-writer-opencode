@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .chapter_commit_service import ChapterCommitService
+from .commit_artifacts import extraction_list
 from .config import DataModulesConfig, get_config
 from .urgency_utils import coerce_urgency
 from .memory_contract import (
@@ -134,9 +135,9 @@ class MemoryContractAdapter:
         summary_file = self.config.webnovel_dir / "summaries" / f"ch{chapter:04d}.md"
         return CommitResult(
             chapter=chapter,
-            entities_added=len(payload.get("entity_deltas") or []),
+            entities_added=len(extraction_list(payload, "entity_deltas")),
             entities_updated=0,
-            state_changes_recorded=len(payload.get("state_deltas") or []),
+            state_changes_recorded=len(extraction_list(payload, "state_deltas")),
             relationships_added=0,
             memory_items_added=0,
             summary_path=str(summary_file) if summary_file.exists() else "",

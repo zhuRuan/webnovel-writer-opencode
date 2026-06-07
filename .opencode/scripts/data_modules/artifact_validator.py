@@ -26,6 +26,7 @@ from .chapter_commit_schema import (
     FulfillmentResult,
     ReviewResult,
 )
+from .commit_artifacts import extraction_list
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ def _policy_issues(artifact_name: str, payload: Dict[str, Any]) -> List[Dict[str
             ))
 
     elif artifact_name == "extraction_result":
-        events = payload.get("accepted_events") or []
+        events = extraction_list(payload, "accepted_events")
         if not events:
             issues.append(_issue(
                 "no_events",

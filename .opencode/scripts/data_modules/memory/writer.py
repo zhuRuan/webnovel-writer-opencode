@@ -8,6 +8,8 @@ from __future__ import annotations
 import hashlib
 from typing import Any, Dict, List
 
+from ..commit_artifacts import extraction_list
+
 from ..config import DataModulesConfig, get_config
 from ..urgency_utils import coerce_urgency
 from .schema import MemoryItem
@@ -271,8 +273,8 @@ class MemoryWriter:
 
     def apply_commit_projection(self, commit_payload: Dict[str, Any]) -> Dict[str, Any]:
         chapter = int((commit_payload.get("meta") or {}).get("chapter") or 0)
-        entity_deltas = list(commit_payload.get("entity_deltas") or [])
-        accepted_events = list(commit_payload.get("accepted_events") or [])
+        entity_deltas = extraction_list(commit_payload, "entity_deltas")
+        accepted_events = extraction_list(commit_payload, "accepted_events")
 
         memory_facts: Dict[str, Any] = {
             "timeline_events": [],
@@ -358,7 +360,7 @@ class MemoryWriter:
                 and str(row.get("entity_id") or row.get("id") or "").strip()
                 and not (row.get("from_entity") or row.get("from"))
             ],
-            "state_changes": list(commit_payload.get("state_deltas") or []),
+            "state_changes": extraction_list(commit_payload, "state_deltas"),
             "relationships_new": [
                 {
                     "from": row.get("from_entity") or row.get("from"),
