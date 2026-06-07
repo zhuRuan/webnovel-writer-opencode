@@ -30,54 +30,11 @@ compatibility: opencode
 
 ## 文风约束编辑器（/style）
 
-5 个 Tab 对应 5 层文风约束：
+6 个 Tab：自定义文风（`设定集/prompts/*.md`，读写）、全局文风（`MASTER_SETTING.json`，读写）、禁止模式（`anti_patterns.json`，读写）、写作技法（CSV，只读）、章级合同（只读）、审查维度（只读）。
 
-| Tab | 数据源 | 读写 |
-|-----|--------|------|
-| **自定义文风** | `设定集/prompts/*.md` | **读写（新建+编辑+删除）** |
-| 全局文风 | `MASTER_SETTING.json` → `master_constraints` | 读写（locked 字段不可改） |
-| 禁止模式 | `anti_patterns.json` | 读写（增删） |
-| 写作技法 | `写作技法.csv`（104 条） | 只读（搜索+筛选+展开详情） |
-| 章级合同 | `.story-system/chapters/chapter_*.json` | 只读（章节选择+详情查看） |
-| 审查维度 | `reviewer.md` 6 维度 + `anti_patterns.json` | 只读 |
+## API 参考
 
-### 写入 API
-
-| Endpoint | Method | 功能 |
-|----------|--------|------|
-| `/api/style/master-setting` | PUT | 更新 `master_constraints` |
-| `/api/style/anti-patterns` | POST | 追加反模式（自动去重） |
-| `/api/style/anti-patterns` | DELETE | 按文本删除反模式 |
-| `/api/style/prompts` | POST | 创建提示词文件 |
-| `/api/style/prompts/{filename}` | PUT | 更新提示词内容 |
-| `/api/style/prompts/{filename}` | DELETE | 删除提示词文件 |
-| `/api/actions/{action}` | POST | 运维操作（ssot-verify/rebuild, entity-clean） |
-| `/api/batch/{action}` | POST | 批量操作（write/delete，async 不阻塞） |
-
-写入操作通过 `atomic_write_json` 原子写入，带文件锁防并发。批量操作使用 `asyncio.create_subprocess_exec` 避免阻塞 FastAPI 线程。
-
-### 只读 API
-
-| Endpoint | 功能 |
-|----------|------|
-| `/api/context/health/{chapter}` | 上下文健康度报告（Section 状态、Token 估算、关键排除告警） |
-| `/api/context/history` | 最近 N 章上下文健康趋势 |
-| `/api/entities/{id}/timeline` | 实体状态变化时间线 + 出场记录 |
-| `/api/consistency/anomalies` | 实体状态异常检测（值回退、无变化） |
-| `/api/review/analytics` | 审查维度分析（8 维度趋势、严重程度、weakest 3） |
-| `/api/foreshadowing/reminders` | 即将到期的伏笔提醒 |
-
-### 配置
-
-可通过 `.webnovel/dashboard_config.json` 自定义关键 Section 列表：
-
-```json
-{
-  "critical_sections": ["core", "scene", "story_contract", "user_prompts", "memory"]
-}
-```
-
-不配置时默认使用 `{"core", "scene", "story_contract", "user_prompts"}`。支持运行时修改（无需重启）。
+写入 API（8 个）、只读 API（6 个）、配置说明见 `references/dashboard-api.md`。
 
 ## 环境设置
 
