@@ -1,17 +1,22 @@
 {
-  "version": "v2.9.0-20260607.1216",
+  "version": "v2.9.0-20260607.1427",
   "tag": "v2.9.0",
-  "updated": "2026-06-07T12:16:46Z",
+  "updated": "2026-06-07T14:27:44Z",
   "changelog": [
     {
-      "hash": "6339e3a",
-      "type": "fix",
-      "message": "fix: \u8865\u5168 extraction \u6570\u636e\u7ed3\u6784\u8fc1\u79fb\u9057\u6f0f \u2014 _sync_foreshadowing\u3001memory writer\u3001artifact validator\u3001memory contract adapter"
+      "hash": "cf2b5b8",
+      "type": "test",
+      "message": "test: \u65b0\u589e commit_artifacts \u6a21\u5757\u6d4b\u8bd5\uff0821 \u4e2a\u7528\u4f8b\uff09"
     },
     {
-      "hash": "e482974",
+      "hash": "3abb7fc",
+      "type": "refactor",
+      "message": "refactor: \u589e\u5f3a artifact_validator \u2014 \u5e38\u91cf\u3001helper\u3001\u5d4c\u5957\u9a8c\u8bc1\u3001\u6295\u5f71\u5b8c\u6574\u6027\u68c0\u67e5"
+    },
+    {
+      "hash": "3c71964",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260607.1207 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260607.1216 [skip ci]"
     }
   ],
   "files": {
@@ -844,8 +849,8 @@
       "size": 318
     },
     ".opencode/scripts/data_modules/artifact_validator.py": {
-      "sha256": "0423548351fbff3157c60b0e89f52fd403e1af70a92bb258cf2e44a9c19f34fd",
-      "size": 8768
+      "sha256": "66a5d0c5780ff159f154cc32a031d4c978c5522fc19d1b076820c8d6d4879faa",
+      "size": 17460
     },
     ".opencode/scripts/data_modules/query_router.py": {
       "sha256": "dd507f4c92f707f0226ed8f8b05f5d108705cd3490775ad0eac43dd9b732be7c",
@@ -988,8 +993,8 @@
       "size": 3531
     },
     ".opencode/scripts/data_modules/tests/test_artifact_validator.py": {
-      "sha256": "fc476a380387804add8524a066d77d3d414957c88adf1d0cf13c1c1958a16571",
-      "size": 4342
+      "sha256": "7440b0b27ffca8863f74b416390192ae00d6a931912a4a43a5c01fdfcef7f5c0",
+      "size": 4880
     },
     ".opencode/scripts/data_modules/tests/test_extract_chapter_context.py": {
       "sha256": "35cec8447d414d01dbbdfee325f609f3b914b2ebb0becd378eec6bce7e5f9842",
@@ -1190,6 +1195,10 @@
     ".opencode/scripts/data_modules/tests/test_update_state_add_review_cli.py": {
       "sha256": "aefc1cf9c46f67cac4b63a552cb8ef5104bfb875e04ae450e1513f34edb60faa",
       "size": 1454
+    },
+    ".opencode/scripts/data_modules/tests/test_commit_artifacts.py": {
+      "sha256": "a940825f46f6989444fb860cefdb36dba39ff271652f8015806f3427aeb3bd26",
+      "size": 5861
     },
     ".opencode/scripts/data_modules/tests/test_context_manager.py": {
       "sha256": "78a3d8031b2a6a00de8399b62c5dd83fb5eca728d05866317daebe2867ba7c5b",
