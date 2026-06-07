@@ -74,12 +74,12 @@
 
 | 审查维度 | 检查重点 |
 |----------|----------|
-| High-point Checker | 爽点密度与质量 |
-| Consistency Checker | 设定一致性（战力/地点/时间线） |
-| Pacing Checker | Strand 比例与断档 |
-| OOC Checker | 人物行为是否偏离人设 |
-| Continuity Checker | 场景与叙事连贯性 |
-| Reader-pull Checker | 钩子强度、期待管理、追读力 |
+| 设定一致性 | 角色状态/世界规则/物品属性是否与 state.json 一致 |
+| 时间线 | 事件顺序/时间跨度是否合理 |
+| 叙事连贯 | 视角是否统一/场景切换是否有过渡 |
+| 角色一致性 | 对话风格/行为动机是否符合人设 |
+| 逻辑 | 因果关系/行为后果是否合理 |
+| 项目规则 | 破折号≤20、但≤6、不是X是Y≤1、句号≤70/千字、系统【】格式 |
 
 ### Observer Agent（提）
 
@@ -120,6 +120,26 @@ preflight / dashboard
 实际执行入口仍是 `ChapterCommitService.apply_projections()`。
 
 Phase 5 文档见：`docs/architecture/story-system-phase5.md`
+
+## Dashboard（可视化管理面板）
+
+FastAPI 后端 + React 19 前端，提供 9 个页面：
+
+| 页面 | 功能 |
+|------|------|
+| 总览 | 统计卡片、审查趋势、字数分布、伏笔提醒、workflow 进度 |
+| 上下文健康 | Token 预算、Section 状态、权重分布、历史趋势 |
+| 角色图鉴 | 实体列表、关系图谱、时间线（状态变化+出场记录+异常检测） |
+| 审查分析 | 8 维度雷达图、严重程度分布、趋势折线图、Critical Issues |
+| 节奏雷达 | 钩子强度趋势、Strand 堆叠分布、字数箱线图 |
+| 伏笔追踪 | 伏笔甘特图、债务表 |
+| 文档浏览 | 文件树、正文预览 |
+| 文风约束 | 自定义提示词、全局文风、禁止模式、写作技法、章级合同、审查维度 |
+| 系统状态 | 合同树、提交历史、RAG 环境、运维操作、批量操作 |
+
+支持亮色/暗色主题切换。关键 Section 列表可通过 `.webnovel/dashboard_config.json` 自定义。
+
+后端：`.opencode/dashboard/app.py`。前端：`.opencode/dashboard/frontend/`。发展规划：`docs/superpowers/specs/2026-06-06-dashboard-development-roadmap.md`。
 
 ## inkOS 启发改进
 

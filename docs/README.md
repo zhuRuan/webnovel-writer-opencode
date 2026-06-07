@@ -33,10 +33,12 @@
 
 - [`superpowers/README.md`](./superpowers/README.md)：架构 spec 与设计文档导航
 - [superpowers/specs/2026-05-25-inkos-inspired-improvements-design.md](./superpowers/specs/2026-05-25-inkos-inspired-improvements-design.md)：inkOS 借鉴改进设计文档
+- [superpowers/specs/2026-06-06-dashboard-development-roadmap.md](./superpowers/specs/2026-06-06-dashboard-development-roadmap.md)：看板发展规划（Phase 4-11，含实施状态）
 
 ### Plans
 
 - [superpowers/plans/2026-05-25-inkos-inspired-improvements-plan.md](./superpowers/plans/2026-05-25-inkos-inspired-improvements-plan.md)：inkOS 借鉴改进实现计划
+- [superpowers/plans/2026-05-25-dashboard-evolution-plan.md](./superpowers/plans/2026-05-25-dashboard-evolution-plan.md)：看板演进实现计划（Phase 1-3，已完成）
 
 ## 分类原则
 

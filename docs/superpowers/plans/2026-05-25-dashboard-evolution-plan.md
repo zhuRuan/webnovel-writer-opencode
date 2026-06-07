@@ -2,6 +2,7 @@
 
 > **目标**：将看板从只读观察窗升级为可操作的写作指挥中心
 > **顺序**：Phase 1（操作能力）→ Phase 2（实时监控）→ Phase 3（质量预警）
+> **状态**：✅ 已完成（2026-05）。Phase 4-10 已在 2026-06-06 完成，详见 [dashboard-development-roadmap.md](../specs/2026-06-06-dashboard-development-roadmap.md)
 
 ---
 
