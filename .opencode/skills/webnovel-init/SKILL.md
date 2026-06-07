@@ -230,63 +230,9 @@ Agent(
 
 ## 内部数据模型（初始化收集对象）
 
-```json
-{
-  "project": {
-    "title": "",
-    "genre": "",
-    "target_words": 0,
-    "target_chapters": 0,
-    "one_liner": "",
-    "core_conflict": "",
-    "target_reader": "",
-    "platform": ""
-  },
-  "protagonist": {
-    "name": "",
-    "desire": "",
-    "flaw": "",
-    "archetype": "",
-    "structure": "单主角"
-  },
-  "relationship": {
-    "heroine_config": "",
-    "heroine_names": [],
-    "heroine_role": "",
-    "co_protagonists": [],
-    "co_protagonist_roles": [],
-    "antagonist_tiers": {},
-    "antagonist_level": "",
-    "antagonist_mirror": ""
-  },
-  "golden_finger": {
-    "type": "",
-    "name": "",
-    "style": "",
-    "visibility": "",
-    "irreversible_cost": "",
-    "growth_rhythm": ""
-  },
-  "world": {
-    "scale": "",
-    "factions": "",
-    "power_system_type": "",
-    "social_class": "",
-    "resource_distribution": "",
-    "currency_system": "",
-    "currency_exchange": "",
-    "sect_hierarchy": "",
-    "cultivation_chain": "",
-    "cultivation_subtiers": ""
-  },
-  "constraints": {
-    "anti_trope": "",
-    "hard_constraints": [],
-    "core_selling_points": [],
-    "opening_hook": ""
-  }
-}
-```
+完整 JSON schema 和字段说明见 `references/init-collection-schema.md`。
+
+顶层字段：`project`（项目信息）、`protagonist`（主角）、`relationship`（关系与反派）、`golden_finger`（金手指）、`world`（世界观）、`constraints`（创意约束）。
 
 ## 充分性闸门（必须通过）
 
@@ -329,42 +275,21 @@ echo "PROJECT_ROOT=${PROJECT_ROOT}"
 ### 1) 运行初始化脚本
 
 ```bash
-python "${SCRIPTS_DIR}/webnovel.py" init \
-  "${PROJECT_ROOT}" \
-  "{title}" \
-  "{genre}" \
-  --protagonist-name "{protagonist_name}" \
-  --target-words {target_words} \
-  --target-chapters {target_chapters} \
-  --golden-finger-name "{gf_name}" \
-  --golden-finger-type "{gf_type}" \
-  --golden-finger-style "{gf_style}" \
-  --core-selling-points "{core_points}" \
-  --protagonist-structure "{protagonist_structure}" \
-  --heroine-config "{heroine_config}" \
-  --heroine-names "{heroine_names}" \
-  --heroine-role "{heroine_role}" \
-  --co-protagonists "{co_protagonists}" \
-  --co-protagonist-roles "{co_protagonist_roles}" \
-  --antagonist-tiers "{antagonist_tiers}" \
-  --world-scale "{world_scale}" \
-  --factions "{factions}" \
-  --power-system-type "{power_system_type}" \
-  --social-class "{social_class}" \
-  --resource-distribution "{resource_distribution}" \
-  --gf-visibility "{gf_visibility}" \
-  --gf-irreversible-cost "{gf_irreversible_cost}" \
-  --currency-system "{currency_system}" \
-  --currency-exchange "{currency_exchange}" \
-  --sect-hierarchy "{sect_hierarchy}" \
-  --cultivation-chain "{cultivation_chain}" \
-  --cultivation-subtiers "{cultivation_subtiers}" \
-  --protagonist-desire "{protagonist_desire}" \
-  --protagonist-flaw "{protagonist_flaw}" \
-  --protagonist-archetype "{protagonist_archetype}" \
-  --antagonist-level "{antagonist_level}" \
-  --target-reader "{target_reader}" \
-  --platform "{platform}"
+python "${SCRIPTS_DIR}/webnovel.py" init "${PROJECT_ROOT}" "{title}" "{genre}" \
+  --protagonist-name "{protagonist_name}" --target-words {target_words} --target-chapters {target_chapters} \
+  --golden-finger-name "{gf_name}" --golden-finger-type "{gf_type}" --golden-finger-style "{gf_style}" \
+  --core-selling-points "{core_points}" --protagonist-structure "{protagonist_structure}" \
+  --heroine-config "{heroine_config}" --heroine-names "{heroine_names}" --heroine-role "{heroine_role}" \
+  --co-protagonists "{co_protagonists}" --co-protagonist-roles "{co_protagonist_roles}" \
+  --antagonist-tiers "{antagonist_tiers}" --world-scale "{world_scale}" --factions "{factions}" \
+  --power-system-type "{power_system_type}" --social-class "{social_class}" \
+  --resource-distribution "{resource_distribution}" --gf-visibility "{gf_visibility}" \
+  --gf-irreversible-cost "{gf_irreversible_cost}" --currency-system "{currency_system}" \
+  --currency-exchange "{currency_exchange}" --sect-hierarchy "{sect_hierarchy}" \
+  --cultivation-chain "{cultivation_chain}" --cultivation-subtiers "{cultivation_subtiers}" \
+  --protagonist-desire "{protagonist_desire}" --protagonist-flaw "{protagonist_flaw}" \
+  --protagonist-archetype "{protagonist_archetype}" --antagonist-level "{antagonist_level}" \
+  --target-reader "{target_reader}" --platform "{platform}"
 ```
 
 ### 2) 写入 `idea_bank.json`
