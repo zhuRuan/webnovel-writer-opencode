@@ -1,22 +1,17 @@
 {
-  "version": "v2.9.0-20260607.1443",
+  "version": "v2.9.0-20260607.1608",
   "tag": "v2.9.0",
-  "updated": "2026-06-07T14:43:21Z",
+  "updated": "2026-06-07T16:08:32Z",
   "changelog": [
     {
-      "hash": "750d151",
+      "hash": "79a38b1",
       "type": "refactor",
-      "message": "refactor: webnovel-dashboard \u7626\u8eab 163\u2192120\uff0cAPI \u6587\u6863\u79fb\u5230 references/"
+      "message": "refactor: webnovel-write \u7626\u8eab 480\u2192333\uff0c\u5185\u8054\u811a\u672c\u79fb\u5230 references/"
     },
     {
-      "hash": "242b653",
-      "type": "refactor",
-      "message": "refactor: webnovel-init \u7626\u8eab 452\u2192377\uff0c\u5185\u90e8\u6570\u636e\u6a21\u578b\u79fb\u5230 references/"
-    },
-    {
-      "hash": "617fe2a",
+      "hash": "fea1503",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260607.1434 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260607.1443 [skip ci]"
     }
   ],
   "files": {
@@ -237,8 +232,8 @@
       "size": 5583
     },
     ".opencode/skills/webnovel-write/SKILL.md": {
-      "sha256": "652fbfc5b5d87eead42e702616b7264f81369b98e749b791e9278db6226cd99a",
-      "size": 18039
+      "sha256": "be7dbdb02ff547e47d890f29d54b2dfc66f8714d26256fcc8a75667632295c04",
+      "size": 13215
     },
     ".opencode/skills/webnovel-write/evals/evals.json": {
       "sha256": "d19b4b196c1637055371ad64899a74ae3d9b01d568bdb8e63c4f71835c8a16e3",
@@ -251,6 +246,10 @@
     ".opencode/skills/webnovel-write/references/polish-guide.md": {
       "sha256": "8ba21d32517598a80a083416225cacbce2f25cedfda6a91aea12a2b35437c87a",
       "size": 17905
+    },
+    ".opencode/skills/webnovel-write/references/self-check-evidence.md": {
+      "sha256": "a04543e3985b7692505731d528878d3cf0db5f8a30855eead89f7bf774fc02bb",
+      "size": 2094
     },
     ".opencode/skills/webnovel-write/references/anti-ai-guide.md": {
       "sha256": "fa60601e0080c47bbac1cf33e6d9372a3aa0725e9a005f155618820b1ce36685",
