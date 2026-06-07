@@ -1,27 +1,22 @@
 {
-  "version": "v2.9.0-20260607.1434",
+  "version": "v2.9.0-20260607.1443",
   "tag": "v2.9.0",
-  "updated": "2026-06-07T14:34:03Z",
+  "updated": "2026-06-07T14:43:21Z",
   "changelog": [
     {
-      "hash": "527ebda",
+      "hash": "750d151",
       "type": "refactor",
-      "message": "refactor: context-agent \u7626\u8eab 220\u2192192\uff0c\u8f93\u51fa\u793a\u4f8b\u79fb\u5230 references/"
+      "message": "refactor: webnovel-dashboard \u7626\u8eab 163\u2192120\uff0cAPI \u6587\u6863\u79fb\u5230 references/"
     },
     {
-      "hash": "8b98c48",
+      "hash": "242b653",
       "type": "refactor",
-      "message": "refactor: Agent \u7626\u8eab \u2014 deconstruction-agent 299\u2192116\u3001reviewer 239\u2192127"
+      "message": "refactor: webnovel-init \u7626\u8eab 452\u2192377\uff0c\u5185\u90e8\u6570\u636e\u6a21\u578b\u79fb\u5230 references/"
     },
     {
-      "hash": "403e500",
-      "type": "docs",
-      "message": "docs: \u65b0\u589e P1/P3 \u8be6\u7ec6\u5b9e\u65bd\u8ba1\u5212"
-    },
-    {
-      "hash": "59449db",
+      "hash": "617fe2a",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260607.1427 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260607.1434 [skip ci]"
     }
   ],
   "files": {
@@ -102,8 +97,12 @@
       "size": 8695
     },
     ".opencode/skills/webnovel-dashboard/SKILL.md": {
-      "sha256": "4422bd119ee6940abbb847a3c759307e6d07abac916939cc8754986859d2e2da",
-      "size": 6894
+      "sha256": "2289a815358fc9429b6b448252b94ea7a6410676361745222d334b02f6991e1d",
+      "size": 4956
+    },
+    ".opencode/skills/webnovel-dashboard/references/dashboard-api.md": {
+      "sha256": "144e77f2026bbc74ca297da1ac77e78813afa1ead2c8ce26d4c79cb156b69d46",
+      "size": 1718
     },
     ".opencode/skills/webnovel-write-batch/SKILL.md": {
       "sha256": "8ab14088472271affe733b28c27a8b60d3595fc260602b27b46fccbb789345c5",
@@ -146,8 +145,8 @@
       "size": 3657
     },
     ".opencode/skills/webnovel-init/SKILL.md": {
-      "sha256": "51c97a823e467eadb3fa3190e1d295397a1d122d7f7c55532d5f85c76262efb1",
-      "size": 18426
+      "sha256": "62d2d8c6a77244a65eb848b4b85fed2ac5c7a54316e42b7883530b8f4759590c",
+      "size": 17491
     },
     ".opencode/skills/webnovel-init/references/system-data-flow.md": {
       "sha256": "7a5ca0adfd58fc4045cd4c04d14953c3a3932d0958e7a78078a465ef018515d5",
@@ -156,6 +155,10 @@
     ".opencode/skills/webnovel-init/references/genre-tropes.md": {
       "sha256": "3b5d120f2219b051adfffc14472793bf5ee8369dcfb3558cb792c3214d626a26",
       "size": 6392
+    },
+    ".opencode/skills/webnovel-init/references/init-collection-schema.md": {
+      "sha256": "807446fd975579728cc01c706926f60b66bdc2836d33a82ef1b6f87113c26a92",
+      "size": 3173
     },
     ".opencode/skills/webnovel-init/references/creativity/anti-trope-game.md": {
       "sha256": "c23971e2a7abf8a9ab2ed110fdb6f5532c0fa26eadf8fff9876d3613e97ae2f7",
