@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260607.1608",
+  "version": "v2.9.0-20260607.1635",
   "tag": "v2.9.0",
-  "updated": "2026-06-07T16:08:32Z",
+  "updated": "2026-06-07T16:35:02Z",
   "changelog": [
     {
-      "hash": "79a38b1",
+      "hash": "7fb6100",
       "type": "refactor",
-      "message": "refactor: webnovel-write \u7626\u8eab 480\u2192333\uff0c\u5185\u8054\u811a\u672c\u79fb\u5230 references/"
+      "message": "refactor: webnovel-plan \u7626\u8eab 409\u2192378\uff0c\u7ed3\u6784\u5316\u8282\u70b9\u89c4\u8303\u79fb\u5230 references/"
     },
     {
-      "hash": "fea1503",
+      "hash": "5cd72bb",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260607.1443 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260607.1608 [skip ci]"
     }
   ],
   "files": {
@@ -68,8 +68,8 @@
       "size": 2860
     },
     ".opencode/skills/webnovel-plan/SKILL.md": {
-      "sha256": "ca61dd298a527ce6f93a28ec233b6f7ca73f3d1abeff506f4abaf26f529c2d04",
-      "size": 14014
+      "sha256": "dff1684a59acb6d293e647f7b041e7e92d8790945428f7d932de4f512ee88bd8",
+      "size": 13104
     },
     ".opencode/skills/webnovel-plan/references/outlining/outline-structure.md": {
       "sha256": "f20a88e845cf01f06a5cd7bfc234d188edc217bfd2d7e46b9ce34b3290c05c2c",
@@ -86,6 +86,10 @@
     ".opencode/skills/webnovel-plan/references/outlining/chapter-planning.md": {
       "sha256": "44846da8f5d7b135fa090ab1f7b9aaaa24ea0d74eed1e7ca9d9ddf19be54660d",
       "size": 9044
+    },
+    ".opencode/skills/webnovel-plan/references/outlining/structured-nodes.md": {
+      "sha256": "72ba5c24aaa6203dd32f5bafd821c59c3d0a2e7e4b9d9f80d3ac874fd341b54e",
+      "size": 1240
     },
     ".opencode/skills/webnovel-plan/references/outlining/conflict-design.md": {
       "sha256": "8452c014c45e0151806a1cf85ad4ad0dd1dfe5a1028f4f3d0753b51f1c7e6f75",
