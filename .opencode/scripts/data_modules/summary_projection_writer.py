@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .commit_artifacts import extraction_text
+
 
 def append_summary_projection(project_root: Path, commit_payload: dict) -> dict:
     chapter = int(commit_payload.get("meta", {}).get("chapter") or 0)
-    summary_text = str(commit_payload.get("summary_text") or "").strip()
+    summary_text = extraction_text(commit_payload, "summary_text")
     if chapter <= 0 or not summary_text:
         return {"applied": False, "writer": "summary", "reason": "missing_summary"}
 

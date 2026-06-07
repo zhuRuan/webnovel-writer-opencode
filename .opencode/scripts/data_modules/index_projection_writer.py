@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .commit_artifacts import extraction_dict, extraction_list, extraction_text
 from .config import DataModulesConfig
 from .index_manager import ChapterMeta, IndexManager, SceneMeta, StateChangeMeta
 
@@ -61,9 +62,8 @@ class IndexProjectionWriter:
         if chapter <= 0:
             return False
 
-        meta = commit_payload.get("chapter_meta") or {}
-        if not isinstance(meta, dict):
-            meta = {}
+        meta = extraction_dict(commit_payload, "chapter_meta")
+        summary_text = extraction_text(commit_payload, "summary_text")
 
         title = str(
             meta.get("title")
@@ -72,7 +72,7 @@ class IndexProjectionWriter:
             or ""
         ).strip()
         location = str(meta.get("location") or commit_payload.get("location") or "").strip()
-        summary = str(commit_payload.get("summary_text") or meta.get("summary") or "").strip()
+        summary = str(summary_text or meta.get("summary") or "").strip()
         word_count = self._safe_int(meta.get("word_count") or commit_payload.get("word_count"))
         if word_count <= 0:
             word_count = self._chapter_word_count(chapter)
@@ -95,7 +95,7 @@ class IndexProjectionWriter:
 
     def _apply_scenes(self, manager: IndexManager, commit_payload: dict) -> int:
         chapter = int(commit_payload.get("meta", {}).get("chapter") or 0)
-        scenes = commit_payload.get("scenes") or []
+        scenes = extraction_list(commit_payload, "scenes")
         if chapter <= 0 or not isinstance(scenes, list) or not scenes:
             return 0
 
@@ -125,7 +125,7 @@ class IndexProjectionWriter:
 
     def _apply_appearances(self, manager: IndexManager, commit_payload: dict) -> int:
         chapter = int(commit_payload.get("meta", {}).get("chapter") or 0)
-        entities = commit_payload.get("entities_appeared") or []
+        entities = extraction_list(commit_payload, "entities_appeared")
         if chapter <= 0 or not isinstance(entities, list):
             return 0
 
@@ -179,7 +179,7 @@ class IndexProjectionWriter:
     def _collect_state_changes(self, commit_payload: dict) -> list[dict]:
         deltas = [
             self._normalize_state_delta(delta)
-            for delta in (commit_payload.get("state_deltas") or [])
+            for delta in extraction_list(commit_payload, "state_deltas")
             if isinstance(delta, dict)
         ]
         seen = {
@@ -191,7 +191,7 @@ class IndexProjectionWriter:
             for delta in deltas
         }
 
-        for event in commit_payload.get("accepted_events") or []:
+        for event in extraction_list(commit_payload, "accepted_events"):
             if not isinstance(event, dict):
                 continue
             event_type = str(event.get("event_type") or "").strip()
@@ -275,13 +275,13 @@ class IndexProjectionWriter:
 
     def _collect_character_ids(self, commit_payload: dict) -> list[str]:
         ids: list[str] = []
-        for entity in commit_payload.get("entities_appeared") or []:
+        for entity in extraction_list(commit_payload, "entities_appeared"):
             if not isinstance(entity, dict):
                 continue
             entity_id = str(entity.get("id") or entity.get("entity_id") or "").strip()
             if entity_id and entity_id != "NEW":
                 ids.append(entity_id)
-        for delta in commit_payload.get("entity_deltas") or []:
+        for delta in extraction_list(commit_payload, "entity_deltas"):
             if not isinstance(delta, dict):
                 continue
             entity_id = str(delta.get("entity_id") or delta.get("id") or "").strip()
@@ -331,8 +331,8 @@ class IndexProjectionWriter:
             return default
 
     def _collect_entity_deltas(self, commit_payload: dict) -> list[dict]:
-        deltas = [dict(delta) for delta in (commit_payload.get("entity_deltas") or []) if isinstance(delta, dict)]
-        for event in commit_payload.get("accepted_events") or []:
+        deltas = [dict(delta) for delta in extraction_list(commit_payload, "entity_deltas") if isinstance(delta, dict)]
+        for event in extraction_list(commit_payload, "accepted_events"):
             if not isinstance(event, dict):
                 continue
             event_type = str(event.get("event_type") or "").strip()

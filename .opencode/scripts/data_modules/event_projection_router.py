@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Set
 
+from .commit_artifacts import extraction_list, extraction_text
+
 
 class EventProjectionRouter:
     TABLE = {
@@ -31,11 +33,11 @@ class EventProjectionRouter:
         if status == "accepted":
             writers.add("state")
             writers.add("index")
-        if commit_payload.get("entity_deltas"):
+        if extraction_list(commit_payload, "entity_deltas"):
             writers.add("index")
-        if str(commit_payload.get("summary_text") or "").strip():
+        if extraction_text(commit_payload, "summary_text"):
             writers.add("summary")
-        for event in commit_payload.get("accepted_events") or []:
+        for event in extraction_list(commit_payload, "accepted_events"):
             if not isinstance(event, dict):
                 continue
             writers.update(self.route(event))

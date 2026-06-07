@@ -11,6 +11,7 @@ from typing import Any
 
 import filelock
 
+from .commit_artifacts import extraction_dict, extraction_list, extraction_text
 from .story_contracts import read_json_if_exists
 
 try:
@@ -153,7 +154,7 @@ class StateProjectionWriter:
     def _collect_state_deltas(self, commit_payload: dict) -> list[dict]:
         deltas = [
             self._normalize_state_delta(delta)
-            for delta in (commit_payload.get("state_deltas") or [])
+            for delta in extraction_list(commit_payload, "state_deltas")
             if isinstance(delta, dict)
         ]
         seen = {
@@ -161,7 +162,7 @@ class StateProjectionWriter:
             for delta in deltas
         }
 
-        for event in commit_payload.get("accepted_events") or []:
+        for event in extraction_list(commit_payload, "accepted_events"):
             if not isinstance(event, dict):
                 continue
             event_type = str(event.get("event_type") or "").strip()
@@ -258,7 +259,7 @@ class StateProjectionWriter:
             ids.add(existing_eid)
         protagonist_name = str(protagonist_state.get("name") or "").strip()
 
-        for delta in commit_payload.get("entity_deltas") or []:
+        for delta in extraction_list(commit_payload, "entity_deltas"):
             if not isinstance(delta, dict):
                 continue
             eid = str(delta.get("entity_id") or delta.get("id") or "").strip()
@@ -337,11 +338,9 @@ class StateProjectionWriter:
         return True
 
     def _dominant_strand(self, commit_payload: dict) -> str:
-        chapter_meta = commit_payload.get("chapter_meta") or {}
-        if not isinstance(chapter_meta, dict):
-            chapter_meta = {}
+        chapter_meta = extraction_dict(commit_payload, "chapter_meta")
         raw = (
-            commit_payload.get("dominant_strand")
+            extraction_text(commit_payload, "dominant_strand")
             or commit_payload.get("strand")
             or chapter_meta.get("dominant_strand")
             or chapter_meta.get("strand")

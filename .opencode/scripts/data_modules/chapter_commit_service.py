@@ -9,6 +9,7 @@ from chapter_outline_loader import volume_num_for_chapter_from_state
 
 import logging
 
+from .commit_artifacts import extraction_list
 from .config import DataModulesConfig
 from .event_log_store import EventLogStore
 from .event_projection_router import EventProjectionRouter
@@ -98,14 +99,7 @@ class ChapterCommitService:
             "review_result": review_result,
             "fulfillment_result": fulfillment_result,
             "disambiguation_result": disambiguation_result,
-            "accepted_events": extraction_result.get("accepted_events", []),
-            "state_deltas": extraction_result.get("state_deltas", []),
-            "entity_deltas": extraction_result.get("entity_deltas", []),
-            "entities_appeared": extraction_result.get("entities_appeared", []),
-            "scenes": extraction_result.get("scenes", []),
-            "chapter_meta": extraction_result.get("chapter_meta", {}),
-            "dominant_strand": extraction_result.get("dominant_strand", ""),
-            "summary_text": extraction_result.get("summary_text", ""),
+            "extraction_result": dict(extraction_result),
             "projection_status": {
                 "state": "pending",
                 "index": "pending",
@@ -163,11 +157,18 @@ class ChapterCommitService:
 
         # 只有 accepted 章节才写入事件日志和 SSOT
         if status == "accepted":
+            # Use commit_artifacts helper for backward compat (nested vs top-level)
+            accepted_events = extraction_list(payload, "accepted_events")
+            extraction = payload.setdefault("extraction_result", {})
+            if not isinstance(extraction, dict):
+                extraction = {}
+                payload["extraction_result"] = extraction
+
             # Guard: skip SSOT publishing if this chapter already has events
             # (retry safety — prevents duplicate events in the immutable event log)
             existing_events = read_events(self.project_root, chapter=chapter)
             if not existing_events:
-                for event in payload.get("accepted_events", []):
+                for event in accepted_events:
                     if not isinstance(event, dict):
                         continue
                     try:
@@ -195,12 +196,15 @@ class ChapterCommitService:
                 except Exception as exc:
                     logger.warning("SSOT chapter_status_changed failed for chapter %s: %s", chapter, exc)
 
+            # Normalize events and store back into extraction_result
+            normalized = EventLogStore(self.project_root).normalize_events(chapter, accepted_events)
+            extraction["accepted_events"] = normalized
             try:
-                EventLogStore(self.project_root).write_events(chapter, payload.get("accepted_events", []))
+                EventLogStore(self.project_root).write_events(chapter, normalized)
             except Exception as exc:
                 logger.warning("EventLogStore.write_events failed for chapter %s: %s", chapter, exc)
 
-            proposals = AmendProposalTrigger().check(chapter, payload.get("accepted_events", []))
+            proposals = AmendProposalTrigger().check(chapter, normalized)
             if proposals:
                 manager = IndexManager(DataModulesConfig.from_project_root(self.project_root))
                 with manager._get_conn() as conn:

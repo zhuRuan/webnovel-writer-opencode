@@ -39,6 +39,7 @@
 
 - [superpowers/plans/2026-05-25-inkos-inspired-improvements-plan.md](./superpowers/plans/2026-05-25-inkos-inspired-improvements-plan.md)：inkOS 借鉴改进实现计划
 - [superpowers/plans/2026-05-25-dashboard-evolution-plan.md](./superpowers/plans/2026-05-25-dashboard-evolution-plan.md)：看板演进实现计划（Phase 1-3，已完成）
+- [superpowers/plans/2026-06-07-original-project-sync-plan.md](./superpowers/plans/2026-06-07-original-project-sync-plan.md)：原项目同步计划（P0-P3，待执行）
 
 ## 分类原则
 
