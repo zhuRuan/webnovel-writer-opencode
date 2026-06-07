@@ -1,22 +1,27 @@
 {
-  "version": "v2.9.0-20260607.1427",
+  "version": "v2.9.0-20260607.1434",
   "tag": "v2.9.0",
-  "updated": "2026-06-07T14:27:44Z",
+  "updated": "2026-06-07T14:34:03Z",
   "changelog": [
     {
-      "hash": "cf2b5b8",
-      "type": "test",
-      "message": "test: \u65b0\u589e commit_artifacts \u6a21\u5757\u6d4b\u8bd5\uff0821 \u4e2a\u7528\u4f8b\uff09"
-    },
-    {
-      "hash": "3abb7fc",
+      "hash": "527ebda",
       "type": "refactor",
-      "message": "refactor: \u589e\u5f3a artifact_validator \u2014 \u5e38\u91cf\u3001helper\u3001\u5d4c\u5957\u9a8c\u8bc1\u3001\u6295\u5f71\u5b8c\u6574\u6027\u68c0\u67e5"
+      "message": "refactor: context-agent \u7626\u8eab 220\u2192192\uff0c\u8f93\u51fa\u793a\u4f8b\u79fb\u5230 references/"
     },
     {
-      "hash": "3c71964",
+      "hash": "8b98c48",
+      "type": "refactor",
+      "message": "refactor: Agent \u7626\u8eab \u2014 deconstruction-agent 299\u2192116\u3001reviewer 239\u2192127"
+    },
+    {
+      "hash": "403e500",
+      "type": "docs",
+      "message": "docs: \u65b0\u589e P1/P3 \u8be6\u7ec6\u5b9e\u65bd\u8ba1\u5212"
+    },
+    {
+      "hash": "59449db",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260607.1216 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260607.1427 [skip ci]"
     }
   ],
   "files": {
@@ -293,16 +298,16 @@
       "size": 2439
     },
     ".opencode/agents/reviewer.md": {
-      "sha256": "65aac19e0dc9d36de525a2d8baec516832376873a82d1f07c1904861e1082825",
-      "size": 8686
+      "sha256": "c1fe939d5b2997f35bd84a7550b384a19b7ecc2b69a617bdec30b2a66ea8f6de",
+      "size": 3985
     },
     ".opencode/agents/chapter-writer-agent.md": {
       "sha256": "089edd7d2c72a9d8d612c4fd79cca656e9dce3247a0829629cdfe98d5a428a0b",
       "size": 6084
     },
     ".opencode/agents/deconstruction-agent.md": {
-      "sha256": "1a5958fbed8be3334f7dca544978993d17e843599cc532d92e66da26204f3b20",
-      "size": 11844
+      "sha256": "087bb7930389ffb4274ea2a017781bbe4c713183a8f5358792d0d99670c63de3",
+      "size": 8444
     },
     ".opencode/agents/data-agent.md": {
       "sha256": "8d168e9c1bcaff697b3b36d46a8079e52b4d04780b8046986bfe19fe29dfb0bb",
@@ -313,8 +318,8 @@
       "size": 2626
     },
     ".opencode/agents/context-agent.md": {
-      "sha256": "b1dc12d83b0004579f696300d2bbc5eb043593e1f09cd2a494350a6322a0d2f1",
-      "size": 10830
+      "sha256": "94e96ab5ea27d354d599a18d43a25cb32ccf0efb7de30a6ba89f9368eea053d8",
+      "size": 8644
     },
     ".opencode/agents/evals/evals.json": {
       "sha256": "587fb1f8c617c2412de8785f2758196bc90279c6e83dc33d79f750799c854e66",
@@ -339,6 +344,10 @@
     ".opencode/agents/evals/files/test-project/\u5927\u7eb2/\u7b2c1\u5377-\u65f6\u95f4\u7ebf.md": {
       "sha256": "cc61f5fc594246c38639cf24eac2d055c12082f247c40ce862533169dfcb539f",
       "size": 356
+    },
+    ".opencode/agents/references/context-agent-example.md": {
+      "sha256": "413e6b54d6c2f8e1e5eb19f05d6f9318dc32959e672d12b9c9db24557b83fb3d",
+      "size": 2654
     },
     ".opencode/genres/realistic/character-depth.md": {
       "sha256": "dc888e7744ae0f7b14226b161b64b951bd46dc1d9e66e13476d94d02742136ce",
