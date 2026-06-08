@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260607.1635",
+  "version": "v2.9.0-20260608.1046",
   "tag": "v2.9.0",
-  "updated": "2026-06-07T16:35:02Z",
+  "updated": "2026-06-08T10:46:21Z",
   "changelog": [
     {
-      "hash": "7fb6100",
+      "hash": "90a130c",
       "type": "refactor",
-      "message": "refactor: webnovel-plan \u7626\u8eab 409\u2192378\uff0c\u7ed3\u6784\u5316\u8282\u70b9\u89c4\u8303\u79fb\u5230 references/"
+      "message": "refactor: webnovel-review/learn/doctor \u7626\u8eab"
     },
     {
-      "hash": "5cd72bb",
+      "hash": "8305b0e",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260607.1608 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260607.1635 [skip ci]"
     }
   ],
   "files": {
@@ -112,8 +112,8 @@
       "size": 10711
     },
     ".opencode/skills/webnovel-review/SKILL.md": {
-      "sha256": "6e9a2ea107302f876548fe8171382296b5043e6ec14f195806ebebdb650ac99a",
-      "size": 6464
+      "sha256": "eed26550736ae665bc9dccfd8c5758234dc300892685a30ca0469c6bcebb89d7",
+      "size": 6112
     },
     ".opencode/skills/webnovel-review/evals/evals.json": {
       "sha256": "6f48494aa2b73fa5e94d5302f2b2fc4eb6bd9943d13bd697652093ebc8f914f2",
@@ -228,8 +228,8 @@
       "size": 5863
     },
     ".opencode/skills/webnovel-learn/SKILL.md": {
-      "sha256": "371c93e4c6918e2770b50fbde0b35c4a8dd2816b3904a58b43263913c6e05e54",
-      "size": 2729
+      "sha256": "d688c11f4018285946304af033fcb2912e8fc7c99fa56557ddc322ff1c7b1c38",
+      "size": 2267
     },
     ".opencode/skills/webnovel-publish/SKILL.md": {
       "sha256": "22fdd641c5c9ef5e726a744f2fa56984ac598b769ed71e58e94018d42acd7a1c",
@@ -292,8 +292,8 @@
       "size": 7128
     },
     ".opencode/skills/webnovel-doctor/SKILL.md": {
-      "sha256": "5bb5a1fd45165545c2fb5a65cd1adc92f2a3cd60aa60897fd20f15df5848f615",
-      "size": 1810
+      "sha256": "4efdde28380dc640f113b4637758386b2a54911e24ee00224533c7144e7ee2ce",
+      "size": 885
     },
     ".opencode/skills/webnovel-delete/SKILL.md": {
       "sha256": "fab865eb9bee3bf95ca7ea7bc86b23a50dfee04e31719e72611a0dde3b61ad14",
