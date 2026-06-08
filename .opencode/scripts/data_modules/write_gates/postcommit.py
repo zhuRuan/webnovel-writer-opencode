@@ -6,7 +6,7 @@ Postcommit Gate — 提交后检查。
 在 chapter-commit 完成后验证：
 1. commit JSON 文件存在且可解析
 2. commit status 为 accepted
-3. 投影状态检查
+3. 投影状态检查（优先从 projection_log 读取）
 4. 产物文件存在性
 """
 from __future__ import annotations
@@ -16,6 +16,10 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from . import gate_report, issue
+
+# 投影 writer 列表和合法状态
+REQUIRED_PROJECTION_WRITERS = ("state", "index", "summary", "memory", "vector")
+OK_PROJECTION_STATUSES = {"done", "skipped"}
 
 
 def _check_commit_file(project_root: Path, chapter: int) -> Dict[str, Any]:
@@ -56,27 +60,62 @@ def _check_commit_file(project_root: Path, chapter: int) -> Dict[str, Any]:
     return {"ok": len(errors) == 0, "errors": errors, "commit": commit}
 
 
-def _check_projections(project_root: Path, commit: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _get_projection_status(project_root: Path, chapter: int, commit: Dict[str, Any]) -> Dict[str, str]:
+    """获取投影状态，优先从 projection_log 读取。"""
+    try:
+        from ..projection_log import latest_projection_run, projection_status_from_run
+        latest_run = latest_projection_run(project_root, chapter=chapter)
+        logged_status = projection_status_from_run(latest_run)
+        if logged_status:
+            return logged_status
+    except Exception:
+        pass
+    # fallback 到 commit 文件中的 projection_status
+    raw = commit.get("projection_status") or {}
+    return {str(k): str(v) for k, v in raw.items() if isinstance(raw, dict)}
+
+
+def _check_projections(project_root: Path, chapter: int, commit: Dict[str, Any]) -> List[Dict[str, Any]]:
     """检查投影完整性。"""
     errors = []
-    projection_status = commit.get("projection_status") or {}
+    projection_status = _get_projection_status(project_root, chapter, commit)
 
-    for writer, pstatus in projection_status.items():
-        if str(pstatus).startswith("failed"):
+    # 检查每个必需的 writer
+    for writer in REQUIRED_PROJECTION_WRITERS:
+        status = str(projection_status.get(writer) or "").strip()
+        if not status:
+            errors.append(issue(
+                "projection_missing",
+                "error",
+                f"投影 {writer} 状态缺失",
+                repair=f"运行 webnovel.py ssot rebuild 补跑 {writer}",
+            ))
+        elif status.startswith("failed"):
             errors.append(issue(
                 "projection_failed",
                 "error",
-                f"投影 {writer} 失败: {pstatus}",
+                f"投影 {writer} 失败: {status}",
                 repair=f"运行 webnovel.py ssot rebuild 补跑 {writer}",
+            ))
+        elif status == "pending":
+            errors.append(issue(
+                "projection_pending",
+                "warning",
+                f"投影 {writer} 仍在 pending",
+                repair=f"等待投影完成或运行 webnovel.py ssot rebuild",
+            ))
+        elif status not in OK_PROJECTION_STATUSES:
+            errors.append(issue(
+                "projection_invalid",
+                "warning",
+                f"投影 {writer} 状态非法: {status}",
+                repair="只接受 done 或 skipped 状态",
             ))
 
     # 检查 summary 文件
-    chapter = int((commit.get("meta") or {}).get("chapter") or 0)
     if chapter > 0:
-        summary_dir = project_root / ".webnovel" / "summaries"
-        summary_file = summary_dir / f"ch{chapter:04d}.md"
-        proj_summary = projection_status.get("summary", "")
-        if proj_summary == "done" and not summary_file.is_file():
+        summary_file = project_root / ".webnovel" / "summaries" / f"ch{chapter:04d}.md"
+        if projection_status.get("summary") == "done" and not summary_file.is_file():
             errors.append(issue(
                 "summary_file_missing",
                 "warning",
@@ -85,12 +124,20 @@ def _check_projections(project_root: Path, commit: Dict[str, Any]) -> List[Dict[
 
     # 检查 index.db
     index_db = project_root / ".webnovel" / "index.db"
-    proj_index = projection_status.get("index", "")
-    if proj_index == "done" and not index_db.is_file():
+    if projection_status.get("index") == "done" and not index_db.is_file():
         errors.append(issue(
             "index_db_missing",
             "warning",
             "投影声称 index done 但 index.db 不存在",
+        ))
+
+    # 检查 scratchpad（warning 级别）
+    scratchpad = project_root / ".webnovel" / "memory_scratchpad.json"
+    if projection_status.get("memory") == "done" and not scratchpad.is_file():
+        errors.append(issue(
+            "scratchpad_missing",
+            "warning",
+            "投影声称 memory done 但 memory_scratchpad.json 不存在",
         ))
 
     return errors
@@ -114,8 +161,8 @@ def run_postcommit_gate(project_root: Path, chapter: int) -> Dict[str, Any]:
 
     commit = commit_check["commit"]
 
-    # 投影检查
-    proj_issues = _check_projections(project_root, commit)
+    # 投影检查（优先从 projection_log 读取）
+    proj_issues = _check_projections(project_root, chapter, commit)
     for i in proj_issues:
         if i["severity"] == "error":
             errors.append(i)
