@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260608.1104",
+  "version": "v2.9.0-20260608.1109",
   "tag": "v2.9.0",
-  "updated": "2026-06-08T11:04:45Z",
+  "updated": "2026-06-08T11:09:54Z",
   "changelog": [
     {
-      "hash": "5d4e426",
+      "hash": "5c05f85",
       "type": "test",
-      "message": "test: \u65b0\u589e 5 \u4e2a chapter_commit_service malformed \u8f93\u5165\u62d2\u7edd\u6d4b\u8bd5"
+      "message": "test: \u589e\u5f3a artifact_validator + write_gates \u6d4b\u8bd5"
     },
     {
-      "hash": "d8cbfe7",
+      "hash": "df17aa1",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260608.1103 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260608.1104 [skip ci]"
     }
   ],
   "files": {
@@ -1012,8 +1012,8 @@
       "size": 3531
     },
     ".opencode/scripts/data_modules/tests/test_artifact_validator.py": {
-      "sha256": "7440b0b27ffca8863f74b416390192ae00d6a931912a4a43a5c01fdfcef7f5c0",
-      "size": 4880
+      "sha256": "1716fdc1b25efa92841b1c112473c2a0ad73cc03ff77a1f19487cda504d16fde",
+      "size": 8958
     },
     ".opencode/scripts/data_modules/tests/test_extract_chapter_context.py": {
       "sha256": "35cec8447d414d01dbbdfee325f609f3b914b2ebb0becd378eec6bce7e5f9842",
@@ -1200,8 +1200,8 @@
       "size": 2320
     },
     ".opencode/scripts/data_modules/tests/test_write_gates.py": {
-      "sha256": "9c87e1e1c12df4b39540e0996a97a28e8c808f5e0ccc4ad112a8b1d35f653376",
-      "size": 3089
+      "sha256": "a614daf84ab8226bb2693c3cbe13889616f4533c11d4bac277afb95187856ef3",
+      "size": 6332
     },
     ".opencode/scripts/data_modules/tests/test_csv_config.py": {
       "sha256": "3eb8cb979ff9f8702bcfe049157ba0570778cbb5325e03be3e541cd6a3ac17c9",
