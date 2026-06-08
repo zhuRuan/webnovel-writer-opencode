@@ -109,7 +109,11 @@ CHAPTER_FILE="${PROJECT_ROOT}/${CHAPTER_PATH}"
 | 字数连续 2 次不足 1500 | 回到 Step B 补充→仍不足→标记 warning 完成 | 不阻断 |
 | SCRIPTS_DIR 或 PROJECT_ROOT 未设置 | 设默认值后重试→仍为空则停止 | 阻断 |
 
-## 7. 输出格式
+## 7. 校验清单
+
+完成前逐条确认：正文已写入且非空、字数 ≥ 1500、must_cover_nodes 全部覆盖、forbidden_zones 未违反、无占位符、Anti-AI 终检通过。
+
+## 8. 输出格式
 
 输出纯正文，格式要求：
 - 章节标题：`## 第{NNNN}章 {标题}`
