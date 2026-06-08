@@ -115,7 +115,7 @@ tools:
       "blocking": true,
       "description": "",
       "evidence": "",
-      "suggestion": ""
+      "fix_hint": ""
     }
   ],
   "has_blocking": false
