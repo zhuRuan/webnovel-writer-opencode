@@ -16,28 +16,18 @@ compatibility: opencode
 - 审查时优先依据 `.story-system/reviews/chapter_{NNN}.review.json` 与 latest accepted `CHAPTER_COMMIT` 判断主链事实。
 - 若存在关键问题，明确交给用户决定是否立即返工。
 
-## 常见误区
+## 红线
 
-- ❌ 没看 reviewer 原始 JSON 就直接口头总结
-- ❌ 有 blocking issue 仍将流程视为通过
-- ❌ 把 report 文件生成等同于已落库（`save-review-metrics` 未跑）
-- ❌ 主流程伪造 `overall_score` 或审查结论
-- ❌ 按需参考一次性全部读完
+- 不得伪造审查结论或口头代替 reviewer 输出
+- `blocking=true` 必须停在 Step 6 等用户裁决
+- `save-review-metrics` 未跑不算落库完成
+- 优先级：用户要求 > blocking 硬门槛 > 项目约束 > skill 流程 > reference 建议
 
-## 优先级链
+## 阻断条件
 
-1. 用户明确要求（最高）
-2. `blocking=true` 硬门槛
-3. 项目私有约束（设定集、已有剧情）
-4. skill 默认流程
-5. reference 建议（最低）
-
-## 决策树入口
-
-- 若项目根不合法或缺少 `.webnovel/state.json` → **阻断**
-- 若正文文件不存在 → **阻断**
-- 若 reviewer 返回 `blocking=true` issue → 进入 Step 6 用户裁决
-- 若所有 issue 均为非 blocking → 正常落库，流程结束
+- 项目根不合法或缺少 `state.json`
+- 正文文件不存在
+- reviewer 返回 `blocking=true` → Step 6 用户裁决
 
 ## 执行流程
 

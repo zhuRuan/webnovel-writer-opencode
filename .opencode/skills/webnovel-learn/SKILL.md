@@ -22,24 +22,6 @@ test -n "$PROJECT_ROOT" && test -f "${PROJECT_ROOT}/.webnovel/state.json" || { e
 - 提取可复用的写作模式（钩子/节奏/对话/微兑现等）
 - 追加到 `.webnovel/project_memory.json`
 
-## 输入
-```bash
-/webnovel-learn "本章的危机钩设计很有效，悬念拉满"
-```
-
-## 输出
-```json
-{
-  "status": "success",
-  "learned": {
-    "pattern_type": "hook",
-    "description": "危机钩设计：悬念拉满",
-    "source_chapter": 100,
-    "learned_at": "2026-02-02T12:00:00Z"
-  }
-}
-```
-
 ## 执行流程
 1. 读取 `"$PROJECT_ROOT/.webnovel/state.json"`，获取当前章节号（progress.current_chapter）
 2. 解析用户输入，归类 pattern_type（hook/pacing/dialogue/payoff/emotion/format/other）
@@ -57,14 +39,8 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pro
 
 ## 约束
 - 不删除旧记录，仅追加
-- 避免完全重复的 description（可去重）
+- 追加前扫描已有 patterns，`pattern_type` + `description` 完全相同则跳过
 - 禁止使用 `Write` 或手工编辑 `.webnovel/project_memory.json`
-
-## 去重规则
-
-- 追加前扫描已有 `patterns` 数组
-- 若存在 `pattern_type` + `description` 完全相同的记录，跳过并告知用户
-- 部分相似不去重，由用户判断
 
 ## 成功标准
 
