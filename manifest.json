@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260608.1100",
+  "version": "v2.9.0-20260608.1103",
   "tag": "v2.9.0",
-  "updated": "2026-06-08T11:00:53Z",
+  "updated": "2026-06-08T11:03:06Z",
   "changelog": [
     {
-      "hash": "1ebe758",
-      "type": "test",
-      "message": "test: \u65b0\u589e 4 \u4e2a projection writer \u5e42\u7b49\u6027\u6d4b\u8bd5"
+      "hash": "dd6beb5",
+      "type": "fix",
+      "message": "fix: reviewer.md \u8f93\u51fa JSON \u5b57\u6bb5\u540d suggestion \u2192 fix_hint\uff08\u4e0e review_schema.py \u4e00\u81f4\uff09"
     },
     {
-      "hash": "6c8ee6d",
+      "hash": "36b8848",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260608.1052 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260608.1100 [skip ci]"
     }
   ],
   "files": {
@@ -304,8 +304,8 @@
       "size": 2439
     },
     ".opencode/agents/reviewer.md": {
-      "sha256": "c1fe939d5b2997f35bd84a7550b384a19b7ecc2b69a617bdec30b2a66ea8f6de",
-      "size": 3985
+      "sha256": "1fb425c2b83b0f3f168fea09f15235c9ce4a961d150839b9201d911a2a6aab43",
+      "size": 3983
     },
     ".opencode/agents/chapter-writer-agent.md": {
       "sha256": "089edd7d2c72a9d8d612c4fd79cca656e9dce3247a0829629cdfe98d5a428a0b",
