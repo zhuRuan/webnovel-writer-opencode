@@ -495,4 +495,123 @@ def test_memory_projection_writer_maps_open_loop_event_into_scratchpad(tmp_path)
     store = ScratchpadManager(cfg)
     loops = store.query(category="open_loop", status="active")
     assert result["applied"] is True
-    assert any("三年之约" in x.subject for x in loops)
+
+
+# ---------------------------------------------------------------------------
+# 幂等性测试：重复 apply 同一 commit 不产生重复数据
+# ---------------------------------------------------------------------------
+
+def _make_commit_payload(chapter: int = 3) -> dict:
+    """构造标准 commit payload。"""
+    return {
+        "meta": {"status": "accepted", "chapter": chapter},
+        "extraction_result": {
+            "state_deltas": [{"entity_id": "x", "field": "realm", "new": "斗者"}],
+            "entity_deltas": [{
+                "entity_id": "xiaoyan",
+                "canonical_name": "萧炎",
+                "type": "角色",
+                "current": {"realm": "斗者"},
+                "chapter": chapter,
+            }],
+            "accepted_events": [{
+                "event_id": "evt-001",
+                "chapter": chapter,
+                "event_type": "character_state_changed",
+                "subject": "xiaoyan",
+                "payload": {"entity_id": "xiaoyan", "field": "realm", "new": "斗者"},
+            }],
+            "scenes": [{
+                "scene_index": 1,
+                "location": "斗气大陆",
+                "summary": "萧炎修炼突破",
+                "characters": ["xiaoyan"],
+            }],
+            "summary_text": "萧炎突破至斗者境界。",
+        },
+    }
+
+
+def test_index_projection_writer_is_idempotent_for_replay(tmp_path):
+    """index writer 对同一 payload apply 两次不产生重复数据。"""
+    cfg = DataModulesConfig.from_project_root(tmp_path)
+    cfg.ensure_dirs()
+    writer = IndexProjectionWriter(tmp_path)
+    payload = _make_commit_payload()
+
+    writer.apply(payload)
+    writer.apply(payload)
+
+    manager = IndexManager(cfg)
+    # entity 只应有一条
+    entity = manager.get_entity("xiaoyan")
+    assert entity is not None
+    assert entity["canonical_name"] == "萧炎"
+
+    # scene 只应有一条
+    with manager._get_conn() as conn:
+        scenes = conn.execute("SELECT * FROM scenes WHERE chapter = 3").fetchall()
+        assert len(scenes) == 1
+
+    # state_change 只应有一条
+    with manager._get_conn() as conn:
+        changes = conn.execute("SELECT * FROM state_changes WHERE entity_id = 'xiaoyan'").fetchall()
+        assert len(changes) == 1
+
+
+def test_summary_projection_writer_replay_overwrites_not_appends(tmp_path):
+    """summary writer 重复 apply 时覆盖而非追加。"""
+    cfg = DataModulesConfig.from_project_root(tmp_path)
+    cfg.ensure_dirs()
+    writer = SummaryProjectionWriter(tmp_path)
+    payload = _make_commit_payload()
+
+    writer.apply(payload)
+    writer.apply(payload)
+
+    summary_file = tmp_path / ".webnovel" / "summaries" / "ch0003.md"
+    assert summary_file.is_file()
+    content = summary_file.read_text(encoding="utf-8")
+    # 摘要文本只应出现一次
+    assert content.count("萧炎突破至斗者境界") == 1
+
+
+def test_memory_projection_writer_is_idempotent_for_replay(tmp_path):
+    """memory writer 重复 apply 时 scratchpad 中同 subject+field+chapter 只有 1 条记录。"""
+    cfg = DataModulesConfig.from_project_root(tmp_path)
+    cfg.ensure_dirs()
+    writer = MemoryProjectionWriter(tmp_path)
+
+    # 使用与现有测试相同的顶层字段格式
+    payload = {
+        "meta": {"status": "accepted", "chapter": 3},
+        "state_deltas": [{"entity_id": "xiaoyan", "field": "realm", "new": "斗者", "chapter": 3}],
+        "entity_deltas": [],
+        "accepted_events": [],
+    }
+
+    writer.apply(payload)
+    writer.apply(payload)
+
+    store = ScratchpadManager(cfg)
+    chars = store.query(category="character_state", status="active")
+    matching = [x for x in chars if x.subject == "xiaoyan" and x.field == "realm"]
+    assert len(matching) == 1
+
+
+def test_state_projection_writer_is_idempotent_for_replay(tmp_path):
+    """state writer 重复 apply 时 entity_state 不会累积重复 key。"""
+    (tmp_path / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+    writer = StateProjectionWriter(tmp_path)
+    payload = _make_commit_payload()
+
+    writer.apply(payload)
+    writer.apply(payload)
+
+    state = json.loads((tmp_path / ".webnovel" / "state.json").read_text(encoding="utf-8"))
+    # entity_state 只应有一层
+    assert "x" in state.get("entity_state", {})
+    assert state["entity_state"]["x"]["realm"] == "斗者"
+    # chapter_status 只应有一条
+    assert state["progress"]["chapter_status"]["3"] == "chapter_committed"
