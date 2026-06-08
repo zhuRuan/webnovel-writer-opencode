@@ -14,18 +14,7 @@ tools:
 
 ## 0. 环境
 
-执行任何 bash 命令前，先确保变量已设置：
-
-```bash
-if [ -z "$SCRIPTS_DIR" ] || [ ! -d "$SCRIPTS_DIR" ]; then
-  echo "❌ SCRIPTS_DIR 未正确设置，请检查调用方 prompt。当前值: ${SCRIPTS_DIR:-空}"
-  exit 1
-fi
-if [ -z "$PROJECT_ROOT" ] || [ ! -d "$PROJECT_ROOT" ]; then
-  echo "❌ PROJECT_ROOT 未正确设置，请检查调用方 prompt。当前值: ${PROJECT_ROOT:-空}"
-  exit 1
-fi
-```
+执行任何 bash 命令前，确保 `SCRIPTS_DIR` 和 `PROJECT_ROOT` 已设置。未设置时报错退出。
 
 ## 1. 身份
 
@@ -53,17 +42,7 @@ fi
 
 **修复轮额外约束:**
 □ 逐条对照【审查反馈】中的每条 issue，只修改指出的位置，不改无关段落
-□ 合同树: .story-system/chapters/chapter_{NNN}.json 必须存在。若不存在，输出 "❌ 合同树缺失: 请先运行 story-system 刷新合同" 并退出，不进行起草。
-
-```bash
-# 验证合同树存在
-CHAPTER_CONTRACT="${PROJECT_ROOT}/.story-system/chapters/chapter_$(printf '%03d' $N).json"
-if [ ! -f "$CHAPTER_CONTRACT" ]; then
-  echo "❌ 合同树缺失: $CHAPTER_CONTRACT"
-  echo "请先运行: echo \"\${CHAPTER_GOAL}\" | python -X utf8 \"\${SCRIPTS_DIR}/skill_runner.py\" story-system --project-root \"\${PROJECT_ROOT}\" --chapter $N"
-  exit 1
-fi
-```
+□ 合同树 `.story-system/chapters/chapter_{NNN}.json` 必须存在，不存在则阻断
 
 ### Step B: 起草正文
 
@@ -105,23 +84,7 @@ CHAPTER_FILE="${PROJECT_ROOT}/${CHAPTER_PATH}"
 
 ### Step E: 验证
 
-```bash
-# 文件存在且非空
-test -s "$CHAPTER_FILE" || { echo "❌ 章节文件为空"; exit 1; }
-
-# 字数检查
-WORDS=$(python -c "
-import re
-t = open('$CHAPTER_FILE', encoding='utf-8').read()
-print(len(re.findall(r'[一-鿿]', t)))
-")
-echo "字数: $WORDS"
-if [ "$WORDS" -lt 1500 ]; then
-  echo "⚠️ 字数不足 1500，需补充"
-fi
-```
-
-字数 < 1500 时回到 Step B 补充正文。
+用 python 检查文件存在且非空，统计中文字数。字数 < 1500 时回到 Step B 补充正文。
 
 ## 4. 约束
 
@@ -146,19 +109,7 @@ fi
 | 字数连续 2 次不足 1500 | 回到 Step B 补充→仍不足→标记 warning 完成 | 不阻断 |
 | SCRIPTS_DIR 或 PROJECT_ROOT 未设置 | 设默认值后重试→仍为空则停止 | 阻断 |
 
-## 7. 校验清单
-
-完成前逐条确认：
-
-- [ ] 正文已写入 `${CHAPTER_FILE}` 且文件非空
-- [ ] 字数 ≥ 1500
-- [ ] must_cover_nodes 全部覆盖
-- [ ] forbidden_zones 未违反
-- [ ] 无占位符（`{待补充}`、`[TODO]` 等）
-- [ ] Anti-AI 终检通过
-- [ ] 章节标题格式正确：`## 第{NNNN}章 标题`
-
-## 8. 输出格式
+## 7. 输出格式
 
 输出纯正文，格式要求：
 - 章节标题：`## 第{NNNN}章 {标题}`
