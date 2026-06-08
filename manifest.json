@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260608.1103",
+  "version": "v2.9.0-20260608.1104",
   "tag": "v2.9.0",
-  "updated": "2026-06-08T11:03:06Z",
+  "updated": "2026-06-08T11:04:45Z",
   "changelog": [
     {
-      "hash": "dd6beb5",
-      "type": "fix",
-      "message": "fix: reviewer.md \u8f93\u51fa JSON \u5b57\u6bb5\u540d suggestion \u2192 fix_hint\uff08\u4e0e review_schema.py \u4e00\u81f4\uff09"
+      "hash": "5d4e426",
+      "type": "test",
+      "message": "test: \u65b0\u589e 5 \u4e2a chapter_commit_service malformed \u8f93\u5165\u62d2\u7edd\u6d4b\u8bd5"
     },
     {
-      "hash": "36b8848",
+      "hash": "d8cbfe7",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260608.1100 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260608.1103 [skip ci]"
     }
   ],
   "files": {
@@ -1256,8 +1256,8 @@
       "size": 587
     },
     ".opencode/scripts/data_modules/tests/test_chapter_commit_service.py": {
-      "sha256": "0997b6629732f8bb62067f5c957a31ca71a70b7167adc57a185ed27166553af2",
-      "size": 5943
+      "sha256": "6ecc73f9f2e19344731941da36019e28aeb032a323a2b0a47884a6dc1bd0c1ff",
+      "size": 9908
     },
     ".opencode/scripts/data_modules/tests/test_memory_schema_compat.py": {
       "sha256": "0d40e167be3794f3e5599d6847a46662a27a515894e994855567f60a61649c86",
