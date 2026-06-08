@@ -170,7 +170,7 @@ def merge_reports(
     return {
         "schema_version": SCHEMA_VERSION,
         "artifact": artifact,
-        "ok": not any(item.get("severity") == "blocker" for item in errors),
+        "ok": not any(item.get("severity") in ("blocker", "error") for item in errors),
         "errors": errors,
         "warnings": warnings,
         "payloads": payloads,
@@ -232,7 +232,7 @@ def _policy_issues(artifact_name: str, payload: Dict[str, Any]) -> List[Dict[str
             ))
 
     elif artifact_name == "extraction_result":
-        events = extraction_list(payload, "accepted_events")
+        events = payload.get("accepted_events") if isinstance(payload, dict) else None
         if not events:
             issues.append(_issue(
                 "no_events",

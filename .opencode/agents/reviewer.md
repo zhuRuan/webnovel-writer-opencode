@@ -115,6 +115,7 @@ tools:
       "blocking": true,
       "description": "",
       "evidence": "",
+      "location": "",
       "fix_hint": ""
     }
   ],

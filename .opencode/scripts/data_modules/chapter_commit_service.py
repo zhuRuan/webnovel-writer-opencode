@@ -197,7 +197,7 @@ class ChapterCommitService:
                     logger.warning("SSOT chapter_status_changed failed for chapter %s: %s", chapter, exc)
 
             # Normalize events and store back into extraction_result
-            normalized = EventLogStore(self.project_root)._normalize_events(chapter, accepted_events)
+            normalized = EventLogStore(self.project_root).normalize_events(chapter, accepted_events)
             extraction["accepted_events"] = normalized
             try:
                 EventLogStore(self.project_root).write_events(chapter, normalized)

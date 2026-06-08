@@ -113,9 +113,19 @@ def append_projection_run(
     )
     path = projection_log_path(project_root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True))
-        handle.write("\n")
+    lock_path = path.with_suffix(".jsonl.lock")
+    try:
+        import filelock
+        lock = filelock.FileLock(str(lock_path), timeout=5)
+        with lock:
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True))
+                handle.write("\n")
+    except ImportError:
+        # filelock 不可用时降级为无锁写入
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True))
+            handle.write("\n")
     return record
 
 
@@ -146,5 +156,31 @@ def read_projection_runs(project_root: str | Path, *, chapter: int | None = None
 
 
 def latest_projection_run(project_root: str | Path, *, chapter: int | None = None) -> dict[str, Any] | None:
-    records = read_projection_runs(project_root, chapter=chapter)
-    return records[-1] if records else None
+    """返回最新的投影运行记录。从文件末尾反向搜索以提高效率。"""
+    path = projection_log_path(project_root)
+    if not path.is_file():
+        return None
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    # 从后向前搜索
+    for line in reversed(lines):
+        raw = line.strip()
+        if not raw:
+            continue
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if chapter is not None:
+            try:
+                record_chapter = int(payload.get("chapter") or 0)
+            except (TypeError, ValueError):
+                continue
+            if record_chapter != int(chapter):
+                continue
+        return payload
+    return None

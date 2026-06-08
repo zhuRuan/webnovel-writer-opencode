@@ -32,7 +32,7 @@ class EventLogStore:
             conn.close()
 
     def write_events(self, chapter: int, events: List[dict]) -> Path:
-        normalized = self._normalize_events(chapter, events)
+        normalized = self.normalize_events(chapter, events)
         path = self.paths.event_json(chapter)
         write_json(path, normalized)
         self._write_sqlite_mirror(normalized)
@@ -103,7 +103,7 @@ class EventLogStore:
                     sqlite_rows = 0
         return {"ok": True, "sqlite_rows": sqlite_rows, "event_files": file_count}
 
-    def _normalize_events(self, chapter: int, events: List[dict]) -> List[Dict[str, Any]]:
+    def normalize_events(self, chapter: int, events: List[dict]) -> List[Dict[str, Any]]:
         normalized: List[Dict[str, Any]] = []
         for event in events or []:
             if not isinstance(event, dict):
