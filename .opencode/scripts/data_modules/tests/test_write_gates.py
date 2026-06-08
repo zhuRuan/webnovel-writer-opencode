@@ -92,3 +92,73 @@ class TestRunWriteGate:
 
         result = run_write_gate("prewrite", tmp_path, 1)
         assert result["ok"] is True
+
+    def test_postcommit_missing_commit_file(self, tmp_path):
+        """commit 文件不存在时应报错。"""
+        result = run_write_gate("postcommit", tmp_path, 1)
+        assert result["ok"] is False
+        assert any(e["code"] == "commit_file_missing" for e in result["errors"])
+
+    def test_postcommit_valid_commit(self, tmp_path):
+        """有效 commit 且投影完整时应通过。"""
+        commits_dir = tmp_path / ".story-system" / "commits"
+        commits_dir.mkdir(parents=True)
+        commit = {
+            "meta": {"chapter": 1, "status": "accepted"},
+            "projection_status": {
+                "state": "done", "index": "done", "summary": "done",
+                "memory": "done", "vector": "done",
+            },
+        }
+        (commits_dir / "chapter_001.commit.json").write_text(json.dumps(commit), encoding="utf-8")
+        result = run_write_gate("postcommit", tmp_path, 1)
+        assert result["ok"] is True
+
+    def test_postcommit_failed_projection(self, tmp_path):
+        """projection 失败时应报错。"""
+        commits_dir = tmp_path / ".story-system" / "commits"
+        commits_dir.mkdir(parents=True)
+        commit = {
+            "meta": {"chapter": 1, "status": "accepted"},
+            "projection_status": {
+                "state": "done", "index": "failed:sqlite_error", "summary": "done",
+                "memory": "done", "vector": "done",
+            },
+        }
+        (commits_dir / "chapter_001.commit.json").write_text(json.dumps(commit), encoding="utf-8")
+        result = run_write_gate("postcommit", tmp_path, 1)
+        assert result["ok"] is False
+        assert any(e["code"] == "projection_failed" for e in result["errors"])
+
+    def test_postcommit_missing_projection_writer(self, tmp_path):
+        """缺少 projection writer 时应报错。"""
+        commits_dir = tmp_path / ".story-system" / "commits"
+        commits_dir.mkdir(parents=True)
+        commit = {
+            "meta": {"chapter": 1, "status": "accepted"},
+            "projection_status": {
+                "state": "done", "index": "done", "summary": "done",
+                "memory": "done",
+                # vector 缺失
+            },
+        }
+        (commits_dir / "chapter_001.commit.json").write_text(json.dumps(commit), encoding="utf-8")
+        result = run_write_gate("postcommit", tmp_path, 1)
+        assert result["ok"] is False
+        assert any(e["code"] == "projection_missing" for e in result["errors"])
+
+    def test_postcommit_pending_projection(self, tmp_path):
+        """pending projection 应报 warning。"""
+        commits_dir = tmp_path / ".story-system" / "commits"
+        commits_dir.mkdir(parents=True)
+        commit = {
+            "meta": {"chapter": 1, "status": "accepted"},
+            "projection_status": {
+                "state": "done", "index": "pending", "summary": "done",
+                "memory": "done", "vector": "done",
+            },
+        }
+        (commits_dir / "chapter_001.commit.json").write_text(json.dumps(commit), encoding="utf-8")
+        result = run_write_gate("postcommit", tmp_path, 1)
+        # pending 是 warning，不阻断 ok
+        assert any(e["code"] == "projection_pending" for e in result["warnings"])

@@ -127,3 +127,81 @@ class TestValidateChapterCommit:
         )
         result = validate_chapter_commit(tmp_path, 1)
         assert result["ok"] is True
+
+    def test_commit_with_failed_projection(self, tmp_path):
+        """projection_status 含 failed 时应报错。"""
+        commits_dir = tmp_path / ".story-system" / "commits"
+        commits_dir.mkdir(parents=True)
+        commit = {
+            "meta": {"chapter": 1, "status": "accepted"},
+            "review_result": {"blocking_count": 0, "issues": []},
+            "fulfillment_result": {"planned_nodes": [], "covered_nodes": [], "missed_nodes": [], "extra_nodes": []},
+            "disambiguation_result": {"pending": []},
+            "extraction_result": {"accepted_events": [], "state_deltas": [], "entity_deltas": []},
+            "projection_status": {
+                "state": "done", "index": "failed:sqlite_error", "summary": "done",
+                "memory": "done", "vector": "done",
+            },
+        }
+        (commits_dir / "chapter_001.commit.json").write_text(json.dumps(commit), encoding="utf-8")
+        result = validate_chapter_commit(tmp_path, 1)
+        assert result["ok"] is False
+        assert any("projection" in e["code"] for e in result["errors"])
+
+    def test_commit_missing_vector_projection(self, tmp_path):
+        """projection_status 缺少 vector 时应报错。"""
+        commits_dir = tmp_path / ".story-system" / "commits"
+        commits_dir.mkdir(parents=True)
+        commit = {
+            "meta": {"chapter": 1, "status": "accepted"},
+            "review_result": {"blocking_count": 0, "issues": []},
+            "fulfillment_result": {"planned_nodes": [], "covered_nodes": [], "missed_nodes": [], "extra_nodes": []},
+            "disambiguation_result": {"pending": []},
+            "extraction_result": {"accepted_events": [], "state_deltas": [], "entity_deltas": []},
+            "projection_status": {
+                "state": "done", "index": "done", "summary": "done",
+                "memory": "done",
+                # vector 缺失
+            },
+        }
+        (commits_dir / "chapter_001.commit.json").write_text(json.dumps(commit), encoding="utf-8")
+        result = validate_chapter_commit(tmp_path, 1)
+        assert result["ok"] is False
+        assert any("incomplete" in e["code"] for e in result["errors"])
+
+    def test_commit_missing_nested_artifact(self, tmp_path):
+        """commit 缺少嵌套 artifact 时应报错。"""
+        commits_dir = tmp_path / ".story-system" / "commits"
+        commits_dir.mkdir(parents=True)
+        commit = {
+            "meta": {"chapter": 1, "status": "accepted"},
+            # 缺少 review_result, fulfillment_result 等
+            "projection_status": {
+                "state": "done", "index": "done", "summary": "done",
+                "memory": "done", "vector": "done",
+            },
+        }
+        (commits_dir / "chapter_001.commit.json").write_text(json.dumps(commit), encoding="utf-8")
+        result = validate_chapter_commit(tmp_path, 1)
+        assert result["ok"] is False
+        assert any(e["code"] == "missing_artifact" for e in result["errors"])
+
+    def test_commit_with_pending_projection(self, tmp_path):
+        """projection_status 含 pending 时应报错。"""
+        commits_dir = tmp_path / ".story-system" / "commits"
+        commits_dir.mkdir(parents=True)
+        commit = {
+            "meta": {"chapter": 1, "status": "accepted"},
+            "review_result": {"blocking_count": 0, "issues": []},
+            "fulfillment_result": {"planned_nodes": [], "covered_nodes": [], "missed_nodes": [], "extra_nodes": []},
+            "disambiguation_result": {"pending": []},
+            "extraction_result": {"accepted_events": [], "state_deltas": [], "entity_deltas": []},
+            "projection_status": {
+                "state": "done", "index": "pending", "summary": "done",
+                "memory": "done", "vector": "done",
+            },
+        }
+        (commits_dir / "chapter_001.commit.json").write_text(json.dumps(commit), encoding="utf-8")
+        result = validate_chapter_commit(tmp_path, 1)
+        assert result["ok"] is False
+        assert any("incomplete" in e["code"] for e in result["errors"])
