@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260608.1109",
+  "version": "v2.9.0-20260608.1114",
   "tag": "v2.9.0",
-  "updated": "2026-06-08T11:09:54Z",
+  "updated": "2026-06-08T11:14:08Z",
   "changelog": [
     {
-      "hash": "5c05f85",
-      "type": "test",
-      "message": "test: \u589e\u5f3a artifact_validator + write_gates \u6d4b\u8bd5"
+      "hash": "5a84ba6",
+      "type": "refactor",
+      "message": "refactor: chapter-writer-agent \u7626\u8eab 169\u2192119\uff0c\u538b\u7f29\u73af\u5883\u68c0\u67e5/\u9a8c\u8bc1\u811a\u672c/\u6821\u9a8c\u6e05\u5355"
     },
     {
-      "hash": "df17aa1",
+      "hash": "5713a29",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260608.1104 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260608.1109 [skip ci]"
     }
   ],
   "files": {
@@ -308,8 +308,8 @@
       "size": 3983
     },
     ".opencode/agents/chapter-writer-agent.md": {
-      "sha256": "089edd7d2c72a9d8d612c4fd79cca656e9dce3247a0829629cdfe98d5a428a0b",
-      "size": 6084
+      "sha256": "7abbd91e092b0c725ddd17bd58ff2882741f3822bceb1197e0eeb592de55b45e",
+      "size": 4672
     },
     ".opencode/agents/deconstruction-agent.md": {
       "sha256": "087bb7930389ffb4274ea2a017781bbe4c713183a8f5358792d0d99670c63de3",
