@@ -157,3 +157,94 @@ def test_apply_projections_writes_events_and_amend_proposals(project_root):
     assert row["field"] == "world_rule"
     assert row["override_value"] == "短时失控突破"
     assert row["status"] == "pending"
+
+
+# ---------------------------------------------------------------------------
+# Malformed 输入拒绝测试
+# ---------------------------------------------------------------------------
+
+def test_commit_service_rejects_review_with_blocking_issues(project_root):
+    """review_result 包含 blocking issue 时应 rejected。"""
+    service = ChapterCommitService(project_root)
+    payload = service.build_commit(
+        chapter=3,
+        review_result={"blocking_count": 0, "issues": [{"blocking": True, "severity": "critical", "description": "test"}]},
+        fulfillment_result={"planned_nodes": [], "covered_nodes": [], "missed_nodes": [], "extra_nodes": []},
+        disambiguation_result={"pending": []},
+        extraction_result={"state_deltas": [], "entity_deltas": [], "accepted_events": []},
+    )
+    assert payload["meta"]["status"] == "rejected"
+
+
+def test_commit_service_rejects_disambiguation_with_pending(project_root):
+    """disambiguation_result 包含 pending 项时应 rejected。"""
+    service = ChapterCommitService(project_root)
+    payload = service.build_commit(
+        chapter=3,
+        review_result={"blocking_count": 0},
+        fulfillment_result={"planned_nodes": [], "covered_nodes": [], "missed_nodes": [], "extra_nodes": []},
+        disambiguation_result={"pending": [{"entity": "test"}]},
+        extraction_result={"state_deltas": [], "entity_deltas": [], "accepted_events": []},
+    )
+    assert payload["meta"]["status"] == "rejected"
+
+
+def test_commit_service_rejects_cbn_missed_nodes(project_root):
+    """遗漏 CBN（核心情节点）时应 rejected。"""
+    service = ChapterCommitService(project_root)
+    payload = service.build_commit(
+        chapter=3,
+        review_result={"blocking_count": 0},
+        fulfillment_result={
+            "planned_nodes": ["发现陷阱"],
+            "covered_nodes": [],
+            "missed_nodes": [{"type": "CBN", "name": "发现陷阱"}],
+            "extra_nodes": [],
+        },
+        disambiguation_result={"pending": []},
+        extraction_result={"state_deltas": [], "entity_deltas": [], "accepted_events": []},
+    )
+    assert payload["meta"]["status"] == "rejected"
+
+
+def test_commit_service_accepts_cpn_missed_nodes(project_root):
+    """遗漏 CPN（推进节点）时应 accepted（非阻断）。"""
+    service = ChapterCommitService(project_root)
+    payload = service.build_commit(
+        chapter=3,
+        review_result={"blocking_count": 0},
+        fulfillment_result={
+            "planned_nodes": ["发现陷阱", "试探信息"],
+            "covered_nodes": ["发现陷阱"],
+            "missed_nodes": [{"type": "CPN", "name": "试探信息"}],
+            "extra_nodes": [],
+        },
+        disambiguation_result={"pending": []},
+        extraction_result={"state_deltas": [], "entity_deltas": [], "accepted_events": []},
+    )
+    assert payload["meta"]["status"] == "accepted"
+
+
+def test_commit_service_extraction_result_stored_as_nested(project_root):
+    """extraction_result 应存储在嵌套结构中。"""
+    service = ChapterCommitService(project_root)
+    extraction = {
+        "state_deltas": [{"entity_id": "x", "field": "realm", "new": "斗者"}],
+        "entity_deltas": [],
+        "accepted_events": [{"event_type": "test"}],
+        "summary_text": "本章摘要",
+    }
+    payload = service.build_commit(
+        chapter=3,
+        review_result={"blocking_count": 0},
+        fulfillment_result={"planned_nodes": [], "covered_nodes": [], "missed_nodes": [], "extra_nodes": []},
+        disambiguation_result={"pending": []},
+        extraction_result=extraction,
+    )
+    # 嵌套结构
+    assert "extraction_result" in payload
+    assert payload["extraction_result"]["summary_text"] == "本章摘要"
+    assert payload["extraction_result"]["accepted_events"] == [{"event_type": "test"}]
+    # 顶层不再有这些字段
+    assert "summary_text" not in payload
+    assert "accepted_events" not in payload
