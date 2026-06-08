@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260608.1052",
+  "version": "v2.9.0-20260608.1100",
   "tag": "v2.9.0",
-  "updated": "2026-06-08T10:52:19Z",
+  "updated": "2026-06-08T11:00:53Z",
   "changelog": [
     {
-      "hash": "764fae6",
-      "type": "refactor",
-      "message": "refactor: \u540c\u6b65 projection_log.py + \u589e\u5f3a postcommit gate"
+      "hash": "1ebe758",
+      "type": "test",
+      "message": "test: \u65b0\u589e 4 \u4e2a projection writer \u5e42\u7b49\u6027\u6d4b\u8bd5"
     },
     {
-      "hash": "29a9f45",
+      "hash": "6c8ee6d",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260608.1046 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260608.1052 [skip ci]"
     }
   ],
   "files": {
@@ -1244,8 +1244,8 @@
       "size": 14591
     },
     ".opencode/scripts/data_modules/tests/test_projection_writers.py": {
-      "sha256": "f16e17e76d5859c93cb3b40be33a96b6a2a8422b6b9913928fb08e4658b74b10",
-      "size": 18425
+      "sha256": "f21fb14ee20fed58f9695d71dbb368417e44de0bd4cb467ae5abca761a771a7b",
+      "size": 22911
     },
     ".opencode/scripts/data_modules/tests/test_config.py": {
       "sha256": "72de732cc754d25e19808296992a43fde57b17fd1d6b845e2400769857412678",
