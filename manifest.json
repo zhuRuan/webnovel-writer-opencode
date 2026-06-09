@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260608.1135",
+  "version": "v2.9.0-20260609.0437",
   "tag": "v2.9.0",
-  "updated": "2026-06-08T11:35:40Z",
+  "updated": "2026-06-09T04:37:08Z",
   "changelog": [
     {
-      "hash": "3947a4a",
+      "hash": "2e2ac45",
       "type": "fix",
-      "message": "fix: \u4fee\u590d\u4ee3\u7801\u5ba1\u67e5\u53d1\u73b0\u7684 10 \u4e2a\u95ee\u9898"
+      "message": "fix: \u8865\u5145\u4ee3\u7801\u5ba1\u67e5\u4fee\u590d \u2014 \u79fb\u9664\u6b7b\u5bfc\u5165\u3001filelock \u5f02\u5e38\u5904\u7406\u3001\u6295\u5f71\u72b6\u6001\u4f18\u5148\u7ea7"
     },
     {
-      "hash": "c531aa6",
+      "hash": "ac6204d",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260608.1117 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260608.1135 [skip ci]"
     }
   ],
   "files": {
@@ -748,8 +748,8 @@
       "size": 1646
     },
     ".opencode/scripts/data_modules/projection_log.py": {
-      "sha256": "02069bca29af0544526488092365beaa8a535bd99dddc11b9f7e0f9fe5bf3f42",
-      "size": 6371
+      "sha256": "7f430b4174c799d4d6297906fd97a72a66189c66007b25fc09e41a2e105115b0",
+      "size": 6393
     },
     ".opencode/scripts/data_modules/genre_aliases.py": {
       "sha256": "6e8488e1b6e873fd436b4a3c81a933f11ffadce0e8973ae4a24653c4bae5f6fd",
@@ -868,8 +868,8 @@
       "size": 318
     },
     ".opencode/scripts/data_modules/artifact_validator.py": {
-      "sha256": "cddac852502c51a3b39a4670b8aa4480c6b7b6d38336199fb27adf9bbc8fe5f7",
-      "size": 17497
+      "sha256": "1874229f2a35e060de9c4619d2452f4d313a3153be2700fb5b2feec4640d4bcc",
+      "size": 17646
     },
     ".opencode/scripts/data_modules/query_router.py": {
       "sha256": "dd507f4c92f707f0226ed8f8b05f5d108705cd3490775ad0eac43dd9b732be7c",
@@ -1264,8 +1264,8 @@
       "size": 1295
     },
     ".opencode/scripts/data_modules/write_gates/postcommit.py": {
-      "sha256": "19ce55bf786d083e3e03cd52e9f753c20c29a84e985411212e6923966f15a129",
-      "size": 6469
+      "sha256": "1f6412f860762a766a7cab321884fc0a2f5e9067f59bdbabccd5268290bb5714",
+      "size": 6572
     },
     ".opencode/scripts/data_modules/write_gates/prewrite.py": {
       "sha256": "c6c6df0f7c42118ed836e602804fcf27b62f3467d8ba6497797352cb809cfe8b",
