@@ -162,6 +162,19 @@ def run_postcommit_gate(project_root: Path, chapter: int) -> Dict[str, Any]:
     errors = []
     warnings = []
 
+    # 项目阶段检测（注入诊断上下文）
+    phase_info = {}
+    try:
+        from ..project_phase import resolve_project_phase
+        snapshot = resolve_project_phase(project_root, chapter=chapter)
+        phase_info = {
+            "phase": snapshot.phase,
+            "blocking": list(snapshot.blocking or []),
+            "warnings": list(snapshot.warnings or []),
+        }
+    except Exception:
+        pass
+
     # commit 文件检查
     commit_check = _check_commit_file(project_root, chapter)
     for err in commit_check.get("errors") or []:
@@ -171,7 +184,9 @@ def run_postcommit_gate(project_root: Path, chapter: int) -> Dict[str, Any]:
             warnings.append(err)
 
     if not commit_check["ok"]:
-        return gate_report("postcommit", errors, warnings)
+        result = gate_report("postcommit", errors, warnings)
+        result["phase"] = phase_info
+        return result
 
     commit = commit_check["commit"]
 
@@ -183,4 +198,6 @@ def run_postcommit_gate(project_root: Path, chapter: int) -> Dict[str, Any]:
         else:
             warnings.append(i)
 
-    return gate_report("postcommit", errors, warnings)
+    result = gate_report("postcommit", errors, warnings)
+    result["phase"] = phase_info
+    return result

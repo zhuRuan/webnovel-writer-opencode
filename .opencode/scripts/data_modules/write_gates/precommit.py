@@ -15,6 +15,34 @@ from typing import Any, Dict, List
 
 from . import gate_report, issue
 
+# 阻断提交的项目阶段
+_BLOCKED_PRECOMMIT_PHASES = frozenset({
+    "no_project",
+    "init_scaffolded",
+    "projection_failed",
+})
+
+
+def _check_project_phase(project_root: Path) -> List[Dict[str, Any]]:
+    """检查项目阶段。"""
+    errors = []
+    try:
+        from ..project_phase import resolve_project_phase
+        snapshot = resolve_project_phase(project_root)
+        if snapshot.phase in _BLOCKED_PRECOMMIT_PHASES:
+            blocking_info = list(snapshot.blocking or [])
+            errors.append(issue(
+                "invalid_phase",
+                "error",
+                f"项目阶段 {snapshot.phase} 阻断提交",
+                repair="先修复阻断问题",
+                phase=snapshot.phase,
+                blocking=blocking_info,
+            ))
+    except Exception:
+        pass  # 模块不可用时跳过
+    return errors
+
 
 def _check_chapter_file(project_root: Path, chapter: int) -> List[Dict[str, Any]]:
     """检查 chapter file 存在且非空。"""
@@ -56,6 +84,16 @@ def run_precommit_gate(project_root: Path, chapter: int) -> Dict[str, Any]:
     """运行 precommit gate。"""
     errors = []
     warnings = []
+
+    # 项目阶段检查
+    phase_issues = _check_project_phase(project_root)
+    for i in phase_issues:
+        if i["severity"] == "error":
+            errors.append(i)
+        else:
+            warnings.append(i)
+    if errors:
+        return gate_report("precommit", errors, warnings)
 
     # chapter file 检查
     chapter_issues = _check_chapter_file(project_root, chapter)

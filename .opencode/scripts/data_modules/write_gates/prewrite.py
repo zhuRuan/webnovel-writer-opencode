@@ -16,6 +16,37 @@ from typing import Any, Dict, List
 from . import gate_report, issue
 
 
+def _check_project_phase(project_root: Path) -> List[Dict[str, Any]]:
+    """检查项目阶段。"""
+    errors = []
+    try:
+        from ..project_phase import (
+            PHASE_INIT_SCAFFOLDED,
+            PHASE_NO_PROJECT,
+            resolve_project_phase,
+        )
+        snapshot = resolve_project_phase(project_root)
+        if snapshot.phase == PHASE_NO_PROJECT:
+            errors.append(issue(
+                "no_project",
+                "error",
+                "项目不存在（缺少 state.json）",
+                repair="运行 webnovel-init 初始化项目",
+            ))
+        elif snapshot.phase == PHASE_INIT_SCAFFOLDED:
+            missing = list(snapshot.missing_init_files or []) + list(snapshot.missing_init_dirs or [])
+            errors.append(issue(
+                "init_incomplete",
+                "error",
+                f"项目初始化不完整，缺少 {len(missing)} 项",
+                repair="运行 webnovel-init 补齐缺失文件",
+                missing=missing,
+            ))
+    except Exception:
+        pass  # 模块不可用时跳过
+    return errors
+
+
 def _check_contracts(project_root: Path, chapter: int) -> List[Dict[str, Any]]:
     """检查合同文件存在性。"""
     errors = []
@@ -107,6 +138,16 @@ def run_prewrite_gate(project_root: Path, chapter: int) -> Dict[str, Any]:
     """运行 prewrite gate。"""
     errors = []
     warnings = []
+
+    # 项目阶段检查
+    phase_issues = _check_project_phase(project_root)
+    for i in phase_issues:
+        if i["severity"] == "error":
+            errors.append(i)
+        else:
+            warnings.append(i)
+    if errors:
+        return gate_report("prewrite", errors, warnings)
 
     # 合同检查
     contract_issues = _check_contracts(project_root, chapter)

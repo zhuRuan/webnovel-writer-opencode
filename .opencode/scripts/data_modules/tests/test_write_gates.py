@@ -76,13 +76,28 @@ class TestRunWriteGate:
         assert result["ok"] is False
         assert any(e["code"] == "unknown_stage" for e in result["errors"])
 
+    def test_prewrite_no_project(self, tmp_path):
+        """项目不存在时应报 no_project 错误。"""
+        result = run_write_gate("prewrite", tmp_path, 1)
+        assert result["ok"] is False
+        assert any(e["code"] == "no_project" for e in result["errors"])
+
     def test_prewrite_missing_contracts(self, tmp_path):
+        """项目存在但缺少合同时应报 missing_master_setting 错误。"""
+        # 创建最小项目结构（通过 phase 检查）
+        webnovel = tmp_path / ".webnovel"
+        webnovel.mkdir()
+        (webnovel / "state.json").write_text("{}", encoding="utf-8")
+        # 缺少合同文件
         result = run_write_gate("prewrite", tmp_path, 1)
         assert result["ok"] is False
         assert any(e["code"] == "missing_master_setting" for e in result["errors"])
 
     def test_prewrite_with_contracts(self, tmp_path):
-        # 创建最小合同结构
+        # 创建最小项目结构 + 合同
+        webnovel = tmp_path / ".webnovel"
+        webnovel.mkdir()
+        (webnovel / "state.json").write_text("{}", encoding="utf-8")
         story_dir = tmp_path / ".story-system"
         story_dir.mkdir()
         (story_dir / "MASTER_SETTING.json").write_text("{}", encoding="utf-8")
