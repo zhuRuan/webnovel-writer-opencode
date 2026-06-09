@@ -236,6 +236,18 @@ class ChapterCommitService:
             except Exception as exc:
                 payload["projection_status"][name] = f"failed:{exc}"
         self.persist_commit(payload)
+
+        # 同步写入 projection_log（权威记录）
+        try:
+            from .projection_log import append_projection_run
+            writer_results = {
+                name: {"status": payload["projection_status"].get(name, "unknown")}
+                for name in payload["projection_status"]
+            }
+            append_projection_run(self.project_root, payload, writer_results)
+        except Exception as exc:
+            logger.warning("projection_log append failed: %s", exc)
+
         self._sync_foreshadowing(payload)
 
         # Render markdown projections

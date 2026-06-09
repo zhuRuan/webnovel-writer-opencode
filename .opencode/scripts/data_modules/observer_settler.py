@@ -50,6 +50,13 @@ def _resolve_entity(name_or_id: str, known: dict[str, dict]) -> str:
     return name_or_id
 
 
+def _normalize_heading(heading: str) -> str:
+    """Normalize heading: strip numbering prefix and whitespace."""
+    # Remove leading numbering like "1. ", "2. ", "① "
+    import re as _re
+    return _re.sub(r'^[\d①②③④⑤⑥⑦⑧⑨⑩]+[.、]\s*', '', heading).strip()
+
+
 def _parse_markdown_sections(text: str) -> dict[str, list[str]]:
     """Parse observer output into sections keyed by heading name."""
     sections: dict[str, list[str]] = {}
@@ -57,7 +64,7 @@ def _parse_markdown_sections(text: str) -> dict[str, list[str]]:
     for line in text.splitlines():
         stripped = line.strip()
         if stripped.startswith("## "):
-            current_heading = stripped[3:].strip()
+            current_heading = _normalize_heading(stripped[3:])
             sections.setdefault(current_heading, [])
         elif current_heading and stripped:
             sections[current_heading].append(stripped)

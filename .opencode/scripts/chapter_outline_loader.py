@@ -213,10 +213,16 @@ _DIRECTIVE_FIELD_MAP = {
     "章末问题": "chapter_end_open_question",
     "钩子类型": "hook_type",
     "钩子强度": "hook_strength",
+    "钩子": "hook_content",
     "关键实体": "key_entities",
     "涉及实体": "key_entities",
     "strand": "strand",
     "反派层级": "antagonist_tier",
+    "爽点": "coolpoint",
+    "视角": "pov",
+    "主角": "pov",
+    "本章变化": "chapter_change",
+    "与上章时间差": "time_delta",
 }
 
 _DIRECTIVE_LIST_FIELDS = {"cpns", "must_cover_nodes", "forbidden_zones", "key_entities"}
