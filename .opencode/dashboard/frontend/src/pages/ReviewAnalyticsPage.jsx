@@ -16,6 +16,7 @@ const DIMENSION_LABELS = {
 }
 
 function buildRadarOption(averages) {
+    if (!averages) return null
     const dims = Object.keys(averages)
     if (!dims.length) return null
 
@@ -44,6 +45,7 @@ function buildRadarOption(averages) {
 }
 
 function buildTrendOption(trends) {
+    if (!trends) return null
     const dims = Object.keys(trends)
     if (!dims.length) return null
 
