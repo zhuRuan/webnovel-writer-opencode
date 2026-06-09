@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260609.1443",
+  "version": "v2.9.0-20260609.1514",
   "tag": "v2.9.0",
-  "updated": "2026-06-09T14:43:57Z",
+  "updated": "2026-06-09T15:14:27Z",
   "changelog": [
     {
-      "hash": "6b16243",
+      "hash": "8b8d141",
       "type": "fix",
-      "message": "fix: \u4fee\u590d\u5de5\u4f5c\u6d41\u5ba1\u67e5 P1/P2 \u95ee\u9898"
+      "message": "fix: \u4ee3\u7801\u5ba1\u67e5\u5efa\u8bae \u2014 __all__ \u8865\u5145\u5e38\u91cf + reviewer \u6267\u884c\u6d41\u7a0b\u6392\u9664\u8bf4\u660e"
     },
     {
-      "hash": "3030dd2",
+      "hash": "750e215",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260609.0703 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260609.1443 [skip ci]"
     }
   ],
   "files": {
@@ -304,8 +304,8 @@
       "size": 2439
     },
     ".opencode/agents/reviewer.md": {
-      "sha256": "0058061ac2de8d91cca391f4685538e463b06f032d2aec071a4dd7cb9a3b6c86",
-      "size": 4135
+      "sha256": "e9e239e18378013d43bbc0156675b38bfb199e716aa9fafbd8d0ba6997e055f8",
+      "size": 4261
     },
     ".opencode/agents/chapter-writer-agent.md": {
       "sha256": "e19a4a2c9043f64f4b9cb8cff8c6e906a14ee4590c45c9560c3cc410c5c84382",
@@ -856,8 +856,8 @@
       "size": 1268
     },
     ".opencode/scripts/data_modules/__init__.py": {
-      "sha256": "5939710261f2ca13f28356c6ef05fc4a4119590aa2769ce420275bd05ea3c406",
-      "size": 3899
+      "sha256": "66399a40294bd40667c4985937d109d808b7cba30d9a7f02ae8d782946531154",
+      "size": 3991
     },
     ".opencode/scripts/data_modules/state_validator.py": {
       "sha256": "d35642f8bfa93afe6b31d660857117f3dc11bad5458ce0f2879d3f698517a7ba",
