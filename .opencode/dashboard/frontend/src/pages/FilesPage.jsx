@@ -1,8 +1,10 @@
-import { startTransition, useEffect, useMemo, useState } from 'react'
+import { lazy, startTransition, Suspense, useEffect, useMemo, useState } from 'react'
 import { useDashboardContext } from '../App.jsx'
 import Badge from '../components/Badge.jsx'
 import { fetchFileContent, fetchFilesTree } from '../api.js'
 import { findFirstFilePath } from '../lib/files.js'
+
+const EditorPanel = lazy(() => import('../components/EditorPanel.jsx'))
 
 function countTreeItems(items) {
     return (items || []).reduce(
@@ -66,6 +68,8 @@ export default function FilesPage() {
     const [selectedPath, setSelectedPath] = useState(null)
     const [content, setContent] = useState('')
     const [loadingContent, setLoadingContent] = useState(false)
+    const [editing, setEditing] = useState(false)
+    const darkMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark'
 
     useEffect(() => {
         let cancelled = false
@@ -179,12 +183,36 @@ export default function FilesPage() {
                     </div>
 
                     {selectedPath ? (
-                        <>
-                            <div className="selected-path">{selectedPath}</div>
-                            <pre className={`file-preview ${loadingContent ? 'loading' : ''}`.trim()}>
-                                {loadingContent ? '读取中…' : content}
-                            </pre>
-                        </>
+                        editing ? (
+                            <Suspense fallback={<div className="empty-state compact">加载编辑器...</div>}>
+                                <EditorPanel
+                                    path={selectedPath}
+                                    initialContent={content}
+                                    darkMode={darkMode}
+                                    onSave={(newContent) => {
+                                        setContent(newContent)
+                                        setEditing(false)
+                                    }}
+                                    onCancel={() => setEditing(false)}
+                                />
+                            </Suspense>
+                        ) : (
+                            <>
+                                <div className="selected-path" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <span>{selectedPath}</span>
+                                    <button
+                                        className="page-btn"
+                                        style={{ padding: '2px 10px', minHeight: 24, fontSize: 12 }}
+                                        onClick={() => setEditing(true)}
+                                    >
+                                        编辑
+                                    </button>
+                                </div>
+                                <pre className={`file-preview ${loadingContent ? 'loading' : ''}`.trim()}>
+                                    {loadingContent ? '读取中…' : content}
+                                </pre>
+                            </>
+                        )
                     ) : (
                         <div className="empty-state">
                             <p>选择左侧文件以预览内容</p>

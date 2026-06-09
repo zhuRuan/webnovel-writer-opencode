@@ -949,6 +949,45 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
         return {"path": path, "content": content}
 
+    @app.put("/api/files/write")
+    def file_write(request: dict):
+        """写入文件内容（限 正文/大纲/设定集 目录）。"""
+        path = request.get("path")
+        content = request.get("content")
+        if not path or content is None:
+            raise HTTPException(400, "path 和 content 不能为空")
+
+        root = _get_project_root()
+        resolved = safe_resolve(root, path)
+
+        # 二次限制：只允许三大目录
+        allowed_parents = [root / n for n in ("正文", "大纲", "设定集")]
+        if not any(_is_child(resolved, p) for p in allowed_parents):
+            raise HTTPException(403, "仅允许写入 正文/大纲/设定集 目录下的文件")
+
+        if not resolved.is_file():
+            raise HTTPException(404, "文件不存在")
+
+        # 备份原文件
+        try:
+            backup = resolved.with_suffix(resolved.suffix + ".bak")
+            backup.write_text(resolved.read_text(encoding="utf-8"), encoding="utf-8")
+        except Exception:
+            pass  # 备份失败不阻断写入
+
+        # 写入新内容
+        resolved.write_text(content, encoding="utf-8")
+
+        # 触发 SSE 通知
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "file-saved", "path": path, "ts": time.time(),
+            }))
+        except Exception:
+            pass
+
+        return {"ok": True, "path": path, "size": len(content)}
+
     # ===========================================================
     # SSE：实时变更推送
     # ===========================================================

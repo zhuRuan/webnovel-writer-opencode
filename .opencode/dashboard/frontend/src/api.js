@@ -71,6 +71,10 @@ export function fetchFileContent(path) {
     return fetchJSON('/api/files/read', { path })
 }
 
+export function saveFileContent(path, content) {
+    return apiPut('/api/files/write', { path, content })
+}
+
 // --- 写入 helper ---
 
 export async function apiPost(path, body = {}) {
