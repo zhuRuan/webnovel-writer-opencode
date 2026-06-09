@@ -97,6 +97,7 @@ export default function FilesPage() {
     useEffect(() => {
         if (!selectedPath) return undefined
 
+        setEditing(false)
         let cancelled = false
         setLoadingContent(true)
         fetchFileContent(selectedPath)

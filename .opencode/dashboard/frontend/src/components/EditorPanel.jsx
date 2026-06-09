@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -8,6 +8,16 @@ export default function EditorPanel({ path, initialContent, onSave, onCancel, da
     const [content, setContent] = useState(initialContent)
     const [saving, setSaving] = useState(false)
     const [msg, setMsg] = useState(null)
+    const prevPathRef = useRef(path)
+
+    // 切换文件时重置内容
+    useEffect(() => {
+        if (prevPathRef.current !== path) {
+            prevPathRef.current = path
+            setContent(initialContent)
+            setMsg(null)
+        }
+    }, [path, initialContent])
 
     const charCount = content.length
     const lineCount = content.split(/\n/).length
