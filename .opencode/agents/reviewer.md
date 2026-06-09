@@ -40,6 +40,8 @@ tools:
 
 ## 5. 执行流程（按顺序执行）
 
+**注意：只检查以下 6 个维度。ai_flavor 和 pacing 由 polish 阶段处理，不在 reviewer 检查范围内。**
+
 ### 1. 设定一致性（category: setting）
 
 **必须先执行 bash 查询主角状态和最近状态变更，再对比正文内容，不得凭记忆审查。**

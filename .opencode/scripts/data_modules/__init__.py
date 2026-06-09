@@ -61,6 +61,9 @@ __all__ = [
     # Memory Contract
     "MemoryContract",
     "MemoryContractAdapter",
+    # Projection Constants
+    "REQUIRED_PROJECTION_WRITERS",
+    "OK_PROJECTION_STATUSES",
 ]
 
 
