@@ -312,15 +312,49 @@ def settle(raw_facts_path: Path, project_root: Path, chapter: int) -> dict:
                        dropped, len(all_events))
 
     entities_appeared = list({e["subject"] for e in validated})
+
+    # 从 accepted_events 提取 state_deltas 和 entity_deltas
+    state_deltas = []
+    entity_deltas = []
+    for evt in validated:
+        event_type = evt.get("event_type", "")
+        payload = evt.get("payload", {})
+        subject = evt.get("subject", "")
+        if event_type in ("character_state_changed", "power_breakthrough"):
+            field = payload.get("field") or payload.get("field_path") or "realm"
+            old_val = payload.get("old") or payload.get("old_value") or payload.get("previous_state")
+            new_val = payload.get("new") or payload.get("new_value") or payload.get("new_state") or payload.get("new_realm")
+            if subject and field and new_val is not None:
+                state_deltas.append({
+                    "entity_id": subject,
+                    "field": field,
+                    "old": old_val,
+                    "new": new_val,
+                    "reason": event_type,
+                    "chapter": evt.get("chapter"),
+                })
+        if event_type == "relationship_changed":
+            from_e = payload.get("from_entity") or subject
+            to_e = payload.get("to_entity") or payload.get("to")
+            rel_type = payload.get("relationship_type") or payload.get("type")
+            if from_e and to_e and rel_type:
+                entity_deltas.append({
+                    "from_entity": from_e,
+                    "to_entity": to_e,
+                    "relationship_type": rel_type,
+                    "description": payload.get("description", ""),
+                    "chapter": evt.get("chapter"),
+                })
+
     return {
         "accepted_events": validated,
-        "state_deltas": [],
-        "entity_deltas": [],
+        "state_deltas": state_deltas,
+        "entity_deltas": entity_deltas,
         "entities_appeared": entities_appeared,
-        "scenes": [],
-        "chapter_meta": {},
-        "dominant_strand": "",
-        "summary_text": "",
+        "scenes": [],       # 由 data-agent 在 Step 5.1c 补全
+        "chapter_meta": {},  # 由 data-agent 在 Step 5.1c 补全
+        "dominant_strand": "",  # 由 data-agent 在 Step 5.1c 补全
+        "summary_text": "",    # 由 data-agent 在 Step 5.1c 补全
     }
 
 

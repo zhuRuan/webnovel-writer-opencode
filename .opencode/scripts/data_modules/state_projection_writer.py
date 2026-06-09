@@ -176,6 +176,11 @@ class StateProjectionWriter:
                 field = (
                     str(payload.get("field") or payload.get("field_path") or "realm").strip()
                 )
+                # 兼容 observer_settler 产出的 new_realm/old_realm 格式
+                if "new" not in payload and "new_realm" in payload:
+                    payload["new"] = payload["new_realm"]
+                if "old" not in payload and "old_realm" in payload:
+                    payload["old"] = payload["old_realm"]
             elif event_type == "character_state_changed":
                 field = str(payload.get("field") or payload.get("field_path") or "").strip()
             else:

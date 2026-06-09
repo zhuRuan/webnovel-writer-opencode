@@ -327,6 +327,7 @@ cat "${SKILL_ROOT}/references/outlining/chapter-planning.md"
 {
   "next_volume_anchor": {
     "volume": 2,
+    "chapters_range": "51-100",
     "volume_name": "下一卷卷名",
     "core_conflict": "下一卷核心冲突",
     "volume_end_climax": "下一卷卷末高潮"
