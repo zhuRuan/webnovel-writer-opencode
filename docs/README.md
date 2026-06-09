@@ -41,6 +41,7 @@
 - [superpowers/plans/2026-05-25-dashboard-evolution-plan.md](./superpowers/plans/2026-05-25-dashboard-evolution-plan.md)：看板演进实现计划（Phase 1-3，已完成）
 - [superpowers/plans/2026-06-07-original-project-sync-plan.md](./superpowers/plans/2026-06-07-original-project-sync-plan.md)：原项目同步计划（P0 已完成，P1/P3 待执行）
 - [superpowers/plans/2026-06-07-p1-p3-detailed-plan.md](./superpowers/plans/2026-06-07-p1-p3-detailed-plan.md)：P1/P3 详细实施计划
+- [superpowers/plans/2026-06-08-project-phase-sync-plan.md](./superpowers/plans/2026-06-08-project-phase-sync-plan.md)：project_phase.py 同步计划
 
 ## 分类原则
 
