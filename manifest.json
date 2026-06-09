@@ -1,17 +1,27 @@
 {
-  "version": "v2.9.0-20260609.0437",
+  "version": "v2.9.0-20260609.0508",
   "tag": "v2.9.0",
-  "updated": "2026-06-09T04:37:08Z",
+  "updated": "2026-06-09T05:08:24Z",
   "changelog": [
     {
-      "hash": "2e2ac45",
-      "type": "fix",
-      "message": "fix: \u8865\u5145\u4ee3\u7801\u5ba1\u67e5\u4fee\u590d \u2014 \u79fb\u9664\u6b7b\u5bfc\u5165\u3001filelock \u5f02\u5e38\u5904\u7406\u3001\u6295\u5f71\u72b6\u6001\u4f18\u5148\u7ea7"
+      "hash": "dd4f64e",
+      "type": "refactor",
+      "message": "refactor: \u96c6\u6210 project_phase \u5230 write_gates \u4e09\u9636\u6bb5\u95e8\u7981"
     },
     {
-      "hash": "ac6204d",
+      "hash": "06f7d45",
+      "type": "docs",
+      "message": "docs: \u65b0\u589e project_phase.py \u540c\u6b65\u8ba1\u5212"
+    },
+    {
+      "hash": "cc91bae",
+      "type": "refactor",
+      "message": "refactor: \u540c\u6b65 project_phase.py \u2014 \u9879\u76ee\u9636\u6bb5\u611f\u77e5\u6a21\u5757\uff08398 \u884c\uff09"
+    },
+    {
+      "hash": "a5f4663",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260608.1135 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260609.0437 [skip ci]"
     }
   ],
   "files": {
@@ -739,6 +749,10 @@
       "sha256": "4387e79c60ecea9d542a1dce71390fb40b1457bd896e738f6bff69773822b54a",
       "size": 21853
     },
+    ".opencode/scripts/data_modules/project_phase.py": {
+      "sha256": "af9abafd672553bc1d6d930d5dbeb705ee5917a89688f96ebcba395ba743da28",
+      "size": 13661
+    },
     ".opencode/scripts/data_modules/story_event_schema.py": {
       "sha256": "69261ec8dd0abf74c5360afa37a01cd3adb523af788f28b181290662d1473a5b",
       "size": 644
@@ -1155,6 +1169,10 @@
       "sha256": "6bee5c959ba1950b5a963082777a6968c166cb785df76d3300e4da2ead9d12b3",
       "size": 2553
     },
+    ".opencode/scripts/data_modules/tests/test_project_phase.py": {
+      "sha256": "eca90f4155df3e7bcf67115043a79f58e25b1c30c09e45b7f17eed584bbb9732",
+      "size": 5747
+    },
     ".opencode/scripts/data_modules/tests/test_memory_orchestrator.py": {
       "sha256": "3bda0b682859716260efd10471d05d6eadfd8facc6a1f06b56d6e6f1488758f9",
       "size": 2038
@@ -1200,8 +1218,8 @@
       "size": 2320
     },
     ".opencode/scripts/data_modules/tests/test_write_gates.py": {
-      "sha256": "a614daf84ab8226bb2693c3cbe13889616f4533c11d4bac277afb95187856ef3",
-      "size": 6332
+      "sha256": "30e1d285e8855031355c5ed1f4adc74de15a2350fcd99040590c7aaeb88fb69c",
+      "size": 7063
     },
     ".opencode/scripts/data_modules/tests/test_csv_config.py": {
       "sha256": "3eb8cb979ff9f8702bcfe049157ba0570778cbb5325e03be3e541cd6a3ac17c9",
@@ -1264,20 +1282,20 @@
       "size": 1295
     },
     ".opencode/scripts/data_modules/write_gates/postcommit.py": {
-      "sha256": "1f6412f860762a766a7cab321884fc0a2f5e9067f59bdbabccd5268290bb5714",
-      "size": 6572
+      "sha256": "d100ce0586209bce704dfb717501222292fedf92db40dfafacb79bf40ecd11d5",
+      "size": 7113
     },
     ".opencode/scripts/data_modules/write_gates/prewrite.py": {
-      "sha256": "c6c6df0f7c42118ed836e602804fcf27b62f3467d8ba6497797352cb809cfe8b",
-      "size": 4219
+      "sha256": "05473756b120ea2431d743e63867483d2920c66603990193dc4294192f6fa23f",
+      "size": 5630
     },
     ".opencode/scripts/data_modules/write_gates/__init__.py": {
       "sha256": "8fe38ab67b93033ec477c2e321e9d438a4c277e729000acc88e8284b6c6b88df",
       "size": 2967
     },
     ".opencode/scripts/data_modules/write_gates/precommit.py": {
-      "sha256": "32a997835e684c6c7bc617767589bc7a461789b5f2f6bdb4299919c2e9f53ad9",
-      "size": 2444
+      "sha256": "fcdfc94562518bf7108a4ef30bcaf925e2423c7b9bc8ae4544be7a9dbac882a8",
+      "size": 3607
     },
     ".opencode/scripts/data_modules/memory/schema.py": {
       "sha256": "6b68ef11ef9827d2b69244991a65e7d82a6b0c572a6827a6b23961cb99da3ceb",
