@@ -28,7 +28,6 @@ from .chapter_commit_schema import (
     FulfillmentResult,
     ReviewResult,
 )
-from .commit_artifacts import extraction_list
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +231,8 @@ def _policy_issues(artifact_name: str, payload: Dict[str, Any]) -> List[Dict[str
             ))
 
     elif artifact_name == "extraction_result":
+        # 注意：payload 已经是 Pydantic 归一化后的扁平 dict，直接 .get() 即可。
+        # 若传入原始 commit payload（嵌套结构），需用 extraction_list() 读取。
         events = payload.get("accepted_events") if isinstance(payload, dict) else None
         if not events:
             issues.append(_issue(

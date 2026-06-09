@@ -61,29 +61,32 @@ def _check_commit_file(project_root: Path, chapter: int) -> Dict[str, Any]:
 
 
 def _get_projection_status(project_root: Path, chapter: int, commit: Dict[str, Any]) -> Dict[str, str]:
-    """获取投影状态，优先从 commit 文件读取（最终状态），fallback 到 projection_log。"""
-    # 优先从 commit 文件读取（投影完成后 commit 中的状态是最新的）
-    raw = commit.get("projection_status")
-    if isinstance(raw, dict) and raw:
-        commit_status = {str(k): str(v) for k, v in raw.items()}
-        # 如果 commit 中有任何非 pending 的状态，说明投影已完成
-        if any(v != "pending" for v in commit_status.values()):
-            return commit_status
-
-    # fallback 到 projection_log
+    """获取投影状态。优先从 projection_log 读取（权威记录），fallback 到 commit 文件。"""
+    # 优先从 projection_log 读取
+    logged_status: Dict[str, str] = {}
     try:
         from ..projection_log import latest_projection_run, projection_status_from_run
         latest_run = latest_projection_run(project_root, chapter=chapter)
-        logged_status = projection_status_from_run(latest_run)
-        if logged_status:
-            return logged_status
+        logged_status = projection_status_from_run(latest_run) or {}
     except Exception:
         pass
 
-    # 最后使用 commit 文件（即使全是 pending）
+    # 从 commit 文件读取
+    raw = commit.get("projection_status")
+    commit_status: Dict[str, str] = {}
     if isinstance(raw, dict):
-        return {str(k): str(v) for k, v in raw.items()}
-    return {}
+        commit_status = {str(k): str(v) for k, v in raw.items()}
+
+    # 如果 log 有非 pending 数据，优先使用（权威记录）
+    if logged_status and any(v != "pending" for v in logged_status.values()):
+        return logged_status
+
+    # 如果 commit 有非 pending 数据，使用 commit（投影完成后 commit 也会更新）
+    if commit_status and any(v != "pending" for v in commit_status.values()):
+        return commit_status
+
+    # 都是 pending 或缺失，返回 commit 状态（或空）
+    return commit_status
 
 
 def _check_projections(project_root: Path, chapter: int, commit: Dict[str, Any]) -> List[Dict[str, Any]]:

@@ -121,8 +121,8 @@ def append_projection_run(
             with path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True))
                 handle.write("\n")
-    except ImportError:
-        # filelock 不可用时降级为无锁写入
+    except (ImportError, Exception):
+        # filelock 不可用或超时时降级为无锁写入
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True))
             handle.write("\n")
