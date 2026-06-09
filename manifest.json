@@ -1,32 +1,17 @@
 {
-  "version": "v2.9.0-20260609.0625",
+  "version": "v2.9.0-20260609.0703",
   "tag": "v2.9.0",
-  "updated": "2026-06-09T06:25:34Z",
+  "updated": "2026-06-09T07:03:50Z",
   "changelog": [
     {
-      "hash": "1270d31",
+      "hash": "f12e6f8",
       "type": "fix",
-      "message": "fix: \u4fee\u590d\u5de5\u4f5c\u6d41\u5ba1\u67e5 P0 \u95ee\u9898"
+      "message": "fix: \u4fee\u590d\u5de5\u4f5c\u6d41\u5ba1\u67e5 P1 \u95ee\u9898"
     },
     {
-      "hash": "2890a5d",
-      "type": "fix",
-      "message": "fix: \u4fee\u590d\u5de5\u4f5c\u6d41\u5ba1\u67e5 P0 \u95ee\u9898"
-    },
-    {
-      "hash": "9099734",
-      "type": "docs",
-      "message": "docs: \u65b0\u589e\u5199\u4f5c\u5de5\u4f5c\u6d41\u5ba1\u67e5\u62a5\u544a"
-    },
-    {
-      "hash": "e3fe7d8",
-      "type": "docs",
-      "message": "docs: \u65b0\u589e\u5199\u4f5c\u5de5\u4f5c\u6d41\u8be6\u7ec6\u5206\u6790\u62a5\u544a"
-    },
-    {
-      "hash": "93b824e",
+      "hash": "e8645e2",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260609.0537 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260609.0625 [skip ci]"
     }
   ],
   "files": {
@@ -559,8 +544,8 @@
       "size": 262
     },
     ".opencode/scripts/chapter_outline_loader.py": {
-      "sha256": "5cb20697827a68e20a63e352cffdf3b0258d4c78c4cc7830f5cd8c0ba0fbce77",
-      "size": 12585
+      "sha256": "e34ed9af68b9c41907569a90690197db3a1eccd23b84509fa6af55f925c17682",
+      "size": 12762
     },
     ".opencode/scripts/story_system.py": {
       "sha256": "b2ea7ebf857952efd2d60052f2ea17181dfa05f01c391667629f41274d9e137f",
@@ -827,8 +812,8 @@
       "size": 1013
     },
     ".opencode/scripts/data_modules/chapter_commit_service.py": {
-      "sha256": "0bed6796b6aacb2400fd68795ef2a2fd7a842a8d0c3ded8230541292e9b16132",
-      "size": 11267
+      "sha256": "2ddd77b36719ab877bdaa6b8a8d918f43672b2a3e71410c387bab2a5d2e11595",
+      "size": 11765
     },
     ".opencode/scripts/data_modules/memory_projection_writer.py": {
       "sha256": "3a3f4fd87cc530a2ea2fa4b3be836853e8bdc66d51b40fca5e1ecb7deaac0636",
@@ -975,8 +960,8 @@
       "size": 4676
     },
     ".opencode/scripts/data_modules/observer_settler.py": {
-      "sha256": "e5cb9933cb04a1199d2e825d2f1f2d30e4dfaefcc3d7f6f6c4b659613b5197e0",
-      "size": 15030
+      "sha256": "aef29e33eb6972e29a458b08e3fc065803b1544d9a65081be397bedc72226119",
+      "size": 15325
     },
     ".opencode/scripts/data_modules/index_projection_writer.py": {
       "sha256": "301566e9b185efefe47bbfcf9ef24983777a460325d20e51b610079b69badcaf",
