@@ -287,6 +287,8 @@ def init_project(
     protagonist_flaw: str = "",
     protagonist_archetype: str = "",
     antagonist_level: str = "",
+    one_liner: str = "",
+    core_conflict: str = "",
     target_reader: str = "",
     platform: str = "",
     currency_system: str = "",
@@ -342,6 +344,8 @@ def init_project(
             "created_at": created_at,
             "target_words": int(target_words),
             "target_chapters": int(target_chapters),
+            "one_liner": one_liner,
+            "core_conflict": core_conflict,
             # 下面字段属于“初始化元信息”，不影响运行时脚本
             "golden_finger_name": golden_finger_name,
             "golden_finger_type": golden_finger_type,

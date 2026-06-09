@@ -240,10 +240,12 @@ Agent(
 
 1. 书名、题材（可复合）已确定。
 2. 目标规模可计算（字数或章数至少一个）。
-3. 主角姓名 + 欲望 + 缺陷完整。
-4. 世界规模 + 力量体系类型完整。
-5. 金手指类型已确定（允许"无金手指"）。
-6. 创意约束已确定：
+3. 一句话故事（one_liner）已确定。
+4. 核心冲突（core_conflict）已确定。
+5. 主角姓名 + 欲望 + 缺陷完整。
+6. 世界规模 + 力量体系类型完整。
+7. 金手指类型已确定（允许"无金手指"）。
+8. 创意约束已确定：
    - 反套路规则 1 条
    - 硬约束至少 2 条
    - 或用户明确拒绝并记录原因。
@@ -289,6 +291,7 @@ python "${SCRIPTS_DIR}/webnovel.py" init "${PROJECT_ROOT}" "{title}" "{genre}" \
   --cultivation-chain "{cultivation_chain}" --cultivation-subtiers "{cultivation_subtiers}" \
   --protagonist-desire "{protagonist_desire}" --protagonist-flaw "{protagonist_flaw}" \
   --protagonist-archetype "{protagonist_archetype}" --antagonist-level "{antagonist_level}" \
+  --one-liner "{one_liner}" --core-conflict "{core_conflict}" \
   --target-reader "{target_reader}" --platform "{platform}"
 ```
 
