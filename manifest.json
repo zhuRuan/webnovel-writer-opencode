@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.0-20260609.0703",
+  "version": "v2.9.0-20260609.1443",
   "tag": "v2.9.0",
-  "updated": "2026-06-09T07:03:50Z",
+  "updated": "2026-06-09T14:43:57Z",
   "changelog": [
     {
-      "hash": "f12e6f8",
+      "hash": "6b16243",
       "type": "fix",
-      "message": "fix: \u4fee\u590d\u5de5\u4f5c\u6d41\u5ba1\u67e5 P1 \u95ee\u9898"
+      "message": "fix: \u4fee\u590d\u5de5\u4f5c\u6d41\u5ba1\u67e5 P1/P2 \u95ee\u9898"
     },
     {
-      "hash": "e8645e2",
+      "hash": "3030dd2",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260609.0625 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260609.0703 [skip ci]"
     }
   ],
   "files": {
@@ -252,8 +252,8 @@
       "size": 17905
     },
     ".opencode/skills/webnovel-write/references/self-check-evidence.md": {
-      "sha256": "a04543e3985b7692505731d528878d3cf0db5f8a30855eead89f7bf774fc02bb",
-      "size": 2094
+      "sha256": "8fd63ba5dc83732a672801682726485b7e361e606c1018467f3d132e14858dcc",
+      "size": 2680
     },
     ".opencode/skills/webnovel-write/references/anti-ai-guide.md": {
       "sha256": "fa60601e0080c47bbac1cf33e6d9372a3aa0725e9a005f155618820b1ce36685",
@@ -304,8 +304,8 @@
       "size": 2439
     },
     ".opencode/agents/reviewer.md": {
-      "sha256": "598949f4b5baa85ed3f92c98943858621eca312272d1efd8295b54ba26976fee",
-      "size": 4005
+      "sha256": "0058061ac2de8d91cca391f4685538e463b06f032d2aec071a4dd7cb9a3b6c86",
+      "size": 4135
     },
     ".opencode/agents/chapter-writer-agent.md": {
       "sha256": "e19a4a2c9043f64f4b9cb8cff8c6e906a14ee4590c45c9560c3cc410c5c84382",
@@ -856,8 +856,8 @@
       "size": 1268
     },
     ".opencode/scripts/data_modules/__init__.py": {
-      "sha256": "02e7701b523eb2cfab120e0f1cf9ff01a08dcef3a7da128d445c7020cb4a42bb",
-      "size": 3680
+      "sha256": "5939710261f2ca13f28356c6ef05fc4a4119590aa2769ce420275bd05ea3c406",
+      "size": 3899
     },
     ".opencode/scripts/data_modules/state_validator.py": {
       "sha256": "d35642f8bfa93afe6b31d660857117f3dc11bad5458ce0f2879d3f698517a7ba",
@@ -872,8 +872,8 @@
       "size": 318
     },
     ".opencode/scripts/data_modules/artifact_validator.py": {
-      "sha256": "1874229f2a35e060de9c4619d2452f4d313a3153be2700fb5b2feec4640d4bcc",
-      "size": 17646
+      "sha256": "586a036c5692e3e497a540d5143ab3ddbc558e2168bfae2d4721f8b6ddecc046",
+      "size": 17586
     },
     ".opencode/scripts/data_modules/query_router.py": {
       "sha256": "dd507f4c92f707f0226ed8f8b05f5d108705cd3490775ad0eac43dd9b732be7c",
@@ -1272,8 +1272,8 @@
       "size": 1295
     },
     ".opencode/scripts/data_modules/write_gates/postcommit.py": {
-      "sha256": "d100ce0586209bce704dfb717501222292fedf92db40dfafacb79bf40ecd11d5",
-      "size": 7113
+      "sha256": "6bb7b8ae45b1b877a3457c96a512273bf0dcc34b271048a084dbde102d817cc0",
+      "size": 7016
     },
     ".opencode/scripts/data_modules/write_gates/prewrite.py": {
       "sha256": "05473756b120ea2431d743e63867483d2920c66603990193dc4294192f6fa23f",
