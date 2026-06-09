@@ -9,6 +9,7 @@
 - [`architecture/overview.md`](./architecture/overview.md)：系统架构、Agent 分工、Story System 设计
 - [`architecture/current-system-diagnosis.md`](./architecture/current-system-diagnosis.md)：当前系统状态诊断
 - [architecture/system-architecture.md](./architecture/system-architecture.md)：详细系统架构与模块说明
+- [architecture/writing-workflow-analysis.md](./architecture/writing-workflow-analysis.md)：写作工作流详细分析报告（4 阶段 + 6 Agent + 数据流）
 
 ### 使用指南
 
