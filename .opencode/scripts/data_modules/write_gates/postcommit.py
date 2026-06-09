@@ -15,11 +15,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+from .. import OK_PROJECTION_STATUSES, REQUIRED_PROJECTION_WRITERS
 from . import gate_report, issue
-
-# 投影 writer 列表和合法状态
-REQUIRED_PROJECTION_WRITERS = ("state", "index", "summary", "memory", "vector")
-OK_PROJECTION_STATUSES = {"done", "skipped"}
 
 
 def _check_commit_file(project_root: Path, chapter: int) -> Dict[str, Any]:

@@ -17,6 +17,10 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
+# 投影相关常量（单一定义，供 artifact_validator / postcommit 等模块共享）
+REQUIRED_PROJECTION_WRITERS = ("state", "index", "summary", "memory", "vector")
+OK_PROJECTION_STATUSES = {"done", "skipped"}
+
 
 __all__ = [
     # Config

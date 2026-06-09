@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import ValidationError
 
+from . import OK_PROJECTION_STATUSES, REQUIRED_PROJECTION_WRITERS
 from .chapter_commit_schema import (
     DisambiguationResult,
     ExtractionResult,
@@ -44,9 +45,6 @@ ERROR_MISSED_OUTLINE_NODE = "missed_outline_node"
 ERROR_PENDING_DISAMBIGUATION = "pending_disambiguation"
 ERROR_PROJECTION_FAILURE = "projection_failure"
 ERROR_PROJECTION_INCOMPLETE = "projection_incomplete"
-
-REQUIRED_PROJECTION_WRITERS = ("state", "index", "summary", "memory", "vector")
-OK_PROJECTION_STATUSES = {"done", "skipped"}
 
 # 产物名称 → Pydantic 模型映射
 ARTIFACT_SCHEMAS = {

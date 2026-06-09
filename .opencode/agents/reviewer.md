@@ -36,7 +36,7 @@ tools:
 
 ## 4. 输出格式
 
-输出 JSON 到 `${REVIEW_OUTPUT}`，包含 `dimension_results`（6 个维度）、`issues` 列表、`has_blocking` 布尔值。
+输出 JSON 到 `${REVIEW_OUTPUT}`，包含 `dimension_results`（6 个维度：setting/timeline/continuity/character/logic/rules）、`issues` 列表、`has_blocking` 布尔值。注：ai_flavor 和 pacing 由 polish 阶段处理，不由 reviewer 检查。
 
 ## 5. 执行流程（按顺序执行）
 

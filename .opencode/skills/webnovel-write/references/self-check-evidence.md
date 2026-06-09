@@ -2,8 +2,18 @@
 
 审查发现 blocking issue 后，修复阶段使用此脚本检查 evidence 是否仍存在于正文中。
 
+## 自查逻辑
+
+检查策略：对每个 blocking issue，检查其 evidence 是否仍在正文中。
+- 如果 evidence 是精确原文引用（含 `vs` 分隔符），取 `vs` 左侧匹配
+- 如果 evidence 是概括性描述，用前 80 字符模糊匹配
+- 如果 evidence 为空或过短（<3 字符），视为"无法验证"
+- 如果所有 evidence 都已消失，自查通过
+- 如果有 evidence 仍存在，自查不通过
+
+**注意**：此自查是启发式的，不能 100% 确认问题已修复。如果自查通过但 reviewer 重审仍发现 blocking，应信任 reviewer 的判断。
+
 ```bash
-# 修复后自查：检查上次审查的 evidence 是否仍在正文中
 SELF_CHECK_PASSED=$(python -c "
 import json, pathlib
 chapter_file = pathlib.Path('${CHAPTER_FILE}')
@@ -15,18 +25,19 @@ text = chapter_file.read_text(encoding='utf-8')
 review = json.loads(review_file.read_text(encoding='utf-8'))
 issues = review.get('issues', [])
 blocking = [i for i in issues if i.get('blocking')]
-# 检查每个 blocking issue 的 evidence 是否仍在正文中
 remaining = 0
 no_evidence = 0
 for issue in blocking:
     evidence = (issue.get('evidence') or '').strip()
-    if not evidence:
+    if not evidence or len(evidence) < 3:
         no_evidence += 1
         continue
     # evidence 可能是 '原文引用 vs 数据记录' 格式，取 vs 左侧的原文引用部分
     if ' vs ' in evidence:
         evidence = evidence.split(' vs ')[0].strip()
-    if len(evidence) >= 3 and evidence[:80] in text:
+    # 归一化后匹配：去除首尾空白，取前 80 字符
+    search_str = evidence[:80].strip()
+    if len(search_str) >= 3 and search_str in text:
         remaining += 1
 # 有 blocking issue 但全部无 evidence（如空正文），自查不通过
 if blocking and no_evidence == len(blocking):
