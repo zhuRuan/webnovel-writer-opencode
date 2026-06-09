@@ -1,27 +1,22 @@
 {
-  "version": "v2.9.0-20260609.0508",
+  "version": "v2.9.0-20260609.0537",
   "tag": "v2.9.0",
-  "updated": "2026-06-09T05:08:24Z",
+  "updated": "2026-06-09T05:37:17Z",
   "changelog": [
     {
-      "hash": "dd4f64e",
-      "type": "refactor",
-      "message": "refactor: \u96c6\u6210 project_phase \u5230 write_gates \u4e09\u9636\u6bb5\u95e8\u7981"
+      "hash": "ca61d04",
+      "type": "fix",
+      "message": "fix: \u7f16\u8f91\u5668\u72b6\u6001\u7ba1\u7406\u4fee\u590d"
     },
     {
-      "hash": "06f7d45",
-      "type": "docs",
-      "message": "docs: \u65b0\u589e project_phase.py \u540c\u6b65\u8ba1\u5212"
+      "hash": "1497b9c",
+      "type": "feat",
+      "message": "feat: Dashboard Phase 9 \u2014 \u7ae0\u8282\u5185\u8054\u7f16\u8f91\u5668"
     },
     {
-      "hash": "cc91bae",
-      "type": "refactor",
-      "message": "refactor: \u540c\u6b65 project_phase.py \u2014 \u9879\u76ee\u9636\u6bb5\u611f\u77e5\u6a21\u5757\uff08398 \u884c\uff09"
-    },
-    {
-      "hash": "a5f4663",
+      "hash": "692ffca",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.0-20260609.0437 [skip ci]"
+      "message": "chore: update manifest to v2.9.0-20260609.0508 [skip ci]"
     }
   ],
   "files": {
@@ -1658,8 +1653,8 @@
       "size": 8662
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "978934e1fa772b0dd059bd8399e43afe85d3557b03ba1c555e1d2978b13a1016",
-      "size": 69816
+      "sha256": "e1bf8849ab791501fe046252c08ca585f337d44fcb35682b072c86280ca3f559",
+      "size": 71246
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
@@ -1686,12 +1681,12 @@
       "size": 4843
     },
     ".opencode/dashboard/frontend/package-lock.json": {
-      "sha256": "8ab0fea4c1e286013052aa4d0da913ca4dcd6d4d381a2a86e5674949e8f14849",
-      "size": 64799
+      "sha256": "2a3e762d0b0ec760eae605a1b0be03fc92e44b306b344bd326c4ccd0e8fe36e8",
+      "size": 78144
     },
     ".opencode/dashboard/frontend/package.json": {
-      "sha256": "786020a0d79d3280e0360545d1a75019f31ae69c872334c625e8e12cfde8f36b",
-      "size": 515
+      "sha256": "0141295a6557132eb68dea6a7aaa69ba992498e64f03fe3fc6065ec12ccb7ee4",
+      "size": 643
     },
     ".opencode/dashboard/frontend/vite.config.js": {
       "sha256": "58fb64107a46ddca7be062736bc07522acfabf435417f6e1b6d86d122a7afe32",
@@ -1714,16 +1709,16 @@
       "size": 3217
     },
     ".opencode/dashboard/frontend/src/api.js": {
-      "sha256": "3466e154341d68fe280d85aeb8e811290dda931bbe88bdf2af987887deac73d9",
-      "size": 5799
+      "sha256": "a608ef2846ba8d31b0985b419313251c18df7f0206cc08d68c370e4ba5416716",
+      "size": 5908
     },
     ".opencode/dashboard/frontend/src/App.jsx": {
       "sha256": "7147c4576a3b44cd287cf38a50d4f3e5137285367e6262df948c5ccbbd5cb830",
       "size": 4830
     },
     ".opencode/dashboard/frontend/src/index.css": {
-      "sha256": "1d79c2950911b0b2ba544e7dd080d4dd5e06b721ad12403d20e5bba4feee3504",
-      "size": 14260
+      "sha256": "3e3527d56301edc49c53a9d72ba8bf2d70ba5e3dc460eb42a604f593541334a1",
+      "size": 14680
     },
     ".opencode/dashboard/frontend/src/pages/PacingPage.jsx": {
       "sha256": "27f994a2b23ded446d8e21614c745419120779d5fa6f3c9ae42da59a9c40f1aa",
@@ -1734,8 +1729,8 @@
       "size": 39784
     },
     ".opencode/dashboard/frontend/src/pages/FilesPage.jsx": {
-      "sha256": "167257b9ffb6e4e58c3f0f8fd13ee435256645ee855d6f0cd9ff375300718917",
-      "size": 7556
+      "sha256": "62a448e05540013c14d260a62603f5366e030801a0a08b74cb44fce229a19a70",
+      "size": 9230
     },
     ".opencode/dashboard/frontend/src/pages/ReviewAnalyticsPage.jsx": {
       "sha256": "7db2c718bb8a23baf67533339d452d72d383996da8483061f18c461f42b76c45",
@@ -1796,6 +1791,10 @@
     ".opencode/dashboard/frontend/src/components/DataTable.jsx": {
       "sha256": "07cf59e8861a84f111055e918e8e1e7e5c17627800b779d33e545a6244df7e04",
       "size": 3257
+    },
+    ".opencode/dashboard/frontend/src/components/EditorPanel.jsx": {
+      "sha256": "3ea734aa97d96e91c9ad8a80ca6e4fc74185bdefbea57e8ac294733f4711b00d",
+      "size": 3273
     }
   }
 }
