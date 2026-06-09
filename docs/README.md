@@ -10,6 +10,7 @@
 - [`architecture/current-system-diagnosis.md`](./architecture/current-system-diagnosis.md)：当前系统状态诊断
 - [architecture/system-architecture.md](./architecture/system-architecture.md)：详细系统架构与模块说明
 - [architecture/writing-workflow-analysis.md](./architecture/writing-workflow-analysis.md)：写作工作流详细分析报告（4 阶段 + 6 Agent + 数据流）
+- [architecture/workflow-review-report.md](./architecture/workflow-review-report.md)：工作流审查报告（6 严重 + 23 中等 + 15 低）
 
 ### 使用指南
 
