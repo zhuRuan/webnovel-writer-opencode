@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.1-20260609.1604",
+  "version": "v2.9.1-20260610.1159",
   "tag": "v2.9.1",
-  "updated": "2026-06-09T16:04:24Z",
+  "updated": "2026-06-10T11:59:55Z",
   "changelog": [
     {
-      "hash": "3acad17",
+      "hash": "fc3ae87",
       "type": "fix",
-      "message": "fix: \u5ba1\u67e5\u5206\u6790\u9875\u9762\u6e32\u67d3\u9519\u8bef \u2014 dimension_averages/dimension_trends \u4e3a null \u65f6 Object.keys \u5d29\u6e83"
+      "message": "fix: \u5b89\u88c5\u811a\u672c UI \u91cd\u6784 + \u591a\u5904 Bug \u4fee\u590d + \u6587\u6863\u7ef4\u62a4"
     },
     {
-      "hash": "6b90b7a",
+      "hash": "8e839ad",
       "type": "chore",
-      "message": "chore: release v2.9.1 [skip ci]"
+      "message": "chore: update manifest to v2.9.1-20260609.1604 [skip ci]"
     }
   ],
   "files": {
@@ -28,8 +28,8 @@
       "size": 61
     },
     ".opencode/installer/check.py": {
-      "sha256": "ab1af1168d932a628c30d00e77cbe3354ff7941d8a21e75cf8d7efa9051725c7",
-      "size": 5556
+      "sha256": "77baceeb4e3d4589b1d468cef15cf039eb44f78fc1a72f2356b7fdf230a84a15",
+      "size": 5735
     },
     ".opencode/installer/uninstall.py": {
       "sha256": "7b235b632990778a950ce90995e6999ab347ede31240925fe599d1f5b60f96f3",
@@ -40,8 +40,8 @@
       "size": 3143
     },
     ".opencode/installer/deps.py": {
-      "sha256": "8e86c6f724b592c5365408ce3e47818a417a17f2ea85d5b3de85312e0d00966c",
-      "size": 5274
+      "sha256": "e3ecfbf0f79d6f5758b67e7ff7388a289a2f72b98d52f26b881c12bc4dc020b2",
+      "size": 5142
     },
     ".opencode/installer/update.py": {
       "sha256": "b59a114bfa8a2be2ae6217fc82377737425df15651594a29d44ba8dca95f2e27",
@@ -56,8 +56,8 @@
       "size": 6039
     },
     ".opencode/installer/ui.py": {
-      "sha256": "2e77fbd5d1131214668717f8cc900ea04d8d82a996af71184102786673e99699",
-      "size": 4501
+      "sha256": "4235915fd927d8d2e53111ba33a083802bb38e324bff08d0b4483e828e848c27",
+      "size": 8131
     },
     ".opencode/plugins/write-guard.js": {
       "sha256": "275b8c56369d470b165a4f9ece5d5f8beb6ed94032c994cf9e98d171b24c6ee0",
@@ -236,8 +236,8 @@
       "size": 5583
     },
     ".opencode/skills/webnovel-write/SKILL.md": {
-      "sha256": "be7dbdb02ff547e47d890f29d54b2dfc66f8714d26256fcc8a75667632295c04",
-      "size": 13215
+      "sha256": "e850ddd5424bc3fd501c667719c6f556eeca94d59a76a062418811115b58a4bb",
+      "size": 13949
     },
     ".opencode/skills/webnovel-write/evals/evals.json": {
       "sha256": "d19b4b196c1637055371ad64899a74ae3d9b01d568bdb8e63c4f71835c8a16e3",
@@ -304,12 +304,12 @@
       "size": 2439
     },
     ".opencode/agents/reviewer.md": {
-      "sha256": "e9e239e18378013d43bbc0156675b38bfb199e716aa9fafbd8d0ba6997e055f8",
-      "size": 4261
+      "sha256": "6c8b02795e2a8c0aab6b9f44f05872f723747af4d9fc4f488cfd9cc3ccbca29f",
+      "size": 4563
     },
     ".opencode/agents/chapter-writer-agent.md": {
-      "sha256": "e19a4a2c9043f64f4b9cb8cff8c6e906a14ee4590c45c9560c3cc410c5c84382",
-      "size": 4861
+      "sha256": "3e5c3bbe4a35fad6b7ca5a363e173bb08dcca8f8eed5fb2ea44a9709f2de59d4",
+      "size": 5355
     },
     ".opencode/agents/deconstruction-agent.md": {
       "sha256": "087bb7930389ffb4274ea2a017781bbe4c713183a8f5358792d0d99670c63de3",
@@ -536,16 +536,16 @@
       "size": 18317
     },
     ".opencode/scripts/review_pipeline.py": {
-      "sha256": "802c41e54fdc7dc0595c41b7999dac9805b86785971af928e0f7f96a8fd108c7",
-      "size": 9822
+      "sha256": "f1492579aae0964d9379c57751d248dac66443e64709cf28459fd2b7a1610702",
+      "size": 10058
     },
     ".opencode/scripts/requirements.txt": {
       "sha256": "6063cc8e2a44ebef9fbdec6c6cfaa4c1c4ac5c8890e54f5c23e2f6b885e77957",
       "size": 262
     },
     ".opencode/scripts/chapter_outline_loader.py": {
-      "sha256": "e34ed9af68b9c41907569a90690197db3a1eccd23b84509fa6af55f925c17682",
-      "size": 12762
+      "sha256": "530e11d6858ce8854bb638468d839c3897f1c9068cf7eca12a05aaf2e5d8dbc6",
+      "size": 13281
     },
     ".opencode/scripts/story_system.py": {
       "sha256": "b2ea7ebf857952efd2d60052f2ea17181dfa05f01c391667629f41274d9e137f",
@@ -596,8 +596,8 @@
       "size": 8711
     },
     ".opencode/scripts/skill_runner.py": {
-      "sha256": "da76f85d14ad9e37afa7f9cdfd33a7c81eafb251abe76fb0e4c1a14674bdee5f",
-      "size": 11748
+      "sha256": "790c8a62b882403408365f028394ba314b6c8591003bf2190bef7c14a69ef6cb",
+      "size": 11949
     },
     ".opencode/scripts/backup_manager.py": {
       "sha256": "3ad05c88507f3b863f133e2b97ff66c09478e18526a506d84a44d8ee454cd11b",
@@ -763,6 +763,10 @@
       "sha256": "adfc5890517c436f60c3c039c0447cc6fedb6311fa99b90c6a444c13cdc1b4bf",
       "size": 3194
     },
+    ".opencode/scripts/data_modules/chapter_rename.py": {
+      "sha256": "18130f096b098a9e34355ff0ed81c64eaf12de16a227e1cdfe4c355cecd97e30",
+      "size": 4575
+    },
     ".opencode/scripts/data_modules/observability.py": {
       "sha256": "c2fdadddbeb18f9d22a3519b8001907e5bbed42336ce605794db2721c7f8c9e5",
       "size": 2360
@@ -824,16 +828,16 @@
       "size": 14850
     },
     ".opencode/scripts/data_modules/state_projection_renderer.py": {
-      "sha256": "830a3eeb751e4ca988207e7188ac003bdc229f58b543822026e48a0fdb47b417",
-      "size": 7910
+      "sha256": "3f09a9195909fb1298d28386bf7230f5a114d20b6b8b3b3628923b729e00ac51",
+      "size": 8531
     },
     ".opencode/scripts/data_modules/placeholder_scanner.py": {
       "sha256": "e087ae2bf9608f88a9e0c57ecca85828574ad2d03ace9fdc17bcce8f8ac882c1",
       "size": 3322
     },
     ".opencode/scripts/data_modules/context_manager.py": {
-      "sha256": "bbbadc0f11a0e672d7209b3fe0bfb35c65121c8fcac76686f5b38a927ce01765",
-      "size": 39327
+      "sha256": "7263d4cac7123b1cad963ecef8f4bd381d1dae2866618244fb73563899e84b41",
+      "size": 39526
     },
     ".opencode/scripts/data_modules/migrate_state_to_sqlite.py": {
       "sha256": "4411243b3087307c80dde453ee8a753bd4d3a050fcfe6b4552d5217a96ecab85",
@@ -864,8 +868,8 @@
       "size": 8674
     },
     ".opencode/scripts/data_modules/webnovel.py": {
-      "sha256": "63899febae37d90cd746dcb36b6977a37d0af6e46ce6c7d42d3ca85c0c49562a",
-      "size": 33903
+      "sha256": "b88d9b1e58afc55b0a8f5c7c66e7b9d3ef30e8245e9266b709cbc182de0519bd",
+      "size": 34714
     },
     ".opencode/scripts/data_modules/amend_proposal_schema.py": {
       "sha256": "809c9d24c2863535c4e55f604c295dea23556fce7805f20e250b792cf67f1691",
@@ -892,8 +896,8 @@
       "size": 8659
     },
     ".opencode/scripts/data_modules/story_contracts.py": {
-      "sha256": "ac702edb5322fbcb9a7a6981412564589727ffb200b81f2fc80f10813d72f028",
-      "size": 7211
+      "sha256": "ee37ce0afd08328d94d73d3360a0271dfd4502fc7889dace0f09218a4698cee4",
+      "size": 7206
     },
     ".opencode/scripts/data_modules/structural_checker.py": {
       "sha256": "7bfa090e9450df8498a8bfa20fb53b5e00777675ea795a9631526c054e932128",
@@ -1080,8 +1084,8 @@
       "size": 8756
     },
     ".opencode/scripts/data_modules/tests/test_state_projection_renderer.py": {
-      "sha256": "161906468b6c5e8ae4af2f06f239f6819912491c6dd870745ef1776c810510cc",
-      "size": 4129
+      "sha256": "00f1bb51c2cf89fd3571fa75fed231b14ffd29b6f0949ca0623d364bf8372f4b",
+      "size": 4832
     },
     ".opencode/scripts/data_modules/tests/test_dashboard_watcher.py": {
       "sha256": "cb660be13a2332a74886ef334062081c83c84af62eec0ef18cdde4ebff1764b1",
@@ -1648,8 +1652,8 @@
       "size": 8662
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "e1bf8849ab791501fe046252c08ca585f337d44fcb35682b072c86280ca3f559",
-      "size": 71246
+      "sha256": "caca633cb6728775cea9ca86fa4fc4ce796053733a7e54bfe114038407107c1e",
+      "size": 71381
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
@@ -1728,8 +1732,8 @@
       "size": 9230
     },
     ".opencode/dashboard/frontend/src/pages/ReviewAnalyticsPage.jsx": {
-      "sha256": "5af8b734492f87c59c58b886800c397686d07dfa6f9700a8b538e41182cb4a75",
-      "size": 8954
+      "sha256": "4a09ed14eb081557460acaaefb5fa7ec5773358d51845c79a1bbe412de25cc7b",
+      "size": 8956
     },
     ".opencode/dashboard/frontend/src/pages/CharactersPage.jsx": {
       "sha256": "84b28dda2386dc7bcb71650f523f8cef758ec11e9209a79591bec2c0b0c69a5a",
