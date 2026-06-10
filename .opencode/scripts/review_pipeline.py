@@ -42,7 +42,9 @@ def _sanitize_json_text(raw: str, aggressive: bool = False) -> str:
     """
     sanitized = raw.replace("“", "「").replace("”", "」")  # curly → corner
     if aggressive:
-        for ch in ("“", "”", "「", "」", "＂"):
+        # 注意：不转换「」——它们是 line 43 从 curly quotes 安全转换来的，
+        # 转回 ASCII " 会破坏 JSON 字符串值中的内容。
+        for ch in ("“", "”", "＂"):
             sanitized = sanitized.replace(ch, '"')
     sanitized = sanitized.lstrip("﻿")
     return sanitized
@@ -61,8 +63,8 @@ def clean_reviewer_output(raw: str) -> dict:
     if not raw or not raw.strip():
         raise ValueError("reviewer output is empty")
 
-    # Try markdown code block first
-    m = re.search(r'```(?:json)?\s*\n?([\s\S]*?)```', raw)
+    # Try markdown code block first (greedy match: first opening to LAST closing, handles nested ``` in JSON values)
+    m = re.search(r'```(?:json)?\s*\n(.*)```', raw, re.DOTALL)
     if m:
         json_str = m.group(1).strip()
     else:

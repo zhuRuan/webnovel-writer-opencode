@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 """
-Webnovel Writer for OpenCode — one-click installer.
-Downloads .opencode/ from GitHub and sets up the writing toolchain.
+Webnovel Writer for OpenCode — 一键安装脚本。
+从 GitHub 下载 .opencode/ 并配置写作工具链。
 
-Usage:
-  python install.py                    # Interactive menu (recommended)
-  python install.py --update           # Check and apply updates
-  python install.py --clean            # Wipe .opencode/ then fresh install
-  python install.py --incremental      # Incremental update (manifest diff)
-  python install.py --apply            # Apply staged update (after closing OpenCode)
-  python install.py --uninstall        # Remove .opencode/ (keep project files)
-  python install.py --uninstall --full # Full uninstall: .opencode/ + .venv/ + deps
-  python install.py --venv             # Create and use .venv/
-  python install.py --skip-playwright  # Skip browser install
-  python install.py --mirror URL       # Use custom GitHub mirror
+用法:
+  python install.py                    # 交互菜单（推荐）
+  python install.py --update           # 检查并应用更新
+  python install.py --clean            # 擦除后全新安装
+  python install.py --incremental      # 增量更新（仅变更文件）
+  python install.py --apply            # 应用暂存更新
+  python install.py --uninstall        # 卸载（保留项目文件）
+  python install.py --uninstall --full # 完全卸载（含 .venv/）
+  python install.py --venv             # 创建并使用 .venv/
+  python install.py --skip-playwright  # 跳过浏览器安装
+  python install.py --mirror URL       # 使用自定义镜像
 """
-# Self-update: if install.py.new exists, swap it in.
-# Two-step rename works around Windows file locking on running .py files.
+# ── 自更新 ──────────────────────────────────────────────
+# 启动时检查 install.py.new，存在则热替换。
+# 两步 rename 绕过 Windows 文件锁定。
 import os as _os
+import sys as _sys
 from pathlib import Path as _P
 
 _NEW = _P(__file__).with_suffix('.py.new') if '__file__' in dir() else _P('install.py.new')
@@ -33,27 +35,227 @@ if _NEW.is_file():
     except OSError:
         pass
 
+# 自更新区块用 _P，后续代码用 Path
+Path = _P
+
+# ── Windows 控制台 UTF-8 ────────────────────────────────
+if _os.name == "nt":
+    try:
+        for _s in ("stdout", "stderr", "stdin"):
+            _obj = getattr(_sys, _s)
+            if hasattr(_obj, "reconfigure"):
+                _obj.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+# ── 标准库导入 ──────────────────────────────────────────
 import argparse
-import os
+import json
 import shutil
-import sys
 import tempfile
 import urllib.request
 import zipfile
-from pathlib import Path
 
+# ── 内联 UI ─────────────────────────────────────────────
+# install.py 必须在 .opencode/ 不存在时独立运行（自举），
+# 因此 UI 函数直接内联，不依赖 .opencode/installer/ui.py。
+# 安装后其他模块使用 .opencode/installer/ui.py（功能相同，多线程 spinner 等）。
+
+import re
+import threading
+import time
+
+_ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+if _os.name == "nt":
+    try:
+        import ctypes
+        _k32 = ctypes.windll.kernel32
+        _k32.SetConsoleMode(_k32.GetStdHandle(-11), 7)
+    except Exception:
+        pass
+
+# 颜色常量
+_G = '\033[92m'   # green
+_R = '\033[91m'   # red
+_Y = '\033[93m'   # yellow
+_C = '\033[96m'   # cyan
+_B = '\033[1m'    # bold
+_D = '\033[2m'    # dim
+_N = '\033[0m'    # reset
+
+BOX_W = 52
+
+
+def _display_width(s: str) -> int:
+    """计算显示宽度：CJK=2, ASCII=1，忽略 ANSI 转义。"""
+    clean = _ANSI_RE.sub('', s)
+    w = 0
+    for ch in clean:
+        if '一' <= ch <= '鿿' or '　' <= ch <= '〿' or '＀' <= ch <= '￯':
+            w += 2
+        else:
+            w += 1
+    return w
+
+
+def _pad(s: str, w: int) -> str:
+    """将字符串填充到指定显示宽度。"""
+    return s + ' ' * (w - _display_width(s))
+
+
+def box_open(width: int = BOX_W, color: str = ""):
+    c = color or _C
+    print(f"\n{c}┌{'─' * (width + 2)}┐{_N}")
+
+
+def box_close(width: int = BOX_W, color: str = ""):
+    c = color or _C
+    print(f"{c}└{'─' * (width + 2)}┘{_N}")
+
+
+def box_sep(width: int = BOX_W, color: str = ""):
+    c = color or _C
+    print(f"{c}├{'─' * (width + 2)}┤{_N}")
+
+
+def box_row(text: str, width: int = BOX_W, color: str = "",
+            right: str = "", box_color: str = ""):
+    c = box_color or _C
+    content = color + text + _N + right if color else text + right
+    print(f"{c}│{_N} {_pad(content, width)} {c}│{_N}")
+
+
+def header(title: str):
+    w = _display_width(title)
+    bar = "═" * (w + 4)
+    print(f"\n{_B}{_C}{bar}{_N}")
+    print(f"{_B}{_C}  {title}{_N}")
+    print(f"{_B}{_C}{bar}{_N}\n")
+
+
+def step(step_num: int, total: int, msg: str):
+    print(f"\n{_B}{_C}  [{step_num}/{total}]{_N} {msg}")
+    print(f"  {_D}{'─' * 50}{_N}")
+
+
+def info(msg: str):
+    print(f"  {_D}▸{_N} {msg}")
+
+
+def warn(msg: str):
+    print(f"  {_Y}⚠  {msg}{_N}")
+
+
+def error(msg: str):
+    print(f"\n{_R}{_B}  ✗ 错误{_N} {msg}")
+    _sys.exit(1)
+
+
+def success(title: str, lines: list = None):
+    if lines is None:
+        lines = []
+    content = [title]
+    if lines:
+        content.append("")
+        content.extend(lines)
+    box_open(color=_G)
+    for line in content:
+        box_row(f"{_G}{line}{_N}", box_color=_G)
+    box_close(color=_G)
+
+
+def download_progress(resp, dest_path, label: str = "下载中"):
+    """带进度条的下载。"""
+    total = int(resp.headers.get("Content-Length", 0) or 0)
+    downloaded = 0
+    last_pct = -1
+
+    with open(dest_path, 'wb') as f:
+        while True:
+            chunk = resp.read(8192)
+            if not chunk:
+                break
+            f.write(chunk)
+            downloaded += len(chunk)
+
+            if total:
+                pct = downloaded * 100 // total
+                if pct != last_pct:
+                    bar_len = 30
+                    filled = pct * bar_len // 100
+                    bar = "█" * filled + "░" * (bar_len - filled)
+                    size_mb = downloaded / (1024 * 1024)
+                    total_mb = total / (1024 * 1024)
+                    _sys.stdout.write(
+                        f"\r  {_C}{label}{_N} [{bar}] {pct}%  "
+                        f"{_D}{size_mb:.1f}/{total_mb:.1f} MB{_N}"
+                    )
+                    _sys.stdout.flush()
+                    last_pct = pct
+
+    if total:
+        print()
+    else:
+        size_mb = downloaded / (1024 * 1024)
+        print(f"  {_G}✓{_N} {label}  {_D}{size_mb:.1f} MB{_N}")
+
+
+class _Spinner:
+    """带状态的 spinner（✓/✗）。"""
+
+    def __init__(self, msg: str):
+        self._msg = msg
+        self._stop = threading.Event()
+        self._thread = None
+
+    def __enter__(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, *_):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=0.5)
+        if exc_type:
+            _sys.stdout.write(f"\r  {_R}✗{_N} {self._msg}\n")
+        else:
+            _sys.stdout.write(f"\r  {_G}✓{_N} {self._msg}\n")
+        _sys.stdout.flush()
+
+    def _run(self):
+        frames = ["◐", "◓", "◑", "◒"]
+        i = 0
+        while not self._stop.is_set():
+            _sys.stdout.write(f"\r  {_C}{frames[i]}{_N} {self._msg}")
+            _sys.stdout.flush()
+            i = (i + 1) % len(frames)
+            time.sleep(0.15)
+        _sys.stdout.write(f"\r{' ' * (_display_width(self._msg) + 10)}\r")
+        _sys.stdout.flush()
+
+
+def spinner(msg: str):
+    return _Spinner(msg)
+
+
+# ── 安装逻辑 ────────────────────────────────────────────
 # 以下 build_urls/download/extract_opencode 与 installer/fetch.py 功能重复，
 # 这是有意为之：install.py 必须在 .opencode/ 下载之前独立运行（启动自举）。
 # 一旦 .opencode/ 就位，后续流程使用 installer/ 模块。
+
 REPO = "lujih/webnovel-writer-opencode"
 BRANCH = "master"
-MIRRORS = [
+_DEFAULT_MIRRORS = [
     "https://ghproxy.com/",
     "https://mirror.ghproxy.com/",
 ]
+MANIFEST_URL = "https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/manifest.json"
 
-def build_urls(repo, branch, custom_mirror=None):
-    mirrors = [custom_mirror] if custom_mirror else MIRRORS
+
+def build_urls(repo, branch, custom_mirror=None, remote=None):
+    mirrors = [custom_mirror] if custom_mirror else _get_mirrors(remote)
     direct = f"https://github.com/{repo}/archive/refs/heads/{branch}.zip"
     urls = [direct]
     for m in mirrors:
@@ -61,16 +263,37 @@ def build_urls(repo, branch, custom_mirror=None):
     return urls
 
 
+def _get_mirrors(remote: dict = None) -> list:
+    """获取镜像列表：优先从远程 manifest 读取，fallback 到硬编码。
+
+    Args:
+        remote: 已缓存的 manifest dict（避免重复网络请求）。
+    """
+    if remote:
+        mirrors = remote.get("mirrors", [])
+        if mirrors:
+            return mirrors
+    try:
+        with urllib.request.urlopen(MANIFEST_URL, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+            mirrors = data.get("mirrors", [])
+            if mirrors:
+                return mirrors
+    except Exception:
+        pass
+    return list(_DEFAULT_MIRRORS)
+
+
 def download(urls, dest, timeout=30):
     for url in urls:
         try:
-            print(f"  Downloading {url.rsplit('/', 1)[-1]} ...")
+            short_name = url.rsplit('/', 1)[-1][:40]
+            info(f"尝试下载: {short_name}")
             with urllib.request.urlopen(url, timeout=timeout) as resp:
-                with open(dest, 'wb') as f:
-                    shutil.copyfileobj(resp, f)
+                download_progress(resp, dest, label="下载中")
             return True
         except (OSError, urllib.error.URLError, ValueError) as e:
-            print(f"  Failed: {e}")
+            warn(f"下载失败: {e}")
     return False
 
 
@@ -98,7 +321,7 @@ def extract_opencode(zip_path, dest_dir):
                     with zf.open(name) as src, open(target, 'wb') as dst:
                         shutil.copyfileobj(src, dst)
 
-        # Self-update: extract install.py to .new (swapped on next startup)
+        # 自更新：提取 install.py 到 .new（下次启动时替换）
         for root_file in ("install.py",):
             zip_name = prefix + root_file
             if zip_name in names:
@@ -106,72 +329,39 @@ def extract_opencode(zip_path, dest_dir):
                 tmp = Path(str(dest) + ".new")
                 with zf.open(zip_name) as src, open(str(tmp), 'wb') as dst:
                     shutil.copyfileobj(src, dst)
-                # Try in-place replace (works if not locked); .new persists otherwise
                 try:
-                    os.replace(str(tmp), str(dest))
+                    _os.replace(str(tmp), str(dest))
                 except OSError:
-                    pass  # locked — startup check handles it next run
-
-
-def _cjk_width(s: str) -> int:
-    """Count display width: CJK=2, ASCII=1. Strips ANSI escapes first."""
-    import re
-    clean = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', s)
-    w = 0
-    for ch in clean:
-        w += 2 if '一' <= ch <= '鿿' or '　' <= ch <= '〿' or '＀' <= ch <= '￯' else 1
-    return w
-
-
-def _pad(s: str, w: int) -> str:
-    """Pad string to display width w."""
-    return s + ' ' * (w - _cjk_width(s))
-
-
-MANIFEST_URL = "https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/manifest.json"
-BOX_W = 52
-C = "\033[1m\033[96m"  # cyan bold
-R = "\033[0m"       # reset
-D = "\033[90m"       # dim
-B = "\033[1m"        # bold
-G = "\033[92m"       # green
-Y = "\033[93m"       # yellow
-X = "\033[90m"       # gray (inactive)
-
-BAR = C + "─" * (BOX_W + 2) + R
-
-
-def _row(text: str, color: str = "", right: str = "") -> None:
-    """Print a box row: │ content │"""
-    content = color + text + R + right
-    print(f"{C}│{R} {_pad(content, BOX_W)} {C}│{R}")
+                    pass
 
 
 def _check_update():
-    """Compare local version with remote manifest. Returns (is_update, changelog, remote, local_tag, remote_tag)."""
-    import json as _json
-    import urllib.request
-
+    """对比本地与远程版本。返回 (状态, changelog, remote, local_tag, remote_tag)。
+    状态: None=检查失败, False=无更新, True=有更新。
+    """
     local = {}
     local_vf = Path(".opencode/version.json")
     if local_vf.is_file():
         try:
-            local = _json.loads(local_vf.read_text(encoding="utf-8"))
+            local = json.loads(local_vf.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             pass
 
     remote = {}
     try:
         with urllib.request.urlopen(MANIFEST_URL, timeout=10) as resp:
-            remote = _json.loads(resp.read().decode("utf-8", errors="replace"))
+            remote = json.loads(resp.read().decode("utf-8", errors="replace"))
     except (urllib.error.URLError, OSError, ValueError):
-        return (False, [], {}, "", "")
+        return (None, [], {}, "", "")
 
     local_tag = local.get("tag", "")
     remote_tag = remote.get("tag", "")
     local_ver = local.get("version", "unknown")
     remote_ver = remote.get("version", "")
-    if local_ver == "unknown" or not remote_ver:
+
+    if not remote_ver:
+        return (None, [], {}, "", "")
+    if local_ver == "unknown":
         return (True, [], remote, local_tag, remote_tag)
     if local_ver == remote_ver:
         return (False, [], remote, local_tag, remote_tag)
@@ -180,39 +370,39 @@ def _check_update():
 
 
 def _show_changelog(changelog, remote_version, local_tag, remote_tag):
-    """Display update changelog in CJK-aware box."""
+    """在 box 中显示更新日志。"""
     is_major = bool(local_tag and remote_tag and local_tag != remote_tag)
     tag_display = remote_tag or remote_version
 
     title = f"Webnovel Writer for OpenCode {tag_display}"
     subtitle = "大版本更新" if is_major else "小版本更新"
 
-    print(f"\n{C}┌{BAR}┐{R}")
-    print(f"{C}│{R}  {_pad(B + title + R, BOX_W)}  {C}│{R}")
-    print(f"{C}│{R}  {_pad(subtitle, BOX_W)}  {C}│{R}")
-    print(f"{C}├{BAR}┤{R}")
+    box_open()
+    box_row(f"{_B}{title}{_N}")
+    box_row(subtitle, color=_D)
+    box_sep()
     if changelog:
         shown = 0
         for entry in changelog:
             if shown >= 15:
-                print(f"{C}│{R}  {_pad(D + f'... 还有 {len(changelog) - 15} 条变更' + R, BOX_W)}  {C}│{R}")
+                box_row(_D + f"... 还有 {len(changelog) - 15} 条变更" + _N)
                 break
             msg = entry.get("message", "")[:48]
-            print(f"{C}│{R}  {_pad(D + '- ' + R + msg, BOX_W)}  {C}│{R}")
+            box_row(_D + "- " + _N + msg)
             shown += 1
     else:
-        print(f"{C}│{R}  {_pad(D + '(无详细日志)' + R, BOX_W)}  {C}│{R}")
-    print(f"{C}└{BAR}┘{R}")
+        box_row(_D + "(无详细日志)" + _N)
+    box_close()
     print()
 
 
 # _FEATURES 与 installer/deps.py 的 FEATURE_GROUPS 功能重复。
 # 启动自举需要：install.py 独立运行时可无 .opencode/ 依赖。
 _FEATURES = [
-    ("dashboard", "Dashboard — 管理面板",        "fastapi/uvicorn ~15MB", True),
-    ("export",    "导出 MD/EPUB/HTML/DOCX",       "mistune/docx ~8MB",    True),
-    ("publish",   "发布 — 平台自动上传",          "playwright ~150MB",    False),
-    ("dev",       "开发工具 — 测试套件",         "pytest ~10MB",         False),
+    ("dashboard", "Dashboard — Web 管理面板",       "fastapi/uvicorn (~15MB)", True),
+    ("export",    "导出 — MD/TXT/EPUB/HTML/DOCX/PDF", "mistune/python-docx/ebooklib (~8MB)", True),
+    ("publish",   "发布 — 小说平台自动发布",        "playwright + Chromium (~150MB)", False),
+    ("dev",       "开发工具 — 测试套件",           "pytest/pytest-cov (~10MB)", False),
 ]
 
 
@@ -221,23 +411,22 @@ def _select_features_interactive():
     selected = {k: default for k, _, _, default in _FEATURES}
 
     while True:
-        print(f"\n{C}┌{BAR}┐{R}")
-        print(f"{C}│{R}  {B}功能模块选择{R}  {C}│{R}")
-        print(f"{C}├{BAR}┤{R}")
-        _row(f"{G}●{R} 核心依赖 (必装): aiohttp + filelock + pydantic")
-        print(f"{C}├{BAR}┤{R}")
-        _row("可选模块:", color=D)
-        _row("")
+        box_open()
+        box_row(f"{_B}功能模块选择{_N}")
+        box_sep()
+        box_row(f"{_G}●{_N} 核心依赖 (必装): aiohttp + filelock + pydantic")
+        box_sep()
+        box_row("可选模块:", color=_D)
+        box_row("")
         for idx, (key, label, desc, _) in enumerate(_FEATURES):
-            mark = f"{G}Y{R}" if selected[key] else f"{X}N{R}"
-            _row(f" {B}[{idx + 1}]{R} [{mark}] {label}  {D}{desc}{R}")
-        _row("")
-        _row(f" {B}[A]{R} 全选    {B}[N]{R} 仅核心    {B}[0]{R} 确认", color=D)
-        print(f"{C}└{BAR}┘{R}")
-        print()
+            mark = f"{_G}Y{_N}" if selected[key] else f"{_D}N{_N}"
+            box_row(f" {_B}[{idx + 1}]{_N} [{mark}] {label}  {_D}{desc}{_N}")
+        box_row("")
+        box_row(f" {_B}[A]{_N} 全选    {_B}[N]{_N} 仅核心    {_B}[0]{_N} 确认", color=_D)
+        box_close()
 
         try:
-            choice = input(f"  {B}输入数字切换开关，0 确认{R}: ").strip()
+            choice = input(f"  {_B}输入数字切换开关，0 确认{_N}: ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n  已取消。")
             return None
@@ -266,6 +455,26 @@ def _select_features_interactive():
     return selected
 
 
+def _show_post_install_guidance(installed_before: bool):
+    """安装/更新完成后显示下一步操作指引。"""
+    if installed_before:
+        success("更新完成！", [
+            "已更新到最新版本。",
+            "",
+            "下一步:",
+            "  python .opencode/scripts/webnovel.py status  # 查看项目状态",
+        ])
+    else:
+        success("安装完成！", [
+            "Webnovel Writer 已就绪。",
+            "",
+            "下一步:",
+            "  1. python .opencode/scripts/webnovel.py init    # 初始化小说项目",
+            "  2. 编辑 .env 添加 API Key",
+            "  3. python install.py --with dashboard           # 启动管理面板",
+        ])
+
+
 def interactive_menu(args):
     installed = Path(".opencode").is_dir()
     staging = Path(".opencode_staging").is_dir()
@@ -273,39 +482,37 @@ def interactive_menu(args):
     version = "未知"
     vf = Path(".opencode/version.json")
     if vf.is_file():
-        import json
         try:
             version = json.loads(vf.read_text(encoding="utf-8")).get("version", "未知")
         except (OSError, ValueError):
             pass
 
-    print(f"\n{C}┌{BAR}┐{R}")
-    print(f"{C}│{R}  {B}Webnovel Writer for OpenCode — 安装管理{R}  {C}│{R}")
-    print(f"{C}├{BAR}┤{R}")
+    box_open()
+    box_row(f"{_B}Webnovel Writer for OpenCode — 安装管理{_N}")
+    box_sep()
 
     if installed:
-        _row(f"{G}●{R} 已安装 ({B}{version}{R})")
+        box_row(f"{_G}●{_N} 已安装 ({_B}{version}{_N})")
     else:
-        _row(f"{X}●{R} 未安装")
+        box_row(f"{_D}●{_N} 未安装")
     if staging:
-        _row(f"{Y}◐{R} 有暂存更新待应用")
+        box_row(f"{_Y}◐{_N} 有暂存更新待应用")
 
-    print(f"{C}├{BAR}┤{R}")
-    _row("请选择操作:", color=D)
-    _row("")
-    _row(f" {B}[1]{R} 安装 / 更新      {D}下载最新版本{R}")
-    _row(f" {B}[2]{R} 增量更新          {D}仅变更文件 (快){R}")
-    _row(f" {B}[3]{R} 清洁安装          {D}擦除后全新安装{R}")
+    box_sep()
+    box_row("请选择操作:", color=_D)
+    box_row("")
+    box_row(f" {_B}[1]{_N} 安装 / 更新      {_D}下载最新版本{_N}")
+    box_row(f" {_B}[2]{_N} 增量更新          {_D}仅变更文件 (快){_N}")
+    box_row(f" {_B}[3]{_N} 清洁安装          {_D}擦除后全新安装{_N}")
     if staging:
-        _row(f" {B}[4]{R} {Y}应用暂存更新{R}      {D}关闭 IDE 后执行{R}")
-    _row(f" {B}[5]{R} 卸载              {D}移除 .opencode/{R}")
-    _row(f" {B}[6]{R} 完全卸载          {D}移除 .opencode/ + .venv/{R}")
-    _row(f" {B}[0]{R} 退出")
-    print(f"{C}└{BAR}┘{R}")
-    print()
+        box_row(f" {_B}[4]{_N} {_Y}应用暂存更新{_N}      {_D}关闭 IDE 后执行{_N}")
+    box_row(f" {_B}[5]{_N} 卸载              {_D}移除 .opencode/{_N}")
+    box_row(f" {_B}[6]{_N} 完全卸载          {_D}移除 .opencode/ + .venv/{_N}")
+    box_row(f" {_B}[0]{_N} 退出")
+    box_close()
 
     try:
-        choice = input(f"  {B}输入数字选择{R} {D}(默认=1){R}: ").strip()
+        choice = input(f"  {_B}输入数字选择{_N} {_D}(默认=1){_N}: ").strip()
     except (EOFError, KeyboardInterrupt):
         print("\n  已取消。")
         return
@@ -349,109 +556,116 @@ def interactive_menu(args):
 
 
 def run_selected_action(args):
-    """Execute the action selected from menu or CLI flags."""
+    """执行从菜单或 CLI 标志选择的操作。"""
     cwd = Path.cwd()
     opencode_dir = cwd / ".opencode"
 
     if getattr(args, 'uninstall', False):
-        print("\n" + "=" * 60)
-        print("  Webnovel Writer — 卸载")
-        print("=" * 60 + "\n")
-        sys.path.insert(0, str(opencode_dir))
+        header("Webnovel Writer — 卸载")
+        if not opencode_dir.is_dir():
+            warn(".opencode/ 不存在，无需卸载。")
+            return
+        _sys.path.insert(0, str(opencode_dir))
         from installer.uninstall import cmd_uninstall
         cmd_uninstall(args)
         return
 
     if getattr(args, 'apply', False):
-        print("\n--- Apply Staged Update ---\n")
+        header("应用暂存更新")
         installer_dir = Path(".opencode/installer")
         if not installer_dir.is_dir():
-            print("Downloading installer modules...")
+            info("下载安装器模块...")
             urls = build_urls(REPO, BRANCH, args.mirror)
             zip_path = Path(tempfile.gettempdir()) / "webnovel_installer.zip"
             if not download(urls, zip_path, getattr(args, 'timeout', 30)):
-                print("[ERROR] Cannot download installer. Check network.")
-                sys.exit(1)
-            extract_opencode(zip_path, Path(".opencode"))
+                error("无法下载安装器，请检查网络。")
+            with spinner("解压安装器..."):
+                extract_opencode(zip_path, opencode_dir)
             zip_path.unlink(missing_ok=True)
 
-        sys.path.insert(0, str(opencode_dir))
+        _sys.path.insert(0, str(opencode_dir))
         from installer.preflight import apply_staging
         if apply_staging():
-            print("\nUpdate applied. You can now reopen OpenCode.")
+            success("暂存更新已应用", ["现在可以重新打开 OpenCode。"])
         else:
-            sys.exit(1)
+            _sys.exit(1)
         return
 
     if getattr(args, 'clean', False):
         for d in [opencode_dir, Path(".opencode_staging"), Path(".opencode_backup")]:
             if d.is_dir():
-                print(f"  Clean: removing {d}/")
+                info(f"清洁安装: 删除 {d}/")
                 shutil.rmtree(str(d))
 
-    # Show update changelog
+    # 显示更新日志
     is_update, changelog, remote, local_tag, remote_tag = _check_update()
-    if is_update and changelog:
+    if is_update is None:
+        warn("无法检查更新（网络问题），将执行全量安装")
+    elif is_update and changelog:
         _show_changelog(changelog, remote.get("version", ""), local_tag, remote_tag)
 
-    print(f"\n{C}┌{BAR}┐{R}")
-    print(f"{C}│{R}  {B}Webnovel Writer — Installer{R}  {C}│{R}")
-    print(f"{C}└{BAR}┘{R}\n")
+    installed_before = opencode_dir.is_dir()
 
-    print("[1/3] Downloading latest version...")
-    urls = build_urls(REPO, BRANCH, getattr(args, 'mirror', None))
+    header("Webnovel Writer — 安装")
+
+    step(1, 3, "下载最新版本...")
+    urls = build_urls(REPO, BRANCH, getattr(args, 'mirror', None), remote=remote)
     zip_path = Path(tempfile.gettempdir()) / "webnovel_writer_repo.zip"
 
     if not download(urls, zip_path, getattr(args, 'timeout', 30)):
-        print("[ERROR] Download failed. Check network or use --mirror URL.")
-        sys.exit(1)
+        error("下载失败，请检查网络或使用 --mirror URL 指定镜像。")
 
-    sys.path.insert(0, str(opencode_dir))
-    print("[2/3] Extracting...")
+    _sys.path.insert(0, str(opencode_dir))
+    step(2, 3, "解压文件...")
 
     if getattr(args, 'incremental', False) and opencode_dir.is_dir():
         from installer.update import run_incremental_update
-        extract_opencode(zip_path, Path(".opencode_staging"))
-        run_incremental_update()
+        with spinner("解压到暂存目录..."):
+            extract_opencode(zip_path, Path(".opencode_staging"))
+        with spinner("应用增量更新..."):
+            run_incremental_update()
         Path(zip_path).unlink(missing_ok=True)
     else:
-        extract_opencode(zip_path, opencode_dir)
+        with spinner("解压中..."):
+            extract_opencode(zip_path, opencode_dir)
         Path(zip_path).unlink(missing_ok=True)
-        print("  Done.\n")
 
     from installer.preflight import run_install, run_update
 
+    step(3, 3, "安装依赖...")
     if getattr(args, 'update', False):
         run_update(args)
     else:
         run_install(args, skip_download=True)
 
+    _show_post_install_guidance(installed_before)
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Webnovel Writer for OpenCode Installer")
-    parser.add_argument("--update", action="store_true", help="Check and apply updates")
-    parser.add_argument("--apply", action="store_true", help="Apply staged update")
-    parser.add_argument("--clean", action="store_true", help="Wipe .opencode/ before install or update")
+    parser = argparse.ArgumentParser(description="Webnovel Writer for OpenCode 安装器")
+    parser.add_argument("--update", action="store_true", help="检查并应用更新")
+    parser.add_argument("--apply", action="store_true", help="应用暂存更新")
+    parser.add_argument("--clean", action="store_true", help="安装/更新前擦除 .opencode/")
     parser.add_argument("--incremental", action="store_true",
-                        help="Incremental update: only download changed files via manifest diff")
-    parser.add_argument("--uninstall", action="store_true", help="Remove .opencode/ (keep project files)")
-    parser.add_argument("--full", action="store_true", help="With --uninstall: also remove .venv/")
-    parser.add_argument("--yes", action="store_true", help="Skip confirmation prompts")
-    parser.add_argument("--venv", action="store_true", help="Use/create .venv/")
-    parser.add_argument("--skip-playwright", action="store_true", help="Skip playwright install")
+                        help="增量更新：通过 manifest diff 仅下载变更文件")
+    parser.add_argument("--uninstall", action="store_true", help="移除 .opencode/（保留项目文件）")
+    parser.add_argument("--full", action="store_true", help="配合 --uninstall：同时移除 .venv/")
+    parser.add_argument("--yes", action="store_true", help="跳过确认提示")
+    parser.add_argument("--venv", action="store_true", help="创建并使用 .venv/")
+    parser.add_argument("--skip-playwright", action="store_true", help="跳过 playwright 安装")
     parser.add_argument("--with", dest="with_features", action="append", default=[],
                         choices=["dashboard", "export", "publish", "dev"],
-                        help="Enable optional feature (repeatable)")
-    parser.add_argument("--no-dashboard", action="store_true", help="Disable dashboard module")
-    parser.add_argument("--no-export", action="store_true", help="Disable export module")
-    parser.add_argument("--no-publish", action="store_true", help="Disable publish module")
-    parser.add_argument("--no-dev", action="store_true", help="Disable dev tools")
-    parser.add_argument("--mirror", type=str, help="Custom GitHub mirror URL")
-    parser.add_argument("--timeout", "-t", type=int, default=30, help="Download timeout seconds")
+                        help="启用可选功能模块（可重复）")
+    parser.add_argument("--no-dashboard", action="store_true", help="禁用 dashboard 模块")
+    parser.add_argument("--no-export", action="store_true", help="禁用 export 模块")
+    parser.add_argument("--no-publish", action="store_true", help="禁用 publish 模块")
+    parser.add_argument("--no-dev", action="store_true", help="禁用 dev 工具")
+    parser.add_argument("--mirror", type=str, help="自定义 GitHub 镜像 URL")
+    parser.add_argument("--timeout", "-t", type=int, default=30, help="下载超时秒数")
     parser.add_argument("--no-menu", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    # Detect if user passed any action flag
+    # 检测是否传入了操作标志
     action_flags = (
         getattr(args, 'update', False) or
         getattr(args, 'apply', False) or

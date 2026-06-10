@@ -37,11 +37,14 @@ install.py (引导 ~120行)
   ▼
 .opencode/installer/     ← repo zip 中提取，是 .opencode/ 的子集
   preflight.py           ← 编排主流程（首次安装）或 update.py（更新）
-  check.py               ← 系统预检
+  check.py               ← 系统预检（Python版本/磁盘/网络/aiohttp，输出汇总）
   fetch.py               ← 下载管理
   update.py              ← 版本管理 (manifest.json diff)
-  deps.py                ← 依赖安装
-  ui.py                  ← 终端 UI
+  deps.py                ← 依赖安装（全中文 UI）
+  ui.py                  ← 终端 UI（box/spinner/progress）
+
+install.py               ← 入口脚本，内联 UI 函数（自举：.opencode/ 不存在时独立运行）
+                          安装后模块使用 .opencode/installer/ui.py（签名和视觉效果一致）
 ```
 
 **首次安装**：从 repo zip 中直接提取完整 `.opencode/`，无需 staging。  

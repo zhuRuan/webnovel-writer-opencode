@@ -1,11 +1,11 @@
-"""System preflight checks. Pure stdlib, no external deps."""
+"""系统预检模块。纯标准库，无外部依赖。"""
 import os
 import sys
 import shutil
 import subprocess
 import platform as _platform
 
-from installer.ui import info, warn, error
+from installer.ui import info, warn, error, success, Colors
 
 KNOWN_OPENCODE_PROCESSES = {
     "windows": ["OpenCode.exe"],
@@ -15,7 +15,7 @@ KNOWN_OPENCODE_PROCESSES = {
 
 
 def platform_name() -> str:
-    """Return normalized platform name: windows, linux, or darwin."""
+    """返回标准化平台名: windows, linux, darwin。"""
     s = _platform.system()
     if s == "Windows":
         return "windows"
@@ -27,26 +27,24 @@ def platform_name() -> str:
 
 
 def check_python_version(version: tuple = None) -> bool:
-    """Check that a Python version meets the project minimum (3.10).
-    Defaults to checking the current interpreter.
-    """
+    """检查 Python 版本是否满足最低要求 (3.10)。"""
     if version is None:
         version = (sys.version_info.major, sys.version_info.minor)
     return version >= (3, 10)
 
 
 def check_disk_space(path: str, required_mb: int = 50) -> bool:
-    """Check available disk space at path."""
+    """检查磁盘可用空间。"""
     try:
         usage = shutil.disk_usage(path)
         free_mb = usage.free / (1024 * 1024)
         return free_mb >= required_mb
     except Exception:
-        return True  # Can't check, don't block
+        return True  # 无法检查时不阻断
 
 
 def check_network(timeout: int = 5) -> bool:
-    """Check if we can reach GitHub."""
+    """检查是否能访问 GitHub。"""
     import urllib.request
     try:
         urllib.request.urlopen("https://github.com", timeout=timeout)
@@ -56,15 +54,14 @@ def check_network(timeout: int = 5) -> bool:
 
 
 def is_opencode_running(target_dir: str = ".opencode") -> str:
-    """
-    Check if OpenCode is running. Returns 'running', 'not_running', or 'locked'.
+    """检查 OpenCode 是否正在运行。返回 'running', 'not_running', 'locked'。
 
-    Layer 1: Process name scan (all platforms)
-    Layer 2: File lock detection (Windows: os.rename, macOS/Linux: lsof/fuser)
+    层级 1: 进程名扫描 (全平台)
+    层级 2: 文件锁检测 (Windows: os.rename, macOS/Linux: lsof/fuser)
     """
     pname = platform_name()
 
-    # Layer 1: process scan
+    # 层级 1: 进程扫描
     found = False
     try:
         procs = KNOWN_OPENCODE_PROCESSES.get(pname, [])
@@ -84,7 +81,6 @@ def is_opencode_running(target_dir: str = ".opencode") -> str:
             )
             found = result.returncode == 0
         elif pname == "darwin":
-            # ps aux | grep OpenCode (not Electron — too many false matches)
             result = subprocess.run(
                 ["pgrep", "-i", "OpenCode"],
                 capture_output=True, text=True,
@@ -92,9 +88,9 @@ def is_opencode_running(target_dir: str = ".opencode") -> str:
             )
             found = result.returncode == 0
     except Exception:
-        pass  # Process scan failed, try lock test
+        pass  # 进程扫描失败，尝试锁检测
 
-    # Layer 2: file lock test
+    # 层级 2: 文件锁检测
     if pname == "windows":
         if os.path.isdir(target_dir):
             lock_test = target_dir + "_lock_test"
@@ -107,7 +103,6 @@ def is_opencode_running(target_dir: str = ".opencode") -> str:
         else:
             return "not_running"
     else:
-        # macOS / Linux: use lsof to see if any process holds files in .opencode/
         if os.path.isdir(target_dir):
             locked = _check_open_files_non_windows(target_dir)
             if locked:
@@ -118,8 +113,7 @@ def is_opencode_running(target_dir: str = ".opencode") -> str:
 
 
 def _check_open_files_non_windows(target_dir: str) -> bool:
-    """Check if any process has files open under target_dir (macOS/Linux)."""
-    # Try lsof first (available on macOS, often on Linux)
+    """检查是否有进程持有 target_dir 下的文件 (macOS/Linux)。"""
     if shutil.which("lsof"):
         try:
             result = subprocess.run(
@@ -132,7 +126,6 @@ def _check_open_files_non_windows(target_dir: str) -> bool:
         except Exception:
             pass
 
-    # Fallback: fuser (Linux)
     if shutil.which("fuser"):
         try:
             result = subprocess.run(
@@ -149,22 +142,38 @@ def _check_open_files_non_windows(target_dir: str) -> bool:
 
 
 def run_preflight_checks():
-    """Run all preflight checks. Calls error() on failure."""
-    info("Checking Python version...")
-    if not check_python_version():
+    """运行全部预检项目，输出汇总结果。"""
+    results = []
+
+    info("检查 Python 版本...")
+    ok = check_python_version()
+    if not ok:
         v = f"{sys.version_info.major}.{sys.version_info.minor}"
-        error(f"Python {v} is too old. Need 3.10+.")
+        error(f"Python {v} 版本过低，需要 3.10+。请升级 Python 后重试。")
+    results.append(("Python 版本", ok))
 
-    info("Python version OK")
+    info("检查磁盘空间...")
+    ok = check_disk_space(".")
+    if not ok:
+        warn("磁盘空间不足，安装可能失败")
+    results.append(("磁盘空间", ok))
 
-    info("Checking disk space...")
-    if not check_disk_space("."):
-        warn("Low disk space — installation may fail")
+    info("检查网络连接...")
+    ok = check_network()
+    if not ok:
+        warn("无法访问 GitHub，下载可能失败。可使用 --mirror 指定镜像。")
+    results.append(("网络连接", ok))
+
+    # 汇总
+    print()
+    all_ok = True
+    for name, passed in results:
+        icon = f"{Colors.GREEN}✓{Colors.NC}" if passed else f"{Colors.RED}✗{Colors.NC}"
+        info(f"{icon} {name}")
+        if not passed:
+            all_ok = False
+
+    if all_ok:
+        success("预检全部通过")
     else:
-        info("Disk space OK")
-
-    info("Checking network...")
-    if not check_network():
-        warn("Cannot reach GitHub — download may fail. Use --mirror if needed.")
-    else:
-        info("Network OK")
+        warn("部分检查未通过，安装可能遇到问题")

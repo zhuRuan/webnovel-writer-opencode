@@ -195,7 +195,7 @@ def persist_story_seed(
         is_new = not ch_path.is_file()
         write_json(ch_path, chapter_payload)
         if is_new:
-            print(f"[story-system] 创建新章合同: {ch_path.name}")
+            print(f"[story-system] 创建新章合同: {ch_path}")
         write_marked_markdown(
             ch_path.with_suffix(".md"),
             render_chapter_markdown(chapter_payload),

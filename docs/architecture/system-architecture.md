@@ -560,6 +560,7 @@ graph LR
 
 - 从 state.json + index.db 渲染 5 份 Markdown 投影
 - 触发时机：chapter-commit 完成后、SSOT rebuild 后
+- 数据兼容：`relationships` 字段支持 dict（`"A-B": {...}`）和 list（`[{"from": "A", "to": "B"}]`）两种格式自动转换；`entities_v3` 值类型防御（跳过非 dict 条目）
 - 投影内容包括：
   - **角色状态**：各角色的当前状态、位置、关系变化
   - **世界状态**：世界观关键要素的变更

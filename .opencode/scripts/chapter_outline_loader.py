@@ -153,15 +153,25 @@ def load_chapter_outline(project_root: Path, chapter_num: int, max_chars: int | 
 
     volume_outline = _find_volume_outline_file(project_root, chapter_num)
     if volume_outline is None:
-        return f"⚠️ 大纲文件不存在：第 {chapter_num} 章"
+        raise FileNotFoundError(
+            f"大纲文件不存在：第 {chapter_num} 章。"
+            f"请在 大纲/ 目录创建第 {_volume_for_chapter(project_root, chapter_num)} 卷-详细大纲.md 或独立的第{chapter_num}章大纲文件。"
+        )
 
     outline = _extract_outline_section(volume_outline.read_text(encoding="utf-8"), chapter_num)
     if outline is None:
-        return f"⚠️ 未找到第 {chapter_num} 章的大纲"
+        raise FileNotFoundError(
+            f"未找到第 {chapter_num} 章的大纲。"
+            f"文件 {volume_outline.name} 存在但未包含第 {chapter_num} 章的章节标题。"
+        )
 
     if max_chars and len(outline) > max_chars:
         return outline[:max_chars] + "\n...(已截断)"
     return outline
+
+
+def _volume_for_chapter(project_root: Path, chapter_num: int) -> int:
+    return volume_num_for_chapter_from_state(project_root, chapter_num) or volume_num_for_chapter(chapter_num)
 
 _PLOT_SECTION_FIELD_MAP = {
     "cbn": "cbn",

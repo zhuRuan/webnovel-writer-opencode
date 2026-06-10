@@ -1,4 +1,4 @@
-"""Dependency installation. Pure stdlib, runs subprocess for pip."""
+"""依赖安装模块。纯标准库，通过子进程调用 pip。"""
 import subprocess
 import sys
 from pathlib import Path
@@ -48,9 +48,9 @@ def check_pip_available() -> bool:
 
 def create_venv(path: Path) -> bool:
     if path.exists():
-        warn(f"Virtual env already exists: {path}")
+        warn(f"虚拟环境已存在: {path}")
         return False
-    info(f"Creating virtual environment: {path}")
+    info(f"创建虚拟环境: {path}")
     try:
         subprocess.run(
             [sys.executable, "-m", "venv", str(path)],
@@ -58,7 +58,7 @@ def create_venv(path: Path) -> bool:
         )
         return True
     except subprocess.CalledProcessError as e:
-        warn(f"Failed to create venv: {e}")
+        warn(f"创建虚拟环境失败: {e}")
         return False
 
 
@@ -78,16 +78,16 @@ def install_pip_requirements(req_files: list, venv_path: Path = None) -> bool:
 
     for rf in req_files:
         if not Path(rf).exists():
-            warn(f"Requirements file not found: {rf}")
+            warn(f"依赖文件未找到: {rf}")
             continue
-        info(f"Installing: {rf}")
+        info(f"安装依赖: {rf}")
         try:
             subprocess.run(
                 pip + ["install", "-r", str(rf), "--progress-bar", "on"],
                 check=True, timeout=300
             )
         except subprocess.CalledProcessError as e:
-            warn(f"pip install failed for {rf}: {e}")
+            warn(f"pip 安装失败 ({rf}): {e}")
             return False
     return True
 
@@ -97,10 +97,10 @@ def install_playwright_browser(venv_path: Path = None) -> bool:
     try:
         subprocess.run(pip + ["install", "playwright", "--quiet"], check=True, timeout=60)
     except subprocess.CalledProcessError:
-        warn("playwright pip install failed")
+        warn("playwright pip 包安装失败")
         return False
 
-    with spinner("安装 Chromium 浏览器 (~150MB，可能需要几分钟，请耐心等待)..."):
+    with spinner("安装 Chromium 浏览器 (~150MB，可能需要几分钟)..."):
         try:
             subprocess.run(
                 [pip[0], "-m", "playwright", "install", "chromium"],
@@ -108,12 +108,12 @@ def install_playwright_browser(venv_path: Path = None) -> bool:
             )
             return True
         except subprocess.CalledProcessError:
-            warn("playwright chromium install failed")
+            warn("Chromium 浏览器安装失败")
             return False
 
 
 def _resolve_features(args, *, skip_playwright: bool = False) -> dict:
-    """Resolve which optional features to install from args or defaults."""
+    """从 args 或默认值解析要安装的可选功能模块。"""
     features = {}
     with_any = getattr(args, 'with_features', None) or []
     for key in FEATURE_GROUPS:
@@ -130,33 +130,32 @@ def _resolve_features(args, *, skip_playwright: bool = False) -> dict:
 
 def install_core_deps(venv_path: Path = None, skip_playwright: bool = False,
                       features: dict = None):
-    """Install core + selected optional dependencies."""
-    # Core is always installed
+    """安装核心 + 选定的可选依赖。"""
+    # 核心依赖始终安装
     req_files = [CORE_REQ]
 
-    # Resolve optional features
+    # 解析可选功能
     if features is None:
         features = {k: v["default"] for k, v in FEATURE_GROUPS.items()}
         if skip_playwright:
             features["publish"] = False
 
-    # Collect optional requirement files
+    # 收集可选依赖文件
     for key, cfg in FEATURE_GROUPS.items():
         if features.get(key) and cfg["req"]:
             req_files.append(cfg["req"])
 
-    # Show what will be installed
+    # 显示安装计划
     labels = ["core"]
     for key, cfg in FEATURE_GROUPS.items():
         labels.append(f"{key}={'Y' if features.get(key) else 'N'}")
     info(f"模块选择: {', '.join(labels)}")
 
-    # 如果下载速度慢，提示国内镜像
-    print("    💡 下载慢？可用国内镜像: pip install -r xxx -i https://pypi.tuna.tsinghua.edu.cn/simple")
+    print(f"    💡 下载慢？可用国内镜像: pip install -r xxx -i https://pypi.tuna.tsinghua.edu.cn/simple")
 
     if not install_pip_requirements(req_files, venv_path):
-        error("Core dependency installation failed")
+        error("核心依赖安装失败")
 
-    # Playwright is special — separate pip + browser install
+    # Playwright 特殊处理：先 pip install 再安装浏览器
     if features.get("publish") and not skip_playwright:
         install_playwright_browser(venv_path)

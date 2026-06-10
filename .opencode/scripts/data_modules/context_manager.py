@@ -772,7 +772,12 @@ class ContextManager:
         return json.loads(path.read_text(encoding="utf-8"))
 
     def _load_outline(self, chapter: int) -> str:
-        return load_chapter_outline(self.config.project_root, chapter, max_chars=1500)
+        try:
+            return load_chapter_outline(self.config.project_root, chapter, max_chars=1500)
+        except FileNotFoundError as e:
+            raise FileNotFoundError(
+                f"无法加载第 {chapter} 章大纲，写作流程已阻断。{e}"
+            ) from e
 
     def _load_plot_structure(self, chapter: int) -> Dict[str, Any]:
         return load_chapter_plot_structure(self.config.project_root, chapter)

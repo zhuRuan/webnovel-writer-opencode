@@ -1,2 +1,2 @@
--r webnovel-writer/scripts/requirements.txt
--r webnovel-writer/dashboard/requirements.txt
+-r .opencode/scripts/requirements.txt
+-r .opencode/dashboard/requirements.txt

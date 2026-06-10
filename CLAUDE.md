@@ -55,6 +55,9 @@ python .opencode/scripts/webnovel.py delete-chapters "5-8" --dry-run
 python .opencode/scripts/webnovel.py entity-clean                 # scan dirty entities
 python .opencode/scripts/webnovel.py state render                 # markdown projections
 
+# 独立工具脚本
+python .opencode/scripts/data_modules/chapter_rename.py --project-root <PATH> --dry-run  # 章节文件名编号统一
+
 # Others
 python .opencode/scripts/webnovel.py export          # export novel
 python .opencode/scripts/webnovel.py publish         # publish to platform
@@ -106,13 +109,13 @@ Code is organized as a pipeline — each layer feeds the next:
 
 **DebtTracker** — Foreshadowing tracking with hard constraint blocking. Active debts > 2 triggers debt-aware context budget (auto-allocate 15% tokens to foreshadowing list). Implemented in `data_modules/index_debt_mixin.py` (mixed into `index_manager.py`).
 
-**Review Pipeline** — Two layers: Code Checkers (deterministic, run before LLM, block critical issues) → 13-dimension LLM reviewer (设定一致性、时间线、叙事连贯、角色一致性、逻辑、AI味×5、项目规则、节奏、毒点). 结构化检查清单强制逐项输出 pass/问题结论. Reviewer output processed via `.opencode/scripts/review_pipeline.py`, schema in `data_modules/review_schema.py`. 写-修循环最多 3 轮，修复后自查 evidence 子串匹配可跳过重审.
+**Review Pipeline** — Two layers: Code Checkers (deterministic, run before LLM, block critical issues) → 13-dimension LLM reviewer (设定一致性、时间线、叙事连贯、角色一致性、逻辑、AI味×5、项目规则、节奏、毒点). 结构化检查清单强制逐项输出 pass/问题结论. Reviewer output processed via `.opencode/scripts/review_pipeline.py`, schema in `data_modules/review_schema.py`. JSON 解析含中文引号安全处理（`_sanitize_json_text`）. 写-修循环最多 3 轮，修复后自查 evidence 子串匹配可跳过重审.
 
-**Markdown Projection Renderer** (v2.8) — Renders 5 human-readable markdown files from `state.json` + `index.db` into `story/` directory. Triggered after `chapter-commit` and `ssot rebuild`. File: `state_projection_renderer.py`.
+**Markdown Projection Renderer** (v2.8) — Renders 5 human-readable markdown files from `state.json` + `index.db` into `story/` directory. Triggered after `chapter-commit` and `ssot rebuild`. File: `state_projection_renderer.py`. 兼容 `relationships` 字段的 dict 和 list 两种格式，`entities_v3` 值类型防御.
 
 **Runtime Artifacts** (v2.8) — `context_manager.build_context()` persists `.webnovel/runtime/chapter-NNN.context.json` (full context pack) and `.trace.json` (section inclusion/exclusion decisions) for post-hoc debugging.
 
-**Dashboard** — FastAPI backend (GET 查询 + 文风约束编辑 PUT/POST/DELETE + 批量操作) + React 19 frontend with ECharts visualization. Backend: `.opencode/dashboard/app.py`. Frontend: `.opencode/dashboard/frontend/`. 9 个页面：总览、上下文健康、角色图鉴（含时间线）、审查分析、节奏雷达、伏笔追踪、文档浏览、文风约束（6 Tab）、系统状态（含批量操作）。支持亮色/暗色主题切换。文风约束编辑器（`/style`）支持 6 层约束的可视化编辑：自定义提示词、全局文风、禁止模式、写作技法、章级合同、审查维度。批量操作使用 `asyncio.create_subprocess_exec` 避免阻塞。关键 Section 列表可通过 `.webnovel/dashboard_config.json` 自定义。All SQL queries use parameterized `?` placeholders. CORS restricted to localhost. 项目根目录解析支持 5 级优先级（CLI > 环境变量 > CWD 向上搜索 > 指针文件 > 智能搜索）。
+**Dashboard** — FastAPI backend (GET 查询 + 文风约束编辑 PUT/POST/DELETE + 批量操作) + React 19 frontend with ECharts visualization. Backend: `.opencode/dashboard/app.py`. Frontend: `.opencode/dashboard/frontend/`. 9 个页面：总览、上下文健康、角色图鉴（含时间线）、审查分析、节奏雷达、伏笔追踪、文档浏览、文风约束（6 Tab）、系统状态（含批量操作）。支持亮色/暗色主题切换。文风约束编辑器（`/style`）支持 6 层约束的可视化编辑：自定义提示词、全局文风、禁止模式、写作技法、章级合同、审查维度。批量操作使用 `asyncio.create_subprocess_exec` 避免阻塞。关键 Section 列表可通过 `.webnovel/dashboard_config.json` 自定义。All SQL queries use parameterized `?` placeholders. CORS restricted to localhost. 项目根目录解析支持 5 级优先级（CLI > 环境变量 > 脚本位置搜索 > CWD 向上搜索 > 指针文件/注册表）。
 
 ### OpenCode Integration
 

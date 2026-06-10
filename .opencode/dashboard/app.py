@@ -242,6 +242,11 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     async def _lifespan(_: FastAPI):
         webnovel = _webnovel_dir()
         story_system = _story_system_dir()
+
+        # 确保关键目录存在
+        runtime_dir = webnovel / "runtime"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+
         if webnovel.is_dir() or story_system.is_dir():
             _watcher.start(
                 watch_webnovel_dir=webnovel if webnovel.is_dir() else None,

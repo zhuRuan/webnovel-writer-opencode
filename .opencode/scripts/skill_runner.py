@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sqlite3
 
 import sys
@@ -43,6 +44,9 @@ def cmd_story_system(args: argparse.Namespace) -> int:
     goal = sys.stdin.read().strip()
     if not goal:
         print("ERROR: stdin missing CHAPTER_GOAL", file=sys.stderr)
+        return 1
+    if re.search(r'\{.*章纲.*}|\{.*chapter.*\}|第N章', goal, re.IGNORECASE):
+        print(f"ERROR: CHAPTER_GOAL 疑似占位符未替换: {goal[:80]}", file=sys.stderr)
         return 1
 
     s = json.loads((root / ".webnovel" / "state.json").read_text("utf-8"))

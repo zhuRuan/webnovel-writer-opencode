@@ -9,6 +9,8 @@
 - [`architecture/overview.md`](./architecture/overview.md)：系统架构、Agent 分工、Story System 设计
 - [`architecture/current-system-diagnosis.md`](./architecture/current-system-diagnosis.md)：当前系统状态诊断
 - [architecture/system-architecture.md](./architecture/system-architecture.md)：详细系统架构与模块说明
+- [architecture/scripts-backend-flow.md](./architecture/scripts-backend-flow.md)：`.opencode/scripts` 后端脚本流程梳理（双入口、数据流、模块清单）
+- [architecture/frontend-backend-collab-review.md](./architecture/frontend-backend-collab-review.md)：前后端协作审查报告（写作/审查/Dashboard/初始化/SSOT 逐流程分析）
 - [architecture/writing-workflow-analysis.md](./architecture/writing-workflow-analysis.md)：写作工作流详细分析报告（4 阶段 + 6 Agent + 数据流）
 - [architecture/workflow-review-report.md](./architecture/workflow-review-report.md)：工作流审查报告（6 严重 + 23 中等 + 15 低）
 

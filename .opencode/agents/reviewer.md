@@ -128,3 +128,5 @@ tools:
 ## 8. 强制输出约束
 
 用 Write 工具将完整 JSON 写入 `${REVIEW_OUTPUT}`。不得将报告写入 `.story-system/reviews/`。记录 workflow checkpoint。
+
+**JSON 安全规则**：所有字符串值中禁止使用中文双引号 `""`（会被误解析为 JSON 分隔符）。需要引号时用直角引号 `「」` 或方括号 `【】` 替代。例如：`"fix_hint": "将「守则」改为「法则」"` 而非 `"fix_hint": "将"守则"改为"法则""`。

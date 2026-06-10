@@ -83,6 +83,23 @@ class TestCharacterMatrix:
         result = _render_character_matrix({}, Path("."))
         assert "暂无关系数据" in result
 
+    def test_dict_relationships_no_crash(self):
+        """Test that dict-format relationships (from state.json) don't crash."""
+        state = {
+            "relationships": {
+                "xiaoyan-yunlanzong": {"type": "敌对", "chapter": 5},
+                "xiaoyan-xunillian": {"type": "师徒", "chapter": 1},
+            },
+            "entities_v3": {
+                "xiaoyan": {"name": "萧炎", "entity_type": "角色"},
+                "yunlanzong": {"name": "云岚宗", "entity_type": "势力"},
+            },
+        }
+        result = _render_character_matrix(state, Path("."))
+        assert "萧炎" in result
+        assert "敌对" in result
+        assert "师徒" in result
+
 
 class TestPowerSystem:
     def test_renders_realms(self):

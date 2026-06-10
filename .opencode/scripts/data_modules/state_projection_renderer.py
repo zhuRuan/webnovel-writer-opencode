@@ -33,6 +33,8 @@ def _render_world_state(state: dict, project_root: Path) -> str:
     if entities:
         lines.append("## 实体状态\n")
         for eid, info in sorted(entities.items()):
+            if not isinstance(info, dict):
+                continue
             cs = info.get("current_state") or {}
             state_str = ", ".join(f"{k}={v}" for k, v in cs.items()) if cs else "无特殊状态"
             lines.append(f"- **{info.get('name', eid)}** ({info.get('entity_type', '未知')}): {state_str}")
@@ -86,6 +88,20 @@ def _render_character_matrix(state: dict, project_root: Path) -> str:
     rels = state.get("relationships") or []
     entities = state.get("entities_v3") or {}
 
+    # Handle both dict and list formats
+    if isinstance(rels, dict):
+        # Convert dict format to list format
+        rel_list = []
+        for key, value in rels.items():
+            if not isinstance(value, dict):
+                continue
+            # Try to parse "from-to" key format
+            parts = key.split("-", 1)
+            if len(parts) == 2:
+                value = {**value, "from": parts[0], "to": parts[1]}
+            rel_list.append(value)
+        rels = rel_list
+
     if not rels:
         lines.append("（暂无关系数据）\n")
         return "\n".join(lines)
@@ -108,6 +124,8 @@ def _render_power_system(state: dict, project_root: Path) -> str:
     entities = state.get("entities_v3") or {}
     power_entities = []
     for eid, info in entities.items():
+        if not isinstance(info, dict):
+            continue
         cs = info.get("current_state") or {}
         realm = cs.get("realm")
         if realm:

@@ -155,7 +155,7 @@ export default function ReviewAnalyticsPage() {
             {!loading && !error && data && (
                 <>
                     {/* 最薄弱维度 */}
-                    {data.weakest_dimensions.length > 0 && (
+                    {data.weakest_dimensions?.length > 0 && (
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
                             <span style={{ fontWeight: 700, lineHeight: '28px' }}>最薄弱维度：</span>
                             {data.weakest_dimensions.map(w => (
@@ -201,7 +201,7 @@ export default function ReviewAnalyticsPage() {
                     )}
 
                     {/* Critical Issues */}
-                    {data.critical_issues.length > 0 && (
+                    {data.critical_issues?.length > 0 && (
                         <article className="card" style={{ borderColor: 'var(--accent-red)' }}>
                             <div className="card-header">
                                 <span className="card-title" style={{ color: 'var(--accent-red)' }}>Critical Issues</span>

@@ -143,7 +143,7 @@ python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_RO
 | 子命令 | 说明 |
 |--------|------|
 | `where` | 打印当前解析出的项目根目录 |
-| `preflight` | 校验 CLI 环境、脚本路径和项目根是否可用 |
+| `preflight` | 校验 CLI 环境、脚本路径、项目根和可选依赖（aiohttp）。输出 OK/WARN/ERROR 汇总 |
 | `use <路径>` | 绑定当前工作区使用的书项目 |
 | `chapter-path <章号>` | 查找指定章节的正文文件路径 |
 
@@ -163,6 +163,12 @@ python -X utf8 "<OPENCODE_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_RO
 | `delete-chapters` | 安全删除章节（dry-run 预览 → 确认执行 → 清理投影） |
 | `orchestrate` | 批量编排（write/heal/nightly 模式） |
 | `entity-clean` | 扫描脏实体（`--mark-invalid` 标记无效） |
+
+### 独立工具脚本
+
+| 脚本 | 说明 |
+|------|------|
+| `data_modules/chapter_rename.py` | 章节文件名编号统一（`第060章` → `第0060章`）。`--dry-run` 预览，`--recursive` 递归子目录 |
 
 ### 运维子命令
 

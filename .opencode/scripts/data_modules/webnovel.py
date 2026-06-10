@@ -49,7 +49,13 @@ def _resolve_root(explicit_project_root: Optional[str]) -> Path:
     raw = explicit_project_root
     if raw:
         return resolve_project_root(raw)
-    return resolve_project_root()
+    # 优先从脚本自身位置搜索（解决 CWD != 项目目录时的路径问题），
+    # 失败再从 CWD 搜索。
+    scripts_ws = _scripts_dir().parent  # .opencode/ → workspace root
+    try:
+        return resolve_project_root(cwd=scripts_ws)
+    except FileNotFoundError:
+        return resolve_project_root()
 
 
 def _strip_project_root_args(argv: list[str]) -> list[str]:
@@ -267,6 +273,18 @@ def _build_preflight_report(explicit_project_root: Optional[str]) -> dict:
         {"name": "skill_root", "ok": skill_root.is_dir(), "path": str(skill_root)},
     ]
 
+    # 可选依赖检查（不阻断 preflight）
+    try:
+        import aiohttp  # noqa: F401
+        checks.append({"name": "aiohttp", "ok": True, "path": ""})
+    except ImportError:
+        checks.append({
+            "name": "aiohttp",
+            "ok": True,
+            "path": "",
+            "warning": "aiohttp 未安装，vector 投影将跳过。pip install aiohttp",
+        })
+
     project_root = ""
     project_root_error = ""
     story_runtime: dict = {}
@@ -320,7 +338,12 @@ def cmd_preflight(args: argparse.Namespace) -> int:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
         for item in report["checks"]:
-            status = "OK" if item["ok"] else "ERROR"
+            if item.get("warning"):
+                status = "WARN"
+            elif item["ok"]:
+                status = "OK"
+            else:
+                status = "ERROR"
             path = item.get("path") or ""
             print(f"{status} {item['name']}: {path}")
             if item.get("warning"):
