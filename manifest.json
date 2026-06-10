@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.1-20260610.1159",
+  "version": "v2.9.1-20260610.1225",
   "tag": "v2.9.1",
-  "updated": "2026-06-10T11:59:55Z",
+  "updated": "2026-06-10T12:25:30Z",
   "changelog": [
     {
-      "hash": "fc3ae87",
+      "hash": "d8175d4",
       "type": "fix",
-      "message": "fix: \u5b89\u88c5\u811a\u672c UI \u91cd\u6784 + \u591a\u5904 Bug \u4fee\u590d + \u6587\u6863\u7ef4\u62a4"
+      "message": "fix: \u5ba1\u67e5\u53d1\u73b0\u7684 6 \u9879\u4fee\u590d\uff08P0-P2\uff09"
     },
     {
-      "hash": "8e839ad",
+      "hash": "c8a2b79",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.1-20260609.1604 [skip ci]"
+      "message": "chore: update manifest to v2.9.1-20260610.1159 [skip ci]"
     }
   ],
   "files": {
@@ -308,8 +308,8 @@
       "size": 4563
     },
     ".opencode/agents/chapter-writer-agent.md": {
-      "sha256": "3e5c3bbe4a35fad6b7ca5a363e173bb08dcca8f8eed5fb2ea44a9709f2de59d4",
-      "size": 5355
+      "sha256": "55e09673d9785b17b88a4ccfe194db4f423166538db3fe9c455c3e033c880006",
+      "size": 5464
     },
     ".opencode/agents/deconstruction-agent.md": {
       "sha256": "087bb7930389ffb4274ea2a017781bbe4c713183a8f5358792d0d99670c63de3",
@@ -544,8 +544,8 @@
       "size": 262
     },
     ".opencode/scripts/chapter_outline_loader.py": {
-      "sha256": "530e11d6858ce8854bb638468d839c3897f1c9068cf7eca12a05aaf2e5d8dbc6",
-      "size": 13281
+      "sha256": "d841658706c00582116da7940bc0275f5f6307d24a8e7d9f4cd3a6c1e92634b3",
+      "size": 13284
     },
     ".opencode/scripts/story_system.py": {
       "sha256": "b2ea7ebf857952efd2d60052f2ea17181dfa05f01c391667629f41274d9e137f",
@@ -588,16 +588,16 @@
       "size": 23045
     },
     ".opencode/scripts/chapter_paths.py": {
-      "sha256": "c0f33ba2995c4c43f5bf7d0db6df7f24a0a05efbd9dcb449cdc8bae1cf6ee327",
-      "size": 6019
+      "sha256": "457f82341da4f0c3c986497d94e379a9db3e36de8c021903223d4e7bb0b56dab",
+      "size": 6105
     },
     ".opencode/scripts/quality_trend_report.py": {
       "sha256": "d1635eecaa5cc9679e98afe398b8bd31e3e340c8181b314423e18430c40ae975",
       "size": 8711
     },
     ".opencode/scripts/skill_runner.py": {
-      "sha256": "790c8a62b882403408365f028394ba314b6c8591003bf2190bef7c14a69ef6cb",
-      "size": 11949
+      "sha256": "62f7d38898e63f4968dad16297eb1e1bd0b3ef13493105e0ef97538bb573a8b4",
+      "size": 12039
     },
     ".opencode/scripts/backup_manager.py": {
       "sha256": "3ad05c88507f3b863f133e2b97ff66c09478e18526a506d84a44d8ee454cd11b",
@@ -1652,8 +1652,8 @@
       "size": 8662
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "caca633cb6728775cea9ca86fa4fc4ce796053733a7e54bfe114038407107c1e",
-      "size": 71381
+      "sha256": "210e4f9129cb7f40e4572e2294bda5013a97849895161171613b7c3a79e2b6ea",
+      "size": 71453
     },
     ".opencode/dashboard/requirements.txt": {
       "sha256": "c4c47b815986c1a2091afd90795ac6f6b5379d13b883468faeb0b0217a2dc5e7",
