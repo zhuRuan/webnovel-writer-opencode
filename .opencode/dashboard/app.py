@@ -240,6 +240,10 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def _lifespan(_: FastAPI):
+        if _project_root is None:
+            yield
+            return
+
         webnovel = _webnovel_dir()
         story_system = _story_system_dir()
 

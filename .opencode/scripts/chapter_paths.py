@@ -86,8 +86,11 @@ def extract_chapter_title(project_root: Path, chapter_num: int) -> str:
     except ImportError:  # pragma: no cover
         from scripts.chapter_outline_loader import load_chapter_outline
 
-    outline_text = load_chapter_outline(project_root, chapter_num, max_chars=None)
-    if not outline_text.startswith("⚠️"):
+    try:
+        outline_text = load_chapter_outline(project_root, chapter_num, max_chars=None)
+    except FileNotFoundError:
+        outline_text = ""
+    if outline_text and not outline_text.startswith("⚠️"):
         title = _extract_title_from_outline_text(outline_text, chapter_num)
         if title:
             return title

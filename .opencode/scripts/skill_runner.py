@@ -45,7 +45,7 @@ def cmd_story_system(args: argparse.Namespace) -> int:
     if not goal:
         print("ERROR: stdin missing CHAPTER_GOAL", file=sys.stderr)
         return 1
-    if re.search(r'\{.*章纲.*}|\{.*chapter.*\}|第N章', goal, re.IGNORECASE):
+    if re.search(r'\{章纲[^}]*\}|\{chapter[^}]*\}|第N章', goal, re.IGNORECASE):
         print(f"ERROR: CHAPTER_GOAL 疑似占位符未替换: {goal[:80]}", file=sys.stderr)
         return 1
 
@@ -80,7 +80,9 @@ def cmd_check_structural(args: argparse.Namespace) -> int:
     result = filter_structural_checks(result)
 
     if getattr(args, 'output', None):
-        Path(args.output).write_text(
+        out_path = Path(args.output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(
             json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     if args.format == "json":
         print(json.dumps(result, ensure_ascii=False, indent=2))

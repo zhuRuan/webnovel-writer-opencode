@@ -289,7 +289,7 @@ def _append_directive_value(target: Dict[str, Any], field: str, value: str) -> N
 
 def parse_chapter_plot_structure(outline_text: str) -> Dict[str, Any]:
     text = str(outline_text or "")
-    if not text or text.startswith("⚠️"):
+    if not text:
         return {}
 
     structure: Dict[str, Any] = {}
@@ -339,13 +339,16 @@ def parse_chapter_plot_structure(outline_text: str) -> Dict[str, Any]:
 
 
 def load_chapter_plot_structure(project_root: Path, chapter_num: int) -> Dict[str, Any]:
-    outline = load_chapter_outline(project_root, chapter_num, max_chars=None)
+    try:
+        outline = load_chapter_outline(project_root, chapter_num, max_chars=None)
+    except FileNotFoundError:
+        return {}
     return parse_chapter_plot_structure(outline)
 
 
 def parse_chapter_execution_directive(outline_text: str) -> Dict[str, Any]:
     text = str(outline_text or "")
-    if not text or text.startswith("⚠️"):
+    if not text:
         return {}
 
     directive: Dict[str, Any] = {}
