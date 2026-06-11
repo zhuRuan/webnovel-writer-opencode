@@ -106,8 +106,14 @@ def _display_width(s: str) -> int:
 
 
 def _pad(s: str, w: int) -> str:
-    """将字符串填充到指定显示宽度。"""
-    return s + ' ' * (w - _display_width(s))
+    """将字符串填充到指定显示宽度，过长则截断加 …。"""
+    dw = _display_width(s)
+    if dw > w:
+        # 从右向左逐字截断，留 1 字符宽度给 …
+        while _display_width(s) > w - 1 and s:
+            s = s[:-1]
+        return s + '…'
+    return s + ' ' * (w - dw)
 
 
 def box_open(width: int = BOX_W, color: str = ""):
@@ -415,29 +421,38 @@ _FEATURES = [
 def _select_features_interactive():
     """交互式选择要安装的功能模块。返回 {feature: bool}。"""
     selected = {k: default for k, _, _, default in _FEATURES}
+    first_show = True
 
     while True:
+        if not first_show:
+            print()
+        first_show = False
+
         box_open()
         box_row(f"{_B}功能模块选择{_N}")
         box_sep()
         box_row(f"{_G}●{_N} 核心依赖 (必装): aiohttp + filelock + pydantic")
         box_sep()
-        box_row("可选模块:", color=_D)
-        box_row("")
         for idx, (key, label, desc, _) in enumerate(_FEATURES):
             mark = f"{_G}Y{_N}" if selected[key] else f"{_D}N{_N}"
-            box_row(f" {_B}[{idx + 1}]{_N} [{mark}] {label}  {_D}{desc}{_N}")
+            box_row(f" {_B}[{idx + 1}]{_N} [{mark}] {label}")
+        box_sep()
+        # 显示预计大小
+        selected_keys = {k for k, v in selected.items() if v}
+        if selected_keys:
+            labels = ", ".join(k for k, _, _, _ in _FEATURES if k in selected_keys)
+            box_row(f"{_G}已选:{_N} {labels}", color=_D)
         box_row("")
-        box_row(f" {_B}[A]{_N} 全选    {_B}[N]{_N} 仅核心    {_B}[0]{_N} 确认", color=_D)
+        box_row(f" 回车确认  [1-4]切换  [A]全选  [N]仅核心", color=_D)
         box_close()
 
         try:
-            choice = input(f"  {_B}输入数字切换开关，0 确认{_N}: ").strip()
+            choice = input(f"  {_B}选择{_N} {_D}(回车=确认){_N}: ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n  已取消。")
             return None
 
-        if not choice or choice == "0":
+        if not choice:
             break
         if choice.upper() == "A":
             for key, _, _, _ in _FEATURES:
@@ -448,15 +463,17 @@ def _select_features_interactive():
                 selected[key] = False
             continue
 
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(_FEATURES):
-                key = _FEATURES[idx][0]
-                selected[key] = not selected[key]
-            else:
-                print(f"  无效选择: {choice}")
-        except ValueError:
-            print(f"  无效选择: {choice}")
+        # 支持逗号分隔多选: 1,2,3
+        for part in choice.replace(" ", "").split(","):
+            try:
+                idx = int(part) - 1
+                if 0 <= idx < len(_FEATURES):
+                    key = _FEATURES[idx][0]
+                    selected[key] = not selected[key]
+                else:
+                    print(f"  无效选择: {part}")
+            except ValueError:
+                print(f"  无效选择: {part}")
 
     return selected
 

@@ -68,9 +68,15 @@ def display_width(s: str) -> int:
 
 
 def _pad_to(s: str, w: int) -> str:
-    """Pad string to display width w with spaces."""
+    """Pad string to display width w with spaces. Truncate with … if too long."""
     dw = display_width(s)
-    return s + ' ' * (w - dw) if dw < w else s
+    if dw > w:
+        while display_width(s) > w - 1 and s:
+            s = s[:-1]
+        return s + '…'
+    if dw < w:
+        return s + ' ' * (w - dw)
+    return s
 
 
 # ---------------------------------------------------------------------------

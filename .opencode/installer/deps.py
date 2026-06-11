@@ -80,14 +80,22 @@ def install_pip_requirements(req_files: list, venv_path: Path = None) -> bool:
         if not Path(rf).exists():
             warn(f"依赖文件未找到: {rf}")
             continue
-        info(f"安装依赖: {rf}")
+        info(f"安装依赖: {Path(rf).name}")
         try:
-            subprocess.run(
-                pip + ["install", "-r", str(rf), "--progress-bar", "on"],
-                check=True, timeout=300
+            result = subprocess.run(
+                pip + ["install", "-r", str(rf), "--quiet", "--progress-bar", "off"],
+                capture_output=True, text=True, timeout=300
             )
+            # 只在 pip 有实质性输出时显示（表明有新安装/升级，而非"已满足"）
+            stderr = result.stderr.strip()
+            if stderr:
+                for line in stderr.splitlines():
+                    if not line.startswith("WARNING: ") and "already satisfied" not in line.lower():
+                        print(f"    {line}")
         except subprocess.CalledProcessError as e:
-            warn(f"pip 安装失败 ({rf}): {e}")
+            if e.stderr:
+                print(e.stderr.strip(), file=sys.stderr)
+            warn(f"pip 安装失败 ({Path(rf).name})")
             return False
     return True
 

@@ -70,11 +70,6 @@ def run_install(args, skip_download=False):
     if verify_installation():
         step_ok(n, total, "安装验证通过")
         _write_installed_version()
-        success("安装完成!", [
-            "  1. 编辑 .env 添加 API Key",
-            "  2. 重启 OpenCode",
-            "  3. 运行 /webnovel-init 初始化项目",
-        ])
     else:
         step_warn("验证未通过。运行: python .opencode/scripts/webnovel.py preflight")
 
