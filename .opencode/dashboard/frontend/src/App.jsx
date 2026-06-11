@@ -42,12 +42,6 @@ function ThemeToggle() {
             className="theme-toggle"
             onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
             title={theme === 'light' ? '切换到暗色模式' : '切换到亮色模式'}
-            style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 32, height: 32, border: '2px solid var(--border-main)',
-                background: 'transparent', cursor: 'pointer', fontSize: 16,
-                borderRadius: 0,
-            }}
         >
             {theme === 'light' ? '🌙' : '☀️'}
         </button>

@@ -381,18 +381,19 @@ export default function OverviewPage() {
                     <div style={{ padding: '8px 12px', background: 'var(--bg-card-2)', border: '2px solid var(--accent-amber)', borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
                          onClick={() => setShowAllReminders(!showAllReminders)}>
                         <span>📌</span>
-                        <span style={{ fontWeight: 700 }}>即将到期的伏笔 ({reminders.length})</span>
+                        <span style={{ fontWeight: 700 }}>活跃伏笔 ({reminders.length})</span>
                         <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
                             {showAllReminders ? '收起 ▲' : '展开 ▼'}
                         </span>
                     </div>
                     {(showAllReminders ? reminders : reminders.slice(0, 1)).map(r => {
-                        const desc = r.rationale_text || r.payback_plan || r.debt_type || '未命名伏笔'
+                        const desc = r.content || '未命名伏笔'
+                        const targetLabel = r.target_chapter ? formatChapterLabel(r.target_chapter) : '未定'
                         return (
                         <div key={r.id} style={{ padding: '6px 12px', background: 'var(--bg-panel)', border: '1px solid var(--border-soft)', borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Badge tone="amber">{formatChapterLabel(r.due_chapter)}</Badge>
+                            <Badge tone={r.target_chapter ? 'amber' : 'blue'}>{targetLabel}</Badge>
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{desc}</span>
-                            <Badge tone="blue" style={{ fontSize: 10 }}>{r.constraint_type || r.debt_type || ''}</Badge>
+                            {r.tier && <Badge tone="blue" style={{ fontSize: 10 }}>{r.tier}</Badge>}
                             {reminders.length > 1 && !showAllReminders && (
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                                     +{reminders.length - 1} 条

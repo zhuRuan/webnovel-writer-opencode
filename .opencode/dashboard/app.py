@@ -795,21 +795,51 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
     @app.get("/api/foreshadowing/reminders")
     def foreshadowing_reminders(threshold: int = Query(5, ge=1, le=20)):
-        """返回即将到期的伏笔提醒。"""
+        """返回活跃伏笔提醒（从 state.json plot_threads.foreshadowing 读取）。
+
+        优先显示即将到期的（有 target_chapter/due_chapter 且在当前章节 + threshold 范围内），
+        其次显示未回收但无目标章的活跃伏笔。
+        """
         state = _load_state_payload()
         current_chapter = int((state.get("progress") or {}).get("current_chapter") or 0)
-        with closing(_get_db()) as conn:
-            rows = _fetchall_safe(conn,
-                """SELECT cd.id, cd.debt_type, cd.source_chapter, cd.due_chapter,
-                          cd.status, cd.current_amount, cd.interest_rate,
-                          oc.rationale_text, oc.payback_plan, oc.constraint_type
-                   FROM chase_debt cd
-                   LEFT JOIN override_contracts oc ON cd.override_contract_id = oc.id
-                   WHERE cd.status IN ('active', 'overdue')
-                   AND cd.due_chapter <= ? AND cd.due_chapter >= ?
-                   ORDER BY cd.due_chapter ASC""",
-                (current_chapter + threshold, current_chapter))
-        return {"reminders": rows, "current_chapter": current_chapter}
+        items = (state.get("plot_threads") or {}).get("foreshadowing") or []
+        if not isinstance(items, list):
+            items = []
+        due_soon = []
+        active_no_deadline = []
+        for i, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            status = str(item.get("status") or "").strip()
+            if status in ("已回收", "已完成", "已解决", "resolved", "done", "closed"):
+                continue
+            content = str(item.get("content") or item.get("description") or "未命名伏笔")
+            due = _to_int(item.get("due_chapter") or item.get("target_chapter") or 0)
+            planted = _to_int(item.get("planted_chapter") or item.get("source_chapter") or 0)
+            entry = {
+                "id": f"fs-{i}",
+                "content": content,
+                "target_chapter": due if due > 0 else None,
+                "planted_chapter": planted,
+                "status": status or "active",
+                "tier": str(item.get("tier") or ""),
+            }
+            if due > 0 and current_chapter <= due <= current_chapter + threshold:
+                due_soon.append(entry)
+            elif due <= 0:
+                active_no_deadline.append(entry)
+        # 即将到期的排前面，无目标章的排后面
+        due_soon.sort(key=lambda r: r["target_chapter"] or 9999)
+        active_no_deadline.sort(key=lambda r: r.get("planted_chapter", 0))
+        reminders = due_soon + active_no_deadline
+        return {"reminders": reminders, "current_chapter": current_chapter, "total": len(items)}
+
+
+    def _to_int(value) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
 
     @app.get("/api/invalid-facts")
     def list_invalid_facts(status: Optional[str] = None, limit: int = 100):
@@ -1709,8 +1739,10 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     # 前端静态文件托管
     # ===========================================================
 
-    if STATIC_DIR.is_dir():
-        app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
+    if STATIC_DIR.is_dir() and (STATIC_DIR / "index.html").is_file():
+        assets_dir = STATIC_DIR / "assets"
+        if assets_dir.is_dir():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
         @app.get("/{full_path:path}")
         def serve_spa(full_path: str):
@@ -1724,11 +1756,12 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     else:
         @app.get("/")
         def no_frontend():
+            build_cmd = "cd .opencode/dashboard/frontend && npm install && npm run build"
             return HTMLResponse(
                 "<h2>Webnovel Dashboard API is running</h2>"
-                "<p>前端尚未构建。请先在 <code>dashboard/frontend</code> 目录执行 <code>npm run build</code>。</p>"
-                '<p>API 文档：<a href="/docs">/docs</a></p>'
-            )
+                "<p>前端尚未构建。请先在 <code>dashboard/frontend</code> 目录执行：</p>"
+                f"<pre><code>{build_cmd}</code></pre>"
+                "<p>构建完成后刷新页面即可。API 文档：<a href='/docs'>/docs</a></p>")
 
     return app
 

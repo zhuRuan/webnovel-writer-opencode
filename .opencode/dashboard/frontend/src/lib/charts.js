@@ -25,6 +25,7 @@ echarts.use([
 export { echarts }
 
 const PIXEL_THEME_NAME = 'pixel'
+const PIXEL_DARK_THEME_NAME = 'pixel-dark'
 
 const PIXEL_THEME = {
     color: ['#26a8ff', '#f5a524', '#7f5af0', '#2ec27e', '#d7263d', '#00b8d4', '#ff5c8a'],
@@ -72,6 +73,33 @@ const PIXEL_THEME = {
     grid: { left: 50, right: 24, top: 30, bottom: 48 },
 }
 
+const PIXEL_DARK_THEME = {
+    ...PIXEL_THEME,
+    color: ['#6ccbf0', '#f0c040', '#b994f0', '#5cdb8b', '#f05050', '#60d8c0', '#ff6b90'],
+    textStyle: { ...PIXEL_THEME.textStyle, color: '#eee5d8' },
+    title: { textStyle: { ...PIXEL_THEME.title.textStyle, color: '#eee5d8' } },
+    legend: { textStyle: { ...PIXEL_THEME.legend.textStyle, color: '#c4b9a8' } },
+    tooltip: {
+        backgroundColor: '#2d2822',
+        borderColor: '#5c5245',
+        borderWidth: 2,
+        textStyle: { color: '#eee5d8', fontSize: 13 },
+        extraCssText: 'border-radius:0;box-shadow:3px 3px 0 #0d0b09;',
+    },
+    categoryAxis: {
+        axisLine: { lineStyle: { color: '#5c5245', width: 2 } },
+        axisTick: { lineStyle: { color: '#5c5245' } },
+        axisLabel: { color: '#8c8275', fontSize: 12 },
+        splitLine: { lineStyle: { color: '#353028', type: 'dashed' } },
+    },
+    valueAxis: {
+        axisLine: { lineStyle: { color: '#5c5245', width: 2 } },
+        axisTick: { lineStyle: { color: '#5c5245' } },
+        axisLabel: { color: '#8c8275', fontSize: 12 },
+        splitLine: { lineStyle: { color: '#353028', type: 'dashed' } },
+    },
+}
+
 let themeRegistered = false
 
 export const STRAND_COLORS = {
@@ -90,7 +118,17 @@ export const FORESHADOWING_COLORS = {
 export function ensurePixelTheme() {
     if (themeRegistered) return
     echarts.registerTheme(PIXEL_THEME_NAME, PIXEL_THEME)
+    echarts.registerTheme(PIXEL_DARK_THEME_NAME, PIXEL_DARK_THEME)
     themeRegistered = true
+}
+
+export function getChartTheme() {
+    try {
+        const theme = document.documentElement.getAttribute('data-theme')
+        return theme === 'dark' ? PIXEL_DARK_THEME_NAME : PIXEL_THEME_NAME
+    } catch {
+        return PIXEL_THEME_NAME
+    }
 }
 
 function quantile(sortedValues, ratio) {

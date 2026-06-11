@@ -96,7 +96,7 @@ function PromptsTab() {
             </div>
             <p style={{ marginBottom: 12, color: 'var(--text-sub)', fontSize: 13 }}>
                 在 <code>设定集/prompts/</code> 下放置 <code>.md</code> 文件，系统写作时自动加载。
-                详见 <a href="https://github.com/lujih/webnovel-writer-opencode/blob/master/docs/guides/custom-style-prompts.md" target="_blank" style={{ color: 'var(--accent-blue)' }}>自定义文风指南</a>。
+                详见 <a href="https://github.com/lujih/webnovel-writer-opencode/blob/master/docs/guides/custom-style-prompts.md" target="_blank" style={{ color: 'var(--accent)' }}>自定义文风指南</a>。
             </p>
 
             {error && <p style={{ marginBottom: 8, color: 'var(--accent-red)', fontWeight: 600 }}>加载失败: {error}</p>}
@@ -136,7 +136,7 @@ function PromptsTab() {
 
             {/* 编辑区 */}
             {editing && (
-                <div style={{ marginBottom: 16, padding: 12, border: '2px solid var(--accent-blue)', background: 'var(--bg-card)' }}>
+                <div style={{ marginBottom: 16, padding: 12, border: '2px solid var(--accent)', background: 'var(--bg-card)' }}>
                     <div className="mini-label">编辑: {editing.filename}</div>
                     <textarea
                         value={editing.content}

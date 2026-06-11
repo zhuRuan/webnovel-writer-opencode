@@ -82,8 +82,10 @@ def _kill_process_on_port(port: int) -> None:
     try:
         if sys.platform == "win32":
             # Windows: netstat -ano | findstr :port
+            # 使用 encoding='gbk' 避免 Windows 中文输出 UTF-8 解码错误
             result = subprocess.run(
-                ["netstat", "-ano"], capture_output=True, text=True, timeout=5
+                ["netstat", "-ano"], capture_output=True,
+                text=True, encoding="gbk", errors="replace", timeout=5
             )
             for line in result.stdout.splitlines():
                 if f":{port}" in line and "LISTENING" in line:
@@ -156,6 +158,13 @@ def main():
     url = f"http://{args.host}:{args.port}"
     print(f"Dashboard 启动: {url}")
     print(f"API 文档: {url}/docs")
+
+    # 检查前端构建状态
+    frontend_dist = Path(__file__).parent / "frontend" / "dist" / "index.html"
+    if frontend_dist.is_file():
+        print(f"前端: 已构建 ({url})")
+    else:
+        print(f"前端: 未构建 — 请先 cd .opencode/dashboard/frontend && npm run build")
 
     if not args.no_browser:
         webbrowser.open(url)

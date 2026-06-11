@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import ReactEChartsCore from 'echarts-for-react/lib/core'
-import { echarts, ensurePixelTheme } from '../lib/charts.js'
+import { echarts, ensurePixelTheme, getChartTheme } from '../lib/charts.js'
 
 export default function ChartWrapper({
     option,
@@ -12,12 +12,13 @@ export default function ChartWrapper({
     useEffect(() => {
         ensurePixelTheme()
     }, [])
+    const theme = useMemo(() => getChartTheme(), [])
 
     return (
         <ReactEChartsCore
             className={`chart-box ${className}`.trim()}
             echarts={echarts}
-            theme="pixel"
+            theme={theme}
             option={option}
             style={{ height }}
             showLoading={loading}
