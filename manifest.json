@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.1-20260611.0637",
+  "version": "v2.9.1-20260611.1539",
   "tag": "v2.9.1",
-  "updated": "2026-06-11T06:37:52Z",
+  "updated": "2026-06-11T15:39:27Z",
   "changelog": [
     {
-      "hash": "ef0208f",
+      "hash": "898d506",
       "type": "fix",
-      "message": "fix: \u5b89\u88c5\u811a\u672c UI \u7ec6\u8282\u4f18\u5316"
+      "message": "fix: \u6e05\u6d01\u5b89\u88c5 PermissionError \u65f6\u53cb\u597d\u63d0\u793a\u5173\u95ed IDE"
     },
     {
-      "hash": "f76ab06",
+      "hash": "0b2c95f",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.1-20260611.0627 [skip ci]"
+      "message": "chore: update manifest to v2.9.1-20260611.0637 [skip ci]"
     }
   ],
   "files": {
@@ -904,8 +904,8 @@
       "size": 73
     },
     ".opencode/dashboard/app.py": {
-      "sha256": "ffc18311439640a6fbd5257ef8de428c2aee6a957391fb730a144b4ac1dd2d90",
-      "size": 73261
+      "sha256": "6aa0591c81077c0a254639f1a2f04f642c34bd17c9e61d8d5a7847852ffc0178",
+      "size": 73486
     },
     ".opencode/dashboard/server.py": {
       "sha256": "1cf814d7dc2304041b4ae318bedd649a79494342b80478535c1a4976506293ce",
