@@ -618,7 +618,12 @@ def run_selected_action(args):
         for d in [opencode_dir, Path(".opencode_staging"), Path(".opencode_backup")]:
             if d.is_dir():
                 info(f"清洁安装: 删除 {d}/")
-                shutil.rmtree(str(d))
+                try:
+                    shutil.rmtree(str(d))
+                except PermissionError:
+                    warn(f"无法删除 {d.name}/ — 文件被占用。")
+                    warn("请先关闭 OpenCode IDE，然后重试。")
+                    _sys.exit(1)
 
     # 显示更新日志
     is_update, changelog, remote, local_tag, remote_tag = _check_update()

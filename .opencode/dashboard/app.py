@@ -1195,7 +1195,10 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 conn.execute("PRAGMA journal_mode=WAL")
                 conn.row_factory = sqlite3.Row
                 rows = conn.execute(
-                    "SELECT id, debt_type, due_chapter, source_chapter FROM chase_debt WHERE status IN ('active', 'overdue') AND due_chapter < ?",
+                    """SELECT cd.id, cd.debt_type, cd.due_chapter, cd.source_chapter, de.note
+                       FROM chase_debt cd
+                       LEFT JOIN debt_events de ON de.debt_id = cd.id AND de.event_type = 'created'
+                       WHERE cd.status IN ('active', 'overdue') AND cd.due_chapter < ?""",
                     (current_chapter,),
                 ).fetchall()
                 return [dict(r) for r in rows]
@@ -1236,8 +1239,9 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         # Overdue debts
         overdue = _get_overdue_debts(project_root, current_chapter)
         for d in overdue:
+            detail = d.get("note") or d.get("debt_type", "")
             alerts.append({"type": "debt_overdue", "severity": "critical",
-                           "detail": d.get("debt_type", ""), "due_chapter": d.get("due_chapter", 0)})
+                           "detail": detail, "due_chapter": d.get("due_chapter", 0)})
 
         # Long-absent characters
         absent = _get_long_absent_characters(project_root, current_chapter)
