@@ -211,6 +211,7 @@ export default function OverviewPage() {
     const [workflow, setWorkflow] = useState({})
     const [alerts, setAlerts] = useState([])
     const [reminders, setReminders] = useState([])
+    const [showAllReminders, setShowAllReminders] = useState(false)
 
     useEffect(() => {
         setWindowIndex(0)
@@ -377,16 +378,28 @@ export default function OverviewPage() {
 
             {reminders.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
-                    <div style={{ padding: '8px 12px', background: 'var(--bg-card-2)', border: '2px solid var(--accent-amber)', borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ padding: '8px 12px', background: 'var(--bg-card-2)', border: '2px solid var(--accent-amber)', borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                         onClick={() => setShowAllReminders(!showAllReminders)}>
                         <span>📌</span>
                         <span style={{ fontWeight: 700 }}>即将到期的伏笔 ({reminders.length})</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
+                            {showAllReminders ? '收起 ▲' : '展开 ▼'}
+                        </span>
                     </div>
-                    {reminders.slice(0, 3).map(r => (
+                    {(showAllReminders ? reminders : reminders.slice(0, 1)).map(r => {
+                        const desc = r.rationale_text || r.payback_plan || r.debt_type || '未命名伏笔'
+                        return (
                         <div key={r.id} style={{ padding: '6px 12px', background: 'var(--bg-panel)', border: '1px solid var(--border-soft)', borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Badge tone="amber">{formatChapterLabel(r.due_chapter)}</Badge>
-                            <span>{r.debt_type || '未命名伏笔'}</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{desc}</span>
+                            <Badge tone="blue" style={{ fontSize: 10 }}>{r.constraint_type || r.debt_type || ''}</Badge>
+                            {reminders.length > 1 && !showAllReminders && (
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                                    +{reminders.length - 1} 条
+                                </span>
+                            )}
                         </div>
-                    ))}
+                    )})}
                 </div>
             )}
 

@@ -800,10 +800,14 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         current_chapter = int((state.get("progress") or {}).get("current_chapter") or 0)
         with closing(_get_db()) as conn:
             rows = _fetchall_safe(conn,
-                """SELECT * FROM chase_debt
-                   WHERE status IN ('active', 'overdue')
-                   AND due_chapter <= ? AND due_chapter >= ?
-                   ORDER BY due_chapter ASC""",
+                """SELECT cd.id, cd.debt_type, cd.source_chapter, cd.due_chapter,
+                          cd.status, cd.current_amount, cd.interest_rate,
+                          oc.rationale_text, oc.payback_plan, oc.constraint_type
+                   FROM chase_debt cd
+                   LEFT JOIN override_contracts oc ON cd.override_contract_id = oc.id
+                   WHERE cd.status IN ('active', 'overdue')
+                   AND cd.due_chapter <= ? AND cd.due_chapter >= ?
+                   ORDER BY cd.due_chapter ASC""",
                 (current_chapter + threshold, current_chapter))
         return {"reminders": rows, "current_chapter": current_chapter}
 

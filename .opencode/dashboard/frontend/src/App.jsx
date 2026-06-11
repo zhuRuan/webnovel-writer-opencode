@@ -93,12 +93,12 @@ export default function App() {
     return (
         <div className="app-layout">
             <aside className="sidebar">
-                <div className="sidebar-header" style={{ position: 'relative' }}>
-                    <h1>PIXEL WRITER HUB</h1>
-                    <div className="subtitle" title={title}>{title}</div>
-                    <div style={{ position: 'absolute', top: 12, right: 12 }}>
+                <div className="sidebar-header">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <h1 style={{ margin: 0 }}>PIXEL WRITER HUB</h1>
                         <ThemeToggle />
                     </div>
+                    <div className="subtitle" title={title}>{title}</div>
                 </div>
                 <nav className="sidebar-nav">
                     {NAV_ITEMS.map(item => {
