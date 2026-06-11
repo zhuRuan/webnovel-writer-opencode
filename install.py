@@ -38,7 +38,8 @@ if _NEW.is_file():
 # 自更新区块用 _P，后续代码用 Path
 Path = _P
 
-# ── Windows 控制台 UTF-8 ────────────────────────────────
+# ── Windows 控制台 UTF-8 + ANSI ──────────────────────────
+_ANSI_OK = True  # 假设 ANSI 可用，Win 下检测后可能关闭
 if _os.name == "nt":
     try:
         for _s in ("stdout", "stderr", "stdin"):
@@ -47,6 +48,16 @@ if _os.name == "nt":
                 _obj.reconfigure(encoding="utf-8")
     except Exception:
         pass
+    try:
+        import ctypes
+        _k32 = ctypes.windll.kernel32
+        _STD_OUT = -11
+        _ENABLE_VT = 0x0004
+        _mode = ctypes.c_ulong()
+        _k32.GetConsoleMode(_k32.GetStdHandle(_STD_OUT), ctypes.byref(_mode))
+        _k32.SetConsoleMode(_k32.GetStdHandle(_STD_OUT), _mode.value | _ENABLE_VT)
+    except Exception:
+        _ANSI_OK = False
 
 # ── 标准库导入 ──────────────────────────────────────────
 import argparse
@@ -67,22 +78,17 @@ import time
 
 _ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
-if _os.name == "nt":
-    try:
-        import ctypes
-        _k32 = ctypes.windll.kernel32
-        _k32.SetConsoleMode(_k32.GetStdHandle(-11), 7)
-    except Exception:
-        pass
-
-# 颜色常量
-_G = '\033[92m'   # green
-_R = '\033[91m'   # red
-_Y = '\033[93m'   # yellow
-_C = '\033[96m'   # cyan
-_B = '\033[1m'    # bold
-_D = '\033[2m'    # dim
-_N = '\033[0m'    # reset
+# 颜色常量（ANSI 不可用时自动降级为无颜色纯文本）
+if _ANSI_OK:
+    _G = '\033[92m'   # green
+    _R = '\033[91m'   # red
+    _Y = '\033[93m'   # yellow
+    _C = '\033[96m'   # cyan
+    _B = '\033[1m'    # bold
+    _D = '\033[2m'    # dim
+    _N = '\033[0m'    # reset
+else:
+    _G = _R = _Y = _C = _B = _D = _N = ""
 
 BOX_W = 52
 

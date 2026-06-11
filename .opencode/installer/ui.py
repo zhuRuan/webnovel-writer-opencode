@@ -14,23 +14,31 @@ _ANSI_ESCAPE_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 
 class Colors:
+    _ANSI_OK = True
     if platform.system() == "Windows":
         try:
             import ctypes
             kernel32 = ctypes.windll.kernel32
-            kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+            _STD_OUT = -11
+            _ENABLE_VT = 0x0004
+            _mode = ctypes.c_ulong()
+            kernel32.GetConsoleMode(kernel32.GetStdHandle(_STD_OUT), ctypes.byref(_mode))
+            kernel32.SetConsoleMode(kernel32.GetStdHandle(_STD_OUT), _mode.value | _ENABLE_VT)
         except Exception:
-            pass
+            _ANSI_OK = False
 
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    YELLOW = '\033[93m'
-    CYAN = '\033[96m'
-    BLUE = '\033[94m'
-    MAGENTA = '\033[95m'
-    BOLD = '\033[1m'
-    DIM = '\033[2m'
-    NC = '\033[0m'
+    if _ANSI_OK:
+        GREEN = '\033[92m'
+        RED = '\033[91m'
+        YELLOW = '\033[93m'
+        CYAN = '\033[96m'
+        BLUE = '\033[94m'
+        MAGENTA = '\033[95m'
+        BOLD = '\033[1m'
+        DIM = '\033[2m'
+        NC = '\033[0m'
+    else:
+        GREEN = RED = YELLOW = CYAN = BLUE = MAGENTA = BOLD = DIM = NC = ""
 
 
 # Box-drawing characters
