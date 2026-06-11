@@ -1,17 +1,17 @@
 {
-  "version": "v2.9.1-20260610.1225",
+  "version": "v2.9.1-20260611.0538",
   "tag": "v2.9.1",
-  "updated": "2026-06-10T12:25:30Z",
+  "updated": "2026-06-11T05:38:25Z",
   "changelog": [
     {
-      "hash": "d8175d4",
+      "hash": "1d5efff",
       "type": "fix",
-      "message": "fix: \u5ba1\u67e5\u53d1\u73b0\u7684 6 \u9879\u4fee\u590d\uff08P0-P2\uff09"
+      "message": "fix: Windows \u63a7\u5236\u53f0 ANSI \u4e71\u7801 \u2014 SetConsoleMode \u6b63\u786e\u7528\u6cd5 + \u964d\u7ea7\u56de\u9000"
     },
     {
-      "hash": "c8a2b79",
+      "hash": "2933503",
       "type": "chore",
-      "message": "chore: update manifest to v2.9.1-20260610.1159 [skip ci]"
+      "message": "chore: update manifest to v2.9.1-20260610.1225 [skip ci]"
     }
   ],
   "files": {
@@ -56,8 +56,8 @@
       "size": 6039
     },
     ".opencode/installer/ui.py": {
-      "sha256": "4235915fd927d8d2e53111ba33a083802bb38e324bff08d0b4483e828e848c27",
-      "size": 8131
+      "sha256": "e346e15086ad6d4e97986674c260574dcf7cb0fa37bc67fcb9d1d1bfd5f4b87c",
+      "size": 8516
     },
     ".opencode/plugins/write-guard.js": {
       "sha256": "275b8c56369d470b165a4f9ece5d5f8beb6ed94032c994cf9e98d171b24c6ee0",
