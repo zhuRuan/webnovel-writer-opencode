@@ -3,10 +3,14 @@ Watchdog 文件变更监听器 + SSE 推送
 
 监控 PROJECT_ROOT/.webnovel/ 与 .story-system/ 的关键文件写事件，
 通过 SSE 通知所有已连接的前端客户端刷新数据。
+
+线程安全：_subscribers 列表受 _sub_lock 保护，
+_dispatch 可从任意线程调用（通过 call_soon_threadsafe 或直接）。
 """
 
 import asyncio
 import json
+import threading
 import time
 from pathlib import Path
 from typing import AsyncGenerator

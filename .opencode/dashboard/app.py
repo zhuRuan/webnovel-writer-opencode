@@ -6,6 +6,7 @@ Webnovel Dashboard - FastAPI 主应用
 
 import asyncio
 import json
+import logging
 import re
 import sqlite3
 import subprocess
@@ -14,15 +15,35 @@ import time
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from .path_guard import safe_resolve
+from .routers.files import router as files_router, set_files_router_watcher
+from .routers.review import router as review_router
+from .routers.extended import router as extended_router
 from .watcher import FileWatcher
+
+# ── Ensure scripts directory is on sys.path before DAO imports ──
+_SCRIPTS_DIR = str(Path(__file__).resolve().parents[1] / "scripts")
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+from data_modules.dao import get_dao  # noqa: E402
+from data_modules.dao.entity_dao import EntityDAO  # noqa: E402
+from data_modules.dao.character_event_dao import CharacterEventDAO  # noqa: E402
+from data_modules.dao.knowledge_dao import KnowledgeDAO  # noqa: E402
+from data_modules.dao.faction_dao import FactionDAO  # noqa: E402
+from data_modules.dao.relationship_dao import RelationshipDAO  # noqa: E402
+from data_modules.dao.memory_dao import MemoryDAO  # noqa: E402
+from data_modules.dao.state_dao import StateDAO  # noqa: E402
+from data_modules.dao.director_dao import DirectorDAO  # noqa: E402
+from data_modules.dao.chapter_dao import ChapterDAO  # noqa: E402
+from data_modules.dao.process_dao import ProcessDAO  # noqa: E402
+from data_modules.dao.style_collector_dao import StyleCollectorDAO  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # 全局状态
@@ -34,6 +55,9 @@ SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 STATIC_DIR = Path(__file__).parent / "frontend" / "dist"
 
 _ACTION_RATE_LIMIT: dict[str, float] = {}  # action → last invoke timestamp
+
+_collection_tasks: dict[str, asyncio.Task] = {}
+_collection_client: Any = None
 
 
 def _get_project_root() -> Path:
@@ -224,6 +248,339 @@ def _build_env_status(project_root: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 名家采集 — 后台采集流程
+# ---------------------------------------------------------------------------
+
+async def _get_collection_client():
+    global _collection_client
+    if _collection_client is None:
+        import httpx
+        _collection_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0),
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        )
+    return _collection_client
+
+
+async def _run_collection(author: str, task_id: str, db_path: str):
+    dao = get_dao(StyleCollectorDAO, db_path)
+    async def _dispatch(status, msg, current=0, total=5):
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "collection-progress",
+                "data": {"task_id": task_id, "author": author, "status": status,
+                         "progress": {"current": current, "total": total, "message": msg}},
+                "ts": time.time(),
+            }))
+        except Exception:
+            pass
+    try:
+        dao.update_progress(task_id, 'searching', f'正在搜索 {author} 的代表作', 0, 5)
+        await _dispatch('searching', f'正在搜索 {author} 的代表作')
+        works = await _search_works(author)
+        if not works:
+            dao.fail_report(task_id, f'未找到 {author} 的代表作')
+            await _dispatch('failed', f'未找到 {author} 的代表作')
+            _collection_tasks.pop(task_id, None)
+            return
+        dao.update_progress(task_id, 'searching', f'找到 {len(works)} 部作品: {", ".join(w["title"] for w in works)}', 0, 5)
+
+        dao.update_progress(task_id, 'downloading', '开始下载章节', 1, 5)
+        await _dispatch('downloading', '开始下载章节', 1)
+        all_chapters = []
+        for wi, work in enumerate(works):
+            dao.update_progress(task_id, 'downloading',
+                f'下载 {work["title"]} (第{wi+1}/{len(works)}部)', 1, 5)
+            chapters = await _download_work_chapters(author, work, task_id, dao, db_path)
+            all_chapters.extend(chapters)
+
+        if not all_chapters:
+            dao.fail_report(task_id, '未能下载任何章节')
+            await _dispatch('failed', '未能下载任何章节')
+            _collection_tasks.pop(task_id, None)
+            return
+        dao.update_progress(task_id, 'downloading', f'共下载 {len(all_chapters)} 章', 1, 5)
+
+        dao.update_progress(task_id, 'analyzing', '开始分析文风', 2, 5)
+        if not await _check_ollama_health():
+            dao.fail_report(task_id, 'Ollama 服务不可用，请确认已启动')
+            await _dispatch('failed', 'Ollama 服务不可用')
+            _collection_tasks.pop(task_id, None)
+            return
+        await _dispatch('analyzing', f'开始分析文风（共 {len(all_chapters)} 章）', 2)
+        analyses = await _analyze_chapters(all_chapters, task_id, dao, db_path, _dispatch)
+
+        dao.update_progress(task_id, 'summarizing', '生成文风总结', 3, 5)
+        await _dispatch('summarizing', '生成文风总结', 3)
+        await _generate_style_summary(author, analyses, dao, db_path)
+
+        dao.complete_report(task_id, len(all_chapters), len(analyses))
+        await _dispatch('done', f'完成：{len(all_chapters)} 章，{len(analyses)} 条分析', 5, 5)
+        _collection_tasks.pop(task_id, None)
+    except asyncio.CancelledError:
+        dao.fail_report(task_id, '任务被取消')
+        await _dispatch('failed', '任务被取消')
+        _collection_tasks.pop(task_id, None)
+        raise
+    except Exception as e:
+        dao.fail_report(task_id, str(e)[:500])
+        await _dispatch('failed', str(e)[:100])
+        _collection_tasks.pop(task_id, None)
+
+
+async def _search_works(author: str) -> list[dict]:
+    import re as _re
+    from urllib.parse import quote as _quote
+    import httpx
+
+    works = []
+    encoded = _quote(author)
+    short_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(10.0),
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+        }
+    )
+
+    async def _try_fetch(url: str, params: dict = None) -> str | None:
+        try:
+            resp = await short_client.get(url, params=params)
+            if resp.status_code == 200 and len(resp.text) > 300:
+                links = _re.findall(r'href="(https?://[^"]+)"', resp.text)
+                for link in links:
+                    low = link.lower()
+                    if any(s in low for s in ['baidu.com', 'bing.com', 'login', 'signup', 'ad.', 'track']):
+                        continue
+                    return link
+        except Exception:
+            pass
+        return None
+
+    async def _try_baidu(query: str) -> str | None:
+        try:
+            resp = await short_client.get('https://www.baidu.com/s', params={'wd': query})
+            if resp.status_code == 200:
+                links = _re.findall(r'href="(https?://[^"]+)"', resp.text)
+                for link in links:
+                    if 'baidu.com' in link:
+                        continue
+                    try:
+                        head = await short_client.head(link)
+                        if head.status_code in (200, 301, 302):
+                            return link
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return None
+
+    search_tasks = [
+        _try_baidu(f'{author} 小说 在线阅读 章节目录'),
+        _try_baidu(f'{author} 作品集 全文免费阅读'),
+        _try_baidu(f'{author} 代表作 txt下载'),
+        _try_fetch('https://www.bing.com/search', {'q': f'{author} 小说 在线阅读', 'setlang': 'zh-cn'}),
+    ]
+
+    try:
+        results = await asyncio.wait_for(
+            asyncio.gather(*search_tasks, return_exceptions=True),
+            timeout=20.0,
+        )
+    except asyncio.TimeoutError:
+        results = []
+
+    for link in results:
+        if isinstance(link, str) and link.startswith('http'):
+            works.append({'title': f'{author}作品{len(works)+1}', 'url': link})
+            if len(works) >= 3:
+                break
+
+    await short_client.aclose()
+    return works[:5]
+
+
+async def _download_work_chapters(author: str, work: dict, task_id: str,
+                                   dao: StyleCollectorDAO, db_path: str) -> list[dict]:
+    import re as _re
+    client = await _get_collection_client()
+    chapters = []
+    work_url = work['url']
+    work_title = work['title']
+    try:
+        resp = await client.get(work_url, follow_redirects=True)
+        if resp.status_code != 200:
+            return chapters
+        html = resp.text
+        chapter_links = _re.findall(
+            r'href="(https?://[^"]*(?:chapter|zhang|read|article|detail|\d+\.html?)[^"]*)"',
+            html, _re.IGNORECASE
+        )
+        if not chapter_links:
+            chapter_links = _re.findall(r'href="(https?://[^"]*\d+\.html?)"', html)[:30]
+        if not chapter_links:
+            chapter_links = list(set(_re.findall(r'href="(https?://[^"]+)"', html)))[:30]
+        seen = set()
+        unique_links = []
+        for l in chapter_links:
+            if l not in seen:
+                seen.add(l)
+                unique_links.append(l)
+        chapter_links = unique_links[:15]
+
+        for ci, link in enumerate(chapter_links):
+            try:
+                dao.update_progress(task_id, 'downloading',
+                    f'下载 {work_title} 第{ci+1}章', 1, 5)
+                cresp = await client.get(link, follow_redirects=True)
+                if cresp.status_code == 200:
+                    text = _re.sub(r'<[^>]+>', '\n', cresp.text)
+                    text = _re.sub(r'&nbsp;|&lt;|&gt;|&amp;|&quot;', ' ', text)
+                    text = _re.sub(r'\n{3,}', '\n\n', text).strip()
+                    if len(text) > 200:
+                        ch = {
+                            'author': author, 'work_title': work_title,
+                            'chapter_num': ci + 1, 'chapter_title': f'第{ci+1}章',
+                            'content': text, 'source_url': link,
+                        }
+                        get_dao(StyleCollectorDAO, db_path).insert_chapter(ch)
+                        chapters.append(ch)
+            except Exception:
+                continue
+            await asyncio.sleep(0.5)
+    except Exception:
+        pass
+    return chapters
+
+
+async def _analyze_chapters(chapters: list[dict], task_id: str,
+                             dao: StyleCollectorDAO, db_path: str,
+                             dispatch_callback: Callable | None = None) -> list[dict]:
+    import os as _os
+    from .services.style_analyzer import analyze_chapter_text
+    concurrency = int(_os.environ.get("STYLE_ANALYSIS_CONCURRENCY", "3"))
+    batch_size = 50  # 每批最多 50 章，避免内存爆炸
+    semaphore = asyncio.Semaphore(concurrency)
+    lock = asyncio.Lock()
+    analyses: list[dict] = []
+    total = len(chapters)
+    completed = 0
+
+    async def _analyze_one(ci: int, ch: dict):
+        nonlocal completed
+        async with semaphore:
+            try:
+                # Load content from DB instead of ch['content']
+                ch_id = ch.get('id')
+                if ch_id:
+                    rows = dao._fetch("SELECT content FROM collected_chapters WHERE id=?", (ch_id,))
+                    text = rows[0]['content'] if rows else ""
+                else:
+                    text = ch.get('content', '')  # fallback for online search path
+                if not text:
+                    async with lock:
+                        completed += 1
+                    return
+                result = await analyze_chapter_text(text)
+                async with lock:
+                    completed += 1
+                    dao.update_progress(task_id, 'analyzing',
+                        f'分析 {ch["work_title"]} 第{ch["chapter_num"]}章 ({completed}/{total})', 2, 5)
+                    if dispatch_callback is not None:
+                        await dispatch_callback("analyzing",
+                            f'分析 {ch["work_title"]} 第{ch["chapter_num"]}章 ({completed}/{total})')
+                    if result:
+                        analyses.append({
+                            'author': ch['author'],
+                            'work_title': ch['work_title'],
+                            'chapter_num': ch['chapter_num'],
+                            'chapter_title': ch.get('chapter_title', ''),
+                            **result,
+                        })
+                        if ch_id:
+                            dao.update_chapter_status(ch_id, 'analyzed')
+            except Exception:
+                async with lock:
+                    completed += 1
+
+    # 分批处理：每批 batch_size 章，批内并发 3，批间串行
+    for batch_start in range(0, total, batch_size):
+        batch = chapters[batch_start:batch_start + batch_size]
+        await asyncio.gather(*[_analyze_one(batch_start + ci, ch) for ci, ch in enumerate(batch)])
+    return analyses
+
+
+async def _check_ollama_health() -> bool:
+    try:
+        cfg = DataModulesConfig.from_project_root(_get_project_root())
+        ollama_host = cfg.ollama_host
+    except Exception:
+        import os
+        ollama_host = os.environ.get("OLLAMA_HOST", "http://192.168.160.1:11434")
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "curl", "-s", "--max-time", "5",
+            f"{ollama_host}/api/tags",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=6)
+        data = json.loads(stdout.decode("utf-8", errors="replace"))
+        return "models" in data and len(data.get("models", [])) > 0
+    except Exception:
+        return False
+
+
+async def _generate_style_summary(author: str, analyses: list[dict],
+                                   dao: StyleCollectorDAO, db_path: str):
+    from .services.style_summarizer import (
+        summarize_by_dimension, generate_author_summary, save_summaries_to_db,
+    )
+    from data_modules.dao.director_dao import DirectorDAO
+    import json as _json
+    if not analyses:
+        return
+    # 每 10 章聚合一次
+    batch_size = 10
+    all_dimension_summaries = []
+    director_dao = get_dao(DirectorDAO, db_path)
+    for i in range(0, len(analyses), batch_size):
+        batch = analyses[i:i + batch_size]
+        start_ch = i + 1
+        end_ch = min(i + batch_size, len(analyses))
+        chapter_range = f"第{start_ch}-{end_ch}章"
+        dims = summarize_by_dimension(batch)
+        for d in dims:
+            d["author"] = author
+            d["chapter_range"] = chapter_range
+        all_dimension_summaries.extend(dims)
+        save_summaries_to_db(dims, db_path)
+        # 每批 10 章单独写入 director_style（分段粒度，支持增量更新与回退）
+        batch_summary = generate_author_summary(author, dims)
+        rules_text = _json.dumps(batch_summary, ensure_ascii=False, indent=2)
+        director_dao.upsert_style({
+            "name": author,
+            "category": f"综合文风_{start_ch}-{end_ch}章",
+            "description": f"{author} 的文风总结（{chapter_range}）",
+            "rules": rules_text,
+            "priority": 5,
+            "is_active": 1,
+        })
+    # 作家级别全量总结 → director_style（全章聚合版）
+    author_summary = generate_author_summary(author, all_dimension_summaries)
+    rules_text = _json.dumps(author_summary, ensure_ascii=False, indent=2)
+    director_dao.upsert_style({
+        "name": author,
+        "category": "综合文风",
+        "description": f"{author} 的文风采集总结（全 {len(analyses)} 章）",
+        "rules": rules_text,
+        "priority": 5,
+        "is_active": 1,
+    })
+
+
+# ---------------------------------------------------------------------------
 # 应用工厂
 # ---------------------------------------------------------------------------
 
@@ -235,6 +592,9 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             import warnings
             warnings.warn(f"Dashboard project_root 被覆盖: {_project_root} → {project_root}", stacklevel=2)
         _project_root = Path(project_root).resolve()
+        # 同步到 core.config 以便 services/db.py 使用
+        from .core.config import init_project_root
+        init_project_root(_project_root)
 
     _ensure_scripts_dir_on_path()
 
@@ -251,12 +611,86 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         runtime_dir = webnovel / "runtime"
         runtime_dir.mkdir(parents=True, exist_ok=True)
 
+        # 确保名家采集相关表已创建
+        db_path = webnovel / "index.db"
+        if db_path.is_file():
+            try:
+                conn = sqlite3.connect(str(db_path), timeout=5)
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.executescript("""
+                    CREATE TABLE IF NOT EXISTS collected_chapters (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        author TEXT NOT NULL,
+                        work_title TEXT NOT NULL,
+                        chapter_num INTEGER NOT NULL,
+                        chapter_title TEXT,
+                        content TEXT NOT NULL,
+                        source_url TEXT,
+                        word_count INTEGER DEFAULT 0,
+                        status TEXT DEFAULT 'raw',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_cc_author ON collected_chapters(author);
+                    CREATE TABLE IF NOT EXISTS style_summaries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        author TEXT NOT NULL,
+                        work_title TEXT,
+                        summary_title TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        examples TEXT DEFAULT '[]',
+                        keywords TEXT DEFAULT '[]',
+                        quality_score REAL DEFAULT 0,
+                        chapter_range TEXT,
+                        model_used TEXT DEFAULT 'qwen3.5_9B_Q4',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE IF NOT EXISTS collection_reports (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        author TEXT NOT NULL,
+                        task_id TEXT NOT NULL UNIQUE,
+                        status TEXT DEFAULT 'pending',
+                        progress TEXT DEFAULT '{}',
+                        steps_json TEXT DEFAULT '[]',
+                        start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        end_time TIMESTAMP,
+                        chapters_collected INTEGER DEFAULT 0,
+                        summaries_generated INTEGER DEFAULT 0,
+                        error_message TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_cr_author ON collection_reports(author);
+                """)
+                conn.close()
+            except Exception:
+                pass
+
         if webnovel.is_dir() or story_system.is_dir():
             _watcher.start(
                 watch_webnovel_dir=webnovel if webnovel.is_dir() else None,
                 watch_story_system_dir=story_system if story_system.is_dir() else None,
                 loop=asyncio.get_running_loop(),
             )
+
+        # 启动时清理僵尸任务（服务重启后残留的 running 状态且无对应 asyncio task）
+        if db_path.is_file():
+            try:
+                dao = get_dao(StyleCollectorDAO, db_path)
+                stale = dao._fetch(
+                    "SELECT task_id FROM collection_reports WHERE status NOT IN ('done','failed','cancelled','stale')"
+                )
+                cleaned = 0
+                for r in stale:
+                    if r["task_id"] not in _collection_tasks:
+                        dao._execute(
+                            "UPDATE collection_reports SET status='stale', error_message='服务重启，任务丢失' WHERE task_id=?",
+                            (r["task_id"],)
+                        )
+                        cleaned += 1
+                if cleaned:
+                    logging.getLogger(__name__).info(f"清理了 {cleaned} 个僵尸采集任务")
+            except Exception:
+                pass
 
         async def _polling_loop():
             """Periodically push workflow and debt status to SSE clients."""
@@ -283,6 +717,15 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 await poll_task
             except asyncio.CancelledError:
                 pass
+            for _tid, _task in list(_collection_tasks.items()):
+                _task.cancel()
+                try:
+                    await _task
+                except asyncio.CancelledError:
+                    pass
+            _collection_tasks.clear()
+            if _collection_client is not None:
+                await _collection_client.aclose()
             _watcher.stop()
 
     app = FastAPI(title="Webnovel Dashboard", version="0.1.0", lifespan=_lifespan)
@@ -294,6 +737,21 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    set_files_router_watcher(_watcher)
+    app.include_router(files_router)
+
+    from .routers.chapters import router as chapters_router
+    from .routers.contracts import router as contracts_router
+    from .routers.entities import router as entities_router
+    from .routers.extended import router as extended_router
+    from .routers.review import router as review_router
+
+    app.include_router(contracts_router)
+    app.include_router(entities_router)
+    app.include_router(review_router)
+    app.include_router(chapters_router)
+    app.include_router(extended_router)
+
     # ===========================================================
     # API：项目元信息
     # ===========================================================
@@ -302,6 +760,44 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     def project_info():
         """返回 state.json 完整内容（只读）。"""
         return _load_state_payload(required=True)
+
+    @app.get("/api/projects")
+    def list_projects():
+        """列出所有可用的书项目。"""
+        from .core.config import ProjectRegistry
+        return {"projects": ProjectRegistry.list_projects(), "current": str(_get_project_root())}
+
+    @app.post("/api/projects/switch")
+    def switch_project(data: dict):
+        """切换到指定项目。"""
+        path_str = (data.get("path") or data.get("project_path") or "").strip()
+        if not path_str:
+            raise HTTPException(400, "缺少 path 参数")
+        target = Path(path_str).resolve()
+        if not target.is_dir():
+            raise HTTPException(404, f"目录不存在: {target}")
+        if not (target / ".webnovel" / "state.json").is_file():
+            raise HTTPException(404, f"不是有效的书项目: {target}")
+        from .core.config import switch_project_root
+        switch_project_root(target)
+        global _project_root
+        _project_root = target
+        # 重启 watcher 以监听新项目
+        webnovel = target / ".webnovel"
+        story_system = target / ".story-system"
+        _watcher.stop()
+        if webnovel.is_dir() or story_system.is_dir():
+            _watcher.start(
+                watch_webnovel_dir=webnovel if webnovel.is_dir() else None,
+                watch_story_system_dir=story_system if story_system.is_dir() else None,
+                loop=asyncio.get_running_loop(),
+            )
+        # 推送 SSE 通知前端刷新
+        try:
+            _watcher._dispatch(json.dumps({"type": "project-switched", "path": str(target), "ts": time.time()}))
+        except Exception:
+            pass
+        return {"ok": True, "current": str(target)}
 
     @app.get("/api/story-runtime/health")
     def story_runtime_health():
@@ -330,358 +826,260 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 return []
             raise HTTPException(status_code=500, detail=f"数据库查询失败: {exc}") from exc
 
-    @app.get("/api/entities")
-    def list_entities(
-        entity_type: Optional[str] = Query(None, alias="type"),
-        include_archived: bool = False,
-    ):
-        """列出所有实体（可按类型过滤）。"""
-        with closing(_get_db()) as conn:
-            q = "SELECT * FROM entities"
-            params: list = []
-            clauses: list[str] = []
-            if entity_type:
-                clauses.append("type = ?")
-                params.append(entity_type)
-            if not include_archived:
-                clauses.append("is_archived = 0")
-            if clauses:
-                q += " WHERE " + " AND ".join(clauses)
-            q += " ORDER BY last_appearance DESC"
-            return _fetchall_safe(conn, q, tuple(params))
+    def _get_db_path() -> str:
+        return str(_get_project_root() / ".webnovel" / "index.db")
 
-    @app.get("/api/entities/{entity_id}")
-    def get_entity(entity_id: str):
-        with closing(_get_db()) as conn:
-            rows = _fetchall_safe(conn, "SELECT * FROM entities WHERE id = ?", (entity_id,))
-            if not rows:
-                raise HTTPException(404, "实体不存在")
-            return rows[0]
-
-    @app.get("/api/entities/{entity_id}/timeline")
-    def entity_timeline(entity_id: str):
-        """返回实体的完整状态变化时间线。"""
-        with closing(_get_db()) as conn:
-            changes = _fetchall_safe(conn,
-                "SELECT * FROM state_changes WHERE entity_id = ? ORDER BY chapter ASC",
-                (entity_id,))
-
-            # 使用 SQLite json_each 在 SQL 层过滤
-            appearances = _fetchall_safe(conn,
-                """SELECT DISTINCT s.chapter, s.scene_index, s.location, s.summary
-                   FROM scenes s, json_each(s.characters) je
-                   WHERE je.value = ?
-                   ORDER BY s.chapter ASC""",
-                (entity_id,))
-
-        return {"changes": changes, "appearances": appearances}
-
-    @app.get("/api/consistency/anomalies")
-    def consistency_anomalies(chapter: Optional[int] = None):
-        """检测实体状态异常跳变。"""
-        with closing(_get_db()) as conn:
-            if chapter is not None:
-                rows = _fetchall_safe(conn,
-                    "SELECT * FROM state_changes WHERE chapter <= ? ORDER BY chapter ASC, id ASC",
-                    (chapter,))
-            else:
-                rows = _fetchall_safe(conn,
-                    "SELECT * FROM state_changes ORDER BY chapter ASC, id ASC", ())
-
-        anomalies = []
-        entity_states = {}  # entity_id → {field: last_value}
-
-        for row in rows:
-            eid = row.get("entity_id")
-            field = row.get("field")
-            old_val = row.get("old_value")
-            new_val = row.get("new_value")
-            row_chapter = row.get("chapter")
-
-            if eid not in entity_states:
-                entity_states[eid] = {}
-            prev = entity_states[eid].get(field)
-
-            # 检测异常：值未实际改变
-            if prev is not None and new_val == prev:
-                anomalies.append({
-                    "type": "no_change",
-                    "entity_id": eid,
-                    "field": field,
-                    "chapter": row_chapter,
-                    "detail": f"{field} 从 {old_val} 变为 {new_val}，但值未实际改变",
-                })
-            # 检测异常：值回退到之前的状态
-            elif prev is not None and old_val is not None and new_val == old_val and new_val != prev:
-                anomalies.append({
-                    "type": "value_reverted",
-                    "entity_id": eid,
-                    "field": field,
-                    "chapter": row_chapter,
-                    "detail": f"{field} 回退到 {new_val}（之前是 {prev}）",
-                })
-
-            entity_states[eid][field] = new_val
-
-        return {"anomalies": anomalies, "total": len(anomalies)}
-
-    @app.get("/api/relationships")
-    def list_relationships(entity: Optional[str] = None, limit: int = 200):
-        with closing(_get_db()) as conn:
-            if entity:
-                return _fetchall_safe(conn,
-                    "SELECT * FROM relationships WHERE from_entity = ? OR to_entity = ? ORDER BY chapter DESC LIMIT ?",
-                    (entity, entity, limit))
-            return _fetchall_safe(conn,
-                "SELECT * FROM relationships ORDER BY chapter DESC LIMIT ?", (limit,))
-
-    @app.get("/api/relationship-events")
-    def list_relationship_events(
-        entity: Optional[str] = None,
-        from_chapter: Optional[int] = None,
-        to_chapter: Optional[int] = None,
-        limit: int = 200,
-    ):
-        with closing(_get_db()) as conn:
-            q = "SELECT * FROM relationship_events"
-            params: list = []
-            clauses: list[str] = []
-            if entity:
-                clauses.append("(from_entity = ? OR to_entity = ?)")
-                params.extend([entity, entity])
-            if from_chapter is not None:
-                clauses.append("chapter >= ?")
-                params.append(from_chapter)
-            if to_chapter is not None:
-                clauses.append("chapter <= ?")
-                params.append(to_chapter)
-            if clauses:
-                q += " WHERE " + " AND ".join(clauses)
-            q += " ORDER BY chapter DESC, id DESC LIMIT ?"
-            params.append(limit)
-            return _fetchall_safe(conn, q, tuple(params))
-
-    @app.get("/api/chapters")
-    def list_chapters():
-        with closing(_get_db()) as conn:
-            rows = _fetchall_safe(conn, "SELECT * FROM chapters ORDER BY chapter ASC")
-            return [{**r, "characters": _parse_json_value(r.get("characters"), [])} for r in rows]
-
-    @app.get("/api/scenes")
-    def list_scenes(chapter: Optional[int] = None, limit: int = 500):
-        with closing(_get_db()) as conn:
-            if chapter is not None:
-                return _fetchall_safe(conn,
-                    "SELECT * FROM scenes WHERE chapter = ? ORDER BY scene_index ASC", (chapter,))
-            return _fetchall_safe(conn,
-                "SELECT * FROM scenes ORDER BY chapter ASC, scene_index ASC LIMIT ?", (limit,))
-
-    @app.get("/api/reading-power")
-    def list_reading_power(limit: int = 50):
-        with closing(_get_db()) as conn:
-            return _fetchall_safe(conn,
-                "SELECT * FROM chapter_reading_power ORDER BY chapter DESC LIMIT ?", (limit,))
-
-    @app.get("/api/review-metrics")
-    def list_review_metrics(limit: int = 20):
-        with closing(_get_db()) as conn:
-            rows = _fetchall_safe(conn,
-                "SELECT * FROM review_metrics ORDER BY end_chapter DESC LIMIT ?", (limit,))
-            return [{**r,
-                "dimension_scores": _parse_json_value(r.get("dimension_scores"), {}),
-                "severity_counts": _parse_json_value(r.get("severity_counts"), {}),
-                "critical_issues": _parse_json_value(r.get("critical_issues"), [])}
-                for r in rows]
-
-    @app.get("/api/review/analytics")
-    def review_analytics(limit: int = Query(50, ge=1, le=200)):
-        """返回审查结果的深度分析。"""
-        with closing(_get_db()) as conn:
-            rows = _fetchall_safe(conn,
-                "SELECT * FROM review_metrics ORDER BY end_chapter DESC LIMIT ?", (limit,))
-
-        if not rows:
-            return {"items": [], "summary": {}}
-
-        dimension_trends = {}
-        severity_totals = {}
-        all_critical_issues = []
-
-        for row in rows:
-            chapter = row.get("end_chapter", 0)
-            scores = _parse_json_value(row.get("dimension_scores"), {})
-            for dim, score in scores.items():
-                if dim not in dimension_trends:
-                    dimension_trends[dim] = []
-                dimension_trends[dim].append({"chapter": chapter, "score": score})
-
-            sev = _parse_json_value(row.get("severity_counts"), {})
-            for s, count in sev.items():
-                severity_totals[s] = severity_totals.get(s, 0) + count
-
-            issues = _parse_json_value(row.get("critical_issues"), [])
-            all_critical_issues.extend(issues)
-
-        dimension_averages = {}
-        for dim, points in dimension_trends.items():
-            valid_scores = [p["score"] for p in points if p["score"] is not None]
-            dimension_averages[dim] = sum(valid_scores) / len(valid_scores) if valid_scores else 0
-
-        weakest = sorted(dimension_averages.items(), key=lambda x: x[1])[:3]
-
-        return {
-            "dimension_trends": dimension_trends,
-            "dimension_averages": dimension_averages,
-            "weakest_dimensions": [{"dimension": d, "avg_score": s} for d, s in weakest],
-            "severity_totals": severity_totals,
-            "critical_issues": all_critical_issues[:20],
-            "total_reviews": len(rows),
-        }
-
-    @app.get("/api/stats/chapter-trend")
-    def chapter_trend(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0)):
-        state = _load_state_payload()
-        strand_map = _build_strand_map(state)
-
-        with closing(_get_db()) as conn:
-            total_rows = _fetchall_safe(conn, "SELECT COUNT(*) AS count FROM chapters")
-            latest_rows = _fetchall_safe(conn, "SELECT MAX(chapter) AS chapter FROM chapters")
-            rows = _fetchall_safe(
-                conn,
-                """
-                WITH selected_chapters AS (
-                    SELECT chapter, title, location, word_count, characters, summary
-                    FROM chapters
-                    ORDER BY chapter DESC
-                    LIMIT ? OFFSET ?
-                )
-                SELECT
-                    c.chapter,
-                    c.title,
-                    c.location,
-                    c.word_count,
-                    c.characters,
-                    c.summary,
-                    rp.hook_type,
-                    rp.hook_strength,
-                    rp.is_transition,
-                    rp.override_count,
-                    rp.debt_balance,
-                    rm.overall_score AS review_score,
-                    rm.severity_counts
-                FROM selected_chapters c
-                LEFT JOIN chapter_reading_power rp ON rp.chapter = c.chapter
-                LEFT JOIN review_metrics rm ON rm.end_chapter = c.chapter
-                ORDER BY c.chapter ASC
-                """,
-                (limit, offset),
-            )
-
-        hook_strength_value = {"weak": 1, "medium": 3, "strong": 5}
-        items = []
-        for row in rows:
-            chapter = int(row.get("chapter") or 0)
-            hook_strength = str(row.get("hook_strength") or "").strip().lower()
-            items.append(
-                {
-                    "chapter": chapter,
-                    "title": row.get("title") or "",
-                    "location": row.get("location") or "",
-                    "word_count": int(row.get("word_count") or 0),
-                    "characters": _parse_json_value(row.get("characters"), []),
-                    "summary": row.get("summary") or "",
-                    "review_score": row.get("review_score"),
-                    "review_severity_counts": _parse_json_value(row.get("severity_counts"), {}),
-                    "hook_type": row.get("hook_type") or "",
-                    "hook_strength": hook_strength,
-                    "hook_strength_value": hook_strength_value.get(hook_strength, 0),
-                    "is_transition": bool(row.get("is_transition")),
-                    "override_count": int(row.get("override_count") or 0),
-                    "debt_balance": float(row.get("debt_balance") or 0.0),
-                    "strand": strand_map.get(chapter, ""),
-                    "volume": _resolve_volume_for_chapter(state, chapter),
-                }
-            )
-
-        return {
-            "items": items,
-            "total": int(total_rows[0]["count"] or 0) if total_rows else 0,
-            "latest_chapter": int(latest_rows[0]["chapter"] or 0) if latest_rows else 0,
-            "limit": limit,
-            "offset": offset,
-        }
-
-    @app.get("/api/commits")
-    def list_commits(limit: int = Query(20, ge=1, le=200)):
-        commits_dir = _story_system_dir() / "commits"
-        if not commits_dir.is_dir():
-            return {"items": [], "total": 0, "limit": limit}
-
-        items = []
-        for path in commits_dir.glob("chapter_*.commit.json"):
-            try:
-                payload = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
-
-            meta = payload.get("meta") if isinstance(payload, dict) else {}
-            provenance = payload.get("provenance") if isinstance(payload, dict) else {}
-            chapter = int((meta or {}).get("chapter") or _extract_story_chapter(path))
-            items.append(
-                {
-                    "chapter": chapter,
-                    "status": str((meta or {}).get("status") or "missing"),
-                    "projection_status": payload.get("projection_status") or {},
-                    "write_fact_role": str((provenance or {}).get("write_fact_role") or ""),
-                    "contract_refs": payload.get("contract_refs") or {},
-                    "path": path.name,
-                    "updated_at": datetime.fromtimestamp(
-                        path.stat().st_mtime, tz=timezone.utc
-                    ).isoformat(),
-                }
-            )
-
-        items.sort(key=lambda item: item["chapter"], reverse=True)
-        return {"items": items[:limit], "total": len(items), "limit": limit}
-
-    @app.get("/api/contracts/summary")
-    def contracts_summary():
-        from data_modules.story_contracts import StoryContractPaths, read_json_if_exists
-
+    def _load_chapter_memories(chapter: int, dao) -> int:
         project_root = _get_project_root()
-        state = _load_state_payload()
-        runtime = _build_story_runtime_health_report(project_root)
-        chapter = int(runtime.get("chapter") or ((state.get("progress") or {}).get("current_chapter") or 0))
-        current_volume = _resolve_volume_for_chapter(state, chapter) or int(
-            ((state.get("progress") or {}).get("current_volume") or 1)
+        commit_path = project_root / '.story-system' / 'commits' / f'chapter_{int(chapter):03d}.commit.json'
+        if not commit_path.exists():
+            return 0
+        commit_data = json.loads(commit_path.read_text(encoding='utf-8'))
+        extraction = commit_data.get('extraction_result', {})
+        raw_facts = extraction.get('raw_facts', '') or ''
+        known_entities = extraction.get('known_entities', {})
+        if not raw_facts or not known_entities:
+            return 0
+        from data_modules.observer_settler import ObserverSettlerModule
+        memories = ObserverSettlerModule._extract_character_memories(raw_facts, known_entities, chapter)
+        created = 0
+        for mem in memories:
+            try:
+                dao.create_memory(mem)
+                created += 1
+            except Exception:
+                pass
+        return created
+
+    def _ensure_character_events_table():
+        with closing(_get_db()) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS character_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    actor_id TEXT NOT NULL,
+                    event_type TEXT NOT NULL CHECK(event_type IN ('need_to_do','want_to_do','planned','promise','prerequisite')),
+                    description TEXT NOT NULL,
+                    source_chapter INTEGER NOT NULL,
+                    target_chapter INTEGER,
+                    prerequisites TEXT DEFAULT '[]',
+                    trigger_condition TEXT DEFAULT '',
+                    status TEXT DEFAULT 'pending' CHECK(status IN ('pending','in_progress','resolved','abandoned')),
+                    resolved_chapter INTEGER,
+                    urgency INTEGER DEFAULT 5 CHECK(urgency BETWEEN 1 AND 10),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ce_actor ON character_events(actor_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ce_status ON character_events(status)")
+            conn.commit()
+
+
+
+    # ===========================================================
+    # API：角色事件
+    # ===========================================================
+
+    @app.get("/api/character-events")
+    def list_character_events(
+        actor_id: Optional[str] = Query(None, description="Filter by actor entity ID"),
+        status: Optional[str] = Query(None, description="Filter by status: pending, in_progress, resolved, abandoned"),
+        overdue: bool = Query(False, description="Return only overdue events"),
+        current_chapter: int = Query(0, description="Current chapter for overdue calculation"),
+    ):
+        dao = get_dao(CharacterEventDAO, _get_db_path())
+        return dao.list_events(
+            actor_id=actor_id,
+            status=status,
+            overdue=overdue,
+            current_chapter=current_chapter,
         )
 
-        paths = StoryContractPaths.from_project_root(project_root)
-        master_payload = read_json_if_exists(paths.master_json) or {}
+    @app.post("/api/character-events", status_code=201)
+    def create_character_event(data: dict):
+        actor_id = (data.get("actor_id") or "").strip()
+        event_type = (data.get("event_type") or "").strip()
+        description = (data.get("description") or "").strip()
+        source_chapter = data.get("source_chapter")
 
-        return {
-            "chapter": chapter,
-            "current_volume": current_volume,
-            "master": {
-                "exists": bool(master_payload),
-                "primary_genre": str(((master_payload.get("route") or {}).get("primary_genre") or "")),
-                "core_tone": str(
-                    ((master_payload.get("master_constraints") or {}).get("core_tone") or "")
-                ),
-            },
-            "counts": {
-                "volumes": len(list(paths.volumes_dir.glob("volume_*.json"))) if paths.volumes_dir.is_dir() else 0,
-                "chapters": len(list(paths.chapters_dir.glob("chapter_*.json"))) if paths.chapters_dir.is_dir() else 0,
-                "reviews": len(list(paths.reviews_dir.glob("chapter_*.review.json"))) if paths.reviews_dir.is_dir() else 0,
-                "commits": len(list(paths.commits_dir.glob("chapter_*.commit.json"))) if paths.commits_dir.is_dir() else 0,
-            },
-            "current_contracts": {
-                "volume": paths.volume_json(current_volume).is_file(),
-                "chapter": paths.chapter_json(chapter).is_file() if chapter > 0 else False,
-                "review": paths.review_json(chapter).is_file() if chapter > 0 else False,
-                "commit": paths.commit_json(chapter).is_file() if chapter > 0 else False,
-            },
-        }
+        if not actor_id or not event_type or not description or source_chapter is None:
+            raise HTTPException(status_code=400, detail="actor_id, event_type, description, source_chapter 为必填字段")
+
+        valid_types = ("need_to_do", "want_to_do", "planned", "promise", "prerequisite")
+        if event_type not in valid_types:
+            raise HTTPException(status_code=422, detail=f"event_type 必须为以下之一: {', '.join(valid_types)}")
+
+        _ensure_character_events_table()
+        dao = get_dao(CharacterEventDAO, _get_db_path())
+        try:
+            return dao.create_event(data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.put("/api/character-events/{event_id}")
+    def update_character_event(event_id: int, data: dict):
+        dao = get_dao(CharacterEventDAO, _get_db_path())
+
+        if "status" in data and data["status"] is not None:
+            valid_statuses = ("pending", "in_progress", "resolved", "abandoned")
+            if data["status"] not in valid_statuses:
+                raise HTTPException(status_code=422, detail=f"status 必须为以下之一: {', '.join(valid_statuses)}")
+
+        allowed = {'status', 'urgency', 'description', 'target_chapter'}
+        if not any(data.get(k) is not None for k in allowed):
+            raise HTTPException(status_code=400, detail="未提供任何可更新字段")
+
+        result = dao.update_event(event_id, data)
+        if result is None:
+            raise HTTPException(status_code=404, detail="事件不存在")
+        return result
+
+    @app.delete("/api/character-events/{event_id}")
+    def delete_character_event(event_id: int):
+        dao = get_dao(CharacterEventDAO, _get_db_path())
+        if not dao.delete_event(event_id):
+            raise HTTPException(status_code=404, detail="事件不存在")
+        return {"ok": True, "deleted_id": event_id}
+
+    @app.patch("/api/character-events/{event_id}/resolve")
+    def resolve_character_event(event_id: int, chapter: int = Query(None, description="结算章节号，不传则自动取当前最新章")):
+        resolved_chapter = chapter
+        if resolved_chapter is None:
+            with closing(_get_db()) as conn:
+                chapters = _fetchall_safe(conn, "SELECT MAX(chapter) AS max_ch FROM chapters")
+            resolved_chapter = chapters[0]["max_ch"] if chapters and chapters[0].get("max_ch") is not None else 0
+
+        dao = get_dao(CharacterEventDAO, _get_db_path())
+        result = dao.resolve_event(event_id, resolved_chapter)
+        if result is None:
+            raise HTTPException(status_code=404, detail="事件不存在")
+        return result
+
+    # ===========================================================
+    # API：角色记忆
+    # ===========================================================
+
+    @app.get("/api/memories")
+    def list_memories(
+        actor_id: str = Query(...),
+        memory_type: Optional[str] = Query(None),
+        tag: Optional[str] = Query(None),
+        limit: int = Query(50),
+        offset: int = Query(0),
+    ):
+        dao = get_dao(MemoryDAO, _get_db_path())
+        return dao.list_memories(
+            actor_id=actor_id,
+            memory_type=memory_type,
+            tag=tag,
+            limit=limit,
+            offset=offset,
+        )
+
+    @app.get("/api/memories/rag")
+    def rag_search_memories(
+        actor_id: str = Query(...),
+        query: str = Query(...),
+        k: int = Query(10),
+    ):
+        dao = get_dao(MemoryDAO, _get_db_path())
+        return {"memories": dao.rag_search(actor_id=actor_id, query_text=query, k=k)}
+
+    @app.get("/api/memories/{memory_id}")
+    def get_memory(memory_id: int):
+        dao = get_dao(MemoryDAO, _get_db_path())
+        result = dao.get_memory(memory_id)
+        if not result:
+            raise HTTPException(404, "记忆不存在")
+        return result
+
+    @app.post("/api/memories", status_code=201)
+    def create_memory(data: dict):
+        required = ["actor_id", "memory_type", "content", "source_chapter"]
+        for f in required:
+            if f not in data:
+                raise HTTPException(400, f"缺少必填字段: {f}")
+        if data["memory_type"] not in ("episodic", "semantic", "relational", "decision"):
+            raise HTTPException(422, "memory_type 必须为 episodic/semantic/relational/decision")
+        dao = get_dao(MemoryDAO, _get_db_path())
+        return dao.create_memory(data)
+
+    @app.delete("/api/memories/{memory_id}")
+    def delete_memory(memory_id: int):
+        dao = get_dao(MemoryDAO, _get_db_path())
+        if not dao.delete_memory(memory_id):
+            raise HTTPException(404, "记忆不存在")
+        return {"ok": True}
+
+    @app.post("/api/memories/decay")
+    def decay_memories(
+        current_chapter: int = Query(...),
+    ):
+        dao = get_dao(MemoryDAO, _get_db_path())
+        return dao.decay_memories(current_chapter=current_chapter)
+
+    @app.post("/api/memories/load-from-chapter")
+    def load_memories_from_chapter(chapter: int = Query(...)):
+        project_root = _get_project_root()
+        commit_path = project_root / '.story-system' / 'commits' / f'chapter_{int(chapter):03d}.commit.json'
+        if not commit_path.exists():
+            raise HTTPException(404, f"第{chapter}章的 commit 文件不存在")
+
+        commit_data = json.loads(commit_path.read_text(encoding='utf-8'))
+        extraction = commit_data.get('extraction_result', {})
+        raw_facts = extraction.get('raw_facts', '') or ''
+        known_entities = extraction.get('known_entities', {})
+
+        if not raw_facts or not known_entities:
+            raise HTTPException(400, "extraction_result 中无 raw_facts 或 known_entities")
+
+        from data_modules.observer_settler import ObserverSettlerModule
+        memories = ObserverSettlerModule._extract_character_memories(raw_facts, known_entities, chapter)
+        dao = get_dao(MemoryDAO, _get_db_path())
+        created = 0
+        for mem in memories:
+            try:
+                dao.create_memory(mem)
+                created += 1
+            except Exception:
+                pass
+        return {"ok": True, "created": created, "chapter": chapter}
+
+    @app.post("/api/memories/batch")
+    def batch_load_memories(from_chapter: int = Query(1), to_chapter: int = Query(...)):
+        dao = get_dao(MemoryDAO, _get_db_path())
+        total = 0
+        for ch in range(from_chapter, to_chapter + 1):
+            total += _load_chapter_memories(ch, dao)
+        return {"ok": True, "total_created": total, "chapters": f"{from_chapter}-{to_chapter}"}
+
+    # ===========================================================
+    # API：角色状态
+    # ===========================================================
+
+    @app.get("/api/state/{actor_id}")
+    def get_character_state(actor_id: str):
+        dao = get_dao(StateDAO, _get_db_path())
+        result = dao.get_state(actor_id)
+        if not result:
+            raise HTTPException(404, "角色状态不存在")
+        return result
+
+    @app.put("/api/state/{actor_id}")
+    def upsert_character_state(actor_id: str, data: dict):
+        if "chapter" not in data:
+            raise HTTPException(400, "缺少必填字段: chapter")
+        dao = get_dao(StateDAO, _get_db_path())
+        return dao.upsert_state(actor_id=actor_id, data=data)
+
+    @app.get("/api/state/{actor_id}/history")
+    def get_state_history(
+        actor_id: str,
+        change_type: Optional[str] = Query(None),
+        limit: int = Query(20),
+    ):
+        dao = get_dao(StateDAO, _get_db_path())
+        return dao.get_state_history(actor_id=actor_id, change_type=change_type, limit=limit)
 
     @app.get("/api/env-status")
     def env_status():
@@ -726,72 +1124,15 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             "checked_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    @app.get("/api/state-changes")
-    def list_state_changes(entity: Optional[str] = None, limit: int = 100):
-        with closing(_get_db()) as conn:
-            if entity:
-                return _fetchall_safe(conn,
-                    "SELECT * FROM state_changes WHERE entity_id = ? ORDER BY chapter DESC LIMIT ?",
-                    (entity, limit))
-            return _fetchall_safe(conn,
-                "SELECT * FROM state_changes ORDER BY chapter DESC LIMIT ?", (limit,))
+    @app.get("/api/process/stats")
+    def get_process_stats():
+        dao = get_dao(ProcessDAO, _get_db_path())
+        return dao.get_global_stats()
 
-    @app.get("/api/aliases")
-    def list_aliases(entity: Optional[str] = None):
-        with closing(_get_db()) as conn:
-            if entity:
-                return _fetchall_safe(conn,
-                    "SELECT * FROM aliases WHERE entity_id = ?", (entity,))
-            return _fetchall_safe(conn, "SELECT * FROM aliases")
-
-    # ===========================================================
-    # API：扩展表（v5.3+ / v5.4+）
-    # ===========================================================
-
-    @app.get("/api/overrides")
-    def list_overrides(status: Optional[str] = None, limit: int = 100):
-        with closing(_get_db()) as conn:
-            if status:
-                return _fetchall_safe(
-                    conn,
-                    "SELECT * FROM override_contracts WHERE status = ? ORDER BY chapter DESC LIMIT ?",
-                    (status, limit),
-                )
-            return _fetchall_safe(
-                conn,
-                "SELECT * FROM override_contracts ORDER BY chapter DESC LIMIT ?",
-                (limit,),
-            )
-
-    @app.get("/api/debts")
-    def list_debts(status: Optional[str] = None, limit: int = 100):
-        with closing(_get_db()) as conn:
-            if status:
-                return _fetchall_safe(
-                    conn,
-                    "SELECT * FROM chase_debt WHERE status = ? ORDER BY updated_at DESC LIMIT ?",
-                    (status, limit),
-                )
-            return _fetchall_safe(
-                conn,
-                "SELECT * FROM chase_debt ORDER BY updated_at DESC LIMIT ?",
-                (limit,),
-            )
-
-    @app.get("/api/debt-events")
-    def list_debt_events(debt_id: Optional[int] = None, limit: int = 200):
-        with closing(_get_db()) as conn:
-            if debt_id is not None:
-                return _fetchall_safe(
-                    conn,
-                    "SELECT * FROM debt_events WHERE debt_id = ? ORDER BY chapter DESC, id DESC LIMIT ?",
-                    (debt_id, limit),
-                )
-            return _fetchall_safe(
-                conn,
-                "SELECT * FROM debt_events ORDER BY chapter DESC, id DESC LIMIT ?",
-                (limit,),
-            )
+    @app.get("/api/process/actor/{actor_id}/behavior")
+    def get_actor_behavior(actor_id: str):
+        dao = get_dao(ProcessDAO, _get_db_path())
+        return dao.get_actor_behavior(actor_id)
 
     @app.get("/api/foreshadowing/reminders")
     def foreshadowing_reminders(threshold: int = Query(5, ge=1, le=20)):
@@ -841,196 +1182,6 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         except (TypeError, ValueError):
             return 0
 
-    @app.get("/api/invalid-facts")
-    def list_invalid_facts(status: Optional[str] = None, limit: int = 100):
-        with closing(_get_db()) as conn:
-            if status:
-                return _fetchall_safe(
-                    conn,
-                    "SELECT * FROM invalid_facts WHERE status = ? ORDER BY marked_at DESC LIMIT ?",
-                    (status, limit),
-                )
-            return _fetchall_safe(
-                conn,
-                "SELECT * FROM invalid_facts ORDER BY marked_at DESC LIMIT ?",
-                (limit,),
-            )
-
-    @app.get("/api/rag-queries")
-    def list_rag_queries(query_type: Optional[str] = None, limit: int = 100):
-        with closing(_get_db()) as conn:
-            if query_type:
-                return _fetchall_safe(
-                    conn,
-                    "SELECT * FROM rag_query_log WHERE query_type = ? ORDER BY created_at DESC LIMIT ?",
-                    (query_type, limit),
-                )
-            return _fetchall_safe(
-                conn,
-                "SELECT * FROM rag_query_log ORDER BY created_at DESC LIMIT ?",
-                (limit,),
-            )
-
-    @app.get("/api/tool-stats")
-    def list_tool_stats(tool_name: Optional[str] = None, limit: int = 200):
-        with closing(_get_db()) as conn:
-            if tool_name:
-                return _fetchall_safe(
-                    conn,
-                    "SELECT * FROM tool_call_stats WHERE tool_name = ? ORDER BY created_at DESC LIMIT ?",
-                    (tool_name, limit),
-                )
-            return _fetchall_safe(
-                conn,
-                "SELECT * FROM tool_call_stats ORDER BY created_at DESC LIMIT ?",
-                (limit,),
-            )
-
-    @app.get("/api/checklist-scores")
-    def list_checklist_scores(limit: int = 100):
-        with closing(_get_db()) as conn:
-            return _fetchall_safe(
-                conn,
-                "SELECT * FROM writing_checklist_scores ORDER BY chapter DESC LIMIT ?",
-                (limit,),
-            )
-
-    @app.get("/api/story-events")
-    def list_story_events(chapter: Optional[int] = None, limit: int = 200):
-        with closing(_get_db()) as conn:
-            if chapter is not None:
-                rows = _fetchall_safe(
-                    conn,
-                    """
-                    SELECT event_id, chapter, event_type, subject, payload_json, created_at
-                    FROM story_events
-                    WHERE chapter = ?
-                    ORDER BY id DESC
-                    LIMIT ?
-                    """,
-                    (chapter, limit),
-                )
-            else:
-                rows = _fetchall_safe(
-                    conn,
-                    """
-                    SELECT event_id, chapter, event_type, subject, payload_json, created_at
-                    FROM story_events
-                    ORDER BY chapter DESC, id DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                )
-
-        normalized = []
-        for row in rows:
-            payload = {}
-            try:
-                payload = json.loads(row.get("payload_json") or "{}")
-            except json.JSONDecodeError:
-                payload = {}
-            normalized.append({**row, "payload": payload})
-        return normalized
-
-    @app.get("/api/story-events/health")
-    def story_event_health():
-        with closing(_get_db()) as conn:
-            event_rows = _fetchall_safe(conn, "SELECT COUNT(*) AS count FROM story_events")
-            proposal_rows = _fetchall_safe(
-                conn,
-                """
-                SELECT COUNT(*) AS count
-                FROM override_contracts
-                WHERE record_type = 'amend_proposal' AND status = 'pending'
-                """,
-            )
-
-        events_dir = _story_system_dir() / "events"
-        file_count = len(list(events_dir.glob("chapter_*.events.json"))) if events_dir.is_dir() else 0
-        return {
-            "story_events": event_rows[0]["count"] if event_rows else 0,
-            "pending_amend_proposals": proposal_rows[0]["count"] if proposal_rows else 0,
-            "event_files": file_count,
-        }
-
-    # ===========================================================
-    # API：文档浏览（正文/大纲/设定集 —— 只读）
-    # ===========================================================
-
-    @app.get("/api/files/tree")
-    def file_tree():
-        """列出 正文/、大纲/、设定集/ 三个目录的树结构。"""
-        root = _get_project_root()
-        result = {}
-        for folder_name in ("正文", "大纲", "设定集"):
-            folder = root / folder_name
-            if not folder.is_dir():
-                result[folder_name] = []
-                continue
-            result[folder_name] = _walk_tree(folder, root)
-        return result
-
-    @app.get("/api/files/read")
-    def file_read(path: str):
-        """只读读取一个文件内容（限 正文/大纲/设定集 目录）。"""
-        root = _get_project_root()
-        resolved = safe_resolve(root, path)
-
-        # 二次限制：只允许三大目录
-        allowed_parents = [root / n for n in ("正文", "大纲", "设定集")]
-        if not any(_is_child(resolved, p) for p in allowed_parents):
-            raise HTTPException(403, "仅允许读取 正文/大纲/设定集 目录下的文件")
-
-        if not resolved.is_file():
-            raise HTTPException(404, "文件不存在")
-
-        # 文本文件直接读；其他情况返回占位信息
-        try:
-            content = resolved.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            content = "[二进制文件，无法预览]"
-
-        return {"path": path, "content": content}
-
-    @app.put("/api/files/write")
-    def file_write(request: dict):
-        """写入文件内容（限 正文/大纲/设定集 目录）。"""
-        path = request.get("path")
-        content = request.get("content")
-        if not path or content is None:
-            raise HTTPException(400, "path 和 content 不能为空")
-
-        root = _get_project_root()
-        resolved = safe_resolve(root, path)
-
-        # 二次限制：只允许三大目录
-        allowed_parents = [root / n for n in ("正文", "大纲", "设定集")]
-        if not any(_is_child(resolved, p) for p in allowed_parents):
-            raise HTTPException(403, "仅允许写入 正文/大纲/设定集 目录下的文件")
-
-        if not resolved.is_file():
-            raise HTTPException(404, "文件不存在")
-
-        # 备份原文件
-        try:
-            backup = resolved.with_suffix(resolved.suffix + ".bak")
-            backup.write_text(resolved.read_text(encoding="utf-8"), encoding="utf-8")
-        except Exception:
-            pass  # 备份失败不阻断写入
-
-        # 写入新内容
-        resolved.write_text(content, encoding="utf-8")
-
-        # 触发 SSE 通知
-        try:
-            _watcher._dispatch(json.dumps({
-                "type": "file-saved", "path": path, "ts": time.time(),
-            }))
-        except Exception:
-            pass
-
-        return {"ok": True, "path": path, "size": len(content)}
-
     # ===========================================================
     # SSE：实时变更推送
     # ===========================================================
@@ -1044,7 +1195,14 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             try:
                 while True:
                     msg = await q.get()
-                    yield f"data: {msg}\n\n"
+                    event_name = "message"
+                    try:
+                        d = json.loads(msg)
+                        if isinstance(d, dict) and "type" in d:
+                            event_name = d["type"]
+                    except Exception:
+                        pass
+                    yield f"event: {event_name}\ndata: {msg}\n\n"
             except asyncio.CancelledError:
                 pass
             finally:
@@ -1263,6 +1421,111 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         alerts.sort(key=lambda a: sev_order.get(a.get("severity", "info"), 2))
 
         return {"alerts": alerts, "updated_at": datetime.now(timezone.utc).isoformat()}
+
+    # ===========================================================
+    # API：Theater 角色知识库
+    # ===========================================================
+
+    @app.get("/api/theater/knowledge")
+    def get_theater_knowledge(actor_id: str | None = None):
+        """获取角色的公共知识库（二进制确定知道/不知道）。"""
+        project_root = _get_project_root()
+        theater_dir = project_root / "theater"
+        if not theater_dir.is_dir():
+            return {"actors": [], "domain_tree": None}
+
+        try:
+            from data_modules.theater.actor_manager import list_actors, get_common_knowledge, load_domain_tree  # noqa: E402
+        except ModuleNotFoundError:
+            # theater 模块尚未实现，返回空数据优雅降级
+            return {"actors": [], "domain_tree": None}
+
+        domain_tree = load_domain_tree(project_root)
+        actors = list_actors(project_root)
+
+        # 从 index.db entities 表加载实体数据（串联角色图鉴）
+        entity_map: dict[str, dict] = {}
+        try:
+            with closing(_get_db()) as conn:
+                rows = _fetchall_safe(conn, "SELECT * FROM entities", ())
+            for row in rows:
+                eid = row.get("id", "")
+                if eid:
+                    entity_map[eid] = row
+        except Exception:
+            pass
+
+        result = {"domain_tree": domain_tree, "actors": []}
+        for actor in actors:
+            aid = actor["actor_id"]
+            if actor_id and aid != actor_id:
+                continue
+            entry = {
+                "actor_id": aid,
+                "name": actor.get("name", aid),
+                "tier": actor.get("tier", "extra"),
+                "intro_chapter": actor.get("intro_chapter", 0),
+            }
+
+            # 附加实体数据
+            entity = entity_map.get(aid)
+            if entity:
+                entry["entity"] = {
+                    "type": entity.get("type", ""),
+                    "first_appearance": entity.get("first_appearance", 0),
+                    "last_appearance": entity.get("last_appearance", 0),
+                    "is_protagonist": entity.get("is_protagonist", 0),
+                    "desc": entity.get("desc", ""),
+                }
+                cj = entity.get("current_json", "{}")
+                try:
+                    entry["entity"]["traits"] = json.loads(cj).get("traits", [])
+                except (json.JSONDecodeError, TypeError):
+                    entry["entity"]["traits"] = []
+
+            try:
+                knowledge = get_common_knowledge(project_root, aid)
+                entry["retrieval_base"] = knowledge.get("retrieval_base", 0.5)
+                entry["known_domains"] = knowledge.get("known_domains", {})
+                entry["total_known"] = len(entry["known_domains"])
+            except Exception:
+                entry["known_domains"] = {}
+                entry["retrieval_base"] = 0
+                entry["total_known"] = 0
+            result["actors"].append(entry)
+
+        result["actors"].sort(key=lambda a: a.get("total_known", 0), reverse=True)
+        return result
+
+    @app.get("/api/skills/catalog")
+    def get_skills_catalog():
+        """公共技能目录——所有技能分类和熟练度标准。"""
+        project_root = _get_project_root()
+        try:
+            from data_modules.theater.actor_manager import get_skills_catalog as load_catalog
+            return load_catalog(project_root)
+        except ModuleNotFoundError:
+            raise HTTPException(503, "theater 模块未安装")
+
+    @app.get("/api/skills/actor/{actor_id}")
+    def get_actor_skills(actor_id: str):
+        """指定角色的技能列表（含熟练度等级和中文标签）。"""
+        project_root = _get_project_root()
+        try:
+            from data_modules.theater.actor_manager import get_actor_skills as load_actor_skills
+            return load_actor_skills(project_root, actor_id)
+        except ModuleNotFoundError:
+            raise HTTPException(503, "theater 模块未安装")
+
+    @app.get("/api/skills/actor/{actor_id}/rag")
+    def get_actor_rag(actor_id: str, q: str = "", top_k: int = 5):
+        """角色 RAG 检索：从历史章节找相关内容。"""
+        project_root = _get_project_root()
+        try:
+            from data_modules.theater.actor_manager import actor_rag_search
+            return actor_rag_search(project_root, actor_id, query=q, top_k=min(top_k, 10))
+        except ModuleNotFoundError:
+            raise HTTPException(503, "theater 模块未安装")
 
     # ===========================================================
     # API：文风约束编辑（读写）
@@ -1614,6 +1877,444 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         return {"checklist": checklist, "anti_patterns": anti_patterns}
 
     # ===========================================================
+    # API：导演文风 & 写作技法（Director Style DB）
+    # ===========================================================
+
+    @app.get("/api/director/styles")
+    def list_director_styles(category: str = Query(None), active_only: bool = Query(True)):
+        dao = get_dao(DirectorDAO, _get_db_path())
+        dao.seed_defaults()
+        return dao.list_styles(category=category, active_only=active_only)
+
+    @app.post("/api/director/styles")
+    def upsert_director_style(data: dict):
+        dao = get_dao(DirectorDAO, _get_db_path())
+        return dao.upsert_style(data)
+
+    @app.get("/api/director/styles/prompt")
+    def get_style_prompt():
+        dao = get_dao(DirectorDAO, _get_db_path())
+        dao.seed_defaults()
+        return {"prompt": dao.get_active_styles_prompt()}
+
+    @app.get("/api/techniques")
+    def list_techniques(category: str = Query(None), search: str = Query(None)):
+        dao = get_dao(DirectorDAO, _get_db_path())
+        if search:
+            return dao.search_techniques(search, category)
+        return dao.list_techniques(category=category)
+
+    @app.post("/api/techniques/track")
+    def track_technique(data: dict):
+        dao = get_dao(DirectorDAO, _get_db_path())
+        return dao.track_technique(
+            data.get("chapter"),
+            data.get("name"),
+            data.get("category"),
+            data.get("context", ""),
+        )
+
+    @app.get("/api/techniques/chapter/{chapter}")
+    def get_chapter_techniques(chapter: int):
+        dao = get_dao(DirectorDAO, _get_db_path())
+        return dao.get_chapter_techniques(chapter)
+
+    @app.post("/api/techniques/import")
+    def import_techniques_from_csv():
+        """从 CSV 导入写作技法"""
+        dao = get_dao(DirectorDAO, _get_db_path())
+        return dao.import_from_csv()
+
+    @app.get("/api/techniques/categories")
+    def list_technique_categories():
+        """列出所有技法分类及每类数量"""
+        dao = get_dao(DirectorDAO, _get_db_path())
+        rows = dao._fetch(
+            """SELECT category, COUNT(*) as count,
+                      GROUP_CONCAT(sub_category) as sub_cats
+               FROM writing_techniques
+               GROUP BY category
+               ORDER BY count DESC"""
+        )
+        return {"categories": [dict(r) for r in rows]}
+
+    @app.get("/api/techniques/grouped")
+    def list_techniques_grouped():
+        """按 7 大主分类分组列出写作技法"""
+        dao = get_dao(DirectorDAO, _get_db_path())
+        return dao.list_by_primary_category()
+
+    # ===========================================================
+    # API：名家采集
+    # ===========================================================
+
+    @app.post("/api/collect/start")
+    async def start_collection(data: dict):
+        author = data.get('author', '').strip()
+        if not author:
+            raise HTTPException(400, "请输入作家名称")
+        db_path = _get_db_path()
+        dao = get_dao(StyleCollectorDAO, db_path)
+        task_id = dao.create_report(author)
+        _collection_tasks[task_id] = asyncio.create_task(
+            _run_collection(author, task_id, db_path)
+        )
+        return {"task_id": task_id, "author": author, "status": "started"}
+
+    @app.get("/api/collect/progress/{task_id}")
+    def get_collection_progress(task_id: str):
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        reports = dao._fetch(
+            "SELECT * FROM collection_reports WHERE task_id = ?", (task_id,)
+        )
+        if not reports:
+            raise HTTPException(404, "任务不存在")
+        return reports[0]
+
+    @app.get("/api/collect/authors")
+    def list_collected_authors():
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        return {"authors": dao.get_authors()}
+
+    @app.get("/api/collect/summaries")
+    def get_style_summaries(
+        author: str = Query(None),
+        category: str = Query(None),
+    ):
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        return {"summaries": dao.get_summaries(author=author, category=category)}
+
+    @app.get("/api/collect/chapters")
+    def get_collected_chapters(
+        author: str = Query(None),
+        work_title: str = Query(None),
+    ):
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        return {"chapters": dao.get_chapters(author=author, work_title=work_title)}
+
+    @app.get("/api/collect/reports")
+    def get_collection_reports(author: str = Query(None)):
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        return {"reports": dao.get_reports(author=author)}
+
+    @app.get("/api/collect/active")
+    def get_active_collections():
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        return {"tasks": dao.get_active_tasks()}
+
+    @app.post("/api/collect/tasks/{task_id}/cancel")
+    async def cancel_collection(task_id: str):
+        """取消正在运行的采集任务。同时取消 asyncio task 并标记 DB。"""
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        # 取消运行中的 asyncio task
+        t = _collection_tasks.get(task_id)
+        if t and not t.done():
+            t.cancel()
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
+        _collection_tasks.pop(task_id, None)
+        dao.fail_report(task_id, '用户取消')
+        # 清空 activeTask 的 SSE 通知
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "collection-progress",
+                "data": {"task_id": task_id, "author": "", "status": "cancelled",
+                         "progress": {"current": 0, "total": 0, "message": "任务已取消"}},
+                "ts": time.time(),
+            }))
+        except Exception:
+            pass
+        return {"task_id": task_id, "status": "cancelled"}
+
+    @app.post("/api/collect/tasks/{task_id}/retry")
+    async def retry_collection(task_id: str):
+        """重试失败或卡死的采集任务。"""
+        db_path = _get_db_path()
+        dao = get_dao(StyleCollectorDAO, db_path)
+        reports = dao._fetch(
+            "SELECT * FROM collection_reports WHERE task_id = ?", (task_id,)
+        )
+        if not reports:
+            raise HTTPException(404, "任务不存在")
+        report = reports[0]
+        author = report["author"]
+
+        # 检查是否同一作家的 running task 已存在
+        existing = _collection_tasks.get(task_id)
+        if existing and not existing.done():
+            raise HTTPException(400, "该任务正在运行中")
+
+        # 清理旧 asyncio task
+        _collection_tasks.pop(task_id, None)
+
+        # 判断重试路径：有已采集章节 → 直接分析，否则重新搜索
+        chapters = dao.get_chapters(author=author)
+        if chapters:
+            chapter_dicts = [{k: ch[k] for k in ch.keys()} for ch in chapters]
+            new_task_id = dao.create_report(author)
+            _collection_tasks[new_task_id] = asyncio.create_task(
+                _analyze_uploaded_book(author, chapter_dicts, new_task_id, db_path)
+            )
+            return {"task_id": new_task_id, "author": author, "chapters": len(chapters), "status": "analyzing"}
+        else:
+            new_task_id = dao.create_report(author)
+            _collection_tasks[new_task_id] = asyncio.create_task(
+                _run_collection(author, new_task_id, db_path)
+            )
+            return {"task_id": new_task_id, "author": author, "status": "searching"}
+
+    @app.post("/api/collect/tasks/cleanup-stale")
+    def cleanup_stale_tasks():
+        """清理无对应 asyncio task 的僵尸任务（服务重启后残留的 running 状态）。"""
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        active_reports = dao._fetch(
+            "SELECT task_id, author FROM collection_reports WHERE status NOT IN ('done','failed','cancelled')"
+        )
+        cleaned = 0
+        for r in active_reports:
+            if r["task_id"] not in _collection_tasks:
+                dao._execute(
+                    "UPDATE collection_reports SET status='stale', error_message='服务重启，任务丢失' WHERE task_id=?",
+                    (r["task_id"],)
+                )
+                cleaned += 1
+        return {"cleaned": cleaned, "message": f"清理了 {cleaned} 个僵尸任务"} if cleaned else {"cleaned": 0}
+
+    @app.post("/api/collect/chapters")
+    def save_collected_chapter(data: dict):
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        cid = dao.insert_chapter(data)
+        return {"id": cid, "ok": True}
+
+    @app.post("/api/collect/reanalyze")
+    async def reanalyze_collection(data: dict):
+        author = data.get('author', '').strip()
+        if not author:
+            raise HTTPException(400, "请输入作家名称")
+        db_path = _get_db_path()
+        dao = get_dao(StyleCollectorDAO, db_path)
+        chapters = dao.get_chapters(author=author)
+        if not chapters:
+            raise HTTPException(404, f"未找到作家 '{author}' 的已采集章节")
+        task_id = dao.create_report(author)
+        chapter_dicts = [
+            {k: ch[k] for k in ch.keys()} for ch in chapters
+        ]
+        _collection_tasks[task_id] = asyncio.create_task(
+            _analyze_uploaded_book(author, chapter_dicts, task_id, db_path)
+        )
+        return {"task_id": task_id, "author": author, "chapters": len(chapters), "status": "started"}
+
+    @app.post("/api/collect/migrate")
+    def migrate_authors_and_cleanup(dry_run: bool = Query(True)):
+        db_path = _get_db_path()
+        dao = get_dao(StyleCollectorDAO, db_path)
+        import re as _re
+        from .services.file_parser import extract_metadata
+        result = {"author_fixes": [], "reports_cleaned": 0, "dry_run": dry_run}
+
+        all_chapters = dao._fetch("SELECT id, author, work_title FROM collected_chapters")
+        for ch in all_chapters:
+            old_author, old_work = ch["author"], ch["work_title"]
+            new_author, new_work = old_author, old_work
+            m = _re.match(r"^(.+?)作者[：:]\s*(.+)$", old_author or "")
+            if m:
+                new_work = m.group(1).strip().strip("《》")
+                new_author = m.group(2).strip()
+            elif "（" in (old_author or "") or "《" in (old_author or ""):
+                meta = extract_metadata(old_author + ".txt" if old_author else "")
+                new_author = meta.get("author") or old_author
+                new_work = meta.get("work_title") or old_work
+            if new_author != old_author:
+                result["author_fixes"].append({
+                    "id": ch["id"], "old_author": old_author, "new_author": new_author,
+                })
+                if not dry_run:
+                    dao._execute("UPDATE collected_chapters SET author=? WHERE id=?",
+                                 (new_author, ch["id"]))
+                    if new_work != old_work and new_work:
+                        dao._execute("UPDATE collected_chapters SET work_title=? WHERE id=?",
+                                     (new_work, ch["id"]))
+
+        corrupt = dao._fetch(
+            "SELECT id FROM collection_reports WHERE status='done' AND summaries_generated=0"
+        )
+        result["reports_to_clean"] = len(corrupt)
+        if not dry_run and corrupt:
+            ids = [r["id"] for r in corrupt]
+            dao._execute(f"DELETE FROM collection_reports WHERE id IN ({','.join('?'*len(ids))})", tuple(ids))
+            result["reports_cleaned"] = len(ids)
+
+        return result
+
+    @app.post("/api/collect/upload")
+    async def upload_book_file(
+        file: UploadFile = File(...),
+        author: str = Form(""),
+        work_title: str = Form(""),
+    ):
+        """上传整本小说文件（.txt / .md），自动分章并导入名家采集库。
+
+        流程：
+        1. 读取文件内容（UTF-8）
+        2. 用 chapter_splitter 自动识别章节边界并切分
+        3. 将章节写入 collected_chapters 表
+        4. 返回 task_id，后台启动文风分析
+        """
+        # 校验文件类型
+        filename = str(file.filename or "")
+        if not filename.lower().endswith((".txt", ".md", ".text", ".markdown")):
+            raise HTTPException(400, "仅支持 .txt / .md 文件")
+
+        # 读取内容
+        content_bytes = await file.read()
+        if not content_bytes:
+            raise HTTPException(400, "文件内容为空")
+        try:
+            text = content_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                text = content_bytes.decode("gbk")
+            except UnicodeDecodeError:
+                raise HTTPException(400, "文件编码不支持（仅支持 UTF-8 / GBK）")
+
+        if not text.strip():
+            raise HTTPException(400, "文件内容为空")
+
+        # 推导作者名和工作名：文件名 → 正文前几行 → 兜底
+        from .services.file_parser import extract_metadata, extract_metadata_from_content
+        meta = extract_metadata(filename)
+        resolved_author = author.strip() or meta.get("author", "")
+        resolved_work = work_title.strip() or meta.get("work_title", "")
+        if not resolved_author or not resolved_work:
+            content_meta = extract_metadata_from_content(text)
+            resolved_author = resolved_author or content_meta.get("author", "")
+            resolved_work = resolved_work or content_meta.get("work_title", "")
+        resolved_author = resolved_author or filename.rsplit(".", 1)[0].strip()
+        resolved_work = resolved_work or resolved_author
+
+        # 提前创建采集任务以获取 task_id（用于 SSE 进度推送）
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        task_id = dao.create_report(resolved_author)
+
+        # SSE 进度推送 helper（上传/解析阶段也用同一个 task_id）
+        def _upload_dispatch(status, msg, current=0, total=5):
+            try:
+                _watcher._dispatch(json.dumps({
+                    "type": "collection-progress",
+                    "data": {"task_id": task_id, "author": resolved_author, "status": status,
+                             "progress": {"current": current, "total": total, "message": msg}},
+                    "ts": time.time(),
+                }))
+            except Exception:
+                pass
+
+        _upload_dispatch("processing", f"读取完成，开始解析 {filename}", 1, 5)
+
+        # 分章
+        from .services.chapter_splitter import split_chapters
+        segments = split_chapters(text)
+
+        if not segments:
+            raise HTTPException(400, "未能从文件中识别出章节，请检查文件格式")
+
+        _upload_dispatch("splitting", f"已识别 {len(segments)} 个章节，正在保存到数据库...", 1, 5)
+
+        # 写入数据库（逐章保存 + 记录 DB id 用于后续分析状态更新）
+        saved_count = 0
+        chapter_id_map = {}  # seg.chapter_num → db row id
+        for si, seg in enumerate(segments):
+            try:
+                ch_id = dao.insert_chapter({
+                    "author": resolved_author,
+                    "work_title": resolved_work,
+                    "chapter_num": seg.chapter_num,
+                    "chapter_title": seg.title or f"第{seg.chapter_num}章",
+                    "content": seg.content,
+                    "source_url": f"upload://{filename}",
+                    "word_count": len(seg.content),
+                    "status": "raw",
+                })
+                saved_count += 1
+                chapter_id_map[seg.chapter_num] = ch_id
+                # 每 20 章推送一次保存进度
+                if (si + 1) % 20 == 0:
+                    _upload_dispatch("saving", f"已保存 {saved_count}/{len(segments)} 章...", 2, 5)
+            except Exception:
+                continue
+
+        _upload_dispatch("saving", f"保存完成（{saved_count}/{len(segments)} 章），启动文风分析...", 2, 5)
+
+        # 提取章节内容列表用于分析（携带 DB id 用于后续状态更新）
+        chapters_for_analysis = [
+            {
+                "id": chapter_id_map.get(seg.chapter_num),
+                "author": resolved_author,
+                "work_title": resolved_work,
+                "chapter_num": seg.chapter_num,
+                "chapter_title": seg.title or f"第{seg.chapter_num}章",
+                "source_url": f"upload://{filename}",
+            }
+            for seg in segments
+        ]
+        # 释放原始文本和分章数据，避免内存膨胀
+        detected_count = len(segments)
+        del text
+        del segments
+        _collection_tasks[task_id] = asyncio.create_task(
+            _analyze_uploaded_book(resolved_author, chapters_for_analysis, task_id, _get_db_path())
+        )
+
+        return {
+            "task_id": task_id,
+            "author": resolved_author,
+            "work_title": resolved_work,
+            "chapters_detected": detected_count,
+            "chapters_saved": saved_count,
+            "status": "analyzing",
+        }
+
+    async def _analyze_uploaded_book(author: str, chapters: list[dict], task_id: str, db_path: str):
+        """后台分析上传的书籍章节（跳过搜索和下载阶段，直接分析）。"""
+        dao = get_dao(StyleCollectorDAO, db_path)
+        async def _dispatch(status, msg, current=2, total=5):
+            try:
+                _watcher._dispatch(json.dumps({
+                    "type": "collection-progress",
+                    "data": {"task_id": task_id, "author": author, "status": status,
+                             "progress": {"current": current, "total": total, "message": msg}},
+                    "ts": time.time(),
+                }))
+            except Exception:
+                pass
+        try:
+            dao.update_progress(task_id, "analyzing", f"开始分析 {author} 的文风（共 {len(chapters)} 章）", 2, 5)
+            await _dispatch("analyzing", f"开始分析文风（共 {len(chapters)} 章）", 2)
+            if not await _check_ollama_health():
+                dao.fail_report(task_id, 'Ollama 服务不可用，请确认已启动')
+                await _dispatch("failed", "Ollama 服务不可用")
+                return
+            analyses = await _analyze_chapters(chapters, task_id, dao, db_path, _dispatch)
+
+            dao.update_progress(task_id, "summarizing", "生成文风总结", 3, 5)
+            await _dispatch("summarizing", "生成文风总结", 3)
+            await _generate_style_summary(author, analyses, dao, db_path)
+
+            dao.complete_report(task_id, len(chapters), len(analyses))
+            await _dispatch("done", f"完成：{len(chapters)} 章，{len(analyses)} 条分析", 5, 5)
+        except asyncio.CancelledError:
+            dao.fail_report(task_id, "任务被取消")
+            await _dispatch("failed", "任务被取消")
+            raise
+        except Exception as e:
+            dao.fail_report(task_id, str(e)[:500])
+            await _dispatch("failed", str(e)[:100])
+        finally:
+            _collection_tasks.pop(task_id, None)
+
+    # ===========================================================
     # API：运维操作（安全写入口）
     # ===========================================================
 
@@ -1768,28 +2469,3 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 "<p>构建完成后刷新页面即可。API 文档：<a href='/docs'>/docs</a></p>")
 
     return app
-
-
-# ---------------------------------------------------------------------------
-# 辅助函数
-# ---------------------------------------------------------------------------
-
-def _walk_tree(folder: Path, root: Path) -> list[dict]:
-    items = []
-    for child in sorted(folder.iterdir()):
-        if child.is_symlink():
-            continue
-        rel = str(child.relative_to(root)).replace("\\", "/")
-        if child.is_dir():
-            items.append({"name": child.name, "type": "dir", "path": rel, "children": _walk_tree(child, root)})
-        else:
-            items.append({"name": child.name, "type": "file", "path": rel, "size": child.stat().st_size})
-    return items
-
-
-def _is_child(path: Path, parent: Path) -> bool:
-    try:
-        path.resolve().relative_to(parent.resolve())
-        return True
-    except ValueError:
-        return False
