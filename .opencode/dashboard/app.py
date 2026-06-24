@@ -5,6 +5,7 @@ Webnovel Dashboard - FastAPI 主应用
 """
 
 import asyncio
+import gc
 import json
 import logging
 import re
@@ -16,6 +17,8 @@ from datetime import datetime, timezone
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
 from typing import Any, Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -57,7 +60,7 @@ STATIC_DIR = Path(__file__).parent / "frontend" / "dist"
 _ACTION_RATE_LIMIT: dict[str, float] = {}  # action → last invoke timestamp
 
 _collection_tasks: dict[str, asyncio.Task] = {}
-_collection_client: Any = None
+_vacuum_lock: asyncio.Lock | None = None  # Initialized in lifespan
 
 
 def _get_project_root() -> Path:
@@ -247,227 +250,25 @@ def _build_env_status(project_root: Path) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# 名家采集 — 后台采集流程
-# ---------------------------------------------------------------------------
-
-async def _get_collection_client():
-    global _collection_client
-    if _collection_client is None:
-        import httpx
-        _collection_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(30.0),
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        )
-    return _collection_client
-
-
-async def _run_collection(author: str, task_id: str, db_path: str):
-    dao = get_dao(StyleCollectorDAO, db_path)
-    async def _dispatch(status, msg, current=0, total=5):
-        try:
-            _watcher._dispatch(json.dumps({
-                "type": "collection-progress",
-                "data": {"task_id": task_id, "author": author, "status": status,
-                         "progress": {"current": current, "total": total, "message": msg}},
-                "ts": time.time(),
-            }))
-        except Exception:
-            pass
-    try:
-        dao.update_progress(task_id, 'searching', f'正在搜索 {author} 的代表作', 0, 5)
-        await _dispatch('searching', f'正在搜索 {author} 的代表作')
-        works = await _search_works(author)
-        if not works:
-            dao.fail_report(task_id, f'未找到 {author} 的代表作')
-            await _dispatch('failed', f'未找到 {author} 的代表作')
-            _collection_tasks.pop(task_id, None)
-            return
-        dao.update_progress(task_id, 'searching', f'找到 {len(works)} 部作品: {", ".join(w["title"] for w in works)}', 0, 5)
-
-        dao.update_progress(task_id, 'downloading', '开始下载章节', 1, 5)
-        await _dispatch('downloading', '开始下载章节', 1)
-        all_chapters = []
-        for wi, work in enumerate(works):
-            dao.update_progress(task_id, 'downloading',
-                f'下载 {work["title"]} (第{wi+1}/{len(works)}部)', 1, 5)
-            chapters = await _download_work_chapters(author, work, task_id, dao, db_path)
-            all_chapters.extend(chapters)
-
-        if not all_chapters:
-            dao.fail_report(task_id, '未能下载任何章节')
-            await _dispatch('failed', '未能下载任何章节')
-            _collection_tasks.pop(task_id, None)
-            return
-        dao.update_progress(task_id, 'downloading', f'共下载 {len(all_chapters)} 章', 1, 5)
-
-        dao.update_progress(task_id, 'analyzing', '开始分析文风', 2, 5)
-        if not await _check_ollama_health():
-            dao.fail_report(task_id, 'Ollama 服务不可用，请确认已启动')
-            await _dispatch('failed', 'Ollama 服务不可用')
-            _collection_tasks.pop(task_id, None)
-            return
-        await _dispatch('analyzing', f'开始分析文风（共 {len(all_chapters)} 章）', 2)
-        analyses = await _analyze_chapters(all_chapters, task_id, dao, db_path, _dispatch)
-
-        dao.update_progress(task_id, 'summarizing', '生成文风总结', 3, 5)
-        await _dispatch('summarizing', '生成文风总结', 3)
-        await _generate_style_summary(author, analyses, dao, db_path)
-
-        dao.complete_report(task_id, len(all_chapters), len(analyses))
-        await _dispatch('done', f'完成：{len(all_chapters)} 章，{len(analyses)} 条分析', 5, 5)
-        _collection_tasks.pop(task_id, None)
-    except asyncio.CancelledError:
-        dao.fail_report(task_id, '任务被取消')
-        await _dispatch('failed', '任务被取消')
-        _collection_tasks.pop(task_id, None)
-        raise
-    except Exception as e:
-        dao.fail_report(task_id, str(e)[:500])
-        await _dispatch('failed', str(e)[:100])
-        _collection_tasks.pop(task_id, None)
-
-
-async def _search_works(author: str) -> list[dict]:
-    import re as _re
-    from urllib.parse import quote as _quote
-    import httpx
-
-    works = []
-    encoded = _quote(author)
-    short_client = httpx.AsyncClient(
-        timeout=httpx.Timeout(10.0),
-        headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-        }
-    )
-
-    async def _try_fetch(url: str, params: dict = None) -> str | None:
-        try:
-            resp = await short_client.get(url, params=params)
-            if resp.status_code == 200 and len(resp.text) > 300:
-                links = _re.findall(r'href="(https?://[^"]+)"', resp.text)
-                for link in links:
-                    low = link.lower()
-                    if any(s in low for s in ['baidu.com', 'bing.com', 'login', 'signup', 'ad.', 'track']):
-                        continue
-                    return link
-        except Exception:
-            pass
-        return None
-
-    async def _try_baidu(query: str) -> str | None:
-        try:
-            resp = await short_client.get('https://www.baidu.com/s', params={'wd': query})
-            if resp.status_code == 200:
-                links = _re.findall(r'href="(https?://[^"]+)"', resp.text)
-                for link in links:
-                    if 'baidu.com' in link:
-                        continue
-                    try:
-                        head = await short_client.head(link)
-                        if head.status_code in (200, 301, 302):
-                            return link
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-        return None
-
-    search_tasks = [
-        _try_baidu(f'{author} 小说 在线阅读 章节目录'),
-        _try_baidu(f'{author} 作品集 全文免费阅读'),
-        _try_baidu(f'{author} 代表作 txt下载'),
-        _try_fetch('https://www.bing.com/search', {'q': f'{author} 小说 在线阅读', 'setlang': 'zh-cn'}),
-    ]
-
-    try:
-        results = await asyncio.wait_for(
-            asyncio.gather(*search_tasks, return_exceptions=True),
-            timeout=20.0,
-        )
-    except asyncio.TimeoutError:
-        results = []
-
-    for link in results:
-        if isinstance(link, str) and link.startswith('http'):
-            works.append({'title': f'{author}作品{len(works)+1}', 'url': link})
-            if len(works) >= 3:
-                break
-
-    await short_client.aclose()
-    return works[:5]
-
-
-async def _download_work_chapters(author: str, work: dict, task_id: str,
-                                   dao: StyleCollectorDAO, db_path: str) -> list[dict]:
-    import re as _re
-    client = await _get_collection_client()
-    chapters = []
-    work_url = work['url']
-    work_title = work['title']
-    try:
-        resp = await client.get(work_url, follow_redirects=True)
-        if resp.status_code != 200:
-            return chapters
-        html = resp.text
-        chapter_links = _re.findall(
-            r'href="(https?://[^"]*(?:chapter|zhang|read|article|detail|\d+\.html?)[^"]*)"',
-            html, _re.IGNORECASE
-        )
-        if not chapter_links:
-            chapter_links = _re.findall(r'href="(https?://[^"]*\d+\.html?)"', html)[:30]
-        if not chapter_links:
-            chapter_links = list(set(_re.findall(r'href="(https?://[^"]+)"', html)))[:30]
-        seen = set()
-        unique_links = []
-        for l in chapter_links:
-            if l not in seen:
-                seen.add(l)
-                unique_links.append(l)
-        chapter_links = unique_links[:15]
-
-        for ci, link in enumerate(chapter_links):
-            try:
-                dao.update_progress(task_id, 'downloading',
-                    f'下载 {work_title} 第{ci+1}章', 1, 5)
-                cresp = await client.get(link, follow_redirects=True)
-                if cresp.status_code == 200:
-                    text = _re.sub(r'<[^>]+>', '\n', cresp.text)
-                    text = _re.sub(r'&nbsp;|&lt;|&gt;|&amp;|&quot;', ' ', text)
-                    text = _re.sub(r'\n{3,}', '\n\n', text).strip()
-                    if len(text) > 200:
-                        ch = {
-                            'author': author, 'work_title': work_title,
-                            'chapter_num': ci + 1, 'chapter_title': f'第{ci+1}章',
-                            'content': text, 'source_url': link,
-                        }
-                        get_dao(StyleCollectorDAO, db_path).insert_chapter(ch)
-                        chapters.append(ch)
-            except Exception:
-                continue
-            await asyncio.sleep(0.5)
-    except Exception:
-        pass
-    return chapters
-
-
 async def _analyze_chapters(chapters: list[dict], task_id: str,
                              dao: StyleCollectorDAO, db_path: str,
-                             dispatch_callback: Callable | None = None) -> list[dict]:
+                             dispatch_callback: Callable | None = None):
+    """Async generator yielding individual chapter analysis results as they complete.
+
+    Uses asyncio.as_completed() within each batch so results are yielded
+    incrementally instead of accumulating all in memory. Peak memory for
+    analysis results is bounded by batch_size (50), not total chapters.
+    """
     import os as _os
     from .services.style_analyzer import analyze_chapter_text
     concurrency = int(_os.environ.get("STYLE_ANALYSIS_CONCURRENCY", "3"))
     batch_size = 50  # 每批最多 50 章，避免内存爆炸
     semaphore = asyncio.Semaphore(concurrency)
     lock = asyncio.Lock()
-    analyses: list[dict] = []
     total = len(chapters)
     completed = 0
 
-    async def _analyze_one(ci: int, ch: dict):
+    async def _analyze_one(ci: int, ch: dict) -> dict | None:
         nonlocal completed
         async with semaphore:
             try:
@@ -481,7 +282,7 @@ async def _analyze_chapters(chapters: list[dict], task_id: str,
                 if not text:
                     async with lock:
                         completed += 1
-                    return
+                    return None
                 result = await analyze_chapter_text(text)
                 async with lock:
                     completed += 1
@@ -490,25 +291,33 @@ async def _analyze_chapters(chapters: list[dict], task_id: str,
                     if dispatch_callback is not None:
                         await dispatch_callback("analyzing",
                             f'分析 {ch["work_title"]} 第{ch["chapter_num"]}章 ({completed}/{total})')
+                    if not result:
+                        logger.warning(f"章节分析返回空结果: {ch.get('work_title','')} 第{ch.get('chapter_num','?')}章 (id={ch_id})")
                     if result:
-                        analyses.append({
+                        if ch_id:
+                            dao.update_chapter_status(ch_id, 'analyzed')
+                        return {
                             'author': ch['author'],
                             'work_title': ch['work_title'],
                             'chapter_num': ch['chapter_num'],
                             'chapter_title': ch.get('chapter_title', ''),
                             **result,
-                        })
-                        if ch_id:
-                            dao.update_chapter_status(ch_id, 'analyzed')
+                        }
+                return None
             except Exception:
                 async with lock:
                     completed += 1
+                return None
 
     # 分批处理：每批 batch_size 章，批内并发 3，批间串行
+    # 使用 asyncio.as_completed 增量 yield 结果，不再积累到 analyses 列表
     for batch_start in range(0, total, batch_size):
         batch = chapters[batch_start:batch_start + batch_size]
-        await asyncio.gather(*[_analyze_one(batch_start + ci, ch) for ci, ch in enumerate(batch)])
-    return analyses
+        batch_tasks = [_analyze_one(batch_start + ci, ch) for ci, ch in enumerate(batch)]
+        for coro in asyncio.as_completed(batch_tasks):
+            result = await coro
+            if result:
+                yield result
 
 
 async def _check_ollama_health() -> bool:
@@ -536,11 +345,31 @@ async def _generate_style_summary(author: str, analyses: list[dict],
                                    dao: StyleCollectorDAO, db_path: str):
     from .services.style_summarizer import (
         summarize_by_dimension, generate_author_summary, save_summaries_to_db,
+        cluster_techniques,
     )
     from data_modules.dao.director_dao import DirectorDAO
     import json as _json
     if not analyses:
         return
+
+    # Detect format: new (has "techniques" key) vs old (dimension keys)
+    first = analyses[0] if analyses else {}
+    is_new_format = "techniques" in first
+
+    if is_new_format:
+        # ── New technique extraction format ──
+        # Cluster by category → sub_category → technique name
+        clustered = cluster_techniques(analyses)
+        if not clustered:
+            return
+        for cat_group in clustered:
+            cat_group["author"] = author
+            cat_group["chapter_range"] = f"全{len(analyses)}章"
+        # Save to style_summaries only (no director_style writes for technique format)
+        save_summaries_to_db(clustered, db_path)
+        return
+
+    # ── Old dimension format (backward compatible) ──
     # 每 10 章聚合一次
     batch_size = 10
     all_dimension_summaries = []
@@ -580,7 +409,150 @@ async def _generate_style_summary(author: str, analyses: list[dict],
     })
 
 
+async def _summarize_chapter_style(
+    chapter: int,
+    project_root_str: str,
+    sse_callback: Callable | None = None,
+) -> dict:
+    """Summarize a single chapter's writing style.
+
+    Resolves the chapter file via CLI, reads content, calls
+    style_analyzer.analyze_chapter_text(), saves results to
+    style_summaries table, and returns a summary dict.
+
+    Returns:
+        dict with keys: chapter, techniques_count, summary_id,
+        db_path, author, title, error (None on success).
+    """
+    project_root = Path(project_root_str)
+
+    # Step 1: Resolve chapter file directly (no subprocess)
+    text_dir = project_root / "正文"
+    if not text_dir.is_dir():
+        return {"chapter": chapter, "techniques_count": 0, "summary_id": None,
+                "error": f"Chapter file not found: 正文目录不存在 {text_dir}"}
+    import re
+    chapter_file = None
+    pattern = re.compile(rf"第0*{chapter}章")
+    for f in sorted(text_dir.iterdir()):
+        if f.is_file() and pattern.search(f.name):
+            chapter_file = f
+            break
+    if not chapter_file or not chapter_file.exists():
+        return _empty_chapter_result(chapter, f"Chapter file not found for chapter {chapter}")
+
+    chapter_path = chapter_file
+
+    # Step 2: Read content
+    text = chapter_path.read_text(encoding="utf-8")
+
+    # Step 3: Analyze style (async Ollama call)
+    from .services.style_analyzer import analyze_chapter_text
+    analysis = await analyze_chapter_text(text)
+
+    if not analysis:
+        return _empty_chapter_result(chapter, "empty_analysis")
+
+    # Step 4: Source metadata
+    state_path = project_root / ".webnovel" / "state.json"
+    master_path = project_root / ".story-system" / "MASTER_SETTING.json"
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        title = state.get("project_info", {}).get("title", f"第{chapter}章")
+    except Exception:
+        title = f"第{chapter}章"
+
+    author = "未知作者"
+    try:
+        master = json.loads(master_path.read_text(encoding="utf-8"))
+        author = master.get("author", "未知作者")
+    except Exception:
+        pass
+
+    if not author or author == "未知作者":
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            if state.get("project_info", {}).get("author"):
+                author = state["project_info"]["author"]
+        except Exception:
+            pass
+
+    # Step 5: Process result and save to DB
+    from .services.style_summarizer import cluster_techniques, save_summaries_to_db
+
+    db_path = project_root / ".webnovel" / "index.db"
+    saved_ids: list[int] = []
+
+    if isinstance(analysis, dict) and "techniques" in analysis:
+        # New technique extraction format
+        clustered = cluster_techniques([analysis])
+        if clustered:
+            for cat_group in clustered:
+                cat_group["author"] = author
+                cat_group["work_title"] = title
+                cat_group["chapter_range"] = f"第{chapter}章"
+            saved_ids = save_summaries_to_db(clustered, str(db_path))
+        return {
+            "chapter": chapter,
+            "techniques_count": len(analysis.get("techniques", [])),
+            "summary_id": saved_ids[0] if saved_ids else None,
+            "db_path": str(db_path),
+            "author": author,
+            "title": title,
+            "error": None,
+        }
+
+    if isinstance(analysis, dict):
+        # Old 9-dimension format
+        from .services.style_summarizer import summarize_by_dimension
+        dims = summarize_by_dimension([analysis])
+        for d in dims:
+            d["author"] = author
+            d["chapter_range"] = f"第{chapter}章"
+        if dims:
+            saved_ids = save_summaries_to_db(dims, str(db_path))
+        return {
+            "chapter": chapter,
+            "techniques_count": 0,
+            "summary_id": saved_ids[0] if saved_ids else None,
+            "db_path": str(db_path),
+            "author": author,
+            "title": title,
+            "error": None,
+        }
+
+    return _empty_chapter_result(chapter, "unknown_format", db_path=str(db_path))
+
+
+def _empty_chapter_result(
+    chapter: int,
+    error: str,
+    db_path: str = "",
+) -> dict:
+    """Return a uniform error dict for chapter style summarization failures."""
+    return {
+        "chapter": chapter,
+        "techniques_count": 0,
+        "summary_id": None,
+        "db_path": db_path,
+        "author": "",
+        "title": "",
+        "error": error,
+    }
+
+
 # ---------------------------------------------------------------------------
+# ── 数据库维护助手 ─────────────────────────────────────────
+def _do_incremental_vacuum(db_path: str, pages: int = 500) -> None:
+    """Execute PRAGMA incremental_vacuum(N) on a dedicated connection."""
+    conn = sqlite3.connect(db_path, timeout=10)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(f"PRAGMA incremental_vacuum({pages})")
+    finally:
+        conn.close()
+
+
 # 应用工厂
 # ---------------------------------------------------------------------------
 
@@ -600,9 +572,12 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def _lifespan(_: FastAPI):
+        global _vacuum_lock
         if _project_root is None:
             yield
             return
+
+        _vacuum_lock = asyncio.Lock()
 
         webnovel = _webnovel_dir()
         story_system = _story_system_dir()
@@ -692,6 +667,26 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             except Exception:
                 pass
 
+        # Seed writing techniques if table is empty
+        try:
+            seed_dao = DirectorDAO(str(db_path))
+            seed_dao.seed_techniques()
+        except Exception:
+            pass
+
+        # Sync 裁决规则.csv → anti_patterns.json（仅在文件不存在时）
+        try:
+            anti_path = _get_project_root() / ".story-system" / "anti_patterns.json"
+            if not anti_path.is_file():
+                sync_script = SCRIPTS_DIR / "sync_anti_patterns.py"
+                if sync_script.is_file():
+                    subprocess.run(
+                        [sys.executable, str(sync_script), "--project-root", str(_get_project_root())],
+                        capture_output=True, timeout=10,
+                    )
+        except Exception:
+            pass
+
         async def _polling_loop():
             """Periodically push workflow and debt status to SSE clients."""
             while True:
@@ -708,13 +703,60 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 except asyncio.CancelledError:
                     break
 
+        async def _vacuum_scheduler():
+            """Periodically run incremental VACUUM and expire old style summaries."""
+            while True:
+                try:
+                    await asyncio.sleep(21600)  # 6 hours
+                    db_path_val = _webnovel_dir() / "index.db"
+                    if not db_path_val.is_file():
+                        continue
+                    async with _vacuum_lock:
+                        await asyncio.to_thread(_do_incremental_vacuum, str(db_path_val))
+                        # TTL cleanup: delete style_summaries older than 90 days
+                        try:
+                            dao = get_dao(StyleCollectorDAO, db_path_val)
+                            deleted = dao.cleanup_expired_summaries()
+                            if deleted:
+                                logging.getLogger(__name__).info(
+                                    "清理了 %d 条过期文风总结(>90天)", deleted
+                                )
+                        except Exception:
+                            pass
+                except asyncio.CancelledError:
+                    break
+                except Exception:
+                    pass
+
         poll_task = asyncio.create_task(_polling_loop())
+        vacuum_task = asyncio.create_task(_vacuum_scheduler())
+
+        # Dispatch SSE event on server startup for frontend auto-reload
+        async def _startup_event():
+            await asyncio.sleep(2)
+            _watcher._dispatch(json.dumps({
+                "type": "server-restart",
+                "ts": time.time(),
+            }))
+
+        startup_task = asyncio.create_task(_startup_event())
+
         try:
             yield
         finally:
             poll_task.cancel()
             try:
                 await poll_task
+            except asyncio.CancelledError:
+                pass
+            vacuum_task.cancel()
+            try:
+                await vacuum_task
+            except asyncio.CancelledError:
+                pass
+            startup_task.cancel()
+            try:
+                await startup_task
             except asyncio.CancelledError:
                 pass
             for _tid, _task in list(_collection_tasks.items()):
@@ -724,8 +766,6 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 except asyncio.CancelledError:
                     pass
             _collection_tasks.clear()
-            if _collection_client is not None:
-                await _collection_client.aclose()
             _watcher.stop()
 
     app = FastAPI(title="Webnovel Dashboard", version="0.1.0", lifespan=_lifespan)
@@ -813,6 +853,9 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             raise HTTPException(404, "index.db 不存在")
         conn = sqlite3.connect(str(db_path), timeout=5)
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA mmap_size = 1073741824")
+        conn.execute("PRAGMA cache_size = -64000")
+        conn.execute("PRAGMA auto_vacuum = INCREMENTAL")
         conn.row_factory = sqlite3.Row
         return conn
 
@@ -1665,49 +1708,34 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
         return {"ok": True, "removed_text": text, "total": len(new_list)}
 
+    # ── DB-backed anti-patterns (replaces JSON file reader) ──
+
+    @app.get("/api/anti-patterns")
+    def get_anti_patterns_db():
+        dao = get_dao(DirectorDAO, _get_db_path())
+        return dao.list_anti_patterns()
+
+    @app.post("/api/anti-patterns")
+    def add_anti_pattern_db(data: dict):
+        dao = get_dao(DirectorDAO, _get_db_path())
+        text = data.get("text", "").strip()
+        if not text:
+            raise HTTPException(400, "text 不能为空")
+        return dao.add_anti_pattern(
+            text,
+            data.get("source", ""),
+            data.get("category", "禁写"),
+            data.get("genre", ""),
+        )
+
+    @app.delete("/api/anti-patterns/{pattern_id}")
+    def delete_anti_pattern_db(pattern_id: int):
+        dao = get_dao(DirectorDAO, _get_db_path())
+        return dao.delete_anti_pattern(pattern_id)
+
     # ===========================================================
     # API：文风约束只读数据
     # ===========================================================
-
-    @app.get("/api/style/techniques")
-    def get_techniques():
-        """读取写作技法 CSV。"""
-        # 从 dashboard 模块位置推导仓库根目录（.opencode/dashboard/app.py → .opencode/）
-        opencode_dir = Path(__file__).resolve().parent.parent
-        csv_path = opencode_dir / "references" / "csv" / "写作技法.csv"
-        if not csv_path.is_file():
-            for candidate in [
-                _get_project_root() / ".opencode" / "references" / "csv" / "写作技法.csv",
-                Path.cwd() / ".opencode" / "references" / "csv" / "写作技法.csv",
-            ]:
-                if candidate.is_file():
-                    csv_path = candidate
-                    break
-        if not csv_path.is_file():
-            return {"techniques": [], "error": f"CSV 文件不存在: {csv_path.name}"}
-
-        import csv as csv_mod
-        techniques = []
-        try:
-            with open(csv_path, "r", encoding="utf-8-sig") as f:
-                reader = csv_mod.DictReader(f)
-                for row in reader:
-                    techniques.append({
-                        "id": row.get("编号", ""),
-                        "category": row.get("分类", ""),
-                        "name": row.get("技法名称", ""),
-                        "summary": row.get("核心摘要", ""),
-                        "instruction": row.get("大模型指令", ""),
-                        "keywords": row.get("关键词", ""),
-                        "pitfalls": row.get("毒点", ""),
-                        "positive_example": row.get("正例", ""),
-                        "negative_example": row.get("反例", ""),
-                        "applicable_genre": row.get("适用题材", ""),
-                        "scene": row.get("适用场景", ""),
-                    })
-        except Exception as e:
-            return {"techniques": [], "error": f"CSV 读取失败: {e}"}
-        return {"techniques": techniques}
 
     @app.get("/api/style/chapters")
     def list_chapter_contracts():
@@ -1876,6 +1904,50 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 pass
         return {"checklist": checklist, "anti_patterns": anti_patterns}
 
+    @app.get("/api/style/active")
+    def get_active_style_constraints():
+        """合并返回当前激活的全部风格约束——供 Agent 通过 webnovel-style skill 调用。"""
+        dao = get_dao(DirectorDAO, _get_db_path())
+        dao.seed_defaults()
+
+        # 1. Active director styles (is_active=1)
+        styles = dao.list_styles(active_only=True)
+
+        # 2. Anti-patterns from anti_patterns.json
+        anti_patterns = []
+        ap_path = _anti_patterns_path()
+        if ap_path.is_file():
+            try:
+                data = json.loads(ap_path.read_text(encoding="utf-8"))
+                anti_patterns = data if isinstance(data, list) else []
+            except Exception:
+                pass
+
+        # 3. Writing techniques grouped by primary category
+        techniques = dao.list_by_primary_category()
+
+        # 4. Reference entries grouped by source_csv
+        ref_rows = dao._fetch(
+            "SELECT source_csv, COUNT(*) as count FROM reference_entries GROUP BY source_csv ORDER BY source_csv"
+        )
+        reference_sections = {}
+        for r in ref_rows:
+            items = dao._fetch(
+                "SELECT * FROM reference_entries WHERE source_csv=? ORDER BY name ASC LIMIT 10",
+                (r["source_csv"],),
+            )
+            reference_sections[r["source_csv"]] = {
+                "count": r["count"],
+                "items": items,
+            }
+
+        return {
+            "director_styles": styles,
+            "anti_patterns": anti_patterns,
+            "techniques": techniques,
+            "reference_sections": reference_sections,
+        }
+
     # ===========================================================
     # API：导演文风 & 写作技法（Director Style DB）
     # ===========================================================
@@ -1891,6 +1963,17 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         dao = get_dao(DirectorDAO, _get_db_path())
         return dao.upsert_style(data)
 
+    @app.post("/api/director/styles/{style_id}/toggle")
+    def toggle_director_style(style_id: int, data: dict = None):
+        """切换或设置 director_style 条目的激活状态。body: { is_active: true/false }"""
+        if data is None:
+            data = {}
+        dao = get_dao(DirectorDAO, _get_db_path())
+        result = dao.toggle_style(style_id, data.get("is_active", None))
+        if result is None:
+            raise HTTPException(404, "文风规则不存在")
+        return result
+
     @app.get("/api/director/styles/prompt")
     def get_style_prompt():
         dao = get_dao(DirectorDAO, _get_db_path())
@@ -1900,6 +1983,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     @app.get("/api/techniques")
     def list_techniques(category: str = Query(None), search: str = Query(None)):
         dao = get_dao(DirectorDAO, _get_db_path())
+        dao.seed_techniques()
         if search:
             return dao.search_techniques(search, category)
         return dao.list_techniques(category=category)
@@ -1913,6 +1997,103 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             data.get("category"),
             data.get("context", ""),
         )
+
+    @app.post("/api/style/summarize-chapter")
+    async def summarize_chapter_style_endpoint(data: dict):
+        """分析单章文风并保存结果。
+
+        Accepts ``{chapter: int}``, calls _summarize_chapter_style() asynchronously,
+        dispatches SSE events (``style-summarize-progress``) through the file watcher
+        with steps: started → analyzing → saving → error → done.
+        """
+        chapter = data.get("chapter")
+        if not chapter or not isinstance(chapter, int) or chapter < 1:
+            raise HTTPException(400, "Invalid chapter number")
+
+        project_root = str(_get_project_root())
+
+        # SSE start event
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "style-summarize-progress",
+                "chapter": chapter,
+                "step": "started",
+                "ts": time.time(),
+            }))
+        except Exception:
+            pass
+
+        # Build SSE callback for _summarize_chapter_style
+        async def _sse_callback(step: str):
+            try:
+                _watcher._dispatch(json.dumps({
+                    "type": "style-summarize-progress",
+                    "chapter": chapter,
+                    "step": step,
+                    "ts": time.time(),
+                }))
+            except Exception:
+                pass
+
+        result = await _summarize_chapter_style(
+            chapter=chapter,
+            project_root_str=project_root,
+            sse_callback=_sse_callback,
+        )
+
+        if result.get("error"):
+            error = result["error"]
+            # SSE error event
+            try:
+                _watcher._dispatch(json.dumps({
+                    "type": "style-summarize-progress",
+                    "chapter": chapter,
+                    "step": "error",
+                    "error": error,
+                    "ts": time.time(),
+                }))
+            except Exception:
+                pass
+
+            if "Chapter file not found" in error or "Timeout" in error:
+                raise HTTPException(404, error)
+            if error == "empty_analysis":
+                raise HTTPException(503, "Ollama unavailable or returned empty analysis")
+            raise HTTPException(400, error)
+
+        # SSE done event
+        try:
+            _watcher._dispatch(json.dumps({
+                "type": "style-summarize-progress",
+                "chapter": chapter,
+                "step": "done",
+                "summary_id": result.get("summary_id"),
+                "ts": time.time(),
+            }))
+        except Exception:
+            pass
+
+        return result
+
+    @app.post("/api/techniques")
+    def create_technique(data: dict):
+        """手动创建写作技法."""
+        dao = get_dao(DirectorDAO, _get_db_path())
+        dao.seed_techniques()
+        try:
+            return dao.create_technique(data)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
+    @app.put("/api/techniques/{tech_id}")
+    def update_technique(tech_id: int, data: dict):
+        """更新写作技法."""
+        dao = get_dao(DirectorDAO, _get_db_path())
+        dao.seed_techniques()
+        try:
+            return dao.update_technique(tech_id, data)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
     @app.get("/api/techniques/chapter/{chapter}")
     def get_chapter_techniques(chapter: int):
@@ -1929,6 +2110,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     def list_technique_categories():
         """列出所有技法分类及每类数量"""
         dao = get_dao(DirectorDAO, _get_db_path())
+        dao.seed_techniques()
         rows = dao._fetch(
             """SELECT category, COUNT(*) as count,
                       GROUP_CONCAT(sub_category) as sub_cats
@@ -1942,24 +2124,174 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     def list_techniques_grouped():
         """按 7 大主分类分组列出写作技法"""
         dao = get_dao(DirectorDAO, _get_db_path())
+        dao.seed_techniques()
         return dao.list_by_primary_category()
+
+    @app.get("/api/techniques/search")
+    def search_techniques(
+        q: str = Query(""),
+        category: str = Query(""),
+        skill: str = Query(""),
+        genre: str = Query(""),
+        source: str = Query(""),
+        limit: int = Query(50, ge=1, le=50),
+        offset: int = Query(0, ge=0),
+    ):
+        """搜索写作技法，支持分类/技能/题材过滤 + 关键词全文检索。
+        当 source 参数指定非写作技法来源时，同步检索 reference_entries 表。"""
+        dao = get_dao(DirectorDAO, _get_db_path())
+        dao.seed_techniques()
+
+        conditions = []
+        params = []
+
+        like = None
+        if q:
+            conditions.append("(name LIKE ? OR description LIKE ? OR keywords LIKE ? OR when_to_use LIKE ?)")
+            like = f"%{q}%"
+            params.extend([like, like, like, like])
+        if category:
+            conditions.append("primary_category = ?")
+            params.append(category)
+        if skill:
+            conditions.append("skill_tags LIKE ?")
+            params.append(f"%{skill}%")
+        if genre:
+            conditions.append("applicable_genres LIKE ?")
+            params.append(f"%{genre}%")
+
+        where = " AND ".join(conditions) if conditions else "1=1"
+        sql = f"SELECT * FROM writing_techniques WHERE {where} ORDER BY name ASC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        results = dao._fetch(sql, tuple(params))
+
+        if source and source != "写作技法":
+            ref_conditions = []
+            ref_params_list: list = []
+            if q and like:
+                ref_conditions.append("(name LIKE ? OR description LIKE ? OR keywords LIKE ?)")
+                ref_params_list.extend([like, like, like])
+            ref_conditions.append("source_csv = ?")
+            ref_params_list.append(source)
+            ref_where = " AND ".join(ref_conditions)
+            ref_sql = f"SELECT * FROM reference_entries WHERE {ref_where} ORDER BY name ASC LIMIT ? OFFSET ?"
+            ref_params_list.extend([limit, offset])
+            ref_results = dao._fetch(ref_sql, tuple(ref_params_list))
+            results.extend(ref_results)
+
+        return results
+
+    @app.post("/api/techniques")
+    def create_technique(data: dict):
+        """创建写作技法。POST body 字段对应 writing_techniques 表全部可写列。"""
+        dao = get_dao(DirectorDAO, _get_db_path())
+        name = (data.get("name") or "").strip()
+        if not name:
+            raise HTTPException(400, "技法名称不能为空")
+        primary = (data.get("primary_category") or data.get("category") or "情节").strip()
+        category = dao._PRIMARY_CATEGORY_MAP.get(primary, primary)
+        dao._execute(
+            """INSERT INTO writing_techniques
+               (name, category, primary_category, sub_category, description,
+                when_to_use, applicable_genres, keywords, example, anti_pattern,
+                model_instruction, detailed_description, level_name, difficulty, source_csv)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                name,
+                category, primary,
+                (data.get("sub_category") or "").strip(),
+                (data.get("description") or "").strip(),
+                (data.get("when_to_use") or "").strip(),
+                (data.get("applicable_genres") or "").strip(),
+                (data.get("keywords") or "").strip(),
+                (data.get("example") or "").strip(),
+                (data.get("anti_pattern") or "").strip(),
+                (data.get("model_instruction") or "").strip(),
+                (data.get("detailed_description") or "").strip(),
+                (data.get("level_name") or "知识补充").strip(),
+                int(data.get("difficulty", 5)),
+                (data.get("source_csv") or "手动创建").strip(),
+            )
+        )
+        rows = dao._fetch("SELECT * FROM writing_techniques ORDER BY id DESC LIMIT 1")
+        return rows[0] if rows else {"ok": True}
+
+    @app.put("/api/techniques/{tech_id}")
+    def update_technique(tech_id: int, data: dict):
+        """更新写作技法。PUT body 字段对应 writing_techniques 表可写列。"""
+        dao = get_dao(DirectorDAO, _get_db_path())
+        existing = dao._fetch("SELECT id FROM writing_techniques WHERE id=?", (tech_id,))
+        if not existing:
+            raise HTTPException(404, "技法不存在")
+        allowed = {
+            "name", "category", "primary_category", "sub_category", "description",
+            "when_to_use", "applicable_genres", "keywords", "example", "anti_pattern",
+            "model_instruction", "detailed_description", "level_name", "difficulty",
+            "source_csv", "skill_tags",
+        }
+        updates = {k: v for k, v in data.items() if k in allowed and v is not None}
+        if not updates:
+            raise HTTPException(400, "没有可更新的字段")
+        if "category" in updates:
+            updates["primary_category"] = dao._PRIMARY_CATEGORY_MAP.get(
+                updates["category"], updates["category"]
+            )
+        elif "primary_category" in updates:
+            updates["category"] = updates["primary_category"]
+        set_clause = ", ".join(f"{k}=?" for k in updates)
+        values = list(updates.values()) + [tech_id]
+        dao._execute(f"UPDATE writing_techniques SET {set_clause} WHERE id=?", tuple(values))
+        rows = dao._fetch("SELECT * FROM writing_techniques WHERE id=?", (tech_id,))
+        return rows[0] if rows else {"ok": True}
+
+    @app.delete("/api/techniques/{tech_id}")
+    def delete_technique_by_id(tech_id: int):
+        """删除指定写作技法。"""
+        dao = get_dao(DirectorDAO, _get_db_path())
+        existing = dao._fetch("SELECT id FROM writing_techniques WHERE id=?", (tech_id,))
+        if not existing:
+            raise HTTPException(404, "技法不存在")
+        dao._execute("DELETE FROM writing_techniques WHERE id=?", (tech_id,))
+        return {"deleted": True, "id": tech_id}
+
+    @app.get("/api/reference/search")
+    def search_reference(
+        source: str = Query(""),
+        q: str = Query(""),
+        limit: int = Query(50, ge=1, le=100),
+        offset: int = Query(0, ge=0),
+    ):
+        dao = get_dao(DirectorDAO, _get_db_path())
+        dao._ensure_tables()
+
+        conditions = []
+        params: list = []
+        if source:
+            conditions.append("source_csv = ?")
+            params.append(source)
+        if q:
+            conditions.append("(name LIKE ? OR description LIKE ? OR keywords LIKE ?)")
+            like = f"%{q}%"
+            params.extend([like, like, like])
+
+        where = " AND ".join(conditions) if conditions else "1=1"
+        sql = f"SELECT * FROM reference_entries WHERE {where} ORDER BY name ASC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        return dao._fetch(sql, tuple(params))
+
+    @app.get("/api/reference/sources")
+    def list_reference_sources():
+        dao = get_dao(DirectorDAO, _get_db_path())
+        rows = dao._fetch(
+            "SELECT source_csv, COUNT(*) as count FROM reference_entries GROUP BY source_csv ORDER BY source_csv"
+        )
+        return [{"source": r["source_csv"], "count": r["count"]} for r in rows]
 
     # ===========================================================
     # API：名家采集
     # ===========================================================
-
-    @app.post("/api/collect/start")
-    async def start_collection(data: dict):
-        author = data.get('author', '').strip()
-        if not author:
-            raise HTTPException(400, "请输入作家名称")
-        db_path = _get_db_path()
-        dao = get_dao(StyleCollectorDAO, db_path)
-        task_id = dao.create_report(author)
-        _collection_tasks[task_id] = asyncio.create_task(
-            _run_collection(author, task_id, db_path)
-        )
-        return {"task_id": task_id, "author": author, "status": "started"}
 
     @app.get("/api/collect/progress/{task_id}")
     def get_collection_progress(task_id: str):
@@ -1974,7 +2306,57 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     @app.get("/api/collect/authors")
     def list_collected_authors():
         dao = get_dao(StyleCollectorDAO, _get_db_path())
-        return {"authors": dao.get_authors()}
+        authors_raw = dao.get_authors()
+        works = []
+        for author in authors_raw:
+            chs = dao._fetch(
+                """SELECT work_title, COUNT(*) as chapter_count,
+                   MAX(created_at) as last_updated
+                   FROM collected_chapters WHERE author=?
+                   GROUP BY work_title ORDER BY last_updated DESC""",
+                (author,)
+            )
+            total = sum(w['chapter_count'] for w in chs)
+            works.append({
+                "author": author,
+                "total_chapters": total,
+                "works": [{
+                    "title": w['work_title'],
+                    "chapters": w['chapter_count'],
+                    "last_updated": w['last_updated'],
+                } for w in chs],
+                "can_reanalyze": total > 0,
+            })
+        return {"authors": works}
+
+    @app.get("/api/collect/authors/{author}/styles")
+    def get_author_styles(author: str):
+        """返回作家的 style_summaries + director_style + 统计聚合结果"""
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        summaries = dao._fetch(
+            "SELECT * FROM style_summaries WHERE author=? ORDER BY created_at DESC",
+            (author,),
+        )
+        styles = dao._fetch(
+            "SELECT * FROM director_style WHERE name=? ORDER BY created_at DESC",
+            (author,),
+        )
+        chapters = dao._fetch(
+            "SELECT COUNT(*) as cnt FROM collected_chapters WHERE author=?",
+            (author,),
+        )
+        last = dao._fetch(
+            "SELECT created_at FROM collected_chapters WHERE author=? ORDER BY created_at DESC LIMIT 1",
+            (author,),
+        )
+        return {
+            "author": author,
+            "summaries": summaries or [],
+            "style_rules": styles or [],
+            "total_chapters": chapters[0]["cnt"] if chapters else 0,
+            "total_summaries": len(summaries or []),
+            "last_updated": last[0]["created_at"] if last else "",
+        }
 
     @app.get("/api/collect/summaries")
     def get_style_summaries(
@@ -1984,6 +2366,366 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         dao = get_dao(StyleCollectorDAO, _get_db_path())
         return {"summaries": dao.get_summaries(author=author, category=category)}
 
+    @app.delete("/api/collect/summaries/{summary_id}")
+    def delete_collected_summary(summary_id: int):
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        existing = dao._fetch(
+            "SELECT id FROM style_summaries WHERE id = ?", (summary_id,)
+        )
+        if not existing:
+            raise HTTPException(404, "摘要不存在")
+        dao._execute("DELETE FROM style_summaries WHERE id = ?", (summary_id,))
+        return {"deleted": True, "summary_id": summary_id}
+
+    @app.post("/api/collect/summaries/{summary_id}/retry")
+    async def retry_style_summary(summary_id: int):
+        """Regenerate a style summary from peer analyses for the same author+dimension.
+        Does NOT touch director_style."""
+        from .services.style_summarizer import summarize_by_dimension, DIMENSION_MAP
+
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+
+        # 1. Load target summary to get author + dimension (category)
+        target = dao._fetch(
+            "SELECT * FROM style_summaries WHERE id = ?", (summary_id,)
+        )
+        if not target:
+            raise HTTPException(404, "摘要不存在")
+        target = target[0]
+        author = target["author"]
+        category = target["category"]  # Chinese display name, e.g. "句式风格"
+
+        # 2. Map category → internal dimension key for summarize_by_dimension
+        dim_key = None
+        for key, info in DIMENSION_MAP.items():
+            if info["display_name"] == category:
+                dim_key = key
+                break
+        if not dim_key:
+            raise HTTPException(400, f"未识别的文风维度: {category}")
+
+        # 3. Load peer summaries (same author + category, excluding target)
+        peer_rows = dao._fetch(
+            "SELECT * FROM style_summaries WHERE author = ? AND category = ? AND id != ?",
+            (author, category, summary_id),
+        )
+        if len(peer_rows) < 2:
+            raise HTTPException(
+                400,
+                f"需要至少 2 条同维度摘要才能聚合，当前仅 {len(peer_rows)} 条",
+            )
+
+        # 4. Construct analysis dicts from peers (one per peer, only target dimension)
+        analyses: list[dict] = []
+        for row in peer_rows:
+            score = row.get("quality_score")
+            try:
+                score = float(score) if score is not None else 0.0
+            except (TypeError, ValueError):
+                score = 0.0
+            analyses.append({
+                dim_key: {
+                    "summary": row.get("content", "") or "",
+                    "score": score,
+                }
+            })
+
+        # 5. Call summarize_by_dimension to re-aggregate
+        results = summarize_by_dimension(analyses)
+
+        # 6. Find regenerated result for our dimension
+        new_result = None
+        for r in results:
+            if r["dimension"] == dim_key:
+                new_result = r
+                break
+        if not new_result:
+            raise HTTPException(500, f"聚合失败: 未生成 {category} 的聚合结果")
+
+        # 7. UPSERT: delete old row + insert regenerated row
+        dao._execute("DELETE FROM style_summaries WHERE id = ?", (summary_id,))
+        dao._execute(
+            """INSERT INTO style_summaries
+               (author, work_title, summary_title, category, content,
+                examples, keywords, quality_score, chapter_range)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (
+                target["author"],
+                target.get("work_title", ""),
+                f"{target['author']} - {category} (重新聚合)",
+                category,
+                new_result["summary"],
+                target.get("examples", "[]") or "[]",
+                target.get("keywords", "[]") or "[]",
+                new_result["score"],
+                target.get("chapter_range", ""),
+            ),
+        )
+
+        return {
+            "summary_id": summary_id,
+            "author": author,
+            "category": category,
+            "dimension": dim_key,
+            "peers_used": len(peer_rows),
+            "regenerated": True,
+        }
+
+    async def _extract_technique_names_via_ollama(content: str) -> list[dict]:
+        """Call Ollama to extract specific technique names from analysis content."""
+        from .services.style_analyzer import OLLAMA_CHAT_URL, OLLAMA_MODEL
+
+        TECH_NAME_PROMPT = """你是一位写作技法命名专家。请阅读以下文风分析内容，从中提取2-4个具体的写作技法。每个技法需要name（4-8字，精炼如"潜台词错位式对谈"）、description（50-120字）、keywords（3-5个用/分隔）。技法名不要重复维度标签。严格按JSON数组格式输出：[{"name": "技法名", "description": "描述", "keywords": "关键词/关键词"}]。分析内容：{content}"""
+
+        prompt = TECH_NAME_PROMPT.format(content=content[:3000])
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "curl", "-s", OLLAMA_CHAT_URL,
+                "-d", json.dumps({"model": OLLAMA_MODEL, "messages": [{"role": "user", "content": prompt}], "stream": False, "think": False}, ensure_ascii=False),
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
+            data = json.loads(stdout.decode("utf-8", errors="replace"))
+            response = data.get("message", {}).get("content", "")
+            start = response.find("["); end = response.rfind("]")
+            if start != -1 and end != -1: return json.loads(response[start:end+1])
+            parsed = json.loads(response)
+            return parsed if isinstance(parsed, list) else [parsed]
+        except Exception as e:
+            raise Exception(f"技法名提取失败: {e}")
+
+    def _build_technique_entry(
+        tech: dict, s: dict, citation: str, raw_category: str, primary: str,
+        content: str, chapter_range: str,
+    ) -> dict:
+        """Build a single technique entry dict from text extraction + summary metadata."""
+        name = f"{tech['name']}（{chapter_range}）" if chapter_range else tech["name"]
+        desc = tech.get("description", "")[:200]
+        keywords = tech.get("keywords", "")
+
+        # Process summary-level keywords as fallback
+        keywords_raw = s.get("keywords", "") or ""
+        if not keywords and keywords_raw:
+            if isinstance(keywords_raw, str):
+                try:
+                    kw_list = json.loads(keywords_raw)
+                    if isinstance(kw_list, list):
+                        keywords = ", ".join(str(k) for k in kw_list)
+                except (json.JSONDecodeError, TypeError):
+                    keywords = str(keywords_raw)
+
+        # Process examples
+        examples_raw = s.get("examples", "") or ""
+        example = examples_raw
+        if examples_raw:
+            try:
+                ex_list = json.loads(examples_raw) if isinstance(examples_raw, str) else examples_raw
+                if isinstance(ex_list, list) and ex_list:
+                    example = "\n".join(
+                        f"▶ ✅ {ex}" if not str(ex).startswith("▶") else str(ex)
+                        for ex in ex_list
+                    )
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # Limit fallback text sizes to prevent massive API responses
+        _when_fallback = tech.get("scenes", content[:200] if content else "")
+        _detail_fallback = content[:1000] if content else ""
+
+        return {
+            "name": name,
+            "raw_category": raw_category,
+            "primary": primary,
+            "sub_category": s.get("category", ""),
+            "description": desc,
+            "when_to_use": tech.get("when_to_use", _when_fallback),
+            "example": example,
+            "anti_pattern": tech.get("anti_pattern", ""),
+            "source_csv": "名家技法",
+            "applicable_genres": citation,
+            "detailed_description": tech.get("detailed_description", _detail_fallback),
+            "model_instruction": tech.get("model_instruction", ""),
+            "keywords": keywords,
+            "level_name": tech.get("level_name", "分析提取"),
+            "difficulty": tech.get("difficulty", 5),
+        }
+
+    @app.post("/api/collect/summaries/{summary_id}/publish")
+    async def publish_summary_to_techniques(summary_id: int):
+        """将名家分析摘要发布到写作技法库。
+        从分析内容中提取具体写作技法名，
+        写入 writing_techniques 表（idempotent: name 冲突时 UPDATE）。"""
+        try:
+            return await _publish_summary_to_techniques_impl(summary_id)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception(f"publish_summary_to_techniques failed for summary {summary_id}")
+            raise HTTPException(500, str(e))
+
+    async def _publish_summary_to_techniques_impl(summary_id: int):
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        summaries = dao._fetch("SELECT * FROM style_summaries WHERE id=?", (summary_id,))
+        if not summaries:
+            raise HTTPException(404, "摘要不存在")
+        s = summaries[0]
+
+        tech_dao = get_dao(DirectorDAO, _get_db_path())
+        tech_dao._ensure_tables()
+
+        # Build citation metadata
+        citation_parts = []
+        if s.get("author"):
+            citation_parts.append(f"作者: {s['author']}")
+        if s.get("work_title"):
+            citation_parts.append(f"作品: {s['work_title']}")
+        if s.get("chapter_range"):
+            citation_parts.append(f"章节: {s['chapter_range']}")
+        citation = "｜".join(citation_parts) if citation_parts else ""
+
+        chapter_range = (s.get("chapter_range") or "").strip()
+
+        # Map summary dimension to category
+        _dim_cat = {
+            '句式风格': ('文笔', '文笔'), '词汇质地': ('文笔', '文笔'),
+            '修辞手法': ('文笔', '文笔'), '叙事视角': ('文笔', '文笔'),
+            '对白风格': ('对话', '对话'), '情感张力': ('情感', '情感'),
+            '描写偏好': ('场景', '场景'), '节奏控制': ('节奏', '节奏'),
+            '人物刻画': ('人物', '人物'),
+        }
+        raw_category = s.get("category", "情节").strip()
+        primary = raw_category
+        title = (s.get("summary_title") or "").strip()
+        for dim, (cat, prim) in _dim_cat.items():
+            if dim in title:
+                raw_category, primary = cat, prim
+                break
+
+        content = s.get("content", "") or ""
+        if not content:
+            raise HTTPException(400, "分析内容为空，无法提取技法")
+
+        # Detect format: v2 JSON cluster or legacy markdown
+        parsed_techniques = []
+        if content.strip().startswith("{"):
+            # ── v2 JSON format (from style_summarizer._format_category_summary) ──
+            try:
+                cluster = json.loads(content)
+                if cluster.get("format") == "technique-cluster-v2":
+                    for t in cluster.get("techniques", []):
+                        parsed_techniques.append({
+                            "name": t["name"],
+                            "description": t.get("description", "")[:200],
+                            "scenes": "、".join(t.get("applicable_scenes", [])),
+                            "keywords": "/".join(t.get("sub_categories", [])),
+                            "examples": t.get("examples", []),
+                        })
+            except (json.JSONDecodeError, KeyError, TypeError):
+                logger.warning("JSON cluster parse failed, falling back to regex")
+                parsed_techniques = []
+        
+        if not parsed_techniques:
+            # ── Legacy markdown format (regex fallback) ──
+            technique_blocks = re.split(r'\n(?=##\s)', content)
+            for block in technique_blocks:
+                name_match = re.search(r'##\s*(.+?)（出现', block)
+                if not name_match:
+                    continue
+                name = name_match.group(1).strip()
+                desc_match = re.search(r'说明：(.+?)(?:\n|$)', block)
+                desc = desc_match.group(1).strip() if desc_match else ""
+                keywords_str = s.get("keywords", "") or ""
+                if isinstance(keywords_str, str) and keywords_str.startswith("["):
+                    try:
+                        kw_list = json.loads(keywords_str)
+                        keywords_str = "/".join(kw_list[:6])
+                    except Exception:
+                        pass
+                scenes_match = re.search(r'适用：(.+?)(?:\n|$)', block)
+                scenes = scenes_match.group(1).strip() if scenes_match else ""
+                parsed_techniques.append({
+                    "name": name,
+                    "description": desc[:200],
+                    "scenes": scenes,
+                    "keywords": keywords_str,
+                })
+
+        tech_names = parsed_techniques
+
+        # Dedup helpers
+        def _name_match(a, b):
+            """Check if two technique names are exactly the same (ignoring chapter range suffix).
+            Only merge techniques with EXACT same name (cleaned)."""
+            a_clean = re.sub(r'[（(].*?[）)]', '', a).strip()
+            b_clean = re.sub(r'[（(].*?[）)]', '', b).strip()
+            return a_clean == b_clean
+
+        def _merge_texts(old, new):
+            """Merge two texts, keeping both if different."""
+            if old == new or not new:
+                return old
+            if not old:
+                return new
+            return f"{old}\n\n{new}"
+
+        existing = tech_dao._fetch(
+            "SELECT id, name, description, example FROM writing_techniques WHERE source_csv='名家技法'",
+            (),
+        )
+
+        published_techniques = []
+        for tech in tech_names:
+            entry = _build_technique_entry(
+                tech, s, citation, raw_category, primary, content, chapter_range,
+            )
+            name = entry["name"]
+
+            merged = False
+            for ex in existing:
+                if _name_match(ex['name'], name):
+                    merged_desc = _merge_texts(ex['description'], entry["description"])
+                    merged_example = _merge_texts(ex.get('example', ''), entry["example"])
+                    tech_dao._execute(
+                        "UPDATE writing_techniques SET description=?, example=?, applicable_genres=? WHERE id=?",
+                        (merged_desc, merged_example, citation, ex['id']),
+                    )
+                    merged = True
+                    break
+
+            if not merged:
+                tech_dao._execute(
+                    """INSERT OR REPLACE INTO writing_techniques
+                       (name, category, primary_category, sub_category, description,
+                        when_to_use, example, anti_pattern, source_csv, applicable_genres,
+                        detailed_description, model_instruction, keywords, level_name, difficulty)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        name,
+                        entry["raw_category"],
+                        entry["primary"],
+                        entry["sub_category"],
+                        entry["description"],
+                        entry["when_to_use"],
+                        entry["example"],
+                        entry["anti_pattern"],
+                        entry["source_csv"],
+                        entry["applicable_genres"],
+                        entry["detailed_description"],
+                        entry["model_instruction"],
+                        entry["keywords"],
+                        entry["level_name"],
+                        entry["difficulty"],
+                    ),
+                )
+
+            published_techniques.append({"name": name, "merged": merged})
+
+        return {
+            "published": True,
+            "summary_id": summary_id,
+            "techniques": published_techniques,
+        }
+
     @app.get("/api/collect/chapters")
     def get_collected_chapters(
         author: str = Query(None),
@@ -1992,10 +2734,80 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         dao = get_dao(StyleCollectorDAO, _get_db_path())
         return {"chapters": dao.get_chapters(author=author, work_title=work_title)}
 
+    @app.post("/api/collect/authors/{author}/reanalyze")
+    async def reanalyze_author_chapters(author: str, data: dict = None):
+        """批量重新分析指定作家的章节。可选过滤: start, end, work_title"""
+        if data is None:
+            data = {}
+        db_path = _get_db_path()
+        dao = get_dao(StyleCollectorDAO, db_path)
+
+        start = data.get("start", None)
+        end = data.get("end", None)
+        work_title = data.get("work_title", None)
+
+        chapters = dao.get_chapters(author=author, work_title=work_title)
+        if not chapters:
+            raise HTTPException(404, f"作家 '{author}' 没有已采集的章节")
+
+        # Filter by chapter range if specified
+        if start is not None or end is not None:
+            chapters = [
+                ch for ch in chapters
+                if (start is None or ch["chapter_num"] >= start) and
+                   (end is None or ch["chapter_num"] <= end)
+            ]
+
+        if not chapters:
+            raise HTTPException(400, "指定范围内没有章节")
+
+        # Create analysis task
+        task_id = dao.create_report(author)
+        chapter_dicts = [{k: ch[k] for k in ch.keys()} for ch in chapters]
+        _collection_tasks[task_id] = asyncio.create_task(
+            _analyze_uploaded_book(author, chapter_dicts, task_id, db_path)
+        )
+
+        return {
+            "task_id": task_id,
+            "author": author,
+            "work_title": work_title,
+            "chapters": len(chapters),
+            "range": f"{chapters[0]['chapter_num']}-{chapters[-1]['chapter_num']}" if chapters else "",
+            "status": "analyzing",
+        }
+
     @app.get("/api/collect/reports")
     def get_collection_reports(author: str = Query(None)):
         dao = get_dao(StyleCollectorDAO, _get_db_path())
         return {"reports": dao.get_reports(author=author)}
+
+    @app.delete("/api/collect/reports/{report_id}")
+    def delete_collection_report(report_id: int):
+        """删除采集报告（不删除关联的章节数据）。"""
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        existing = dao._fetch("SELECT id FROM collection_reports WHERE id=?", (report_id,))
+        if not existing:
+            raise HTTPException(404, "报告不存在")
+        dao._execute("DELETE FROM collection_reports WHERE id=?", (report_id,))
+        return {"deleted": True, "report_id": report_id}
+
+    @app.delete("/api/collect/reports/batch/failed")
+    def delete_failed_collection_reports():
+        """批量删除所有 status='failed' 的采集报告。"""
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        reports = dao._fetch(
+            "SELECT id FROM collection_reports WHERE status='failed'"
+        )
+        if not reports:
+            return {"deleted": 0, "message": "没有失败的采集报告"}
+        ids = [r["id"] for r in reports]
+        placeholders = ",".join("?" * len(ids))
+        dao._execute(
+            f"DELETE FROM collection_reports WHERE id IN ({placeholders})",
+            tuple(ids),
+        )
+        return {"deleted": len(ids), "report_ids": ids}
 
     @app.get("/api/collect/active")
     def get_active_collections():
@@ -2049,7 +2861,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         # 清理旧 asyncio task
         _collection_tasks.pop(task_id, None)
 
-        # 判断重试路径：有已采集章节 → 直接分析，否则重新搜索
+        # 判断重试路径：有已采集章节 → 直接分析，否则报错（在线搜索已停用）
         chapters = dao.get_chapters(author=author)
         if chapters:
             chapter_dicts = [{k: ch[k] for k in ch.keys()} for ch in chapters]
@@ -2059,11 +2871,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             )
             return {"task_id": new_task_id, "author": author, "chapters": len(chapters), "status": "analyzing"}
         else:
-            new_task_id = dao.create_report(author)
-            _collection_tasks[new_task_id] = asyncio.create_task(
-                _run_collection(author, new_task_id, db_path)
-            )
-            return {"task_id": new_task_id, "author": author, "status": "searching"}
+            raise HTTPException(400, "该作家没有已采集的章节，请先通过上传文件进行分析。在线搜索功能已停用。")
 
     @app.post("/api/collect/tasks/cleanup-stale")
     def cleanup_stale_tasks():
@@ -2087,6 +2895,198 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         dao = get_dao(StyleCollectorDAO, _get_db_path())
         cid = dao.insert_chapter(data)
         return {"id": cid, "ok": True}
+
+    @app.put("/api/collect/chapters/{chapter_id}")
+    def update_collected_chapter(chapter_id: int, data: dict):
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        allowed = {"chapter_title", "status", "author", "work_title"}
+        update_data = {k: v for k, v in data.items() if k in allowed}
+        if not update_data:
+            raise HTTPException(400, "未提供可编辑字段")
+        existing = dao._fetch("SELECT id FROM collected_chapters WHERE id=?", (chapter_id,))
+        if not existing:
+            raise HTTPException(404, "章节不存在")
+        set_clause = ", ".join(f"{k} = ?" for k in update_data)
+        values = list(update_data.values()) + [chapter_id]
+        dao._execute(f"UPDATE collected_chapters SET {set_clause} WHERE id = ?", tuple(values))
+        return {"id": chapter_id, **update_data}
+
+    @app.delete("/api/collect/chapters/{chapter_id}")
+    def delete_collected_chapter(chapter_id: int):
+        """Delete a collected chapter and cascade to associated style_summaries.
+
+        Does NOT touch director_style entries.
+        """
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        # Check chapter exists
+        existing = dao._fetch(
+            "SELECT id, author, chapter_num FROM collected_chapters WHERE id=?",
+            (chapter_id,),
+        )
+        if not existing:
+            raise HTTPException(404, "章节不存在")
+        ch = existing[0]
+        # Compute batch range (10-chapter batches used by _generate_style_summary)
+        batch_start = ((ch["chapter_num"] - 1) // 10) * 10 + 1
+        chapter_range_pattern = f"第{batch_start}-%章"
+        # Count summaries before deletion
+        count_rows = dao._fetch(
+            "SELECT COUNT(*) as cnt FROM style_summaries WHERE author=? AND chapter_range LIKE ?",
+            (ch["author"], chapter_range_pattern),
+        )
+        summaries_deleted = count_rows[0]["cnt"] if count_rows else 0
+        # Delete associated style_summaries
+        dao._execute(
+            "DELETE FROM style_summaries WHERE author=? AND chapter_range LIKE ?",
+            (ch["author"], chapter_range_pattern),
+        )
+        # Delete the chapter
+        dao._execute("DELETE FROM collected_chapters WHERE id=?", (chapter_id,))
+        return {"deleted": True, "chapter_id": chapter_id, "summaries_deleted": summaries_deleted}
+
+    @app.post("/api/collect/chapters/delete-batch")
+    def delete_collected_chapters_batch(data: dict):
+        """Delete ALL collected_chapters, style_summaries, and director_style entries
+        for a given author at once."""
+        author = (data.get("author") or "").strip()
+        if not author:
+            raise HTTPException(400, "请提供 author 参数")
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        # Count chapters for author
+        ch = dao._fetch("SELECT COUNT(*) as cnt FROM collected_chapters WHERE author=?", (author,))
+        chapters_deleted = ch[0]["cnt"] if ch else 0
+        if chapters_deleted == 0:
+            raise HTTPException(404, f"作家 '{author}' 没有已采集的章节")
+        # Count summaries
+        sm = dao._fetch("SELECT COUNT(*) as cnt FROM style_summaries WHERE author=?", (author,))
+        summaries_deleted = sm[0]["cnt"] if sm else 0
+        # Count director_style entries (name matches author)
+        st = dao._fetch("SELECT COUNT(*) as cnt FROM director_style WHERE name=?", (author,))
+        styles_deleted = st[0]["cnt"] if st else 0
+        # Delete style_summaries
+        dao._execute("DELETE FROM style_summaries WHERE author=?", (author,))
+        # Delete collected_chapters
+        dao._execute("DELETE FROM collected_chapters WHERE author=?", (author,))
+        # Delete director_style entries for this author
+        dao._execute("DELETE FROM director_style WHERE name=?", (author,))
+        return {
+            "deleted": True,
+            "author": author,
+            "chapters_deleted": chapters_deleted,
+            "summaries_deleted": summaries_deleted,
+            "styles_deleted": styles_deleted,
+        }
+
+    @app.delete("/api/collect/authors/{author}")
+    def delete_author(author: str):
+        """级联删除作家的所有采集数据: chapters → summaries → reports → director_style"""
+        dao = get_dao(StyleCollectorDAO, _get_db_path())
+        # Count and delete collected_chapters
+        ch = dao._fetch("SELECT COUNT(*) as cnt FROM collected_chapters WHERE author=?", (author,))
+        chapters_deleted = ch[0]["cnt"] if ch else 0
+        # Count and delete style_summaries
+        sm = dao._fetch("SELECT COUNT(*) as cnt FROM style_summaries WHERE author=?", (author,))
+        summaries_deleted = sm[0]["cnt"] if sm else 0
+        # Count and delete collection_reports
+        rp = dao._fetch("SELECT COUNT(*) as cnt FROM collection_reports WHERE author=?", (author,))
+        reports_deleted = rp[0]["cnt"] if rp else 0
+        # Count and delete director_style (name field stores author name)
+        st = dao._fetch("SELECT COUNT(*) as cnt FROM director_style WHERE name=?", (author,))
+        styles_deleted = st[0]["cnt"] if st else 0
+        if chapters_deleted == 0 and summaries_deleted == 0 and reports_deleted == 0 and styles_deleted == 0:
+            raise HTTPException(404, f"作家 '{author}' 没有已采集的数据")
+        # Delete in cascade order
+        dao._execute("DELETE FROM style_summaries WHERE author=?", (author,))
+        dao._execute("DELETE FROM collection_reports WHERE author=?", (author,))
+        dao._execute("DELETE FROM director_style WHERE name=?", (author,))
+        dao._execute("DELETE FROM collected_chapters WHERE author=?", (author,))
+        return {
+            "author": author,
+            "chapters_deleted": chapters_deleted,
+            "summaries_deleted": summaries_deleted,
+            "reports_deleted": reports_deleted,
+            "styles_deleted": styles_deleted,
+        }
+
+    @app.post("/api/collect/chapters/{chapter_id}/retry")
+    async def retry_chapter_analysis(chapter_id: int):
+        """Re-analyze a single chapter. Loads content, runs 9-dimension analysis,
+        upserts into style_summaries. Does NOT touch director_style."""
+        from .services.style_analyzer import analyze_chapter_text, _CN_TO_EN
+
+        db_path = _get_db_path()
+        dao = get_dao(StyleCollectorDAO, db_path)
+
+        # 1. Load chapter content and metadata
+        content = dao.get_chapter_content(chapter_id)
+        if not content:
+            raise HTTPException(404, f"章节 {chapter_id} 无正文内容")
+
+        rows = dao._fetch(
+            "SELECT author, work_title, chapter_num, chapter_title "
+            "FROM collected_chapters WHERE id=?",
+            (chapter_id,),
+        )
+        if not rows:
+            raise HTTPException(404, f"章节 {chapter_id} 不存在")
+
+        ch = rows[0]
+        author = ch["author"]
+        work_title = ch["work_title"]
+        chapter_num = ch["chapter_num"]
+        chapter_title = ch.get("chapter_title", "")
+
+        # 2. Run 9-dimension analysis
+        result = await analyze_chapter_text(content)
+        if not result:
+            raise HTTPException(500, "文风分析返回空结果（Ollama 可能不可用）")
+
+        # 3. Delete old summaries for this chapter (match by author + chapter_range)
+        chapter_range = f"第{chapter_num}章"
+        dao._execute(
+            "DELETE FROM style_summaries WHERE author=? AND chapter_range=?",
+            (author, chapter_range),
+        )
+
+        # 4. Insert new summaries (one row per dimension, includes quality_score)
+        for cn_key, en_key in _CN_TO_EN.items():
+            dim = result.get(en_key)
+            if not isinstance(dim, dict):
+                continue
+            score = dim.get("score", 0)
+            try:
+                score = max(0.0, min(1.0, float(score)))
+            except (TypeError, ValueError):
+                score = 0.0
+            dao._execute(
+                """INSERT INTO style_summaries
+                   (author, work_title, summary_title, category, content,
+                    examples, keywords, quality_score, chapter_range)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (
+                    author,
+                    work_title,
+                    f"{author} - {cn_key} ({chapter_range})",
+                    cn_key,
+                    str(dim.get("summary", "")),
+                    "[]",
+                    "[]",
+                    score,
+                    chapter_range,
+                ),
+            )
+
+        # 5. Update chapter status
+        dao.update_chapter_status(chapter_id, "analyzed")
+
+        return {
+            "chapter_id": chapter_id,
+            "author": author,
+            "work_title": work_title,
+            "chapter_num": chapter_num,
+            "chapter_title": chapter_title,
+            "analysis": result,
+        }
 
     @app.post("/api/collect/reanalyze")
     async def reanalyze_collection(data: dict):
@@ -2179,6 +3179,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 text = content_bytes.decode("gbk")
             except UnicodeDecodeError:
                 raise HTTPException(400, "文件编码不支持（仅支持 UTF-8 / GBK）")
+        del content_bytes  # 释放原始字节，避免 bytes+str 双倍内存峰值
 
         if not text.strip():
             raise HTTPException(400, "文件内容为空")
@@ -2216,6 +3217,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         # 分章
         from .services.chapter_splitter import split_chapters
         segments = split_chapters(text)
+        del text  # 立即释放原始全文，仅保留分章后的 segments 列表
 
         if not segments:
             raise HTTPException(400, "未能从文件中识别出章节，请检查文件格式")
@@ -2259,10 +3261,10 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             }
             for seg in segments
         ]
-        # 释放原始文本和分章数据，避免内存膨胀
+        # 释放分章列表并强制 GC，避免内存膨胀
         detected_count = len(segments)
-        del text
         del segments
+        gc.collect()
         _collection_tasks[task_id] = asyncio.create_task(
             _analyze_uploaded_book(resolved_author, chapters_for_analysis, task_id, _get_db_path())
         )
@@ -2296,7 +3298,9 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 dao.fail_report(task_id, 'Ollama 服务不可用，请确认已启动')
                 await _dispatch("failed", "Ollama 服务不可用")
                 return
-            analyses = await _analyze_chapters(chapters, task_id, dao, db_path, _dispatch)
+            analyses: list[dict] = []
+            async for result in _analyze_chapters(chapters, task_id, dao, db_path, _dispatch):
+                analyses.append(result)
 
             dao.update_progress(task_id, "summarizing", "生成文风总结", 3, 5)
             await _dispatch("summarizing", "生成文风总结", 3)
@@ -2363,6 +3367,57 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             "stderr": result.stderr,
             "code": result.returncode,
         }
+
+    # ===========================================================
+    # API：数据库维护 - VACUUM
+    # ===========================================================
+
+    @app.post("/api/admin/vacuum")
+    async def vacuum_database(full: bool = Query(True)):
+        """Execute database VACUUM operation.
+
+        - full=True (default): full VACUUM, rebuilds entire database. Slow (~minutes).
+        - full=False: incremental vacuum, frees up to N pages from freelist. Fast.
+        """
+        global _vacuum_lock
+        db_path = _webnovel_dir() / "index.db"
+        if not db_path.is_file():
+            raise HTTPException(404, "index.db 不存在")
+
+        if _vacuum_lock is None or _vacuum_lock.locked():
+            raise HTTPException(409, "VACUUM 正在执行中，请稍后再试")
+
+        async with _vacuum_lock:
+            pages_before = 0
+            pages_after = 0
+
+            def _run_vacuum():
+                nonlocal pages_before, pages_after
+                conn = sqlite3.connect(str(db_path), timeout=10)
+                try:
+                    conn.execute("PRAGMA journal_mode=WAL")
+                    pages_before = conn.execute("PRAGMA page_count").fetchone()[0]
+                    if full:
+                        conn.execute("PRAGMA auto_vacuum = INCREMENTAL")
+                        conn.execute("VACUUM")
+                    else:
+                        conn.execute("PRAGMA incremental_vacuum(500)")
+                    pages_after = conn.execute("PRAGMA page_count").fetchone()[0]
+                finally:
+                    conn.close()
+
+            try:
+                await asyncio.to_thread(_run_vacuum)
+            except Exception as exc:
+                raise HTTPException(500, f"VACUUM 失败: {exc}") from exc
+
+            return {
+                "ok": True,
+                "type": "full" if full else "incremental",
+                "pages_before": pages_before,
+                "pages_after": pages_after,
+                "pages_freed": pages_before - pages_after,
+            }
 
     # ===========================================================
     # API：批量操作
