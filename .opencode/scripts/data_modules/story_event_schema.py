@@ -17,6 +17,8 @@ class StoryEvent(BaseModel):
         "world_rule_broken",
         "power_breakthrough",
         "artifact_obtained",
+        "artifact_acquired",
+        "entity_created",
         "promise_created",
         "promise_paid_off",
         "open_loop_created",

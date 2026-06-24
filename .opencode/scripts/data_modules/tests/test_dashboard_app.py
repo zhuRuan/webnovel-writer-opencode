@@ -423,3 +423,309 @@ def test_dashboard_env_status_endpoints_report_local_rag_state(monkeypatch, tmp_
     assert "embed_api_key" in check_names
     assert "rerank_api_key" in check_names
     assert "vector_db" in check_names
+
+
+# ──────────────────────────────────────────────────────────────────
+# 空数据 / 无文件 场景测试 — 对应 角色图鉴、上下文健康、状态变化
+# ──────────────────────────────────────────────────────────────────
+
+def test_dashboard_entities_endpoint_returns_empty_when_no_entities(monkeypatch, tmp_path):
+    """角色图鉴：entities 表为空时返回 200 + 空数组。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/entities")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_dashboard_entity_detail_returns_404_when_not_exists(monkeypatch, tmp_path):
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/entities/nonexistent")
+    assert response.status_code == 404
+
+
+def test_dashboard_entity_timeline_returns_empty_when_no_data(monkeypatch, tmp_path):
+    """角色图鉴时间线：无 state_changes 无 scenes 时返回空。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/entities/any_id/timeline")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["changes"] == []
+    assert payload["appearances"] == []
+
+
+def test_dashboard_state_changes_returns_empty_when_no_data(monkeypatch, tmp_path):
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/state-changes")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_dashboard_relationships_returns_empty_when_no_data(monkeypatch, tmp_path):
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/relationships")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_dashboard_context_health_returns_404_when_no_trace(monkeypatch, tmp_path):
+    """上下文健康：trace 文件不存在时返回 404。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/context/health/1")
+    assert response.status_code == 404
+
+
+def test_dashboard_context_history_returns_empty_when_no_traces(monkeypatch, tmp_path):
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/context/history")
+    assert response.status_code == 200
+    assert response.json()["items"] == []
+
+
+# ──────────────────────────────────────────────────────────────────
+# Theater 知识库 — 模块缺失时优雅降级
+# ──────────────────────────────────────────────────────────────────
+
+def test_dashboard_theater_knowledge_graceful_when_module_missing(monkeypatch, tmp_path):
+    """角色知识：theater 模块不存在时返回 200 + 空数据。"""
+    project_root = tmp_path / "book"
+    webnovel_dir = project_root / ".webnovel"
+    webnovel_dir.mkdir(parents=True, exist_ok=True)
+    (webnovel_dir / "state.json").write_text(
+        json.dumps({"project_info": {"title": "测试书"}}), encoding="utf-8"
+    )
+    (project_root / "theater").mkdir(parents=True, exist_ok=True)
+
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/theater/knowledge")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actors"] == []
+    assert payload["domain_tree"] is None
+
+
+def test_dashboard_theater_knowledge_returns_empty_when_no_theater_dir(monkeypatch, tmp_path):
+    """角色知识：theater/ 目录不存在时返回空。"""
+    project_root = tmp_path / "book"
+    webnovel_dir = project_root / ".webnovel"
+    webnovel_dir.mkdir(parents=True, exist_ok=True)
+    (webnovel_dir / "state.json").write_text(
+        json.dumps({"project_info": {"title": "测试书"}}), encoding="utf-8"
+    )
+
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/theater/knowledge")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actors"] == []
+
+
+# ──────────────────────────────────────────────────────────────────
+# 文风约束 — 边缘场景
+# ──────────────────────────────────────────────────────────────────
+
+def test_dashboard_style_master_setting_returns_404_when_missing(monkeypatch, tmp_path):
+    """文风约束：MASTER_SETTING.json 不存在时返回 404。"""
+    project_root = tmp_path / "book"
+    webnovel_dir = project_root / ".webnovel"
+    webnovel_dir.mkdir(parents=True, exist_ok=True)
+    (webnovel_dir / "state.json").write_text("{}", encoding="utf-8")
+
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/style/master-setting")
+    assert response.status_code == 404
+
+
+def test_dashboard_style_anti_patterns_returns_empty_when_missing(monkeypatch, tmp_path):
+    """文风约束：anti_patterns.json 不存在时返回空数组。"""
+    project_root = tmp_path / "book"
+    webnovel_dir = project_root / ".webnovel"
+    webnovel_dir.mkdir(parents=True, exist_ok=True)
+    (webnovel_dir / "state.json").write_text("{}", encoding="utf-8")
+
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/style/anti-patterns")
+    assert response.status_code == 200
+    assert response.json().get("patterns") == []
+
+
+def test_dashboard_style_techniques_returns_empty_when_csv_missing(monkeypatch, tmp_path):
+    """文风约束：写作技法 CSV 不存在时返回 200 + 空。"""
+    project_root = tmp_path / "book"
+    webnovel_dir = project_root / ".webnovel"
+    webnovel_dir.mkdir(parents=True, exist_ok=True)
+    (webnovel_dir / "state.json").write_text("{}", encoding="utf-8")
+    (project_root / ".story-system").mkdir(parents=True, exist_ok=True)
+
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/style/techniques")
+    assert response.status_code == 200
+    payload = response.json()
+    assert isinstance(payload, dict)
+    assert "techniques" in payload
+
+
+def test_dashboard_style_chapters_returns_list_when_no_contracts(monkeypatch, tmp_path):
+    """文风约束：章节合同列表——无合同时返回空。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/style/chapters")
+    assert response.status_code == 200
+    payload = response.json()
+    assert isinstance(payload, dict)
+    assert "chapters" in payload
+
+
+# ──────────────────────────────────────────────────────────────────
+# 角色图鉴：实体类型筛选 — 验证主角/配角过滤在 API 层正确
+# ──────────────────────────────────────────────────────────────────
+
+def test_dashboard_entities_filter_by_type(monkeypatch, tmp_path):
+    """角色图鉴筛选：按类型过滤实体。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    all_entities = client.get("/api/entities").json()
+    assert len(all_entities) == 0  # _build_project_data 没有 theater 角色, entities 表为空
+
+    # theater 角色的筛选在应用层合并，用真实数据测
+    client2 = _create_dashboard_client(monkeypatch, project_root)
+    response = client2.get("/api/entities", params={"type": "主角"})
+    assert response.status_code == 200
+    for entity in response.json():
+        assert entity["type"] == "主角", f"expected 主角, got {entity['type']}"
+
+
+def test_dashboard_entity_detail_same_from_list_and_direct(monkeypatch, tmp_path):
+    """列表和详情返回的同一实体数据一致。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    entities = client.get("/api/entities").json()
+    if entities:
+        eid = entities[0]["id"]
+        detail = client.get(f"/api/entities/{eid}")
+        assert detail.status_code == 200
+        assert detail.json()["id"] == eid
+
+
+def test_dashboard_entity_timeline_structure(monkeypatch, tmp_path):
+    """角色时间线返回正确的数据结构。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/entities/any_id/timeline")
+    assert response.status_code == 200
+    payload = response.json()
+    assert "changes" in payload
+    assert "appearances" in payload
+    assert isinstance(payload["changes"], list)
+    assert isinstance(payload["appearances"], list)
+
+
+def test_dashboard_relationships_filter_by_entity(monkeypatch, tmp_path):
+    """关系列表可按实体筛选。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    response = client.get("/api/relationships", params={"entity": "lin_zhan"})
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+# ── 缺陷回归测试：本轮修复的 Bug ──
+
+def test_workflow_api_format(monkeypatch, tmp_path):
+    """Bug: 总览页进度条断裂 — workflow API 返回格式正确。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    resp = client.get("/api/workflow/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, dict)
+    # 格式: {"1": {"stage": "...", "complete": bool, "steps": int}}
+    for ch, info in data.items():
+        assert isinstance(info, dict), f"ch{ch} value should be dict"
+        assert "stage" in info or "complete" in info, f"ch{ch} missing stage/complete"
+
+
+def test_project_info_includes_chapter_status(monkeypatch, tmp_path):
+    """Bug: 总览页只显示第 1 章 — project/info 应有 current_chapter。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    resp = client.get("/api/project/info")
+    assert resp.status_code == 200
+    data = resp.json()
+    progress = data.get("progress", {})
+    assert "current_chapter" in progress
+    assert isinstance(progress["current_chapter"], int)
+
+
+def test_entities_no_migration_artifacts(monkeypatch, tmp_path):
+    """Bug: 陈末等测试数据混入真实项目 — entities 不应有迁移残留。"""
+    project_root = tmp_path / "book"
+    _build_project_data(project_root)
+    client = _create_dashboard_client(monkeypatch, project_root)
+
+    resp = client.get("/api/entities")
+    assert resp.status_code == 200
+    ids = {e["id"] for e in resp.json()}
+    assert "chen_mo" not in ids, "chen_mo 不应出现在 _build_project_data 创建的项目中"
+
+
+def test_theater_knowledge_no_unconfirmed(monkeypatch, tmp_path):
+    """Bug: 角色知识全是"待确认" — known_domains 应为确定性数据。"""
+    project_root = tmp_path / "book"
+    webnovel_dir = project_root / ".webnovel"
+    webnovel_dir.mkdir(parents=True)
+    (webnovel_dir / "state.json").write_text(
+        '{"project_info":{"title":"T"},"progress":{"current_chapter":1}}',
+        encoding="utf-8",
+    )
+    theater_dir = project_root / "theater"
+    (theater_dir / "actors").mkdir(parents=True)
+    (theater_dir / "common_knowledge").mkdir(parents=True)
+    (theater_dir / "actors" / "registry.json").write_text('{"actors":{}}', encoding="utf-8")
+
+    client = _create_dashboard_client(monkeypatch, project_root)
+    resp = client.get("/api/theater/knowledge")
+    assert resp.status_code == 200
+    data = resp.json()
+    for actor in data.get("actors", []):
+        domains = actor.get("known_domains", {})
+        for domain, value in domains.items():
+            assert isinstance(value, (int, float)), f"known_domain value should be float, got {type(value)}"

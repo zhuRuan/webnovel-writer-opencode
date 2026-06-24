@@ -189,7 +189,7 @@ def persist_story_seed(
         paths.anti_patterns_json.with_suffix(".md"),
         render_anti_patterns_markdown(anti_patterns),
     )
-    if chapter_payload is not None:
+    if chapter_payload and chapter_payload.get("meta", {}).get("chapter"):
         chapter_num = int(chapter_payload["meta"]["chapter"])
         ch_path = paths.chapter_json(chapter_num)
         is_new = not ch_path.is_file()

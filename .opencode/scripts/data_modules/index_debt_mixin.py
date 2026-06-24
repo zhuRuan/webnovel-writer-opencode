@@ -516,9 +516,9 @@ class IndexDebtMixin:
             cursor = conn.cursor()
             cursor.execute(
                 """INSERT INTO chase_debt
-                   (debt_type, source_chapter, due_chapter)
-                   VALUES (?, ?, ?)""",
-                (debt_type, source_chapter, due_chapter),
+                   (debt_type, source_chapter, due_chapter, note)
+                   VALUES (?, ?, ?, ?)""",
+                (debt_type, source_chapter, due_chapter, note or ""),
             )
             debt_id = cursor.lastrowid
             if note:
@@ -549,6 +549,21 @@ class IndexDebtMixin:
             resolved = cursor.rowcount > 0
             conn.commit()
             return resolved
+
+    def get_active_debts_with_notes(self) -> List[Dict]:
+        """获取所有活跃债务，含第一条 note/subject（用于 state.json 投影）。"""
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT d.id, d.debt_type, d.source_chapter, d.due_chapter, d.status,
+                       (SELECT e.note FROM debt_events e
+                        WHERE e.debt_id = d.id AND e.note IS NOT NULL
+                        ORDER BY e.id ASC LIMIT 1) AS note
+                FROM chase_debt d
+                WHERE d.status = 'active'
+                ORDER BY d.due_chapter ASC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
 
     # ==================== 批量操作 ====================
 

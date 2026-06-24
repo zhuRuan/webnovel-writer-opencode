@@ -154,6 +154,14 @@ class DataModulesConfig:
     def rerank_url(self) -> str:
         return self.rerank_base_url
 
+    # ================= Ollama 配置 =================
+    ollama_host: str = field(default_factory=lambda: os.getenv("OLLAMA_HOST", "http://192.168.160.1:11434"))
+
+    @property
+    def ollama_generate_url(self) -> str:
+        """Ollama /api/generate 完整 URL。"""
+        return self.ollama_host.rstrip("/") + "/api/generate"
+
     # ================= 并发配置 =================
     embed_concurrency: int = 64
     rerank_concurrency: int = 32
@@ -224,7 +232,7 @@ class DataModulesConfig:
     context_reader_signal_recent_limit: int = 5
     context_reader_signal_window_chapters: int = 20
     context_reader_signal_review_window: int = 5
-    context_reader_signal_include_debt: bool = False
+    context_reader_signal_include_debt: bool = True
     context_genre_profile_enabled: bool = True
     context_genre_profile_max_refs: int = 8
     context_genre_profile_fallback: str = "shuangwen"
