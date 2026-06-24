@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [".opencode/smart-search-rules.md"],
+  "lsp": {
+    "basedpyright": {
+      "command": ["/home/li/.local/bin/basedpyright-langserver", "--stdio"],
+      "extensions": [".py", ".pyi"]
+    }
+  }
+}
