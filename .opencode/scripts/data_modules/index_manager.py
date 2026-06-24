@@ -253,6 +253,7 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
     def __init__(self, config=None):
         self.config = config or get_config()
         self._init_db()
+        self._seed_professions_if_empty()
 
     def _init_db(self):
         """初始化数据库表（仅在 state.json 存在时创建目录，防止错误 PROJECT_ROOT 漂移）"""
@@ -712,6 +713,15 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_ce_actor ON character_events(actor_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_ce_status ON character_events(status)")
 
+            # ==================== 职业表 ====================
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS professions (
+                    name TEXT PRIMARY KEY,
+                    category TEXT NOT NULL,
+                    typical_skills TEXT NOT NULL DEFAULT '[]'
+                )
+            """)
+
             # ==================== 角色记忆系统表 ====================
 
             # 角色记忆表
@@ -1089,6 +1099,126 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
         return True
 
     # ==================== 章节操作 ====================
+
+    # ==================== 职业管理 ====================
+
+    def ensure_professions_table(self) -> None:
+        """Ensure professions table exists (idempotent)."""
+        with self._get_conn() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS professions (
+                    name TEXT PRIMARY KEY,
+                    category TEXT NOT NULL,
+                    typical_skills TEXT NOT NULL DEFAULT '[]'
+                )
+            """)
+            conn.commit()
+
+    def _seed_professions_if_empty(self) -> None:
+        """Auto-import professions CSV on first init (no-op if already seeded)."""
+        with self._get_conn() as conn:
+            row = conn.execute("SELECT COUNT(*) FROM professions").fetchone()
+            if row and row[0] > 0:
+                return
+        self.import_professions_csv()
+
+    def import_professions_csv(self, csv_path: str | Path | None = None) -> dict:
+        """Import professions from CSV into professions table.
+
+        CSV format expected columns: 职业名称, 职业大类, 典型技能
+        typical_skills format: "技能名:等级|技能名:等级"
+        Returns: {"imported": N, "error": "..."} on failure.
+        """
+        self.ensure_professions_table()
+        if csv_path is None:
+            csv_path = (
+                Path(__file__).resolve().parents[3]
+                / "references"
+                / "csv"
+                / "professions.csv"
+            )
+        else:
+            csv_path = Path(csv_path)
+
+        if not csv_path.exists():
+            alt = Path('/home/li/webnovel-writer-opencode/.opencode/references/csv') / csv_path.name
+            if alt.exists():
+                csv_path = alt
+            else:
+                return {"imported": 0, "error": f"CSV not found: {csv_path}"}
+
+        import csv, io, json
+
+        content = csv_path.read_text(encoding="utf-8-sig")
+        reader = csv.DictReader(io.StringIO(content))
+        if reader.fieldnames is None:
+            return {"imported": 0, "error": "CSV has no headers"}
+
+        imported = 0
+        with self._get_conn() as conn:
+            for row in reader:
+                name = (row.get("职业名称") or "").strip()
+                category = (row.get("职业大类") or "").strip()
+                skills_raw = (row.get("典型技能") or "").strip()
+                if not name or not category:
+                    continue
+                # Parse skills: "谈判:8|团队管理:7" -> [{"name":"谈判","level":8,"label":"精通"}, ...]
+                skills_list = []
+                if skills_raw:
+                    for part in skills_raw.split("|"):
+                        part = part.strip()
+                        if ":" in part:
+                            skill_name, level_str = part.split(":", 1)
+                            try:
+                                level = int(level_str.strip())
+                            except ValueError:
+                                continue
+                            label = "大师" if level >= 9 else "精通" if level >= 7 else "熟练" if level >= 5 else "基础" if level >= 3 else "入门"
+                            skills_list.append({
+                                "name": skill_name.strip(),
+                                "level": level,
+                                "label": label,
+                            })
+                conn.execute(
+                    "INSERT OR REPLACE INTO professions (name, category, typical_skills) VALUES (?, ?, ?)",
+                    (name, category, json.dumps(skills_list, ensure_ascii=False)),
+                )
+                imported += 1
+            conn.commit()
+        return {"imported": imported}
+
+    def lookup_profession_skills(self, name: str) -> list[dict]:
+        """Look up skills for a profession by name.
+
+        Returns: list of {"name": str, "level": int, "label": str} or empty list.
+        """
+        import json
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT typical_skills FROM professions WHERE name = ?", (name,)
+            ).fetchone()
+            if row and row[0]:
+                try:
+                    skills = json.loads(row[0])
+                    if isinstance(skills, list):
+                        return skills
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            return []
+
+    def list_professions(self, category: str | None = None) -> list[dict]:
+        """List professions, optionally filtered by category."""
+        with self._get_conn() as conn:
+            if category:
+                rows = conn.execute(
+                    "SELECT name, category FROM professions WHERE category = ? ORDER BY name",
+                    (category,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT name, category FROM professions ORDER BY category, name"
+                ).fetchall()
+            return [{"name": r[0], "category": r[1]} for r in rows]
 
     # ==================== 角色事件管理 ====================
 
