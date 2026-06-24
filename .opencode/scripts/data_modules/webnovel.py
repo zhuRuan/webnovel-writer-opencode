@@ -38,6 +38,19 @@ from chapter_paths import extract_chapter_num_from_filename
 from .story_runtime_health import build_story_runtime_health
 from .story_contracts import read_json_if_exists
 
+# ── 文风分析（dashboard 服务） ──
+try:
+    from dashboard.app import _summarize_chapter_style
+except ImportError:
+    import sys as _sys
+    from pathlib import Path as _Path
+    _current = _Path(__file__).resolve()  # .../scripts/data_modules/webnovel.py
+    _opencode_dir = str(_current.parent.parent.parent)  # .../.opencode/
+    if _opencode_dir not in _sys.path:
+        _sys.path.insert(0, _opencode_dir)
+    del _sys, _Path, _current, _opencode_dir
+    from dashboard.app import _summarize_chapter_style  # noqa: F811
+
 
 def _scripts_dir() -> Path:
     # data_modules/webnovel.py -> data_modules -> scripts
@@ -397,6 +410,37 @@ def cmd_use(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_style_summarize(args: argparse.Namespace) -> int:
+    """Summarize a chapter's writing style using Ollama analysis."""
+    import asyncio
+    try:
+        result = asyncio.run(_summarize_chapter_style(
+            chapter=args.chapter,
+            project_root_str=args.project_root,
+        ))
+    except FileNotFoundError as e:
+        print(f"错误: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"错误: 文风分析失败 - {e}", file=sys.stderr)
+        return 1
+
+    if result.get("error"):
+        error_msgs = {
+            "empty_analysis": "Ollama 返回空结果",
+            "unknown_format": "分析结果格式无法识别",
+        }
+        print(f"错误: {error_msgs.get(result['error'], result['error'])}", file=sys.stderr)
+        return 1
+
+    print(f"第{result['chapter']}章文风总结完成")
+    print(f"  技法数: {result['techniques_count']}")
+    print(f"  summary_id: {result['summary_id']}")
+    if result.get('author') and result.get('title'):
+        print(f"  作者: {result['author']} | 作品: {result['title']}")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="webnovel unified CLI")
     parser.add_argument("--project-root", help="书项目根目录或工作区根目录（可选，默认自动检测）")
@@ -420,6 +464,10 @@ def main() -> None:
     p_use.add_argument("project_root", help="书项目根目录（必须包含 .webnovel/state.json）")
     p_use.add_argument("--workspace-root", help="工作区根目录（可选；默认由运行环境推断）")
     p_use.set_defaults(func=cmd_use)
+
+    p_style_summarize = sub.add_parser("style-summarize", help="总结指定章节的文风（调用 Ollama 分析）")
+    p_style_summarize.add_argument("--chapter", type=int, required=True, help="章节号")
+    p_style_summarize.set_defaults(func=cmd_style_summarize)
 
     # Pass-through to data modules
     p_index = sub.add_parser("index", help="转发到 index_manager")
