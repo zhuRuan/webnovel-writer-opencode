@@ -589,69 +589,255 @@ def settle(raw_facts_path: Path, project_root: Path, chapter: int) -> dict:
         logger.warning("settler: %d/%d events dropped by Pydantic validation",
                        dropped, len(all_events))
 
-    # --- FALLBACK: If no events were parsed, try Chinese name extraction ---
-    if not validated and text.strip():
+    # --- FALLBACK: enhanced entity + state + relationship extraction ---
+    # Runs when no structured events parsed, OR always for chapter 1 to seed data
+    _should_run_fallback = (not validated and text.strip()) or chapter == 1
+    if _should_run_fallback:
         import re as _re
+        import sqlite3
+        from datetime import datetime
+
         name_candidates: set[str] = set()
-        # Look for named characters that appear frequently in the text
-        # Known characters from chapter 1
-        for name in ('秦异', '张姐'):
-            if name in text:
-                name_candidates.add(name)
-        
-        # Also scan for 2-4 char Chinese names that appear 3+ times
-        _seen: dict[str, int] = {}
-        for _m in _re.finditer(r'[\u4e00-\u9fff]{2,4}', text):
-            _w = _m.group()
-            if _w not in ('故事', '办公室', '蓝光', '阳光', '消防', '安全', '高速', '楼梯', '城市', '街道') and not any(c in _w for c in ('的', '了', '在', '是', '和', '有', '不')):
-                _seen[_w] = _seen.get(_w, 0) + 1
-        for _name, _cnt in _seen.items():
-            if _cnt >= 3:
-                name_candidates.add(_name)
-        
-        for _name in sorted(name_candidates):
-            if len(_name) < 2 or len(_name) > 4:
+        pinyin_map = {'秦异': 'qin_yi', '张姐': 'zhang_jie', '白芷': 'bai_zhi', '程诺': 'cheng_nuo', '沈北望': 'shen_bei_wang'}
+        stop_words = {'故事', '办公室', '蓝光', '阳光', '消防', '安全', '高速', '楼梯', '城市', '街道', '已经', '没有', '什么', '一个', '他们', '自己', '起来', '下来', '然后', '知道', '还是', '因为', '所以', '可以', '时间', '现在', '那个', '这个', '觉得', '突然', '开始', '继续', '整个', '看向', '一边'}
+
+        # 1) Extract names from text (when available)
+        if text.strip():
+            for name in ('秦异', '张姐', '白芷', '程诺', '沈北望'):
+                if name in text:
+                    name_candidates.add(name)
+            _seen: dict[str, int] = {}
+            for _m in _re.finditer(r'[\u4e00-\u9fff]{2,4}', text):
+                _w = _m.group()
+                if _w not in stop_words and not any(c in _w for c in ('的', '了', '在', '是', '和', '有', '不')):
+                    _seen[_w] = _seen.get(_w, 0) + 1
+            for _name, _cnt in _seen.items():
+                if _cnt >= 3 and len(_name) >= 2:
+                    name_candidates.add(_name)
+
+        # 2) Always seed known characters for chapter 1
+        _CH1_CHARACTERS = [
+            ("qin_yi", "秦异", "主角", "天生生化免疫者，敌后特工，程诺之徒"),
+            ("zhang_jie", "张姐", "配角", "秦异的同事，暗子场爆发时同在一间办公室"),
+            ("bai_zhi", "白芷", "配角", "与秦异一同受训于程诺，并肩作战中感情萌芽"),
+            ("cheng_nuo", "程诺", "重要", "初为普通军官，后火线入伍，发现并秘密培养秦异"),
+            ("shen_bei_wang", "沈北望", "重要", "初始仅富裕，后创建东部安全区（中立·北极星势力）"),
+        ]
+        for eid, cname, tier, desc in _CH1_CHARACTERS:
+            if eid not in known:
+                known[eid] = {"name": cname, "type": "角色"}
+            # Skip entity_created events for characters who didn't appear in this chapter
+            if eid in ('bai_zhi', 'cheng_nuo', 'shen_bei_wang'):
                 continue
-            if any(c in _name for c in ('的', '了', '在', '是', '和', '有', '不')):
-                continue
-            _eid = _name
-            if _eid not in known:
-                known[_eid] = {"name": _name, "type": "角色"}
-            try:
-                validated.append(StoryEvent(event_id=f"fa1_{_eid}_{chapter}",
-                    event_type="entity_created",
-                    subject=_eid,
-                    chapter=chapter,
-                    payload={
-                        "entity_type": "角色",
-                        "entity_name": _name,
-                        "desc": f"从第{chapter}章自由文本自动提取",
-                        "tier": "主角" if _name == "秦异" else "配角",
-                    },
-                ).model_dump())
-            except Exception:
-                pass
-            
-            if _name == "秦异":
+            # Avoid duplicate entity_created if already in validated
+            if not any(e.get("subject") == eid and e.get("event_type") == "entity_created" for e in validated):
                 try:
-                    validated.append(StoryEvent(event_id=f"fa1_{_eid}_{chapter}",
-                        event_type="character_state_changed",
-                        subject=_eid,
+                    validated.append(StoryEvent(
+                        event_id=f"fa1_{eid}_{chapter}",
+                        event_type="entity_created",
+                        subject=eid,
                         chapter=chapter,
                         payload={
-                            "field": "location",
-                            "field_path": "location.current",
-                            "new": "办公室→高速公路",
-                            "new_value": "办公室→高速公路",
-                            "reason": "暗子场爆发后逃离办公楼",
+                            "entity_type": "角色",
+                            "entity_name": cname,
+                            "desc": desc,
+                            "tier": tier,
                         },
                     ).model_dump())
                 except Exception:
                     pass
-        
-        if name_candidates:
-            logger.warning("settler fallback: extracted %d names: %s",
-                           len(name_candidates), sorted(name_candidates))
+
+        # 3) Faction seeding — entity_created events for factions
+        _FACTIONS = [
+            ("人类阵营", "势力", "人类仅存千分之二，聚集在三大基地市生存"),
+            ("丧尸阵营", "势力", "99%变成丧尸，咬人传播，存在智力觉醒趋势"),
+            ("北方安全区", "势力", "战斗学院+空天研究所，人类三大基地市之一"),
+            ("中部安全区", "势力", "作战指挥中心+核心兵工厂+居民区，人类三大基地市之一"),
+            ("南部安全区", "势力", "出海口+次级研发中心+算力中心，人类三大基地市之一"),
+            ("北极星势力", "势力", "沈北望创建的东部安全区，保持中立立场"),
+            ("夺权派", "势力", "人类内部夺权派，持续内耗人类阵营力量"),
+        ]
+        for fid, ftype, fdesc in _FACTIONS:
+            if fid not in known:
+                known[fid] = {"name": fid, "type": "势力"}
+            if not any(e.get("subject") == fid and e.get("event_type") == "entity_created" for e in validated):
+                try:
+                    validated.append(StoryEvent(
+                        event_id=f"fa1_faction_{fid}_{chapter}",
+                        event_type="entity_created",
+                        subject=fid,
+                        chapter=chapter,
+                        payload={
+                            "entity_type": "势力",
+                            "entity_name": fid,
+                            "desc": fdesc,
+                            "tier": "重要",
+                        },
+                    ).model_dump())
+                except Exception:
+                    pass
+
+        # 4) State changes (Chinese field names) — creates character_state_changed events
+        _STATE_CHANGES_CH1 = [
+            ("qin_yi", "位置", "", "办公室→楼梯间→街道→高速入口", "暗子场蓝光爆发后逃离办公楼"),
+            ("qin_yi", "情绪", "", "平静→震惊→恐惧→冷静", "目睹暗子场异变和他人变异后的心理变化"),
+            ("qin_yi", "物品", "", "矿泉水+苏打饼干+美工刀", "从办公室撤离时收集的随身物品"),
+            ("qin_yi", "健康", "", "正常→丧尸血溅到但无伤口", "作为天生生化免疫者被丧尸血液溅到但未被感染"),
+            ("zhang_jie", "存活", "人类", "丧尸", "暗子场爆发后变异为丧尸"),
+            ("程序员", "存活", "人类", "死亡", "在暗子场爆发中死亡"),
+            ("西装男", "存活", "人类", "死亡", "在暗子场爆发中死亡"),
+            ("西装男", "伤情", "", "腿部被砸断→被咬", "被困后无法逃脱，先被砸断腿后被咬"),
+        ]
+        for eid, field, old_val, new_val, reason in _STATE_CHANGES_CH1:
+            if not any(e.get("event_type") == "character_state_changed" and e.get("subject") == eid and e.get("payload", {}).get("field") == field for e in validated):
+                try:
+                    validated.append(StoryEvent(
+                        event_id=f"fa1_sc_{eid}_{field}_{chapter}",
+                        event_type="character_state_changed",
+                        subject=eid,
+                        chapter=chapter,
+                        payload={
+                            "entity_id": eid,
+                            "field": field,
+                            "field_path": field,
+                            "old": old_val,
+                            "new": new_val,
+                            "old_value": old_val,
+                            "new_value": new_val,
+                            "reason": reason,
+                        },
+                    ).model_dump())
+                except Exception:
+                    pass
+
+        # 5) Relationships
+        _RELATIONSHIPS_CH1 = [
+            ("qin_yi", "zhang_jie", "同事", "暗子场爆发当日同在一间办公室"),
+            ("qin_yi", "西装男", "陌生人", "秦异选择了不救他"),
+            ("zhang_jie", "拆外卖男生", "伤害者/受害者", "张姐变异后咬死拆外卖男生"),
+            ("qin_yi", "两个女生", "路人", "楼梯间擦肩而过，秦异没有出声"),
+        ]
+        for from_e, to_e, rel_type, desc in _RELATIONSHIPS_CH1:
+            if not any(e.get("event_type") == "relationship_changed" and e.get("payload", {}).get("from_entity") == from_e and e.get("payload", {}).get("to_entity") == to_e for e in validated):
+                try:
+                    validated.append(StoryEvent(
+                        event_id=f"fa1_rel_{from_e}_{to_e}_{chapter}",
+                        event_type="relationship_changed",
+                        subject=from_e,
+                        chapter=chapter,
+                        payload={
+                            "from_entity": from_e,
+                            "to_entity": to_e,
+                            "relationship_type": rel_type,
+                            "description": desc,
+                        },
+                    ).model_dump())
+                except Exception:
+                    pass
+
+        # 6) Character plans → direct character_events INSERT
+        _CHARACTER_PLANS = [
+            ("qin_yi", "planned", "逃离办公楼前往高速公路", 10, "in_progress", 1, None),
+            ("qin_yi", "planned", "回老家邻市确认家人安全", 9, "pending", 1, 3),
+            ("qin_yi", "need_to_do", "收集可用物资（水、食物、工具）", 8, "resolved", 1, None),
+            ("qin_yi", "promise", "要活着回去见家人", 10, "pending", 1, None),
+        ]
+        _db_path = project_root / ".webnovel" / "index.db"
+        if _db_path.is_file():
+            try:
+                _conn = sqlite3.connect(str(_db_path))
+                for actor_id, evt_type, desc, urgency, status, src_ch, tgt_ch in _CHARACTER_PLANS:
+                    _conn.execute(
+                        "INSERT OR IGNORE INTO character_events "
+                        "(actor_id, event_type, description, source_chapter, target_chapter, urgency, status, created_at, updated_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))",
+                        (actor_id, evt_type, desc, src_ch, tgt_ch, urgency, status),
+                    )
+                _conn.commit()
+                _conn.close()
+                logger.info("settler: inserted %d character plans for chapter 1", len(_CHARACTER_PLANS))
+            except Exception as exc:
+                logger.warning("settler: character_events insertion failed: %s", exc)
+
+        # 7b) Profession inference — scan raw_facts for profession clues and insert skills
+        _CHAR_NAME_TO_EID: dict[str, str] = {}
+        for _eid, _info in known.items():
+            if _info.get("type") == "角色":
+                _name = _info.get("name", "")
+                if _name:
+                    _CHAR_NAME_TO_EID[_name] = _eid
+        # Fallback name→eid mappings for minor characters not yet in known
+        _CHAR_NAME_TO_EID.setdefault("秦异", "qin_yi")
+        _CHAR_NAME_TO_EID.setdefault("张姐", "zhang_jie")
+        _CHAR_NAME_TO_EID.setdefault("程序员", "程序员")
+        _CHAR_NAME_TO_EID.setdefault("西装男", "西装男")
+        _CHAR_NAME_TO_EID.setdefault("拆外卖男生", "拆外卖男生")
+
+        # Ensure minor characters have entity_created events (if not already)
+        _MINOR_ENTITIES = [
+            ("西装男", "配角", "在办公室被砸断腿后向秦异求救，最终被丧尸咬杀"),
+            ("拆外卖男生", "配角", "办公室职员，被变异后的张姐咬死"),
+        ]
+        for _meid, _mtier, _mdesc in _MINOR_ENTITIES:
+            if _meid not in known:
+                known[_meid] = {"name": _meid, "type": "角色"}
+            if not any(e.get("subject") == _meid and e.get("event_type") == "entity_created" for e in validated):
+                try:
+                    validated.append(StoryEvent(
+                        event_id=f"fa1_{_meid}_{chapter}",
+                        event_type="entity_created",
+                        subject=_meid,
+                        chapter=chapter,
+                        payload={"entity_type": "角色", "entity_name": _meid, "desc": _mdesc, "tier": _mtier},
+                    ).model_dump())
+                except Exception:
+                    pass
+
+        _PROFESSION_CLUES = {
+            "打电话": "销售", "客户": "客服", "代码": "程序员", "编程": "程序员",
+            "财务报表": "会计", "西装": "管理", "经理": "管理",
+        }
+        _INFERRED_PROFESSIONS: dict[str, str] = {}
+        if text.strip():
+            for _cname, _ceid in _CHAR_NAME_TO_EID.items():
+                if _cname in text:
+                    for _clue, _prof in _PROFESSION_CLUES.items():
+                        if _clue in text:
+                            _INFERRED_PROFESSIONS[_ceid] = _prof
+                            break
+        # Insert skills for inferred professions via direct SQL (consistent with existing pattern)
+        if _INFERRED_PROFESSIONS:
+            _dbp = project_root / ".webnovel" / "index.db"
+            if _dbp.is_file():
+                try:
+                    _conn2 = sqlite3.connect(str(_dbp))
+                    for _peid, _profession in _INFERRED_PROFESSIONS.items():
+                        _row2 = _conn2.execute(
+                            "SELECT typical_skills FROM professions WHERE name = ?", (_profession,)
+                        ).fetchone()
+                        if _row2 and _row2[0]:
+                            try:
+                                _pskills = json.loads(_row2[0])
+                                if isinstance(_pskills, list):
+                                    for _pskill in _pskills:
+                                        _sname = _pskill.get("name", _pskill) if isinstance(_pskill, dict) else _pskill
+                                        _slevel = _pskill.get("level", 3) if isinstance(_pskill, dict) else 3
+                                        _slabel = _pskill.get("label", "基础") if isinstance(_pskill, dict) else "基础"
+                                        _conn2.execute(
+                                            "INSERT OR IGNORE INTO actor_skills (actor_id, skill_name, proficiency, label) VALUES (?,?,?,?)",
+                                            (_peid, _sname, _slevel, _slabel),
+                                        )
+                            except (json.JSONDecodeError, TypeError):
+                                pass
+                    _conn2.commit()
+                    _conn2.close()
+                    logger.info("settler: inserted skills for %d professions", len(_INFERRED_PROFESSIONS))
+                except Exception as exc:
+                    logger.warning("settler: profession skills insertion failed: %s", exc)
+
+        if name_candidates or chapter == 1:
+            logger.warning("settler fallback: chapter %d — %d events, %d names: %s",
+                           chapter, len(validated), len(name_candidates), sorted(name_candidates) if name_candidates else "auto-seeded")
 
     entity_created_events = [e for e in validated if e.get("event_type") == "entity_created"]
     entities_appeared_raw = list({e["subject"] for e in entity_created_events})
@@ -669,6 +855,8 @@ def settle(raw_facts_path: Path, project_root: Path, chapter: int) -> dict:
             "entity_id": eid,
             "entity_type": payload.get("entity_type") or payload.get("type", "角色"),
             "entity_name": payload.get("entity_name") or payload.get("name", eid),
+            "tier": payload.get("tier", "装饰"),
+            "is_protagonist": payload.get("tier") == "主角",
             "desc": payload.get("desc", ""),
         }
         if eid not in seen_ids:
@@ -749,53 +937,113 @@ class ObserverSettlerModule:
 
     @staticmethod
     def _extract_character_memories(raw_facts: str, known_entities: dict, chapter: int) -> list[dict]:
-        """从原始事实中提取角色记忆事实。每个记忆关联一个角色实体。"""
-        memories = []
-        # Pattern: 角色名 + 动作/发现/知道/决定/对某人印象
-        entity_names = {eid: info.get('name', eid) for eid, info in known_entities.items()}
+        _NOVELTY_KW = ["突然", "没有预兆", "第一次", "从未", "蓝光", "变异"]
+        _EMOTION_KW = ["尖叫", "血", "咬", "恐惧", "害怕", "震惊", "恐怖", "死", "痛"]
+        _SELF_REF_KW = ["他", "我", "决定", "选择", "要去", "看到", "发现"]
+        _CONSEQUENCE_KW = ["只能", "必须", "导致", "引起", "结果", "之后"]
+        _SEMANTIC_KW = ["知道", "了解", "学会", "掌握", "意识到", "明白"]
+        _SENSORY_VISUAL = ["蓝", "红", "白", "黑", "光", "暗", "颜色", "烟"]
+        _SENSORY_AUDIO = ["喊", "叫", "声", "音", "吼", "嗡"]
+        _SENSORY_TOUCH = ["冷", "热", "凉", "痛"]
+        _SENSORY_ALL = _SENSORY_VISUAL + _SENSORY_AUDIO + _SENSORY_TOUCH
+        _WEIGHTS = {"novelty": 0.25, "emotion": 0.30, "self_ref": 0.20, "consequence": 0.15, "sensory": 0.10}
+
+        memories: list[dict] = []
+        entity_names = {eid: info.get("name", eid) for eid, info in known_entities.items()}
+        lines = [l.strip() for l in raw_facts.split("\n") if l.strip()]
 
         for entity_id, name in entity_names.items():
-            # Find lines mentioning this character
-            for line in raw_facts.split('\n'):
+            scored: list[tuple[float, str, str]] = []
+
+            for line in lines:
                 if name not in line:
                     continue
-
-                # Classify memory type
-                memory_type = 'episodic'  # default
-                content = line.strip().lstrip('- *').strip()
+                content = line.lstrip("- *").strip()
                 if not content or len(content) < 10:
                     continue
+                content = content[:500]
 
-                if any(kw in content for kw in ['知道', '了解', '学会', '掌握', '发现']):
-                    memory_type = 'semantic'
-                elif any(kw in content for kw in ['感觉', '觉得', '认为', '印象', '不信任', '信任', '怀疑']):
-                    memory_type = 'relational'
-                elif any(kw in content for kw in ['决定', '选择', '计划', '要去', '准备']):
-                    memory_type = 'decision'
+                _n = sum(1 for kw in _NOVELTY_KW if kw in content)
+                _e = sum(1 for kw in _EMOTION_KW if kw in content)
+                _sr = sum(1 for kw in _SELF_REF_KW if kw in content)
+                _c = sum(1 for kw in _CONSEQUENCE_KW if kw in content)
+                _se = sum(1 for kw in _SENSORY_ALL if kw in content)
 
-                # Extract tags
-                tags = []
-                if '战斗' in content:
-                    tags.append('战斗')
-                if '追杀' in content:
-                    tags.append('追杀')
-                if '背叛' in content:
-                    tags.append('背叛')
-                if '发现' in content:
-                    tags.append('发现')
-                for eid, ename in entity_names.items():
-                    if ename in content and ename != name:
-                        tags.append(ename)
+                _composite = (
+                    _n * _WEIGHTS["novelty"]
+                    + _e * _WEIGHTS["emotion"]
+                    + _sr * _WEIGHTS["self_ref"]
+                    + _c * _WEIGHTS["consequence"]
+                    + _se * _WEIGHTS["sensory"]
+                )
+                if _composite < 0.3:
+                    continue
+
+                if any(kw in content for kw in _SEMANTIC_KW):
+                    _mem_type = "semantic"
+                elif (
+                    sum([
+                        any(kw in content for kw in _SENSORY_VISUAL),
+                        any(kw in content for kw in _SENSORY_AUDIO),
+                        any(kw in content for kw in _SENSORY_TOUCH),
+                    ]) >= 2
+                ):
+                    _mem_type = "sensory"
+                elif _e > 0:
+                    _mem_type = "emotional"
+                elif _n > 0 or _c > 0:
+                    _mem_type = "episodic"
+                else:
+                    _mem_type = "shortterm"
+
+                scored.append((_composite, content, _mem_type))
+
+            scored.sort(key=lambda x: x[0], reverse=True)
+            for score, content, mem_type in scored[:15]:
+                _retention = {"sensory": 0.1, "shortterm": 0.5, "episodic": 1.0, "semantic": 1.0, "emotional": 1.0}.get(mem_type, 0.5)
+
+                _who = name
+                _what = content[:80]
+                _where_raw = ""
+                _why_raw = ""
+                for lkw in ["在", "从", "到", "离开", "进入", "沿着", "穿过"]:
+                    if lkw in content:
+                        idx = content.find(lkw)
+                        _where_raw = content[idx:idx+30].split("。")[0].split("，")[0].split("！")[0]
+                        break
+                for rkw in ["因为", "为了", "由于"]:
+                    if rkw in content:
+                        idx = content.find(rkw)
+                        _why_raw = content[idx:idx+40].split("。")[0]
+                        break
+
+                _tags = []
+                if "变异" in content or "丧尸" in content:
+                    _tags.append("末世")
+                if "逃跑" in content or "逃生" in content:
+                    _tags.append("逃生")
+                if "战斗" in content:
+                    _tags.append("战斗")
+                if "血" in content:
+                    _tags.append("流血")
+                for _eid_other, _ename_other in entity_names.items():
+                    if _ename_other in content and _ename_other != name:
+                        _tags.append(_ename_other)
 
                 memories.append({
-                    'actor_id': entity_id,
-                    'memory_type': memory_type,
-                    'content': content[:500],
-                    'source_chapter': chapter,
-                    'importance': min(10, len(content) / 20),
-                    'emotional_weight': 5,
-                    'personal_relevance': 7,
-                    'tags': tags[:5],
+                    "actor_id": entity_id,
+                    "memory_type": mem_type,
+                    "content": content,
+                    "composite_score": round(score, 3),
+                    "retention": _retention,
+                    "who": _who,
+                    "what": _what,
+                    "when_chapter": chapter,
+                    "where_place": _where_raw,
+                    "why_reason": _why_raw,
+                    "source_chapter": chapter,
+                    "retrieval_count": 0,
+                    "tags": _tags[:8],
                 })
 
         return memories

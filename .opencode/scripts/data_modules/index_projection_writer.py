@@ -202,7 +202,9 @@ class IndexProjectionWriter:
 
             entity_type = str(entity.get("entity_type") or entity.get("type") or "角色").strip()
             entity_name = str(entity.get("entity_name") or entity.get("name") or entity_id).strip()
-            manager.upsert_entity(EntityMeta(id=entity_id, type=entity_type, canonical_name=entity_name, first_appearance=chapter, last_appearance=chapter, desc=str(entity.get("desc") or "")[:500]), update_metadata=False)
+            tier = str(entity.get("tier") or "装饰")
+            is_protagonist = (tier == "主角")
+            manager.upsert_entity(EntityMeta(id=entity_id, type=entity_type, canonical_name=entity_name, tier=tier, is_protagonist=is_protagonist, first_appearance=chapter, last_appearance=chapter, desc=str(entity.get("desc") or "")[:500]), update_metadata=True)
             self._sync_theater_actor(entity_id, entity_name, entity_type, chapter)
 
             mentions = entity.get("mentions") or []
