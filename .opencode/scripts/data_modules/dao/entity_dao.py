@@ -16,7 +16,11 @@ class EntityDAO(BaseDAO):
     # ── entities ──────────────────────────────────────────────────────
 
     def list_entities(
-        self, entity_type: Optional[str] = None, include_archived: bool = False
+        self,
+        entity_type: Optional[str] = None,
+        include_archived: bool = False,
+        limit: int = 200,
+        offset: int = 0,
     ) -> list[dict]:
         clauses: list[str] = ["1=1"]
         params: list = []
@@ -28,8 +32,10 @@ class EntityDAO(BaseDAO):
             clauses.append("is_archived = 0")
 
         where = " AND ".join(clauses)
+        params.extend([limit, offset])
         return self._fetch(
-            f"SELECT * FROM entities WHERE {where} ORDER BY last_appearance DESC",
+            f"SELECT * FROM entities WHERE {where} ORDER BY last_appearance DESC "
+            f"LIMIT ? OFFSET ?",
             tuple(params),
         )
 

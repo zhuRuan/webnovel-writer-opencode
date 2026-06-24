@@ -11,8 +11,12 @@ from .base import BaseDAO
 class FactionDAO(BaseDAO):
     """势力数据访问 — 从 entities 表查询势力，聚合关系统计。"""
 
-    def list_factions(self) -> dict:
+    def list_factions(self, limit: int = 200, offset: int = 0) -> dict:
         """列出所有势力（type='势力', 未归档），带关系聚合统计。
+
+        Args:
+            limit: 最大返回势力数（默认 200）
+            offset: 偏移量（默认 0）
 
         Returns:
             {"factions": [{id, canonical_name, tier, desc, member_count,
@@ -22,8 +26,13 @@ class FactionDAO(BaseDAO):
         factions = self._fetch(
             "SELECT * FROM entities "
             "WHERE type = '势力' AND is_archived = 0 "
-            "ORDER BY tier ASC, canonical_name ASC"
+            "ORDER BY tier ASC, canonical_name ASC "
+            "LIMIT ? OFFSET ?",
+            (limit, offset),
         )
+
+        # 关系加载上限，避免单势力海量关系撑爆内存
+        RELATIONSHIP_LIMIT = 500
 
         result: list[dict] = []
         for f in factions:
@@ -48,12 +57,12 @@ class FactionDAO(BaseDAO):
                 (fid, "%合作%", "%联盟%"),
             )
 
-            # 该势力的所有关系
+            # 该势力的所有关系（限制上限）
             relationships = self._fetch(
                 "SELECT * FROM relationships "
                 "WHERE from_entity = ? OR to_entity = ? "
-                "ORDER BY chapter DESC",
-                (fid, fid),
+                "ORDER BY chapter DESC LIMIT ?",
+                (fid, fid, RELATIONSHIP_LIMIT),
             )
 
             result.append({

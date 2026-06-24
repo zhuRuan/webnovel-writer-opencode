@@ -179,6 +179,7 @@ class MemoryDAO(BaseDAO):
     def decay_memories(self, current_chapter: int):
         LAMBDA = 0.1
         updated = 0
+        BATCH_SIZE = 500
 
         strength_rows = self._fetch(
             "SELECT actor_id, memory_strength FROM character_state "
@@ -186,34 +187,42 @@ class MemoryDAO(BaseDAO):
         )
         strength_map = {r["actor_id"]: r.get("memory_strength", 5) for r in strength_rows}
 
-        rows = self._fetch(
-            "SELECT id, actor_id, importance, retrieval_count, "
-            "source_chapter, retention FROM character_memories"
-        )
-
-        for r in rows:
-            mem_id = r["id"]
-            actor_id = r["actor_id"]
-            importance = r["importance"] or 5.0
-            retrieval_count = r["retrieval_count"] or 0
-            source_chapter = r["source_chapter"] or 0
-            memory_strength = strength_map.get(actor_id, 5)
-
-            chapters_passed = max(current_chapter - source_chapter, 0)
-            decay_factor = math.exp(
-                -LAMBDA * chapters_passed / max(memory_strength, 1)
+        offset = 0
+        while True:
+            rows = self._fetch(
+                "SELECT id, actor_id, importance, retrieval_count, "
+                "source_chapter, retention FROM character_memories "
+                "LIMIT ? OFFSET ?",
+                (BATCH_SIZE, offset),
             )
-            retention = importance * decay_factor
+            if not rows:
+                break
 
-            for _ in range(retrieval_count):
-                retention = min(1.0, retention * 1.2)
+            for r in rows:
+                mem_id = r["id"]
+                actor_id = r["actor_id"]
+                importance = r["importance"] or 5.0
+                retrieval_count = r["retrieval_count"] or 0
+                source_chapter = r["source_chapter"] or 0
+                memory_strength = strength_map.get(actor_id, 5)
 
-            self._execute(
-                "UPDATE character_memories SET retention = ?, "
-                "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (retention, mem_id),
-            )
-            updated += 1
+                chapters_passed = max(current_chapter - source_chapter, 0)
+                decay_factor = math.exp(
+                    -LAMBDA * chapters_passed / max(memory_strength, 1)
+                )
+                retention = importance * decay_factor
+
+                for _ in range(retrieval_count):
+                    retention = min(1.0, retention * 1.2)
+
+                self._execute(
+                    "UPDATE character_memories SET retention = ?, "
+                    "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (retention, mem_id),
+                )
+                updated += 1
+
+            offset += BATCH_SIZE
 
         forgotten_rows = self._fetch(
             "SELECT COUNT(*) as cnt FROM character_memories WHERE retention < 0.3"

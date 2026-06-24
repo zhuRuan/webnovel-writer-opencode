@@ -1,4 +1,5 @@
 from .base import BaseDAO
+from datetime import datetime, timedelta
 import json
 import uuid
 
@@ -7,18 +8,37 @@ class StyleCollectorDAO(BaseDAO):
     # ── Chapters ──
     def insert_chapter(self, data: dict) -> int:
         word_count = len([c for c in data.get('content', '') if '\u4e00' <= c <= '\u9fff'])
-        return self._execute(
-            """INSERT INTO collected_chapters (author,work_title,chapter_num,chapter_title,content,source_url,word_count)
-               VALUES (?,?,?,?,?,?,?)""",
-            (
-                data['author'], data['work_title'], data['chapter_num'],
-                data.get('chapter_title', ''), data['content'],
-                data.get('source_url', ''), word_count,
-            ),
-        )
+        with self._conn() as conn:
+            # Per-author cap: keep only newest 199 chapters before inserting new one
+            author = data.get('author', '')
+            count = conn.execute(
+                "SELECT COUNT(*) FROM collected_chapters WHERE author = ?",
+                (author,),
+            ).fetchone()[0]
+            if count >= 200:
+                conn.execute(
+                    "DELETE FROM collected_chapters WHERE id IN ("
+                    "SELECT id FROM collected_chapters WHERE author = ? ORDER BY id ASC LIMIT ?"
+                    ")",
+                    (author, count - 199),
+                )
+            cursor = conn.execute(
+                """INSERT INTO collected_chapters (author,work_title,chapter_num,chapter_title,content,source_url,word_count)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (
+                    data['author'], data['work_title'], data['chapter_num'],
+                    data.get('chapter_title', ''), data['content'],
+                    data.get('source_url', ''), word_count,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
 
-    def get_chapters(self, author: str = None, work_title: str = None) -> list[dict]:
-        q = "SELECT * FROM collected_chapters WHERE 1=1"
+    def get_chapters(self, author: str = None, work_title: str = None,
+                     limit: int = 100, offset: int = 0) -> list[dict]:
+        q = """SELECT id, author, work_title, chapter_num, chapter_title,
+                      source_url, word_count, status, created_at
+               FROM collected_chapters WHERE 1=1"""
         params = []
         if author:
             q += " AND author = ?"
@@ -26,7 +46,15 @@ class StyleCollectorDAO(BaseDAO):
         if work_title:
             q += " AND work_title = ?"
             params.append(work_title)
-        return self._fetch(q + " ORDER BY work_title, chapter_num", tuple(params))
+        q += " ORDER BY work_title, chapter_num LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        return self._fetch(q, tuple(params))
+
+    def get_chapter_content(self, chapter_id: int) -> str:
+        rows = self._fetch(
+            "SELECT content FROM collected_chapters WHERE id = ?", (chapter_id,)
+        )
+        return rows[0]["content"] if rows else ""
 
     def get_authors(self) -> list[str]:
         return [r['author'] for r in self._fetch(
@@ -118,3 +146,16 @@ class StyleCollectorDAO(BaseDAO):
         return self._fetch(
             "SELECT * FROM collection_reports WHERE status NOT IN ('done','failed','cancelled','stale')"
         )
+
+    def cleanup_expired_summaries(self, ttl_days: int = 90) -> int:
+        """Delete style_summaries rows older than *ttl_days* (default 90 days).
+        Does not touch collected_chapters or director_style.
+        """
+        cutoff = (datetime.utcnow() - timedelta(days=ttl_days)).isoformat()
+        with self._conn() as conn:
+            cursor = conn.execute(
+                "DELETE FROM style_summaries WHERE created_at < ?",
+                (cutoff,),
+            )
+            conn.commit()
+            return cursor.rowcount
