@@ -60,12 +60,20 @@ class MemoryItem:
     source_chapter: int = 0
     evidence: List[str] = field(default_factory=list)
     updated_at: str = ""
+    # Phase 1: 人性化记忆模拟字段
+    emotional_intensity: float = 0.0
+    emotional_valence: float = 0.0
+    consolidation_count: int = 0
+    last_recalled_at: str = ""
 
     def normalized(self) -> "MemoryItem":
         layer = self.layer if self.layer in VALID_LAYERS else "semantic"
         category = self.category if self.category in CATEGORY_TO_BUCKET else "story_fact"
         status = self.status if self.status in VALID_STATUSES else "active"
         updated_at = self.updated_at or now_iso()
+        ei = max(0.0, min(1.0, float(self.emotional_intensity or 0.0)))
+        ev = max(-1.0, min(1.0, float(self.emotional_valence or 0.0)))
+        cc = max(0, int(self.consolidation_count or 0))
         return MemoryItem(
             id=str(self.id or ""),
             layer=layer,
@@ -78,6 +86,10 @@ class MemoryItem:
             source_chapter=int(self.source_chapter or 0),
             evidence=[str(x) for x in (self.evidence or []) if str(x)],
             updated_at=updated_at,
+            emotional_intensity=ei,
+            emotional_valence=ev,
+            consolidation_count=cc,
+            last_recalled_at=str(self.last_recalled_at or ""),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -97,6 +109,10 @@ class MemoryItem:
             source_chapter=int(payload.get("source_chapter", 0) or 0),
             evidence=[str(x) for x in (payload.get("evidence") or []) if str(x)],
             updated_at=str(payload.get("updated_at", "")),
+            emotional_intensity=float(payload.get("emotional_intensity", 0.0) or 0.0),
+            emotional_valence=float(payload.get("emotional_valence", 0.0) or 0.0),
+            consolidation_count=int(payload.get("consolidation_count", 0) or 0),
+            last_recalled_at=str(payload.get("last_recalled_at", "")),
         ).normalized()
 
 

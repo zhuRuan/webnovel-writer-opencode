@@ -388,15 +388,71 @@ class RerankAPIClient:
             # Modal 格式: {"results": [...]}
             return data.get("results", [])
 
+    def _is_ollama_url(self) -> bool:
+        return ":11434" in str(self.config.rerank_base_url or "")
+
+    async def _ollama_rerank(
+        self, query: str, documents: List[str], top_n: Optional[int]
+    ) -> Optional[List[Dict[str, Any]]]:
+        """用 Ollama embedding 做相似度排序，模拟 rerank。"""
+        import math
+
+        try:
+            # 用 embed API 获取 query 和所有 doc 的向量
+            embed_client = EmbeddingAPIClient(self.config)
+            # 临时替换为 rerank 的 base_url（指向 Ollama）
+            saved_url = self.config.embed_base_url
+            saved_model = self.config.embed_model
+            self.config.embed_base_url = self.config.rerank_base_url
+            self.config.embed_model = self.config.rerank_model or "nomic-embed-text"
+
+            texts = [query] + documents
+            embeddings = await embed_client.embed_batch(texts, skip_failures=True)
+
+            self.config.embed_base_url = saved_url
+            self.config.embed_model = saved_model
+            await embed_client.close()
+
+            if not embeddings or len(embeddings) < 2:
+                return None
+
+            query_vec = embeddings[0]
+            doc_vecs = embeddings[1:]
+
+            # cosine similarity
+            scores = []
+            for i, doc_vec in enumerate(doc_vecs):
+                if doc_vec is None:
+                    scores.append((i, 0.0))
+                    continue
+                dot = sum(a * b for a, b in zip(query_vec, doc_vec))
+                norm_q = math.sqrt(sum(a * a for a in query_vec))
+                norm_d = math.sqrt(sum(a * a for a in doc_vec))
+                sim = dot / (norm_q * norm_d) if norm_q > 0 and norm_d > 0 else 0.0
+                scores.append((i, sim))
+
+            scores.sort(key=lambda x: -x[1])
+            n = top_n or len(documents)
+            return [
+                {"index": idx, "relevance_score": round(score, 4)}
+                for idx, score in scores[:n] if score > 0
+            ]
+        except Exception:
+            return None
+
     async def rerank(
         self,
         query: str,
         documents: List[str],
         top_n: Optional[int] = None
     ) -> Optional[List[Dict[str, Any]]]:
-        """调用 Rerank 服务（带重试机制）"""
+        """调用 Rerank 服务（带重试机制）。Ollama URL 时用 embedding 相似度。"""
         if not documents:
             return []
+
+        # Ollama 本地模式：用 embedding 相似度模拟 rerank
+        if self._is_ollama_url():
+            return await self._ollama_rerank(query, documents, top_n)
 
         timeout = self.config.cold_start_timeout if not self._warmed_up else self.config.normal_timeout
         max_retries = getattr(self.config, 'api_max_retries', 3)

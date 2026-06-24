@@ -21,6 +21,56 @@ class MemoryWriter:
         self.config = config or get_config()
         self.store = ScratchpadManager(self.config)
 
+    @staticmethod
+    def _emotion_from_category(category: str, payload: dict | None = None) -> tuple[float, float]:
+        p = payload or {}
+        base = {
+            "character_state": (0.4, 0.0),
+            "relationship": (0.5, 0.0),
+            "story_fact": (0.2, 0.0),
+            "world_rule": (0.4, 0.0),
+            "timeline": (0.1, 0.0),
+            "open_loop": (0.5, -0.2),
+            "reader_promise": (0.3, 0.2),
+        }
+        intensity, valence = base.get(category, (0.2, 0.0))
+        text = str(p.get("description", "") or p.get("content", "") or p.get("value", "") or "")
+        high_emotion_keywords = ["死", "杀", "背叛", "牺牲", "突破", "觉醒", "震撼", "绝望", "绝境"]
+        positive_keywords = ["突破", "成功", "获得", "觉醒", "恢复", "和解"]
+        negative_keywords = ["死", "背叛", "失去", "重伤", "崩溃", "失败", "绝望"]
+        for kw in high_emotion_keywords:
+            if kw in text:
+                intensity = min(1.0, intensity + 0.3)
+                break
+        for kw in positive_keywords:
+            if kw in text:
+                valence = min(1.0, valence + 0.3)
+                break
+        for kw in negative_keywords:
+            if kw in text:
+                valence = max(-1.0, valence - 0.3)
+                break
+        return round(intensity, 2), round(valence, 2)
+
+
+    def _make_item(self, category: str, subject: str, field: str, value: str,
+                   chapter: int, layer: str = "semantic", payload: dict | None = None,
+                   evidence: list | None = None) -> MemoryItem:
+        ei, ev = self._emotion_from_category(category, payload)
+        return MemoryItem(
+            id=self._item_id(category, subject, field, chapter),
+            layer=layer,
+            category=category,
+            subject=subject,
+            field=field,
+            value=value,
+            payload=payload or {},
+            source_chapter=int(chapter),
+            evidence=evidence or [],
+            emotional_intensity=ei,
+            emotional_valence=ev,
+        )
+
     def _item_id(self, category: str, subject: str, field: str, chapter: int) -> str:
         raw = f"{category}|{subject}|{field}|{chapter}"
         digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
@@ -87,6 +137,8 @@ class MemoryWriter:
                 old_val = change.get("old_value")
             if old_val is None:
                 old_val = change.get("from")
+            ei, ev = self._emotion_from_category("character_state",
+                {"value": str(new_val if new_val is not None else "")})
             item = MemoryItem(
                 id=self._item_id("character_state", entity_id, field, chapter),
                 layer="semantic",
@@ -97,6 +149,8 @@ class MemoryWriter:
                 payload={"old_value": old_val},
                 source_chapter=int(chapter),
                 evidence=[f"state_change:{entity_id}:{field}:{chapter}"],
+                emotional_intensity=ei,
+                emotional_valence=ev,
             )
             self._upsert(item, stats)
 
@@ -105,18 +159,10 @@ class MemoryWriter:
             name = str(entity.get("name", "") or "").strip()
             if not entity_id:
                 continue
-            item = MemoryItem(
-                id=self._item_id("character_state", entity_id, "first_seen", chapter),
-                layer="semantic",
-                category="character_state",
-                subject=entity_id,
-                field="first_seen",
-                value=name,
-                payload={
-                    "tier": entity.get("tier"),
-                    "type": entity.get("type") or entity.get("entity_type"),
-                },
-                source_chapter=int(chapter),
+            item = self._make_item(
+                category="character_state", subject=entity_id, field="first_seen",
+                value=name, chapter=chapter,
+                payload={"tier": entity.get("tier"), "type": entity.get("type") or entity.get("entity_type")},
                 evidence=[f"entity_new:{entity_id}:{chapter}"],
             )
             self._upsert(item, stats)
@@ -127,15 +173,10 @@ class MemoryWriter:
             rel_type = str(rel.get("type", "") or "").strip()
             if not from_entity or not to_entity:
                 continue
-            item = MemoryItem(
-                id=self._item_id("relationship", from_entity, to_entity, chapter),
-                layer="semantic",
-                category="relationship",
-                subject=from_entity,
-                field=to_entity,
-                value=rel_type,
+            item = self._make_item(
+                category="relationship", subject=from_entity, field=to_entity,
+                value=rel_type, chapter=chapter,
                 payload={"description": rel.get("description", ""), "to_entity": to_entity},
-                source_chapter=int(chapter),
                 evidence=[f"relationship:{from_entity}:{to_entity}:{chapter}"],
             )
             self._upsert(item, stats)
@@ -145,28 +186,17 @@ class MemoryWriter:
         if isinstance(hook, dict):
             hook_content = str(hook.get("content", "") or "").strip()
             if hook_content:
-                item = MemoryItem(
-                    id=self._item_id("story_fact", "chapter_hook", str(chapter), chapter),
-                    layer="semantic",
-                    category="story_fact",
-                    subject="chapter_hook",
-                    field=str(chapter),
-                    value=hook_content,
-                    payload={"hook_type": hook.get("type"), "strength": hook.get("strength")},
-                    source_chapter=int(chapter),
-                    evidence=[f"chapter_meta:hook:{chapter}"],
-                )
-                self._upsert(item, stats)
+                item = self._make_item(
+                category="story_fact", subject="chapter_hook", field=str(chapter),
+                value=hook_content, chapter=chapter,
+                payload={"hook_type": hook.get("type"), "strength": hook.get("strength")},
+                evidence=[f"chapter_meta:hook:{chapter}"],
+            )
+            self._upsert(item, stats)
         elif isinstance(hook, str) and hook.strip():
-            item = MemoryItem(
-                id=self._item_id("story_fact", "chapter_hook", str(chapter), chapter),
-                layer="semantic",
-                category="story_fact",
-                subject="chapter_hook",
-                field=str(chapter),
-                value=hook.strip(),
-                payload={},
-                source_chapter=int(chapter),
+            item = self._make_item(
+                category="story_fact", subject="chapter_hook", field=str(chapter),
+                value=hook.strip(), chapter=chapter,
                 evidence=[f"chapter_meta:hook:{chapter}"],
             )
             self._upsert(item, stats)
@@ -187,15 +217,10 @@ class MemoryWriter:
             if not event:
                 continue
             source_chapter = int(row.get("chapter") or chapter)
-            item = MemoryItem(
-                id=self._item_id("timeline", event, str(source_chapter), chapter),
-                layer="semantic",
-                category="timeline",
-                subject=event[:64],
-                field="event",
-                value=event,
+            item = self._make_item(
+                category="timeline", subject=event[:64], field="event",
+                value=event, chapter=chapter,
                 payload={"time_hint": row.get("time_hint"), "event_type": row.get("event_type")},
-                source_chapter=source_chapter,
                 evidence=[f"memory_facts:timeline:{chapter}"],
             )
             self._upsert(item, stats)
@@ -213,15 +238,10 @@ class MemoryWriter:
                 or "global"
             )
             field = str(row.get("field", "") or "").strip() or rule[:32]
-            item = MemoryItem(
-                id=self._item_id("world_rule", subject, field, chapter),
-                layer="semantic",
-                category="world_rule",
-                subject=subject,
-                field=field,
-                value=rule,
+            item = self._make_item(
+                category="world_rule", subject=subject, field=field,
+                value=rule, chapter=chapter,
                 payload={"scope": row.get("scope"), "rule_text": rule},
-                source_chapter=int(chapter),
                 evidence=[f"memory_facts:world_rule:{chapter}"],
             )
             self._upsert(item, stats)
@@ -233,20 +253,16 @@ class MemoryWriter:
             content = str(row.get("content", "") or "").strip()
             if not content:
                 continue
-            item = MemoryItem(
-                id=self._item_id("open_loop", content, "status", chapter),
-                layer="semantic",
-                category="open_loop",
-                subject=content,
-                field="status",
-                value=content,
+            item = self._make_item(
+                category="open_loop", subject=content, field="status",
+                value=content, chapter=chapter,
                 payload={
                     "urgency": coerce_urgency(row.get("urgency")),
                     "planted_chapter": row.get("planted_chapter"),
                     "expected_payoff": row.get("expected_payoff"),
                     "status": row.get("status"),
+                    "content": content,
                 },
-                source_chapter=int(chapter),
                 evidence=[f"memory_facts:open_loop:{chapter}"],
             )
             self._upsert(item, stats)
@@ -258,15 +274,10 @@ class MemoryWriter:
             content = str(row.get("content", "") or "").strip()
             if not content:
                 continue
-            item = MemoryItem(
-                id=self._item_id("reader_promise", content, "promise", chapter),
-                layer="semantic",
-                category="reader_promise",
-                subject=content,
-                field="promise",
-                value=content,
-                payload={"promise_type": row.get("type"), "target": row.get("target")},
-                source_chapter=int(chapter),
+            item = self._make_item(
+                category="reader_promise", subject=content, field="promise",
+                value=content, chapter=chapter,
+                payload={"promise_type": row.get("type"), "target": row.get("target"), "content": content},
                 evidence=[f"memory_facts:reader_promise:{chapter}"],
             )
             self._upsert(item, stats)
