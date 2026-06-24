@@ -236,6 +236,18 @@ For multi-step tasks, state a brief plan with verification per step. Strong succ
 
 原因：OpenCode 的 agent/skill/plugin 有特定的 frontmatter 格式、生命周期 hook、权限模型。不了解规范就修改会导致功能异常或兼容性问题。
 
+## Smart-Search 搜索工具
+
+smart-search-mcp MCP 服务器已在全局配置（`~/.config/opencode/opencode.jsonc`）中启用，所有主代理和子代理均可访问。工具路由规则通过 `opencode.json` 的 `instructions` 字段注入，详见 `.opencode/smart-search-rules.md`。
+
+**核心要点**：
+- smart-search 搜索工具返回的是 URL，**必须用 `webfetch` 访问 URL 获取实际内容**
+- librarian agent（外部搜索）是搜索效率最高的 agent，优先由它完成搜索任务
+- 专用搜索引擎 > 通用搜索：中文技术社区用 CSDN/掘金，英文用 Stack Overflow/GitHub
+- context7（结构化文档）> ai_search_docs（官方文档）> ai_search_web（通用兜底）
+
+**调用方式**：其他 agent 需要搜索时，通过 `task(subagent_type="librarian", ...)` 调用 librarian 完成搜索。
+
 ## 外置
 
 **实际写小说的目录。**

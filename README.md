@@ -1,312 +1,320 @@
-# Webnovel Writer for OpenCode — AI 长篇网文创作系统
+# Webnovel Writer for OpenCode
 
-[![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
+面向长篇中文网文的 AI 辅助写作系统。不是让 AI "代替"作者，而是让 AI "理解"作者创造的世界，并在世界规则的约束下持续创作。
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![OpenCode](https://img.shields.io/badge/OpenCode-Compatible-purple.svg)](https://opencode.ai)
-[![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://python.org)
-
-## 1. 引言
-
-在 AI 辅助写作的浪潮中，一个优秀的创作系统就像是一座灯塔，指引着作者在漫长的连载旅程中保持方向感和一致性。正如 Antoine de Saint-Exupéry 在《小王子》中所说："一个人只有用心去看，才能看到真实。事物的真实本质是肉眼无法看到的。"
-
-### 1.1 为什么我们需要这个项目
-
-长篇网文创作的核心挑战不在于"写出一章"，而在于"写到第二百章时还记得第一章的伏笔"。传统 AI 写作工具面临三个根本性困境：
-
-| 困境 | 表现 | 本项目的应对 |
-|------|------|-------------|
-| **遗忘** | AI 忘记前文设定、角色关系、已埋伏笔 | 三层 RAG 上下文 + 故事合约引擎 + DebtTracker 伏笔追踪 |
-| **幻觉** | AI 凭空编造设定、前后矛盾 | Graph-RAG 实体关系图谱 + Code Checker 硬约束阻断 |
-| **风格漂移** | 长篇连载中写作风格逐渐偏离初始设定 | MASTER_SETTING 合约 + OOC 审查器 + 题材模板约束 |
-
-在《代码大全》中，Steve McConnell 强调："良好的文档能够帮助开发者避免很多不必要的错误和困惑，提高工作效率。" 对于 AI 写作而言，"文档"就是设定集、大纲和故事合约——它们是确保 AI 在 200 章后仍能遵循初始设定的关键。
-
-### 1.2 项目的主要组成部分
-
-一个完整的 AI 写作系统，就像一支专业的编辑团队，每个模块各司其职：
-
-| 组成部分 | 角色 | 类比 |
-|----------|------|------|
-| **故事合约引擎** | 维护世界规则的"法律体系" | 总编辑 |
-| **上下文管理** | 每章组装最相关的设定和伏笔 | 责任编辑 |
-| **分层审查** | 13 维度结构化检查章节质量 | 审校团队 |
-| **记忆系统** | 三层记忆压缩和检索 | 资料管理员 |
-| **知识库** | CSV 结构化写作技法和命名规则 | 风格指南 |
-
-正如《人月神话》中 Fred Brooks 所言："良好的文档是软件产品成功的关键。" 本项目的每个模块都围绕着一个核心理念：**将写作知识结构化，让 AI 能够持续、一致地创作**。
-
-## 2. 项目标题和描述
-
-### 2.1 项目名称的含义
-
-**Webnovel Writer for OpenCode** —— 这个名字传达了三个关键信息：
-
-| 要素 | 含义 |
-|------|------|
-| **Webnovel** | 专为长篇网文设计，理解网文的独特节奏和爽点体系 |
-| **Writer** | 不是"生成器"，而是辅助作者完成创作的"写作伙伴" |
-| **for OpenCode** | 基于 OpenCode 框架，与 AI 编程助手深度集成 |
-
-### 2.2 项目描述
-
-Webnovel Writer for OpenCode 是一个面向长篇中文网文的 AI 辅助写作系统。它通过分层 RAG 检索、故事合约引擎和结构化质量审查，解决 AI 在连载创作中的"遗忘"和"幻觉"问题，支持从项目初始化到平台发布的全流程。
-
-本项目源于 [lingfengQAQ/webnovel-writer](https://github.com/lingfengQAQ/webnovel-writer)，已深度重构为 OpenCode 架构，扩展了审查器体系、CSV 结构化知识库、故事合约引擎、记忆系统、发布通道等模块。v2.8 起借鉴 [Narcooo/inkOS](https://github.com/Narcooo/inkOS) 的核心设计，引入了 SSOT 事件溯源、Observer→Reflector 双段事实提取、运行时产物持久化和真相文件 Markdown 投影。
-
-**核心设计理念**：不是让 AI "代替"作者，而是让 AI "理解"作者创造的世界，并在这个世界的约束下持续创作。
-
-## 3. 安装和使用说明
-> **新手指南** &nbsp; 从安装到完成第一本书的手把手教程，每一步都有详细说明：[docs/guides/getting-started.md](docs/guides/getting-started.md)
-
-### 3.1 提供详细的安装步骤
-
-安装过程分为三个步骤：环境准备、安装脚本、配置密钥。
-
-**系统要求**：
-- Python 3.10 或更高版本
-- OpenCode 运行环境
-- 网络连接
-
-**macOS / Linux**：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/install.py | python3
-```
-
-**Windows**（PowerShell）：
-
-```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/install.py -OutFile install.py
-python install.py
-```
-
-运行 `python install.py`（无参数）进入交互式菜单，自动检测安装状态并提供 6 种操作选项：
-
-| 命令 | 说明 |
-|------|------|
-| `python install.py` | 交互菜单（推荐） |
-| `python install.py --update` | 更新到最新版 |
-| `python install.py --incremental` | 增量更新（仅变更文件） |
-| `python install.py --clean` | 清洁安装 |
-| `python install.py --uninstall` | 卸载 |
-| `python install.py --venv` | 虚拟环境安装 |
-
-中国大陆用户下载失败时自动切换 GitHub 镜像。
-
-### 3.2 配置 API Key
-
-编辑 `.env` 文件：
-
-```bash
-# Embedding 模型（向量化章节内容）
-EMBED_BASE_URL=https://api-inference.modelscope.cn/v1
-EMBED_MODEL=Qwen/Qwen3-Embedding-8B
-EMBED_API_KEY=your_api_key
-
-# Rerank 模型（检索结果重排）
-RERANK_BASE_URL=https://api.jina.ai/v1
-RERANK_MODEL=jina-reranker-v3
-RERANK_API_KEY=your_api_key
-```
-
-### 3.3 在 OpenCode 中使用
-
-所有功能通过 OpenCode 的斜杠命令调用：
-
-| 命令 | 功能 | 使用场景 |
-|------|------|----------|
-| `/webnovel-init` | 初始化新书项目 | 开始一本新书 |
-| `/webnovel-plan` | 规划大纲 | 设计故事结构 |
-| `/webnovel-write` | 撰写单章 | 日常写作 |
-| `/webnovel-write-batch` | 批量写作 | 集中赶稿 |
-| `/webnovel-review` | 审查润色 | 质量把控 |
-| `/webnovel-delete` | 安全删除章节 | 回退重写 |
-| `/webnovel-rewrite` | 重写章节 | 翻修烂章 |
-| `/webnovel-heal` | 修复问题章节 | 诊断修复 |
-| `/webnovel-export` | 导出正文 | 分发备份 |
-| `/webnovel-publish` | 发布番茄小说 | 平台上线 |
-| `/webnovel-dashboard` | 可视化看板 + 文风约束编辑 | 全局监控 + 文风管理 |
-| `/webnovel-query` | 查询设定 | 快速检索 |
-
-正如《C++编程思想》中所说："代码的清晰是优秀软件的基石。" 每个命令都设计为自解释的——你只需要告诉系统"做什么"，它会自动处理"怎么做"。
-
-### 3.4 提供帮助和支持
-
-遇到问题时，可以通过以下渠道获取帮助：
-
-- **问题追踪**：[GitHub Issues](https://github.com/lujih/webnovel-writer-opencode/issues)
-- **新手完全指南**：[docs/guides/getting-started.md](docs/guides/getting-started.md)
-- **项目文档**：[docs/](docs/) 目录下的架构、指南和运维文档
-
-Donald Knuth 在《计算机程序设计艺术》中写道："程序是为人类读写的，不是为机器执行的。" 我们的文档同样遵循这一原则——为作者而写，而非为 AI 而写。
-
-## 4. 项目结构和文件组织
-
-### 4.1 核心目录结构
-
-```
-webnovel-writer/                  # 仓库根目录（OpenCode 工作区）
-├── install.py                    # 一键安装引导脚本
-├── manifest.json                 # 文件清单（SHA256，增量更新用）
-├── .env                          # API 配置（不提交）
-├── README.md                     # 项目技术概览
-├── README_CN.md                  # 项目详细说明（本文件）
-│
-├── .opencode/                    # OpenCode 引擎核心
-│   ├── agents/                   # Agent 定义
-│   │   ├── context-agent.md      # 上下文搜集 Agent
-│   │   ├── data-agent.md         # 数据处理 Agent
-│   │   ├── reviewer.md           # 审查 Agent（13 维度结构化检查）
-│   │   └── deconstruction-agent.md # 作品解构 Agent
-│   │
-│   ├── skills/                   # 13 个 Skills（webnovel-*）
-│   │
-│   ├── dashboard/                # 可视化面板
-│   │   ├── app.py                # FastAPI 应用入口
-│   │   ├── server.py             # 服务器配置
-│   │   └── frontend/             # React 19 前端（ECharts）
-│   │
-│   ├── installer/                # 安装器（纯 stdlib）
-│   ├── genres/                   # 38+ 题材模板
-│   ├── references/               # 结构化知识库
-│   │   ├── csv/                  # 9 张知识表 + BM25 检索
-│   │   ├── writing/              # 写作技法参考
-│   │   └── review/               # 审查规则
-│   │
-│   └── scripts/                  # Python 核心脚本
-│       ├── webnovel.py           # CLI 统一入口（28 个子命令）
-│       ├── data_modules/         # 核心数据模块（60+ 个）
-│       └── tests/                # 测试（59 个测试文件）
-│
-└── docs/                         # 文档
-    ├── architecture/             # 系统架构
-    ├── guides/                   # 使用指南
-    ├── operations/               # 运维文档
-    └── research/                 # 研究笔记
-```
-
-### 4.2 六层数据流架构
-
-项目采用六层管道架构，每层为下一层提供经过加工的数据：
-
-| 层级 | 名称 | 职责 | 核心模块 |
-|------|------|------|----------|
-| **L1** | Knowledge | CSV 结构化知识 + BM25 检索 | `references/csv/`, `reference_search.py` |
-| **L2** | Reasoning | 题材路由 + 反模式排序 | `genres/` |
-| **L3** | Contract | MASTER_SETTING + 卷纲章纲 + 审查合约 | `story_system_engine.py`, `story_contracts.py` |
-| **L4** | Context | JSON 拼装写作上下文 | `context_manager.py` |
-| **L5** | Commit | 事实提取 + 事件溯源 + 投影路由 | `chapter_commit_service.py`, `event_log_store.py` |
-| **L6** | Projection | 5 个 Writers：state/index/summary/memory/vector | 各 `*_writer.py` 模块 |
-
-正如《代码大全》中所说："一个好的目录结构可以帮助开发者快速地找到他们需要的信息，从而提高生产效率。" 六层架构的设计确保了每一层都有明确的输入和输出，修改某一层不会影响其他层。
-
-### 4.3 关键子系统
-
-| 子系统 | 核心文件 | 功能 |
-|--------|----------|------|
-| **故事合约引擎** | `story_system_engine.py` | MASTER_SETTING 维护 + Runtime 合同生成 |
-| **SSOT 事件溯源** | `ssot_enforcer.py` | append-only 事件日志 + 投影重建 + 一致性校验 |
-| **Override 合约引擎** | `override_contract_engine.py` | 世界规则版本化演进 + 上下文提示生成 |
-| **Observer→Reflector** | `observer_settler.py` | 双段事实提取——自由文本提取+Pydantic Schema 校验 |
-| **记忆系统** | `memory/orchestrator.py` | 三层记忆（工作/情节/语义）+ 压缩编排 |
-| **审查管线** | `review_pipeline.py` | Code Checker 预处理 → 13 维度结构化审查（最多 3 轮收敛） |
-| **Graph-RAG** | `entity_linker.py` | 实体关系图谱 + SQLite 持久化 |
-| **DebtTracker** | `index_debt_mixin.py` | 伏笔创建 → 偿还 → 硬约束阻塞 |
-| **发布模块** | `publisher/` | Playwright 浏览器自动化 + HTTP API |
-
-## 5. 贡献指南
-
-### 5.1 如何为项目做出贡献
-
-贡献开源项目不仅仅是代码的贡献，还包括文档完善、问题报告、新功能建议。正如《人月神话》中所说："好的程序员不仅仅是写出能工作的代码，还需要写出能维护的代码。"
-
-**了解项目**：
-- 阅读 [docs/architecture/](docs/architecture/) 了解系统架构
-- 阅读 [docs/guides/getting-started.md](docs/guides/getting-started.md) 了解使用流程
-- 参与 Issues 讨论，与社区交流
-
-**找到贡献的机会**：
-- 查看 [GitHub Issues](https://github.com/lujih/webnovel-writer-opencode/issues)，找到可以解决的问题
-- 关注项目的未来计划和里程碑
-
-**贡献代码**：
-1. Fork 项目到你的 GitHub 账户
-2. 在本地开发和测试你的代码
-3. 确保代码遵循项目的编码标准和风格指南
-4. 提交 Pull Request
-
-### 5.2 提交问题和拉取请求的流程
-
-| 方面 | 提交问题 | 提交拉取请求 |
-|------|----------|-------------|
-| 标题 | 明确、具体 | 清晰、描述目的 |
-| 描述 | 详细、包含重现步骤 | 详细、解释更改的必要性 |
-| 附加信息 | 屏幕截图、日志 | 符合编码和风格标准 |
-
-在《代码大全》中，作者强调："代码是写给人看的，顺便给机器执行。" 提交的 Issue 和 PR 同样应该让人容易理解。
-
-**提交规范**：所有提交必须遵循 [Conventional Commits](https://www.conventionalcommits.org/) 格式：
-
-```
-<type>: <简短描述>
-
-Co-Authored-By: AI Assistant <noreply@anthropic.com>
-```
-
-常用类型：`feat:`（新功能）、`fix:`（Bug 修复）、`docs:`（文档）、`refactor:`（重构）、`test:`（测试）。
-
-## 6. 许可证
-
-### 6.1 选择合适的开源许可证
-
-本项目采用 **GPL v3** 许可证，继承自原项目 [lingfengQAQ/webnovel-writer](https://github.com/lingfengQAQ/webnovel-writer)。
-
-GPL v3 要求任何使用、修改或分发本代码的人必须将其更改公开，并使用相同的许可证。正如 Richard Stallman 在《自由软件，自由社会》中所说："自由软件是关于自由和合作。"
-
-### 6.2 许可证的含义
-
-| 权限 | 允许 | 条件 |
-|------|------|------|
-| 商业使用 | ✓ | 必须开源衍生作品 |
-| 修改 | ✓ | 必须使用 GPL v3 协议 |
-| 分发 | ✓ | 必须附上原始许可证 |
-| 私人使用 | ✓ | 无限制 |
-
-完整许可证文本见 [LICENSE](LICENSE) 文件。
-
-## 7. 联系信息和致谢
-
-### 7.1 联系方式
-
-如果你有任何问题或建议，请通过以下方式联系：
-
-- **GitHub Issues**：[github.com/lujih/webnovel-writer-opencode/issues](https://github.com/lujih/webnovel-writer-opencode/issues)
-- **GitHub Discussions**：[github.com/lujih/webnovel-writer-opencode/discussions](https://github.com/lujih/webnovel-writer-opencode/discussions)
-
-### 7.2 致谢
-
-每一个成功的开源项目背后，都有一个支持和贡献的社区。正如《人类简史》中所说："合作是人类成功的秘诀。"
-
-| 贡献者/项目 | 贡献内容 |
-|------------|----------|
-| **[lingfengQAQ](https://github.com/lingfengQAQ)** | 原项目作者，奠定了核心架构和写作流程 |
-| **[Narcooo/inkOS](https://github.com/Narcooo/inkOS)** | 自主写作 AI Agent，提供了 Observer→Reflector 双段提取、7 文件真相投影、输入治理三层结构等关键设计灵感 |
-| **[OpenCode](https://opencode.ai)** | AI 编程助手框架，提供了 Skills 和 Agents 运行时 |
-| **[Cppys/OpenNovel](https://github.com/Cppys/OpenNovel)** | 番茄小说发布技术方案参考 |
-| **[@YuerLee](https://github.com/YuerLee)** | 在 macOS 兼容性、安装脚本优化和流程反馈上贡献了重要改进 |
-| **所有社区贡献者** | 通过 Issues、反馈和实际写作测试帮助项目持续迭代 |
-
-### 7.3 社区文化
-
-我们欢迎每一个人的参与和贡献，无论你的技能水平如何，都有你的一席之地。无论你是经验丰富的 Python 开发者、热爱写作的网文作者，还是刚刚接触开源的新手，你的每一次 Issue、每一个 PR、每一条建议，都是项目前进的动力。
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-green.svg)](https://python.org)
 
 ---
 
-## 结语
+## 它解决什么问题
 
-在我们的 AI 写作探索之旅中，理解系统架构是迈向高质量创作的重要一步。然而，掌握新工具、新理念，始终需要时间和坚持。从写作的角度看，使用 AI 辅助创作往往伴随着不断的试错和调整——作者和 AI 在一次次互动中逐渐找到最佳的协作节奏。
+长篇网文的核心挑战不在"写出一章"，而在"写到第二百章时还记得第一章的伏笔"。传统 AI 写作工具在连载场景下会系统性地退化：
 
-这就是为什么当我们遇到 AI 的"遗忘"或"幻觉"时，我们应该将其视为理解系统运作方式的机会，而不仅仅是困扰。通过理解上下文管理、故事合约和审查管线的工作原理，我们不仅可以修复当前的章节，更可以提升整体的创作质量，在未来的章节中保持更高的一致性。
+| 失败模式 | 为什么发生 | 本项目的应对 |
+|----------|-----------|-------------|
+| **遗忘** | 上下文窗口装不下 200 章内容，AI 丢失早期设定 | 三层 RAG 检索 + 故事合约引擎 + 伏笔追踪 |
+| **幻觉** | 没有硬约束阻止 AI 凭空编造 | Graph-RAG 实体图谱 + Code Checker 硬阻断 |
+| **风格漂移** | 连载越久，写作风格越偏离初始设定 | MASTER_SETTING 合约 + OOC 审查器 + 题材模板 |
 
-我鼓励大家积极参与进来，不断探索 AI 辅助写作的可能性。无论你是网文作者还是技术开发者，希望这个项目能对你的创作之路有所帮助。如果你觉得这个项目有用，不妨点击 Star，或者留下你的 Issue 分享你的使用体验和改进建议。
+> 在《代码大全》中，Steve McConnell 强调："良好的文档能够帮助开发者避免很多不必要的错误和困惑。" 对于 AI 写作，"文档"就是设定集、大纲和故事合约——它们是确保 AI 在二百章后仍能遵循初始设定的关键。
 
-每一次的 Star、Issue、PR 和分享都是对这个项目的最大支持，也是我们持续改进和创新的动力。让我们一起，用代码和创意，书写更好的故事。
+---
+
+## 核心设计理念：故事合约
+
+这个项目的核心创新是一个简单但被证明有效的思路——**把"世界规则"当作代码合约**。
+
+软件开发有 API 契约、数据库 schema、lint 规则来防止系统退化。长篇写作同样需要：每个角色、每条设定、每处伏笔都是一份"合约"，写作时必须遵守，提交时必须验证。
+
+具体来说，一个书项目的数据结构分三层：
+
+```
+.webnovel/state.json                 ← 运行态（角色当前状态、能力等级、关系网、伏笔状态）
+.story-system/MASTER_SETTING.json    ← 设计态（世界观规则、核心约束、题材模板）
+.story-system/chapters/chapter_*.json ← 每章的"施工指令"（目标、禁区、必须覆盖的节点）
+```
+
+每写一章的流程就是：从设计态加载合同 → 组装上下文 → 起草 → 对照合同逐项审查 → 修复 → 提交 → 更新运行态。这跟 CI/CD 管线的思路一模一样。
+
+---
+
+## 架构全景
+
+```
+┌──────────────────────────────────────────────────────┐
+│                    Agent 团队                          │
+│                                                      │
+│   director-agent      章节编剧 + 演员调度              │
+│        │                                              │
+│        ├──→ chapter-writer-agent   起草 + 润色         │
+│        ├──→ actor-agent            角色视角演绎        │
+│        ├──→ reviewer               13 维审查           │
+│        └──→ observer-agent         自由事实提取        │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+                         ↑↓
+┌──────────────────────────────────────────────────────┐
+│               六层数据管道（每写一章走一遍）             │
+│                                                      │
+│  L1 Knowledge    CSV 知识库 + BM25 检索               │
+│       ↓                                              │
+│  L2 Reasoning    题材路由 + 反模式排序                 │
+│       ↓                                              │
+│  L3 Contract     MASTER_SETTING + 卷纲章纲 + 审查合约  │
+│       ↓                                              │
+│  L4 Context      JSON 拼装写作上下文（RAG 检索组装）    │
+│       ↓                                              │
+│  L5 Commit       事实提取 + 事件溯源 + 投影路由        │
+│       ↓                                              │
+│  L6 Projection   5 个 Writer 并行写入（见下方）        │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
+## 五大核心机制
+
+### 1. 故事合约引擎 — 写作的"类型检查器"
+
+> 正如《人月神话》中所说："良好的文档是软件产品成功的关键。"
+
+合同系统是项目的基石，分三个层级层层约束：
+
+| 层级 | 文件 | 职责 | 示例 |
+|------|------|------|------|
+| 主合同 | `MASTER_SETTING.json` | 世界观规则、核心约束、题材模板，锁定后不可绕过 | "本世界无复活术"、"主角天赋上限为 SSS 级" |
+| 卷级合同 | `volumes/volume_*.json` | 本卷故事线、节奏策略、重要角色出场计划 | "第三卷主打学院线，节奏中速" |
+| 章级合同 | `chapters/chapter_*.json` | 本章目标、时间锚点、必须覆盖的节点、禁区 | "本章目标：主角通过入学测试；禁写：越级战斗" |
+
+**Override 合约引擎** 支持世界规则版本化演进——比如"第三卷起开放元婴境界"，可以通过 override 机制在不破坏前文一致性的前提下扩展规则。
+
+**硬约束阻断**：如果 AI 试图写"主角被杀了"但合约规定"主角在本卷不死"，审查阶段会直接标记为 blocking issue，必须重写。
+
+### 2. SSOT 事件溯源 — 永不丢失的事实账本
+
+受 [Narcooo/inkOS](https://github.com/Narcooo/inkOS) 启发，所有状态变更走 append-only 事件日志：
+
+```
+.story-system/events/001.event.json   ←  不可变的事实源头
+.story-system/events/002.event.json
+.story-system/events/003.event.json
+             ↓ 投影重建
+state.json + index.db                 ←  可随时从事件日志重建的物化视图
+```
+
+**Observer→Reflector 双段提取**：Observer（自由文本提取）确保"宁可多提不漏"，Reflector（Pydantic Schema 校验）确保"只要合法的结构化数据"。两段配合，兼顾覆盖率和结构化。
+
+```bash
+# 验证一致性：对比投影与事件日志，发现数据漂移
+python webnovel.py ssot verify --project-root /path/to/book
+
+# 从事件日志完整重建所有投影
+python webnovel.py ssot rebuild --project-root /path/to/book
+```
+
+### 3. 分层审查管线 — 三道防线
+
+写完一章不代表它"合格"。审查管线像 CI 一样逐层把关：
+
+```
+草稿完成
+  │
+  ▼
+┌─────────────┐
+│ Code Checker │  硬约束预处理：正则扫描规则违反（如"破折号>20个"直接标红）
+└──────┬──────┘
+       ▼
+┌─────────────┐
+│  Reviewer    │  6 维度结构化检查（设定/时间线/叙事连贯/角色一致性/逻辑/规则）
+│  (最多2轮)   │  每轮发现问题 → 修复 → 再审 → 收敛或标记 blocking
+└──────┬──────┘
+       ▼
+┌─────────────┐
+│  Polish      │  润色审查：AI 味检测、节奏评估、文风适配
+└──────┬──────┘
+       ▼
+   通过 → 提交
+```
+
+审查不是"感觉好不好"的模糊判断，而是精确到行号的证据比对——每条 issue 都带精确位置和引用证据。
+
+### 4. 记忆系统 — 让 AI 记住 200 章
+
+三层记忆，逐层压缩：
+
+| 层 | 存储 | 容量策略 | 例子 |
+|----|------|---------|------|
+| **工作记忆** | 上下文窗口 | 最近 3-5 章全文 | "刚才主角在洞穴里捡到了什么" |
+| **情节记忆** | 章节摘要 + 伏笔表 | 全本，结构化索引 | "第 47 章埋的伏笔：神秘玉佩" |
+| **语义记忆** | 向量数据库 | 全本，RAG 按需检索 | "所有提到'古剑宗'的段落" |
+
+BM25（关键词匹配）+ Embedding（语义相似）+ Rerank（精确排序）三层检索确保上下文组装的既全面又精准。
+
+### 5. Graph-RAG + DebtTracker — 关系网与伏笔追债
+
+**Graph-RAG 实体关系图谱**（SQLite 持久化）追踪角色间的关系变化：
+```
+主角 ──同盟──→ 男二
+  │             │
+  │敌对         │师徒
+  ↓             ↓
+反派Boss ←──暗恋── 女主
+```
+
+**DebtTracker 伏笔追踪**：每埋一个伏笔就创建一条"债务"，设定偿还期限（默认 10 章内）。到期未还 → 阻塞新章生成 → 强制作者先填坑。
+
+---
+
+## Dashboard 可视化面板
+
+除了命令行，项目提供了一个 React 19 + FastAPI 的全功能 Web 面板：
+
+```bash
+cd .opencode/dashboard/frontend && npm install && npm run build
+python -m dashboard.server --project-root /path/to/book
+# 打开 http://127.0.0.1:8765
+```
+
+| 页面 | 功能 |
+|------|------|
+| 总览仪表盘 | 写作进度、审查分趋势、环境状态一目了然 |
+| 上下文健康 | 每章上下文包含/排除的 section、token 预算、关键 section 告警 |
+| 角色图鉴 | 全角色列表、状态变更历史、事件追踪 |
+| 审查分析 | 审查分趋势、各维度问题分布、收敛轮次 |
+| 节奏雷达 | 情节线交替、字数波动、高潮低谷可视化 |
+| 伏笔追踪 | 活跃伏笔、即将到期提醒、回收状态 |
+| 文档浏览 | 正文/大纲/设定集三目录树，支持在线编辑 |
+| 文风编辑器 | 5 级文风约束（全局/禁止模式/写作技法/名家技法/章级合同） |
+| 执行追踪 | 每章 trace.json 详情，context.json token 分布 |
+| 系统状态 | 向量库、RAG 模式、SSOT 一致性检查 |
+
+**多项目切换**：侧栏下拉框可切换不同书项目，SSE 实时推送刷新。
+
+**名家技法采集**：支持在线搜索作家作品 或 上传 `.txt`/`.md` 整本小说，自动分章后调用本地 Ollama 大模型分析文风（叙事语调 / 描写风格 / 节奏控制 / 对话风格 / 人物塑造五个维度）。
+
+---
+
+## 快速开始
+
+```bash
+# 安装
+curl -fsSL https://raw.githubusercontent.com/lujih/webnovel-writer-opencode/master/install.py | python3
+
+# 配置 API Key（编辑 .env）
+EMBED_API_KEY=your_embed_key      # Embedding 模型
+RERANK_API_KEY=your_rerank_key    # Rerank 模型
+
+# 初始化第一本书
+/webnovel-init
+
+# 日常写作流程
+/webnovel-plan     # 规划大纲
+/webnovel-write    # 写一章
+/webnovel-review   # 审查质量
+```
+
+## 命令一览
+
+| 命令 | 用途 | 场景 |
+|------|------|------|
+| `/webnovel-init` | 初始化新书，收集世界观、角色、力量体系 | 开始新书 |
+| `/webnovel-plan` | 生成卷纲、时间线、章纲 | 规划故事 |
+| `/webnovel-write` | 单章写作：上下文→起草→审查→润色→提交 | 日常写作 |
+| `/webnovel-write-batch` | 连续写多章 | 集中赶稿 |
+| `/webnovel-review` | 13 维度结构化审查 | 质量把控 |
+| `/webnovel-rewrite` | 删除旧章后重写 | 翻修 |
+| `/webnovel-heal` | 诊断并修复问题章节（OOC、矛盾） | 修复 |
+| `/webnovel-delete` | 安全删除章节并清理关联数据 | 回退 |
+| `/webnovel-export` | 导出 MD/TXT/EPUB/DOCX/PDF | 分发 |
+| `/webnovel-publish` | 发布到番茄小说等平台 | 上线 |
+| `/webnovel-query` | 查询设定、角色、力量体系、伏笔 | 检索 |
+| `/webnovel-collect` | 名家文风采集（搜索 + 本地上传） | 学习 |
+| `/webnovel-dashboard` | 可视化面板 + 多项目切换 + 文风编辑 | 管理 |
+| `/webnovel-style` | 加载导演文风与写作技法 | 风格参考 |
+
+> 正如《C++编程思想》中所说："代码的清晰是优秀软件的基石。" 每个命令都设计为自解释的——告诉系统"做什么"，它会自动处理"怎么做"。
+
+---
+
+## 项目结构
+
+```
+webnovel-writer-opencode/
+├── install.py                         # 一键安装
+├── .env                               # API 配置
+│
+├── .opencode/                         # OpenCode 引擎核心
+│   ├── agents/                        # 10 个 Agent
+│   │   ├── director-agent.md          #   导演 — 编剧 + 调度
+│   │   ├── chapter-writer-agent.md    #   写手 — 起草 + 润色
+│   │   ├── reviewer.md                #   审查 — 13 维检查
+│   │   ├── actor-agent.md             #   演员 — 角色视角演绎
+│   │   ├── observer-agent.md          #   观察者 — 自由事实提取
+│   │   ├── data-agent.md              #   数据 — 结构化提取
+│   │   ├── deconstruction-agent.md    #   解构 — 作品分析
+│   │   └── style-collector-agent.md   #   采集 — 名家文风
+│   │
+│   ├── skills/                        # 14 个 Skill
+│   │
+│   ├── dashboard/                     # 可视化面板
+│   │   ├── app.py                     #   FastAPI 入口（80+ 端点）
+│   │   ├── server.py                  #   五级项目路径解析
+│   │   ├── core/config.py             #   多项目注册与切换
+│   │   ├── routers/                   #   路由（files/chapters/entities/contracts）
+│   │   ├── services/                  #   分章引擎 + 文风分析 + DB
+│   │   └── frontend/                  #   React 19 + ECharts
+│   │
+│   ├── references/                    # 结构化知识库
+│   │   ├── csv/                       #   9 张知识表 + BM25
+│   │   ├── writing/                   #   写作技法参考
+│   │   └── review/                    #   审查规则
+│   │
+│   ├── genres/                        # 38+ 题材模板
+│   └── scripts/                       # Python 核心
+│       ├── webnovel.py                #   CLI 统一入口（28 子命令）
+│       └── data_modules/              #   60+ 核心模块
+│
+└── docs/                              # 架构 / 指南 / 运维文档
+```
+
+---
+
+## 技术渊源
+
+本项目有两个主要上游：
+
+| 来源 | 贡献 |
+|------|------|
+| [lingfengQAQ/webnovel-writer](https://github.com/lingfengQAQ/webnovel-writer) | 原项目，奠定核心写作流程和 Agent 协作模式 |
+| [Narcooo/inkOS](https://github.com/Narcooo/inkOS) | SSOT 事件溯源、Observer→Reflector 双段提取、7 文件真相投影 |
+
+在此基础上扩展了：审查器体系（13 维 + 收敛）、CSV 结构化知识库、故事合约引擎、记忆系统、Graph-RAG、DebtTracker、Dashboard 面板、多项目支持、名家技法采集、发布通道。
+
+---
+
+## 贡献
+
+遵循 [Conventional Commits](https://www.conventionalcommits.org/)：
+
+```
+feat: 添加多项目切换支持
+Co-Authored-By: AI Assistant <noreply@anthropic.com>
+```
+
+常用类型：`feat:` / `fix:` / `refactor:` / `docs:` / `test:` / `perf:`
+
+## 致谢
+
+| 贡献者 | 贡献内容 |
+|--------|----------|
+| [lingfengQAQ](https://github.com/lingfengQAQ) | 原项目作者 |
+| [Narcooo/inkOS](https://github.com/Narcooo/inkOS) | SSOT 架构设计灵感 |
+| [Cppys/OpenNovel](https://github.com/Cppys/OpenNovel) | 番茄发布技术参考 |
+| [@YuerLee](https://github.com/YuerLee) | macOS 兼容性、安装脚本优化 |
+
+## License
+
+GPL v3 © [lujih](https://github.com/lujih)
