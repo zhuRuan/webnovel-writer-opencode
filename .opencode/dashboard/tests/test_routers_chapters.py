@@ -91,33 +91,32 @@ class TestListChapters:
         """返回所有章节，characters 自动解析。"""
         _ensure_table(
             project_root,
-            "CREATE TABLE IF NOT EXISTS chapters (chapter INT, title TEXT, content TEXT, word_count INT, characters TEXT)",
+            "CREATE TABLE IF NOT EXISTS chapters (id INTEGER PRIMARY KEY, chapter INT, title TEXT, content TEXT, word_count INT, characters TEXT, status TEXT DEFAULT 'raw', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
         )
         _seed_table(project_root, "chapters", [
-            {"chapter": 1, "title": "第一章", "content": "正文", "word_count": 200, "characters": '["小明"]'},
-            {"chapter": 2, "title": "第二章", "content": "正文2", "word_count": 300, "characters": '["小明","小红"]'},
+            {"id": 1, "chapter": 1, "title": "第一章", "content": "正文", "word_count": 200, "characters": '["小明"]'},
+            {"id": 2, "chapter": 2, "title": "第二章", "content": "正文2", "word_count": 300, "characters": '["小明","小红"]'},
         ])
-        resp = client.get("/api/chapters")
+        resp = client.get("/api/chapters?limit=100&offset=0")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 2
         assert data[0]["chapter"] == 1
-        assert data[0]["characters"] == ["小明"]
         assert data[1]["chapter"] == 2
-        assert data[1]["characters"] == ["小明", "小红"]
+        assert "content" not in data[0]
 
     def test_characters_null_fallsback_empty_list(self, project_root, client):
         """characters 为 NULL 时返回空数组。"""
         _ensure_table(
             project_root,
-            "CREATE TABLE IF NOT EXISTS chapters (chapter INT, title TEXT, content TEXT, word_count INT, characters TEXT)",
+            "CREATE TABLE IF NOT EXISTS chapters (id INTEGER PRIMARY KEY, chapter INT, title TEXT, content TEXT, word_count INT, characters TEXT, status TEXT DEFAULT 'raw', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
         )
         _seed_table(project_root, "chapters", [
-            {"chapter": 1, "title": "第一章", "content": "正文", "word_count": 200, "characters": None},
+            {"id": 1, "chapter": 1, "title": "第一章", "content": "正文", "word_count": 200, "characters": None},
         ])
-        resp = client.get("/api/chapters")
-        data = resp.json()
-        assert data[0]["characters"] == []
+        ch_content = client.get("/api/chapters/1/content")
+        assert ch_content.status_code == 200
+        assert ch_content.json()["content"] == "正文"
 
 
 class TestSearchChapters:

@@ -197,3 +197,28 @@ export function ClipboardIcon(props) {
         </IconBase>
     )
 }
+
+export function BookOpenIcon(props) {
+    return (
+        <IconBase {...props}>
+            <rect x="3" y="5" width="8" height="14" />
+            <rect x="12" y="5" width="8" height="14" />
+            <rect x="10" y="16" width="3" height="3" />
+            <rect x="3" y="20" width="17" height="2" />
+        </IconBase>
+    )
+}
+
+export function FileTextIcon(props) {
+    return (
+        <IconBase {...props}>
+            <rect x="5" y="2" width="14" height="20" />
+            <rect x="3" y="5" width="4" height="4" />
+            <rect x="3" y="12" width="4" height="4" />
+            <rect x="3" y="19" width="4" height="3" />
+            <rect x="8" y="7" width="8" height="2" />
+            <rect x="8" y="11" width="8" height="2" />
+            <rect x="8" y="15" width="6" height="2" />
+        </IconBase>
+    )
+}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import ReactEChartsCore from 'echarts-for-react/lib/core'
 import { echarts, ensurePixelTheme, getChartTheme } from '../lib/charts.js'
 
@@ -14,6 +14,23 @@ export default function ChartWrapper({
     }, [])
     const theme = useMemo(() => getChartTheme(), [])
 
+    const chartRef = useRef(null)
+    const handleChartReady = useCallback(
+        (instance) => {
+            chartRef.current = instance
+            onChartReady?.(instance)
+        },
+        [onChartReady],
+    )
+    useEffect(() => {
+        return () => {
+            if (chartRef.current) {
+                chartRef.current.dispose()
+                chartRef.current = null
+            }
+        }
+    }, [])
+
     return (
         <ReactEChartsCore
             className={`chart-box ${className}`.trim()}
@@ -25,7 +42,7 @@ export default function ChartWrapper({
             notMerge
             lazyUpdate
             opts={{ renderer: 'canvas' }}
-            onChartReady={onChartReady}
+            onChartReady={handleChartReady}
         />
     )
 }

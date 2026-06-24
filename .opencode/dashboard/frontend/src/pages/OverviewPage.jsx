@@ -49,10 +49,12 @@ function toneForUrgencyBadge(level) {
 
 function formatRuntimeText(runtimeHealth) {
     if (!runtimeHealth) return '运行态未加载'
-    const fallback = Array.isArray(runtimeHealth.fallback_sources) && runtimeHealth.fallback_sources.length
-        ? runtimeHealth.fallback_sources.join(' / ')
-        : 'none'
-    return `${runtimeHealth.latest_commit_status || 'missing'} · fallback ${fallback}`
+    const status = runtimeHealth.latest_commit_status || 'missing'
+    const sources = Array.isArray(runtimeHealth.fallback_sources) && runtimeHealth.fallback_sources.length
+        ? runtimeHealth.fallback_sources.join('/')
+        : ''
+    if (sources) return `提交 ${status} · 降级 ${sources}`
+    return `最后提交 ${status}`
 }
 
 function buildReviewOption(items) {
@@ -443,7 +445,14 @@ export default function OverviewPage() {
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '12px 0' }}>
-                        {Object.entries(workflow).sort(([a], [b]) => Number(a) - Number(b)).slice(-1).map(([ch, stages]) => (
+                        {Object.entries(workflow).sort(([a], [b]) => Number(a) - Number(b)).slice(-8).map(([ch, info]) => {
+                            const orderedStages = ['PLANNING', 'DRAFTING', 'REVIEWING', 'REVISING', 'COMMITTED']
+                            const current = info?.stage || (info?.complete ? 'COMMITTED' : 'PLANNING')
+                            const currentIdx = orderedStages.indexOf(current)
+                            const stages = {}
+                            orderedStages.forEach((s, i) => { if (i <= currentIdx) stages[s] = true })
+                            stages._current_stage = current
+                            return (
                             <div key={ch} style={{ width: '100%' }}>
                                 <div style={{ fontWeight: 600, marginBottom: 8 }}>第 {ch} 章</div>
                                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -465,13 +474,14 @@ export default function OverviewPage() {
                                         )
                                     })}
                                 </div>
-                                <div style={{ display: 'flex', gap: 4, marginTop: 4, fontSize: 10, color: '#888' }}>
+                                <div style={{ display: 'flex', gap: 4, marginTop: 4, fontSize: 11, color: 'var(--text-mute)' }}>
                                     {['PLANNING', 'DRAFTING', 'REVIEWING', 'REVISING', 'COMMITTED'].map(stage => (
                                         <span key={stage} style={{ flex: 1, textAlign: 'center' }}>{stage === 'COMMITTED' ? 'DONE' : stage.slice(0, 4)}</span>
                                     ))}
                                 </div>
                             </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </article>
             )}

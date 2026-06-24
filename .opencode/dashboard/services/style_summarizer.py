@@ -143,19 +143,150 @@ def _estimate_chapter_count(summaries: list[dict]) -> int:
     return 0
 
 
-def save_summaries_to_db(summaries: list[dict], db_path: str) -> list[int]:
-    """将维度总结写入 style_summaries 表。
+def cluster_techniques(analyses: list[dict]) -> list[dict]:
+    """Cluster extracted techniques by category → sub_category → technique name.
 
-    使用 StyleCollectorDAO.insert_summary() 写入。
-    每个维度写入一条记录。
+    Each analysis entry may have "techniques" key (list) from the new format
+    or dimension keys (dict) from the old format.
+
+    Returns:
+        [{
+            "category": "人物",
+            "technique_count": 5,
+            "total_occurrences": 12,
+            "techniques": [{
+                "technique": "配角番外补完法",
+                "count": 12,
+                "description": "merged best description",
+                "examples": ["原文例1", "原文例2", ...],
+                "all_examples": 50,
+                "scenes": ["高人气配角外传", ...],
+                "sub_categories": ["配角塑造", ...]
+            }]
+        }, ...]
+    """
+    from collections import defaultdict
+
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Cluster: technique_name → {descriptions, examples, scenes, sub_categories, count}
+    clusters: dict[str, dict[str, Any]] = defaultdict(lambda: {
+        "technique": "",
+        "descriptions": [],
+        "examples": [],
+        "scenes": set(),
+        "sub_categories": set(),
+        "count": 0,
+    })
+
+    for analysis in analyses:
+        if not analysis:
+            continue
+        # New format: has "techniques" key
+        if "techniques" in analysis and isinstance(analysis["techniques"], list):
+            for t in analysis["techniques"]:
+                if not isinstance(t, dict):
+                    continue
+                name = t.get("technique", "").strip()
+                if not name:
+                    continue
+                c = clusters[name]
+                c["technique"] = name
+                c["count"] += 1
+                if t.get("description"):
+                    c["descriptions"].append(t["description"])
+                if t.get("text_example"):
+                    c["examples"].append(t["text_example"])
+                if t.get("category"):
+                    c["category"] = t["category"]  # last writer wins
+                if t.get("sub_category"):
+                    c["sub_categories"].add(t["sub_category"])
+                for scene in t.get("applicable_scenes", []):
+                    if scene:
+                        c["scenes"].add(scene)
+        # Old format: has dimension keys (skip — old format doesn't have techniques)
+        else:
+            pass
+
+    if not clusters:
+        logger.warning("cluster_techniques: no techniques found in %d analyses", len(analyses))
+        return []
+
+    # Sort by frequency descending
+    all_techniques = sorted(clusters.values(), key=lambda x: -x["count"])
+
+    # Group by category
+    by_category: dict[str, list] = {}
+    for t in all_techniques:
+        cat = t.get("category") or "其他"
+        if cat not in by_category:
+            by_category[cat] = []
+        by_category[cat].append({
+            "technique": t["technique"],
+            "count": t["count"],
+            "description": t["descriptions"][0] if t["descriptions"] else "",
+            "examples": t["examples"][:5],  # top 5 examples
+            "all_examples": len(t["examples"]),
+            "scenes": sorted(t["scenes"]),
+            "sub_categories": sorted(t["sub_categories"]),
+        })
+
+    result: list[dict] = []
+    for cat, techniques in sorted(by_category.items()):
+        result.append({
+            "category": cat,
+            "technique_count": len(techniques),
+            "total_occurrences": sum(t["count"] for t in techniques),
+            "techniques": techniques,
+        })
+
+    return result
+
+
+def _format_category_summary(cat_group: dict) -> str:
+    """Format category group as structured JSON (replaces legacy markdown format).
+
+    Stores the full clustered technique data as JSON so downstream consumers
+    (publish pipeline, agent AI summary) can read structured fields directly
+    instead of fragile regex-parsing of markdown headers.
+    """
+    import json as _json
+    structured = {
+        "format": "technique-cluster-v2",
+        "category": cat_group.get("category", ""),
+        "technique_count": cat_group.get("technique_count", 0),
+        "total_occurrences": cat_group.get("total_occurrences", 0),
+        "techniques": [
+            {
+                "name": t["technique"],
+                "occurrence_count": t["count"],
+                "description": t.get("description", ""),
+                "examples": t.get("examples", []),
+                "all_examples": t.get("all_examples", 0),
+                "applicable_scenes": t.get("scenes", []),
+                "sub_categories": t.get("sub_categories", []),
+            }
+            for t in cat_group.get("techniques", [])
+        ],
+    }
+    return _json.dumps(structured, ensure_ascii=False, indent=2)
+
+
+def save_summaries_to_db(summaries: list[dict], db_path: str) -> list[int]:
+    """Save summaries to style_summaries table.
+
+    Supports both dimension format (from summarize_by_dimension) and
+    cluster format (from cluster_techniques). Detects format automatically.
 
     Args:
-        summaries: `summarize_by_dimension()` 的输出，每项需含
-            dimension, display_name, summary, score 字段。
+        summaries: Either dimension summaries (each has 'dimension', 'display_name',
+            'summary') or clustered categories (each has 'category', 'techniques').
         db_path: SQLite 数据库路径。
 
     Returns:
-        list[int]: 每条插入记录的 row id。
+        list[int]: Row IDs of each inserted record.
     """
     from data_modules.dao.style_collector_dao import StyleCollectorDAO
 
@@ -163,16 +294,34 @@ def save_summaries_to_db(summaries: list[dict], db_path: str) -> list[int]:
     inserted_ids: list[int] = []
 
     for s in summaries:
-        record = {
-            "author": s.get("author", ""),
-            "work_title": s.get("work_title", ""),
-            "summary_title": f"{s.get('author', '')} - {s['display_name']}",
-            "category": s["display_name"],
-            "content": s["summary"],
-            "examples": s.get("examples", []),
-            "keywords": s.get("keywords", []),
-            "chapter_range": s.get("chapter_range", ""),
-        }
+        if not isinstance(s, dict):
+            continue
+
+        # Detect format: cluster format has "techniques" key
+        if "techniques" in s:
+            # ── New cluster format (from cluster_techniques) ──
+            record = {
+                "author": s.get("author", ""),
+                "work_title": s.get("work_title", ""),
+                "summary_title": f"技法聚类 - {s['category']}",
+                "category": s["category"],
+                "content": _format_category_summary(s),
+                "examples": s.get("techniques", []),
+                "keywords": [t["technique"] for t in s.get("techniques", [])],
+                "chapter_range": s.get("chapter_range", ""),
+            }
+        else:
+            # ── Old dimension format (from summarize_by_dimension) ──
+            record = {
+                "author": s.get("author", ""),
+                "work_title": s.get("work_title", ""),
+                "summary_title": f"{s.get('author', '')} - {s['display_name']}",
+                "category": s["display_name"],
+                "content": s["summary"],
+                "examples": s.get("examples", []),
+                "keywords": s.get("keywords", []),
+                "chapter_range": s.get("chapter_range", ""),
+            }
         row_id = dao.insert_summary(record)
         inserted_ids.append(row_id)
 

@@ -75,36 +75,33 @@ _EN_TO_CN: dict[str, str] = {v: k for k, v in _CN_TO_EN.items()}
 ALL_DIMENSIONS: list[str] = list(_CN_TO_EN.values())
 
 # ── Prompt 模板 ─────────────────────────────────────────────
-_ANALYSIS_PROMPT = """你是一位资深文学评论家。请仔细阅读以下小说片段，从以下 9 个维度分析其文风特征。
+_ANALYSIS_PROMPT = """你是一位写作技法分析专家。仔细阅读以下小说片段，提取作者使用的具体写作技法。
 
-## 主要维度（5 个）
-1. 句式特征：分析句长分布和断句风格。短句主导→快节奏、紧张；长句主导→绵密细腻、舒缓。注意排比、对仗、长短句交替的使用。
-2. 叙事视角：人称选择（第一/二/三人称）、全知/限知程度、叙述者参与度、视角切换频率。
-3. 节奏控制：章节内快慢段落分布、叙事密度、高潮密度、场景切换节奏、爽点间距。
-4. 情感张力：情绪强度曲线、高潮铺垫方式、冲突强度、爽点密度与分布、情绪起伏节奏。
-5. 对白风格：对白占全文比例、对白方式（直接引语/间接引语）、对白推动剧情的程度、人物语言的个性化程度。
+每个技法必须包含：
+1. category — 分类（人物/对话/场景/节奏/情节/情感/文笔/动作/表现）
+2. sub_category — 子分类（如"配角塑造"、"对话声线"、"情绪递进"等细粒度标签）
+3. technique — 技法名称（4-8字，精炼有力）
+4. description — 50-150字解释这个技法在片段中的效果
+5. text_example — 直接从片段中摘录 2-5 句原文作为例证
+6. applicable_scenes — 2-4 个适用场景关键词
 
-## 次要维度（4 个）
-6. 词汇质地：用词偏好（古风/现代/口语/书面语）、词汇丰富度、成语和俗语使用频率。
-7. 修辞手法：比喻、拟人、排比、反复、夸张、反问等修辞手法的使用频率和多样性。
-8. 描写偏好：环境描写、动作描写、心理描写、外貌描写的比例倾向。
-9. 人物塑造：角色的出场方式、通过行动/对白/心理/外貌展现性格的手法、侧面烘托技巧。
+要求：
+- 至少提取 5 个技法
+- 技法必须覆盖至少 3 个不同分类
+- text_example 必须是原文原句，不要改写
+- 不要重复同类技法
 
-## 输出要求
-请严格按以下 JSON 格式输出，不要包含任何其他内容（不要 markdown 代码块标记）：
-{{
-  "句式特征": {{"summary": "分析总结文本，50-200字", "score": 0.75}},
-  "叙事视角": {{"summary": "分析总结文本，50-200字", "score": 0.60}},
-  "节奏控制": {{"summary": "分析总结文本，50-200字", "score": 0.80}},
-  "情感张力": {{"summary": "分析总结文本，50-200字", "score": 0.70}},
-  "对白风格": {{"summary": "分析总结文本，50-200字", "score": 0.65}},
-  "词汇质地": {{"summary": "分析总结文本，50-200字", "score": 0.55}},
-  "修辞手法": {{"summary": "分析总结文本，50-200字", "score": 0.50}},
-  "描写偏好": {{"summary": "分析总结文本，50-200字", "score": 0.60}},
-  "人物塑造": {{"summary": "分析总结文本，50-200字", "score": 0.65}}
-}}
-
-score 为 0-1 之间的浮点数，表示该维度在文中的表现强度 / 特征鲜明度。
+请严格按 JSON 数组格式输出，不要包含任何其他内容（不要 markdown 代码块标记）：
+[
+  {{
+    "category": "人物",
+    "sub_category": "配角塑造",
+    "technique": "配角番外补完法",
+    "description": "通过番外篇补充正文未展开的角色动机和隐性行动逻辑，让配角形象更立体。",
+    "text_example": "原文具体段落...",
+    "applicable_scenes": ["高人气配角外传", "主线空白期补足"]
+  }}
+]
 
 ## 待分析文本
 {text}"""
@@ -119,8 +116,8 @@ async def analyze_chapter_text(
     *,
     model: str = OLLAMA_MODEL,
     timeout: int = DEFAULT_TIMEOUT,
-) -> dict[str, dict[str, Any]]:
-    """对单章文本进行 9 维度文风分析。
+) -> dict[str, Any]:
+    """对单章文本进行写作技法提取分析（支持旧 9 维度格式回退）。
 
     Args:
         text: 章节正文文本（建议 1000-8000 字，超长自动截断至 {MAX_TEXT_CHARS} 字）。
@@ -162,15 +159,21 @@ async def analyze_chapter_text(
         data = json.loads(raw_response)
         response_text = data.get("message", {}).get("content", "")
 
-        # 提取 JSON 并映射到英文字段
+        # Try new technique format first
+        techniques = _parse_technique_array(response_text)
+        if techniques:
+            return {"techniques": techniques}
+
+        # Fallback: try old 9-dimension format
         cn_result = _parse_analysis_json(response_text)
-        mapped = _map_cn_to_en(cn_result)
+        if cn_result:
+            mapped = _map_cn_to_en(cn_result)
+            # 维度筛选
+            if dimensions is not None:
+                mapped = {k: v for k, v in mapped.items() if k in dimensions}
+            return mapped
 
-        # 维度筛选
-        if dimensions is not None:
-            mapped = {k: v for k, v in mapped.items() if k in dimensions}
-
-        return mapped
+        return {}
 
     except asyncio.TimeoutError:
         logger.warning("Ollama 分析超时 (%ds)", timeout)
@@ -278,6 +281,31 @@ def _parse_dimensions_regex(raw: str) -> dict:
             except (json.JSONDecodeError, KeyError, TypeError):
                 pass
     return result
+
+
+def _parse_technique_array(raw: str) -> list[dict]:
+    """Parse technique extraction JSON array from model response."""
+    raw = raw.strip()
+    if not raw:
+        return []
+    # Strategy 1: direct parse
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list) and len(parsed) > 0:
+            return parsed
+    except json.JSONDecodeError:
+        pass
+    # Strategy 2: extract between [ and ]
+    start = raw.find("[")
+    end = raw.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        try:
+            parsed = json.loads(raw[start:end + 1])
+            if isinstance(parsed, list):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+    return []
 
 
 def _has_known_dimension(parsed: dict) -> bool:

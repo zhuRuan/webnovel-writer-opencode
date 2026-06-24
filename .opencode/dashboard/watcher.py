@@ -78,6 +78,7 @@ class FileWatcher:
         self._observer: Observer | None = None
         self._subscribers: list[asyncio.Queue] = []
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._last_heartbeat: dict[int, float] = {}  # subscriber index → last activity timestamp
 
     # --- 订阅管理 ---
 
@@ -100,10 +101,24 @@ class FileWatcher:
         if self._loop and not self._loop.is_closed():
             self._loop.call_soon_threadsafe(self._dispatch, msg)
 
+    def _prune_dead_subscribers(self):
+        """Remove subscribers inactive for more than 60 seconds."""
+        now = time.time()
+        dead = [
+            idx for idx in self._last_heartbeat
+            if now - self._last_heartbeat[idx] > 60
+            and idx < len(self._subscribers)
+        ]
+        for idx in reversed(sorted(dead)):
+            self._subscribers.pop(idx)
+            self._last_heartbeat.pop(idx, None)
+
     def _dispatch(self, msg: str):
-        for q in self._subscribers:
+        self._prune_dead_subscribers()
+        for idx, q in enumerate(self._subscribers):
             try:
                 q.put_nowait(msg)
+                self._last_heartbeat[idx] = time.time()
             except asyncio.QueueFull:
                 # Drain oldest message to make room; keep client connected
                 try:
@@ -112,6 +127,7 @@ class FileWatcher:
                     pass
                 try:
                     q.put_nowait(msg)
+                    self._last_heartbeat[idx] = time.time()
                 except asyncio.QueueFull:
                     pass  # drop if still full after drain
 

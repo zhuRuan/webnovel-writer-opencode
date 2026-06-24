@@ -129,7 +129,7 @@ export default function SystemPage() {
             {
                 name: 'vector_db',
                 ok: envStatus.vector_db?.exists && !envStatus.vector_db?.error,
-                detail: `${envStatus.vector_db?.record_count || 0} records · ${envStatus.vector_db?.size_bytes || 0} bytes`,
+                detail: `${envStatus.vector_db?.record_count || 0} 条记录 · ${envStatus.vector_db?.size_bytes || 0} 字节`,
             },
             {
                 name: 'rag_mode',
@@ -147,31 +147,33 @@ export default function SystemPage() {
 
             <div className="stat-grid">
                 <StatCard
-                    label="Story Runtime"
-                    value={runtimeHealth?.mainline_ready ? 'Mainline' : 'Fallback'}
-                    sub={`fallback: ${(runtimeHealth?.fallback_sources || []).join(', ') || 'none'}`}
+                    label="故事运行时"
+                    value={runtimeHealth?.mainline_ready ? '主链' : '降级'}
+                    sub={runtimeHealth?.mainline_ready
+                        ? `提交 ${runtimeHealth?.latest_commit_status || '—'}`
+                        : `降级 ${(runtimeHealth?.fallback_sources || []).join(', ') || '未知'}`}
                 />
                 <StatCard
-                    label="Latest Commit"
-                    value={latestCommit?.status || runtimeHealth?.latest_commit_status || 'missing'}
+                    label="最近提交"
+                    value={latestCommit?.status || runtimeHealth?.latest_commit_status || '缺失'}
                     sub={latestCommit ? `${formatChapterLabel(latestCommit.chapter)} · ${projectionSummary(latestCommit.projection_status)}` : '暂无 commit 数据'}
                 />
                 <StatCard
-                    label="RAG Mode"
+                    label="RAG 模式"
                     value={envStatus?.rag_mode || 'unknown'}
-                    sub={`${envStatus?.embed?.api_key_present ? 'embed ready' : 'embed missing'} · ${envStatus?.rerank?.api_key_present ? 'rerank ready' : 'rerank missing'}`}
+                    sub={`${envStatus?.embed?.api_key_present ? '嵌入就绪' : '嵌入缺失'} · ${envStatus?.rerank?.api_key_present ? '重排就绪' : '重排缺失'}`}
                 />
                 <StatCard
-                    label="Vector DB"
+                    label="向量库"
                     value={formatNumber(envStatus?.vector_db?.record_count || 0)}
-                    sub={`${envStatus?.vector_db?.size_bytes || 0} bytes`}
+                    sub={`${envStatus?.vector_db?.size_bytes || 0} 字节`}
                 />
             </div>
 
             <article className="card">
                 <div className="card-header">
                     <div>
-                        <div className="section-label">CONTRACT TREE</div>
+                        <div className="section-label">合同树</div>
                         <div className="card-title">合同树概览</div>
                     </div>
                     {contractsSummary ? <Badge tone="purple">{formatChapterLabel(contractsSummary.chapter)}</Badge> : null}
@@ -197,7 +199,7 @@ export default function SystemPage() {
             <article className="card">
                 <div className="card-header">
                     <div>
-                        <div className="section-label">RECENT COMMITS</div>
+                        <div className="section-label">提交历史</div>
                         <div className="card-title">最近 Commit 历史</div>
                     </div>
                     <Badge tone="amber">{commits.length} 条</Badge>
@@ -256,7 +258,7 @@ export default function SystemPage() {
             <article className="card">
                 <div className="card-header">
                     <div>
-                        <div className="section-label">RAG DIAGNOSIS</div>
+                        <div className="section-label">RAG 诊断</div>
                         <div className="card-title">RAG 环境</div>
                     </div>
                     <button
@@ -300,7 +302,7 @@ export default function SystemPage() {
             <article className="card">
                 <div className="card-header">
                     <div>
-                        <div className="section-label">OPERATIONS</div>
+                        <div className="section-label">运维操作</div>
                         <div className="card-title">运维操作</div>
                     </div>
                 </div>
@@ -355,7 +357,7 @@ export default function SystemPage() {
             <article className="card">
                 <div className="card-header">
                     <div>
-                        <div className="section-label">BATCH OPERATIONS</div>
+                        <div className="section-label">批量操作</div>
                         <div className="card-title">批量操作</div>
                     </div>
                 </div>

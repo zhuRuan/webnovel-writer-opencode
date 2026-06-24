@@ -124,6 +124,49 @@ _CHAPTER_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("numeric_prefix", _RE_NUMERIC_PREFIX),
 ]
 
+# ---------------------------------------------------------------------------
+# 卷 / 篇 / 部 标记正则模式（不改变章节编号，仅标注所属卷）
+# ---------------------------------------------------------------------------
+
+# 中文卷标记 — 行首 "第一卷 标题"
+_RE_CN_VOLUME = re.compile(
+    r"^第\s*([零一二三四五六七八九十百千万两\d]+)\s*卷(?:\s|$)\s*(.*)",
+    re.MULTILINE,
+)
+
+# 中文篇标记 — 行首 "第一篇 标题"
+_RE_CN_PART = re.compile(
+    r"^第\s*([零一二三四五六七八九十百千万两\d]+)\s*篇(?:\s|$)\s*(.*)",
+    re.MULTILINE,
+)
+
+# 中文部标记 — 行首 "第一部 标题"
+_RE_CN_BOOK = re.compile(
+    r"^第\s*([零一二三四五六七八九十百千万两\d]+)\s*部(?:\s|$)\s*(.*)",
+    re.MULTILINE,
+)
+
+# 英文卷标记 — 行首 "Part 1: Title" 或 "Part 1 Title"
+_RE_EN_PART = re.compile(
+    r"^Part\s+(\d+)\s*[：:\s]?\s*(.*)",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+# 卷模式合并列表（按维护的 label 区分）
+_VOLUME_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("cn_volume", _RE_CN_VOLUME),
+    ("cn_part", _RE_CN_PART),
+    ("cn_book", _RE_CN_BOOK),
+    ("en_part", _RE_EN_PART),
+]
+
+# 卷标记类型 → 中文前缀的映射（用于拼装卷标题）
+_CN_TYPE_LABEL: dict[str, str] = {
+    "cn_volume": "卷",
+    "cn_part": "篇",
+    "cn_book": "部",
+}
+
 
 # ---------------------------------------------------------------------------
 # Data Classes
@@ -146,6 +189,8 @@ class ChapterSegment:
     """该章节边界是否可疑（由验证规则标记）。"""
     match_type: str = "unknown"
     """匹配所用的模式类型：cn_chapter / arabic_chapter / en_chapter / numeric_heading。"""
+    volume_title: str = ""
+    """所属卷/篇/部的标题（如"第一卷 初始"）。从最近的卷标记继承。"""
     meta: dict[str, Any] = field(default_factory=dict)
     """额外的元数据（如原文匹配到的完整行等）。"""
 
@@ -190,9 +235,9 @@ def split_chapters(
     # Step 1: 收集所有潜在章节边界点
     boundaries = _find_boundaries(text)
 
-    # Step 2: 如果匹配过少，视为单章返回
+    # Step 2: 如果匹配过少，视为单章返回（仍然尝试检测卷标记）
     if len(boundaries) < min_chapter_count:
-        return _single_chapter(text)
+        return _assign_volumes_to_chapters(_single_chapter(text), _find_volumes(text))
 
     # Step 3: 排序并去重（同一位置可能有多个模式匹配）
     boundaries = _deduplicate_boundaries(boundaries)
@@ -202,6 +247,9 @@ def split_chapters(
 
     # Step 5: 切分文本
     segments = _split_by_boundaries(text, boundaries)
+
+    # Step 5.5: 检测卷/篇/部标记，标注到各章节的 volume_title
+    segments = _assign_volumes_to_chapters(segments, _find_volumes(text))
 
     # Step 6: 验证边界 — 标记可疑片段
     segments = _validate_segments(segments, min_chapter_chars)
@@ -240,6 +288,83 @@ def _find_boundaries(text: str) -> list[dict[str, Any]]:
             })
 
     return boundaries
+
+
+def _find_volumes(text: str) -> list[dict[str, Any]]:
+    """扫描文本，收集所有卷/篇/部标记的位置和标题。"""
+    volumes: list[dict[str, Any]] = []
+
+    for match_type, pattern in _VOLUME_PATTERNS:
+        for m in pattern.finditer(text):
+            raw_num = m.group(1)
+            title = m.group(2).strip() if m.lastindex and m.lastindex >= 2 else ""
+
+            vol_num = _parse_volume_num(raw_num, match_type)
+            if vol_num is None:
+                continue
+
+            volume_label = _build_volume_label(raw_num, match_type, vol_num, title)
+
+            volumes.append({
+                "pos": m.start(),
+                "end_pos": m.end(),
+                "volume_num": vol_num,
+                "volume_title": volume_label,
+                "match_type": match_type,
+            })
+
+    volumes.sort(key=lambda v: v["pos"])
+    return volumes
+
+
+def _parse_volume_num(raw: str, match_type: str) -> int | None:
+    """解析卷编号：中文数字或阿拉伯数字→整数。"""
+    if match_type == "en_part":
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+    if raw.isdigit():
+        return int(raw)
+    return _parse_chinese_number(raw)
+
+
+def _build_volume_label(
+    raw_num: str,
+    match_type: str,
+    volume_num: int,
+    title: str,
+) -> str:
+    """根据匹配类型组装人类可读的卷标题。"""
+    if match_type in ("cn_volume", "cn_part", "cn_book"):
+        label = _CN_TYPE_LABEL[match_type]
+        if title:
+            return f"第{raw_num}{label} {title}".strip()
+        return f"第{raw_num}{label}"
+    if title:
+        return f"Part {volume_num}: {title}".strip()
+    return f"Part {volume_num}"
+
+
+def _assign_volumes_to_chapters(
+    segments: list[ChapterSegment],
+    volumes: list[dict[str, Any]],
+) -> list[ChapterSegment]:
+    """将每个章节的 volume_title 设为最近的前一个卷标记标题。"""
+    if not volumes:
+        return segments
+
+    vol_idx = 0
+    current_volume = ""
+    segments_sorted = sorted(segments, key=lambda s: s.start_pos)
+
+    for seg in segments_sorted:
+        while vol_idx < len(volumes) and volumes[vol_idx]["pos"] < seg.start_pos:
+            current_volume = volumes[vol_idx]["volume_title"]
+            vol_idx += 1
+        seg.volume_title = current_volume
+
+    return segments
 
 
 def _resolve_chapter_num(raw: str, match_type: str) -> int | None:

@@ -25,6 +25,9 @@ def get_db() -> Generator[sqlite3.Connection, None, None]:
     """
     conn = sqlite3.connect(get_db_path(), timeout=5)
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA mmap_size = 1073741824")
+    conn.execute("PRAGMA cache_size = -64000")
+    conn.execute("PRAGMA auto_vacuum = INCREMENTAL")
     conn.row_factory = sqlite3.Row
     try:
         yield conn

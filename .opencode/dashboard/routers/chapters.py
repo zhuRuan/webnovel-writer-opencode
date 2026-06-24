@@ -55,9 +55,18 @@ def _parse_json_value(raw: object, default):
 
 
 @router.get("/api/chapters")
-def list_chapters(conn: Connection = Depends(get_db_dependency)):
-    """返回所有章节（按 chapter 升序），characters 自动 JSON 解析。"""
-    rows = fetchall_safe(conn, "SELECT * FROM chapters ORDER BY chapter ASC")
+def list_chapters(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    conn: Connection = Depends(get_db_dependency),
+):
+    """返回章节列表（按 chapter 升序），不含 content 字段，支持分页。"""
+    rows = fetchall_safe(
+        conn,
+        "SELECT id, chapter, title, word_count, status, created_at, updated_at "
+        "FROM chapters ORDER BY chapter ASC LIMIT ? OFFSET ?",
+        (limit, offset),
+    )
     return [
         {**r, "characters": _parse_json_value(r.get("characters"), [])}
         for r in rows
@@ -86,6 +95,20 @@ def import_existing_chapters():
     """从文件系统扫描现有章节并导入 index.db。"""
     dao = get_dao(ChapterDAO, get_db_path())
     return dao.batch_import_existing(str(get_project_root()))
+
+
+# ── 端点：/api/chapters/{chapter_id}/content ──
+
+
+@router.get("/api/chapters/{chapter_id}/content")
+def get_chapter_content(chapter_id: int, conn: Connection = Depends(get_db_dependency)):
+    """返回指定章节的完整正文内容。"""
+    row = conn.execute(
+        "SELECT id, content FROM chapters WHERE id = ?", (chapter_id,)
+    ).fetchone()
+    if row is None:
+        return {"id": chapter_id, "content": ""}
+    return {"id": row[0], "content": row[1] or ""}
 
 
 # ── 端点：/api/scenes ──
