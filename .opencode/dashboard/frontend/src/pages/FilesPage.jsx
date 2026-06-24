@@ -1,7 +1,7 @@
-import { lazy, startTransition, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useDashboardContext } from '../App.jsx'
 import Badge from '../components/Badge.jsx'
-import { fetchFileContent, fetchFilesTree } from '../api.js'
+import { fetchFileContent, fetchFilesTree, summarizeChapterStyle } from '../api.js'
 import { findFirstFilePath } from '../lib/files.js'
 
 const EditorPanel = lazy(() => import('../components/EditorPanel.jsx'))
@@ -13,7 +13,7 @@ function countTreeItems(items) {
     )
 }
 
-function TreeNodes({ items, expanded, selectedPath, onToggle, onSelect, depth = 0 }) {
+function TreeNodes({ items, expanded, selectedPath, onToggle, onSelect, depth = 0, onSummarizeChapter, summarizingChapter, summarizeResults, summarizeErrors }) {
     if (!Array.isArray(items) || !items.length) return null
 
     return items.map(item => {
@@ -39,6 +39,10 @@ function TreeNodes({ items, expanded, selectedPath, onToggle, onSelect, depth = 
                                 onToggle={onToggle}
                                 onSelect={onSelect}
                                 depth={depth + 1}
+                                onSummarizeChapter={onSummarizeChapter}
+                                summarizingChapter={summarizingChapter}
+                                summarizeResults={summarizeResults}
+                                summarizeErrors={summarizeErrors}
                             />
                         </ul>
                     ) : null}
@@ -46,16 +50,61 @@ function TreeNodes({ items, expanded, selectedPath, onToggle, onSelect, depth = 
             )
         }
 
+        const chapterMatch = item.name.match(/第(\d{4})章/)
+        const chapterNum = chapterMatch ? parseInt(chapterMatch[1], 10) : null
+        const isSummarizing = chapterNum && summarizingChapter === chapterNum
+        const result = chapterNum ? summarizeResults[chapterNum] : null
+        const error = chapterNum ? summarizeErrors[chapterNum] : null
+
         return (
             <li key={key}>
-                <button
-                    type="button"
-                    className={`tree-item tree-file ${selectedPath === item.path ? 'active' : ''}`.trim()}
-                    onClick={() => onSelect(item.path)}
-                >
-                    <span className="tree-glyph file" />
-                    <span className="tree-name">{item.name}</span>
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <button
+                        type="button"
+                        className={`tree-item tree-file ${selectedPath === item.path ? 'active' : ''}`.trim()}
+                        style={{ flex: 1 }}
+                        onClick={() => onSelect(item.path)}
+                    >
+                        <span className="tree-glyph file" />
+                        <span className="tree-name">{item.name}</span>
+                    </button>
+                    {chapterNum ? (
+                        isSummarizing ? (
+                            <span
+                                className="page-btn"
+                                style={{ minHeight: 28, padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap', cursor: 'wait', opacity: 0.7 }}
+                            >
+                                ⏳ 分析中…
+                            </span>
+                        ) : result ? (
+                            <span
+                                className="badge badge-green"
+                                style={{ padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}
+                                title={result.preview || '分析完成'}
+                            >
+                                ✓ {result.technique_count || 0}技法
+                            </span>
+                        ) : error ? (
+                            <span
+                                className="badge badge-red"
+                                style={{ padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap', cursor: 'pointer' }}
+                                title={error}
+                                onClick={() => onSummarizeChapter(chapterNum)}
+                            >
+                                ✗ 重试
+                            </span>
+                        ) : (
+                            <button
+                                type="button"
+                                className="page-btn"
+                                style={{ minHeight: 28, padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}
+                                onClick={() => onSummarizeChapter(chapterNum)}
+                            >
+                                总结文风
+                            </button>
+                        )
+                    ) : null}
+                </div>
             </li>
         )
     })
@@ -70,6 +119,12 @@ export default function FilesPage() {
     const [loadingContent, setLoadingContent] = useState(false)
     const [editing, setEditing] = useState(false)
     const darkMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark'
+
+    // ── 文风总结状态 ──
+    const [summarizingChapter, setSummarizingChapter] = useState(null)
+    const [summarizeResults, setSummarizeResults] = useState({})
+    const [summarizeErrors, setSummarizeErrors] = useState({})
+    const [summarizeProgress, setSummarizeProgress] = useState('')
 
     useEffect(() => {
         let cancelled = false
@@ -122,6 +177,40 @@ export default function FilesPage() {
         }
     }, [selectedPath])
 
+    // ── SSE listener for style-summarize-progress ──
+    useEffect(() => {
+        const es = new EventSource('/api/events')
+        es.addEventListener('style-summarize-progress', (e) => {
+            try {
+                const d = JSON.parse(e.data)
+                if (d.type === 'style-summarize-progress' && d.chapter === summarizingChapter) {
+                    setSummarizeProgress(d.step || d.message || '')
+                }
+            } catch { /* ignore malformed messages */ }
+        })
+        es.onerror = () => { /* silent reconnect handled by browser */ }
+        return () => es.close()
+    }, [summarizingChapter])
+
+    const handleSummarizeChapter = useCallback(async (chapterNum) => {
+        setSummarizingChapter(chapterNum)
+        setSummarizeProgress('正在分析...')
+        try {
+            const result = await summarizeChapterStyle(chapterNum)
+            setSummarizeResults(prev => ({ ...prev, [chapterNum]: result }))
+            setSummarizeErrors(prev => {
+                const next = { ...prev }
+                delete next[chapterNum]
+                return next
+            })
+        } catch (err) {
+            setSummarizeErrors(prev => ({ ...prev, [chapterNum]: err.message || '分析失败' }))
+        } finally {
+            setSummarizingChapter(null)
+            setSummarizeProgress('')
+        }
+    }, [])
+
     const totalFiles = useMemo(() => {
         return Object.values(tree).reduce((count, items) => count + countTreeItems(items), 0)
     }, [tree])
@@ -162,6 +251,10 @@ export default function FilesPage() {
                                             })
                                         }}
                                         onSelect={setSelectedPath}
+                                        onSummarizeChapter={handleSummarizeChapter}
+                                        summarizingChapter={summarizingChapter}
+                                        summarizeResults={summarizeResults}
+                                        summarizeErrors={summarizeErrors}
                                     />
                                 </ul>
                             </section>
