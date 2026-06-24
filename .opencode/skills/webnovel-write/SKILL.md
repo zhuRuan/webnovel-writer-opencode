@@ -20,6 +20,9 @@ allowed-tools: Agent AskUserQuestion
 | 默认 | Step 1→2→3→4→5→6 |
 | `--fast` | Step 1→2→3(轻量)→4→5→6 |
 | `--minimal` | Step 1→2→4(仅排版)→5→6 |
+| `--theater` | Step 1→2(theater)→3→4→5→6 |
+
+> **Theater 模式**（实验性）：Step 2 使用 `director-agent`（导演智能体）替代 `chapter-writer-agent`。director-agent 内部执行两阶段：PHASE 1 写前研究（合同刷新/结构自检/任务书生成）→ PHASE 2 执导（拆场景→`actor-agent` 演绎→整合正文→物理检查）。环境描写和动作校验已内化到 chapter-writer-agent 和 director-agent 中。启用前确保 `theater/actors/` 目录已有角色档案，并在 `.webnovel/` 下配置 `writer_mode: theater`。
 
 ## 硬规则
 
@@ -38,10 +41,10 @@ allowed-tools: Agent AskUserQuestion
 
 用户可在 `设定集/prompts/` 文件夹中放置 `.md` 文件，系统自动加载并注入写作上下文（优先级高于 master_constraints，低于章级 forbidden_zones）。详见 `docs/guides/custom-style-prompts.md`。
 
-## CSV 检索（Step 2 按需）
+## 技法检索（Step 2 按需）
 
 ```bash
-python -X utf8 "${SCRIPTS_DIR}/reference_search.py" --skill write --table {表名} --query "{关键词}" --genre {题材}
+curl -s "${DASHBOARD_URL}/api/techniques/search?source=${TABLE}&q=${QUERY}&limit=3"
 ```
 
 触发条件：新角色→命名规则，战斗→场景写法，多角色对话→写作技法，情感描写→写作技法，高频桥段→场景写法。
@@ -69,6 +72,19 @@ echo "✅ PROJECT_ROOT=${PROJECT_ROOT}"
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" preflight &
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" placeholder-scan --format text &
 wait
+
+# 检查演员档案，如不存在则从设定集预创建
+PROFILE_MISSING=0
+if [ ! -d "${PROJECT_ROOT}/theater/actors" ] || [ -z "$(ls -A ${PROJECT_ROOT}/theater/actors/ 2>/dev/null)" ]; then
+  PROFILE_MISSING=1
+elif [ ! -f "${PROJECT_ROOT}/theater/actors/qin_yi/profile.json" ]; then
+  PROFILE_MISSING=1
+fi
+if [ "$PROFILE_MISSING" = "1" ]; then
+  echo "📝 预创建演员档案（从设定集读取）..."
+  python3 -X utf8 "${SCRIPTS_DIR}/data_modules/theater/profile_bootstrap.py" \
+    --project-root "${PROJECT_ROOT}" --all && echo "✅ 演员档案已创建" || echo "⚠️ 演员档案创建失败（不影响写作流程）"
+fi
 ```
 
 ### 准备：刷新合同树
@@ -117,14 +133,14 @@ python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" check-structural \
   --output "${PROJECT_ROOT}/.webnovel/tmp/structural_check.json"
 ```
 
-### Step 1：context-agent 生成写作任务书
+### Step 1：director-agent 生成写作任务书（PHASE 1：写前研究）
 
-必须使用 `Agent` 工具调用 `context-agent`，不得由主流程自行整理任务书。
+必须使用 `Agent` 工具调用 `director-agent`，不得由主流程自行整理任务书。director-agent 的 PHASE 1 执行合同刷新、结构自检、五段任务书生成（原 context-agent 职责）。
 
 ```text
 Agent(
-  subagent_type: "context-agent",
-  prompt: "chapter={chapter_num}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; storage_path=${PROJECT_ROOT}/.webnovel; state_file=${PROJECT_ROOT}/.webnovel/state.json（projection/read-model，仅兼容读取）。先 research，再按 本章硬性约束→CBN/CPNs/CEN→本章禁区→风格指引→dynamic_context补充参考 的顺序输出五段写作任务书。"
+  subagent_type: "director-agent",
+  prompt: "PHASE 1 写前研究模式。chapter={chapter_num}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; storage_path=${PROJECT_ROOT}/.webnovel; state_file=${PROJECT_ROOT}/.webnovel/state.json（projection/read-model，仅兼容读取）。先 research，再按 本章硬性约束→CBN/CPNs/CEN→本章禁区→风格指引→dynamic_context补充参考 的顺序输出五段写作任务书。"
 )
 ```
 
@@ -137,19 +153,35 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 
 ### Step 2：起草正文
 
-必须使用 `Agent` 工具调用 `chapter-writer-agent`，不得由主流程自行起草。
+**默认模式**：使用 `director-agent` PHASE 2 进行 theater 管线创作（拆场景→分派 actor-agent 演绎→整合终稿→物理检查）。actor 档案从 `设定集/` 预创建（预检阶段已处理）。如需跳过 theater 管线直接使用写手，加 `--fallback`。
 
 ```text
 Agent(
-  subagent_type: "chapter-writer-agent",
-  prompt: "project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; chapter={chapter_num}。根据 Step 1 产出的写作任务书起草正文。使用 chapter-path CLI 确定输出路径，写入正文文件。"
+  subagent_type: "director-agent",
+  prompt: "PHASE 2 执导模式（基于 Step 1 已产出的任务书继续）。project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; chapter={chapter_num}。按 theater 管线创作本章：拆场景→分派 actor-agent 演绎→整合终稿→physics_skill 检查。使用 chapter-path CLI 确定输出路径，写入正文文件。"
 )
 ```
+
+> **`--theater` 已过时**：默认模式已使用 theater 管线。`--theater` 标记已无效，保留仅用于向后兼容。如需强制使用原写手起草流程，加 `--fallback` 标记。
 
 ```bash
 # 不依赖 Agent 返回文本，直接校验章节文件
 CHAPTER_PATH=$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter {chapter_num})
-test -s "${PROJECT_ROOT}/${CHAPTER_PATH}" || { echo "❌ 章节文件未生成或为空"; exit 1; }
+if ! test -s "${PROJECT_ROOT}/${CHAPTER_PATH}"; then
+  echo "⚠️ Theater 管线未生成章节文件，回退到 chapter-writer-agent..."
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] chapter=${chapter_num} reason=theater_empty" >> "${PROJECT_ROOT}/.webnovel/tmp/theater_fallback.log"
+fi
+```
+
+```bash
+# 如果章节文件为空，回退到 chapter-writer-agent
+if ! test -s "${PROJECT_ROOT}/${CHAPTER_PATH}"; then
+  echo "⚠️ theater 管线未生成章节文件，回退到 chapter-writer-agent"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] chapter=${chapter_num} reason=theater_pipeline_empty" >> "${PROJECT_ROOT}/.webnovel/tmp/theater_fallback.log"
+  python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" chapter-path --chapter {chapter_num}
+  # Use chapter-writer-agent as fallback
+  # (actual fallback prompt handled by orchestrator Atlas)
+fi
 ```
 
 ```bash
@@ -245,12 +277,12 @@ python -X utf8 "${SCRIPTS_DIR}/skill_runner.py" clean-tmp --project-root "${PROJ
 
 ##### 5.1a Observer：自由提取
 
-必须使用 `Agent` 工具调用 `observer-agent`，产出自由文本 raw_facts.txt。
+必须使用 `Agent` 工具调用 `observer-agent`，严格按照 observer-agent spec 输出 9 个 `## 标题` 段落。
 
 ```text
 Agent(
   subagent_type: "observer-agent",
-  prompt: "project_root={PROJECT_ROOT}; chapter={chapter_num}; chapter_file={CHAPTER_FILE}。输出 raw_facts 到 {PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num}.raw_facts.txt。"
+  prompt: "project_root={PROJECT_ROOT}; chapter={chapter_num}; chapter_file={CHAPTER_FILE}。必须按以下 9 个 `## 标题` 段落输出：`## 角色状态变化`、`## 新出场实体`、`## 关系变化`、`## 力量突破`、`## 宝物/物品获得`、`## 世界规则揭示`、`## 世界规则打破`、`## 对读者的承诺/伏笔`、`## 伏笔创建与闭合`。每个标题下用 `- ` 行格式输出具体条目。宁可多提不漏。输出 raw_facts 到 {PROJECT_ROOT}/.webnovel/runtime/chapter-{chapter_num}.raw_facts.txt。"
 )
 ```
 
