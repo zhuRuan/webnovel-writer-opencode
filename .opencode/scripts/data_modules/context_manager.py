@@ -30,6 +30,8 @@ from .index_manager import IndexManager, WritingChecklistScoreMeta
 from .context_ranker import ContextRanker
 from .prewrite_validator import PrewriteValidator
 from .story_contracts import read_json_if_exists
+from .dao import get_dao
+from .dao.character_event_dao import CharacterEventDAO
 from .story_runtime_sources import RuntimeSourceSnapshot, load_runtime_sources
 from .context_weights import (
     DEFAULT_TEMPLATE as CONTEXT_DEFAULT_TEMPLATE,
@@ -69,6 +71,7 @@ class ContextManager:
         "genre_profile",
         "writing_guidance",
         "plot_structure",
+        "relevant_history",
         "user_prompts",
         "story_contract",
         "runtime_status",
@@ -83,6 +86,7 @@ class ContextManager:
         "latest_commit",
         "prewrite_validation",
         "scene",
+        "relevant_history",
         "global",
         "user_prompts",
         "reader_signal",
@@ -146,6 +150,9 @@ class ContextManager:
         except Exception as exc:
             logger.warning("runtime_artifact_persistence_failed: %s", exc)
 
+        # 注入角色计划数据
+        payload = self._inject_character_plans(payload, chapter)
+
         return payload
 
     def _assemble_json_payload(self, pack: Dict[str, Any], template: str = DEFAULT_TEMPLATE) -> Dict[str, Any]:
@@ -160,11 +167,18 @@ class ContextManager:
         }
 
         for section_name in self.SECTION_ORDER:
-            if section_name in pack and section_name != "global":
-                content = pack[section_name]
-                weight = weights.get(section_name, 0.0)
-                if weight > 0 or section_name in self.EXTRA_SECTIONS:
-                    payload[section_name] = content
+            if section_name in pack:
+                if section_name == "global":
+                    global_data = pack[section_name]
+                    if isinstance(global_data, dict):
+                        for key, value in global_data.items():
+                            if value:
+                                payload[key] = value
+                else:
+                    content = pack[section_name]
+                    weight = weights.get(section_name, 0.0)
+                    if weight > 0 or section_name in self.EXTRA_SECTIONS:
+                        payload[section_name] = content
 
         if chapter > 0:
             payload["meta"]["context_weight_stage"] = self._resolve_context_stage(chapter)
@@ -273,6 +287,8 @@ class ContextManager:
             story_contract=story_contract,
         )
 
+        relevant_history = self._retrieve_relevant_history(chapter, core, scene)
+
         return {
             "meta": {"chapter": chapter},
             "core": core,
@@ -281,6 +297,7 @@ class ContextManager:
             "latest_commit": latest_commit,
             "prewrite_validation": prewrite_validation,
             "scene": scene,
+            "relevant_history": relevant_history,
             "global": global_ctx,
             "user_prompts": user_prompts,
             "reader_signal": reader_signal,
@@ -305,6 +322,74 @@ class ContextManager:
             },
             "override_hints": self._load_override_hints(chapter),
         }
+
+    def _retrieve_relevant_history(
+        self, chapter: int, core: dict, scene: dict
+    ) -> dict:
+        """RAG 检索：从历史章节中找与当前章节相关的内容。"""
+        result: dict = {"passages": [], "entities_mentioned": [], "mode": "skipped"}
+
+        # 检查 RAG 是否可用
+        has_embed = bool(str(getattr(self.config, "embed_api_key", "") or "").strip())
+        if not has_embed:
+            result["mode"] = "no_embed_key"
+            return result
+
+        # 构造查询：章纲目标 + 出场角色
+        outline = core.get("chapter_outline", "")
+        protagonist = core.get("protagonist_snapshot", {})
+        if isinstance(protagonist, dict):
+            protagonist_name = protagonist.get("name", "")
+        else:
+            protagonist_name = ""
+        appearing = scene.get("appearing_characters", [])
+        if isinstance(appearing, list):
+            char_names = [c.get("canonical_name") or c.get("entity_id", "") for c in appearing[:5] if isinstance(c, dict)]
+        else:
+            char_names = []
+
+        query_parts = [outline[:200]] if outline else []
+        if protagonist_name:
+            query_parts.append(protagonist_name)
+        query_parts.extend(char_names)
+        query = " ".join(query_parts).strip()
+
+        if not query:
+            result["mode"] = "no_query"
+            return result
+
+        try:
+            from .rag_adapter import RAGAdapter
+            import asyncio
+
+            adapter = RAGAdapter(self.config)
+            rag_results = asyncio.run(
+                adapter.search(
+                    query=query,
+                    top_k=self.config.context_rag_top_k if hasattr(self.config, "context_rag_top_k") else 5,
+                    strategy="auto",
+                    chapter=chapter - 1 if chapter > 1 else None,  # 不包含当前章
+                )
+            )
+
+            passages = []
+            for r in rag_results[:8]:
+                content = getattr(r, "content", "") or ""
+                source = getattr(r, "chapter", "?") or "?"
+                score = getattr(r, "score", 0) or 0
+                passages.append({
+                    "content": content[:500],
+                    "source_chapter": source,
+                    "relevance": round(float(score), 3),
+                })
+            result["passages"] = passages
+            result["mode"] = "full" if passages else "empty"
+
+        except Exception as e:
+            result["mode"] = "error"
+            result["error"] = str(e)[:200]
+
+        return result
 
     def _load_override_hints(self, chapter: int) -> str:
         """Load active override contract hints for the target chapter.
@@ -813,6 +898,85 @@ class ContextManager:
     def _load_recent_appearances(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         appearances = self.index_manager.get_recent_appearances(limit=limit)
         return appearances or []
+
+    def _inject_character_plans(self, context_pack: dict, chapter_number: int) -> dict:
+        """为 context_pack 中的出场角色注入当前计划数据。
+
+        从 character_events 表查询每个出场角色的 pending/in_progress 事件，
+        注入到 context_pack['scene']['appearing_characters'] 的每个角色条目中。
+        也支持 top-level 的 appearing_characters（向下兼容）。
+        """
+        # 定位 appearing_characters —— 优先从 scene 中查找
+        appearing = []
+        scene = context_pack.get('scene', {})
+        if isinstance(scene, dict):
+            appearing = scene.get('appearing_characters', [])
+        if not appearing:
+            appearing = context_pack.get('appearing_characters', [])
+        if not appearing:
+            return context_pack
+
+        try:
+            enriched_characters = []
+            for char in appearing:
+                if not isinstance(char, dict):
+                    enriched_characters.append(char)
+                    continue
+
+                char_id = char.get('entity_id') or char.get('id', '')
+                if not char_id:
+                    enriched_characters.append(char)
+                    continue
+
+                char = dict(char)
+                try:
+                    # 查询 pending 和 in_progress 事件，按 urgency 降序
+                    dao = get_dao(CharacterEventDAO, str(Path(self.config.project_root) / '.webnovel' / 'index.db'))
+                    result = dao.list_events(actor_id=char_id)
+                    events = result.get('events', [])
+
+                    plans = []
+                    for evt in events:
+                        status_val = evt.get('status', '')
+                        if status_val not in ('pending', 'in_progress'):
+                            continue
+
+                        plan = {
+                            'event_type': evt.get('event_type', ''),
+                            'description': evt.get('description', ''),
+                            'urgency': evt.get('urgency', 0),
+                            'status': status_val,
+                            'target_chapter': evt.get('target_chapter'),
+                            'source_chapter': evt.get('source_chapter'),
+                            'trigger_condition': evt.get('trigger_condition', ''),
+                        }
+
+                        # 标记是否超期：target_chapter 存在且已超过 10 章
+                        target = evt.get('target_chapter')
+                        plan['overdue'] = (
+                            target is not None
+                            and target + 10 < chapter_number
+                        )
+
+                        plans.append(plan)
+
+                    char['pending_plans'] = plans
+                except Exception:
+                    char['pending_plans'] = []
+
+                enriched_characters.append(char)
+
+            # 回写到正确的位置
+            if isinstance(scene, dict) and 'appearing_characters' in scene:
+                scene['appearing_characters'] = enriched_characters
+                context_pack['scene'] = scene
+            elif 'appearing_characters' in context_pack:
+                context_pack['appearing_characters'] = enriched_characters
+
+        except Exception as exc:
+            logger.warning("inject_character_plans_failed: %s", exc)
+
+        return context_pack
 
     def _load_setting(self, keyword: str) -> str:
         settings_dir = self.config.settings_dir

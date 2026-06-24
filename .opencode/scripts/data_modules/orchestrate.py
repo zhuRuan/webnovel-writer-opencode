@@ -1,4 +1,8 @@
-"""Batch orchestration: preflight → review → commit → index for chapter ranges.
+"""Batch orchestration: preflight → editor-agent → review → commit → index.
+
+This is the post-writing pipeline (review + commit + index).
+The actual writing is delegated to editor-agent via OpenCode's agent system.
+For automated writing, use the webnovel-write skill which invokes editor-agent.
 
 Modes:
   write    Sequential chapter pipeline (review → commit → index)
@@ -10,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from chapter_paths import parse_chapter_range
+from chapter_paths import parse_chapter_range, find_chapter_file
 
 _SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 _MODES_REVIEW_COMMIT = {"write", "heal"}
@@ -55,6 +59,14 @@ def cmd_orchestrate(args) -> int:
         chapter_flag = ["--chapter", str(ch)]
 
         if mode in _MODES_REVIEW_COMMIT:
+            # 检查章节文件是否存在（写流程需要先由 editor-agent 生成章
+            chapter_path = find_chapter_file(project_root, ch)
+            if not chapter_path or not Path(chapter_path).is_file():
+                print(f"  Chapter {ch}: 章节文件不存在，需先通过 editor-agent 生成。")
+                print(f"  使用: webnovel-write skill → editor-agent 编排写作流程")
+                failures.append((ch, "no_chapter_file"))
+                continue
+
             rc, _ = _run(root_flag + ["review-pipeline"] + chapter_flag)
             if rc != 0:
                 failures.append((ch, "review"))

@@ -11,8 +11,14 @@ from typing import Any
 
 import filelock
 
+import logging
+
 from .commit_artifacts import extraction_dict, extraction_list, extraction_text
+from .config import DataModulesConfig
+from .index_manager import IndexManager
 from .story_contracts import read_json_if_exists
+
+logger = logging.getLogger(__name__)
 
 try:
     from security_utils import atomic_write_json
@@ -143,6 +149,12 @@ class StateProjectionWriter:
                     progress["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             strand_applied = self._apply_strand_tracker(state, chapter, commit_payload)
+
+            # 同步 foreshadowing 到 state.json（for Dashboard 伏笔面板 + Markdown 投影）
+            try:
+                self._sync_foreshadowing_to_state(state, chapter)
+            except Exception as exc:
+                logger.warning("foreshadowing_state_sync_failed: %s", exc)
 
         return {
             "applied": applied_count > 0 or chapter > 0,
@@ -382,3 +394,34 @@ class StateProjectionWriter:
             return int(value or 0)
         except (TypeError, ValueError):
             return 0
+
+    def _sync_foreshadowing_to_state(self, state: dict, chapter: int) -> None:
+        try:
+            idx = IndexManager(DataModulesConfig.from_project_root(str(self.project_root)))
+        except Exception:
+            return
+
+        debts = idx.get_active_debts_with_notes()
+        if not debts:
+            return
+
+        foreshadowing = []
+        for d in debts:
+            planted = int(d.get("source_chapter") or 0)
+            due = int(d.get("due_chapter") or 0)
+            ch_distance = max(1, due - chapter) if due > chapter else 1
+            urgency = min(100, max(20, 100 - ch_distance * 5))
+            content = str(d.get("note") or d.get("debt_type") or "伏笔")
+            foreshadowing.append({
+                "status": "active",
+                "planted_chapter": planted,
+                "due_chapter": due,
+                "content": content,
+                "urgency": urgency,
+            })
+
+        state["foreshadowing"] = foreshadowing
+        plot_threads = state.setdefault("plot_threads", {})
+        plot_threads["foreshadowing"] = foreshadowing
+        if "active_threads" not in plot_threads:
+            plot_threads["active_threads"] = []

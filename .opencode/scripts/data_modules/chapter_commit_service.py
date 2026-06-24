@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import logging
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
 from chapter_outline_loader import volume_num_for_chapter_from_state
-
-import logging
 
 from .commit_artifacts import extraction_list
 from .config import DataModulesConfig
@@ -131,7 +131,7 @@ class ChapterCommitService:
             etype = evt.get("event_type", "")
             payload = evt.get("payload") or {}
             subject = evt.get("subject", payload.get("subject", ""))
-            content = payload.get("content", "")
+            content = payload.get("description") or payload.get("content", "")
             if etype == "open_loop_created":
                 due = chapter + _FORESHADOW_DUE_OFFSET
                 note = content or subject or f"ch{chapter} foreshadowing"
@@ -249,6 +249,72 @@ class ChapterCommitService:
             logger.warning("projection_log append failed: %s", exc)
 
         self._sync_foreshadowing(payload)
+
+        # 同步 theater actor 活跃章节标记
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+            from theater.actor_manager import sync_actor_from_commit
+            sync_result = sync_actor_from_commit(str(self.project_root), chapter)
+            if sync_result.get("synced", 0) > 0:
+                logger.info("theater_sync: %d actors updated for chapter %s",
+                           sync_result["synced"], chapter)
+        except Exception as exc:
+            logger.warning("theater_sync failed for chapter %s: %s", chapter, exc)
+            try:
+                sys.path.pop(0)
+            except (IndexError, ValueError):
+                pass
+
+        # 7. 章节正文写入数据库
+        try:
+            from data_modules.dao import get_dao
+            from data_modules.dao.chapter_dao import ChapterDAO
+
+            chapter_num = payload.get('meta', {}).get('chapter', 0)
+            chapter_title = payload.get('meta', {}).get('title', '')
+
+            extraction = payload.get('extraction_result', {})
+            if not chapter_title and isinstance(extraction, dict):
+                chapter_title = extraction.get('chapter_title', '')
+
+            chapter_file = self.project_root / '正文' / f"第{chapter_num:04d}章-{chapter_title}.md"
+            if not chapter_file.exists():
+                matches = list(Path(self.project_root / '正文').glob(f"第{chapter_num:04d}章*.md"))
+                if matches:
+                    chapter_file = matches[0]
+
+            if chapter_file.exists():
+                content = chapter_file.read_text(encoding='utf-8')
+                dao = get_dao(ChapterDAO, str(self.project_root / '.webnovel' / 'index.db'))
+                dao.upsert_chapter_content(int(chapter_num), chapter_title, content)
+        except Exception:
+            pass
+
+        # 自动加载角色记忆
+        try:
+            from data_modules.dao import get_dao
+            from data_modules.dao.memory_dao import MemoryDAO
+
+            memory_dao = get_dao(MemoryDAO, str(self.project_root / '.webnovel' / 'index.db'))
+
+            extraction = payload.get('extraction_result', {})
+            if extraction:
+                raw_facts = extraction.get('raw_facts', '')
+                known_entities = extraction.get('known_entities', {})
+                chapter_num = payload.get('meta', {}).get('chapter', 0)
+
+                if raw_facts and known_entities and chapter_num:
+                    from data_modules.observer_settler import ObserverSettlerModule
+                    char_memories = ObserverSettlerModule._extract_character_memories(
+                        raw_facts, known_entities, int(chapter_num)
+                    )
+                    for mem in char_memories:
+                        try:
+                            memory_dao.create_memory(mem)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
 
         # Render markdown projections
         try:

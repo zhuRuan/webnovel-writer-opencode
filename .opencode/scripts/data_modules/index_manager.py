@@ -228,6 +228,25 @@ class WritingChecklistScoreMeta:
     notes: str = ""
 
 
+@dataclass
+class CharacterEventMeta:
+    """角色事件元数据（事件驱动，替代 chase_debt）"""
+
+    actor_id: str
+    event_type: str  # need_to_do / want_to_do / planned / promise / prerequisite
+    description: str
+    source_chapter: int
+    id: int = 0
+    target_chapter: Optional[int] = None
+    prerequisites: str = "[]"
+    trigger_condition: str = ""
+    status: str = "pending"  # pending / in_progress / resolved / abandoned
+    resolved_chapter: Optional[int] = None
+    urgency: int = 5
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
 class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexReadingMixin, IndexObservabilityMixin):
     """索引管理器"""
 
@@ -255,6 +274,13 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # v5.6+: 章节全文存储列（对现有库逐列添加，idempotent）
+            for col, col_def in [("content", "TEXT DEFAULT ''"), ("word_count", "INTEGER DEFAULT 0")]:
+                try:
+                    cursor.execute(f"ALTER TABLE chapters ADD COLUMN {col} {col_def}")
+                except Exception:
+                    pass
 
             # 场景表
             cursor.execute("""
@@ -441,6 +467,7 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                 CREATE TABLE IF NOT EXISTS chase_debt (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     debt_type TEXT NOT NULL,
+                    note TEXT DEFAULT '',
                     original_amount REAL DEFAULT 1.0,
                     current_amount REAL DEFAULT 1.0,
                     interest_rate REAL DEFAULT 0.1,
@@ -622,7 +649,357 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                 "CREATE INDEX IF NOT EXISTS idx_checklist_score_value ON writing_checklist_scores(score)"
             )
 
+            # 技能目录表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS skills_catalog (
+                    skill_name TEXT PRIMARY KEY,
+                    category TEXT NOT NULL,
+                    subcategory TEXT NOT NULL,
+                    description TEXT,
+                    techniques TEXT,
+                    styles TEXT,
+                    features TEXT,
+                    counter TEXT,
+                    affects TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            # 兼容旧表：逐列添加
+            for col, col_type in [("techniques","TEXT"),("styles","TEXT"),("features","TEXT"),("counter","TEXT")]:
+                try: cursor.execute(f"ALTER TABLE skills_catalog ADD COLUMN {col} {col_type}")
+                except: pass
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_skills_catalog_category ON skills_catalog(category, subcategory)"
+            )
+
+            # 角色技能关联表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS actor_skills (
+                    actor_id TEXT NOT NULL,
+                    skill_name TEXT NOT NULL,
+                    proficiency INTEGER NOT NULL CHECK(proficiency BETWEEN 1 AND 10),
+                    label TEXT NOT NULL,
+                    note TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (actor_id, skill_name),
+                    FOREIGN KEY (skill_name) REFERENCES skills_catalog(skill_name)
+                )
+            """)
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_actor_skills_actor ON actor_skills(actor_id)"
+            )
+
             conn.commit()
+
+            # 角色事件表（替代 chase_debt — 事件驱动）
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS character_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    actor_id TEXT NOT NULL,
+                    event_type TEXT NOT NULL CHECK(event_type IN ('need_to_do','want_to_do','planned','promise','prerequisite')),
+                    description TEXT NOT NULL,
+                    source_chapter INTEGER NOT NULL,
+                    target_chapter INTEGER,
+                    prerequisites TEXT DEFAULT '[]',
+                    trigger_condition TEXT DEFAULT '',
+                    status TEXT DEFAULT 'pending' CHECK(status IN ('pending','in_progress','resolved','abandoned')),
+                    resolved_chapter INTEGER,
+                    urgency INTEGER DEFAULT 5 CHECK(urgency BETWEEN 1 AND 10),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ce_actor ON character_events(actor_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ce_status ON character_events(status)")
+
+            # ==================== 角色记忆系统表 ====================
+
+            # 角色记忆表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS character_memories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    actor_id TEXT NOT NULL,
+                    memory_type TEXT NOT NULL CHECK(memory_type IN ('episodic','semantic','relational','decision')),
+                    content TEXT NOT NULL,
+                    who TEXT,
+                    what TEXT,
+                    when_chapter INTEGER,
+                    where_place TEXT,
+                    why_reason TEXT,
+                    importance REAL DEFAULT 5.0,
+                    emotional_weight REAL DEFAULT 5.0,
+                    personal_relevance REAL DEFAULT 5.0,
+                    novelty REAL DEFAULT 5.0,
+                    consequence REAL DEFAULT 5.0,
+                    retention REAL DEFAULT 1.0,
+                    retrieval_count INTEGER DEFAULT 0,
+                    source_chapter INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cm_actor ON character_memories(actor_id)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cm_type ON character_memories(memory_type)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cm_retention ON character_memories(retention)"
+            )
+
+            # 记忆标签表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS memory_tags (
+                    memory_id INTEGER NOT NULL,
+                    tag TEXT NOT NULL,
+                    PRIMARY KEY (memory_id, tag),
+                    FOREIGN KEY (memory_id) REFERENCES character_memories(id) ON DELETE CASCADE
+                )
+            """)
+
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mt_tag ON memory_tags(tag)"
+            )
+
+            # 记忆嵌入表（RAG检索）
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS memory_embeddings (
+                    memory_id INTEGER PRIMARY KEY,
+                    embedding BLOB,
+                    model TEXT DEFAULT 'default',
+                    FOREIGN KEY (memory_id) REFERENCES character_memories(id) ON DELETE CASCADE
+                )
+            """)
+
+            # 角色状态表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS character_state (
+                    actor_id TEXT PRIMARY KEY,
+                    health TEXT DEFAULT '{}',
+                    equipment TEXT DEFAULT '[]',
+                    inventory TEXT DEFAULT '[]',
+                    location TEXT DEFAULT '',
+                    memory_strength INTEGER DEFAULT 5,
+                    chapter INTEGER NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            try:
+                cursor.execute(
+                    "ALTER TABLE character_state ADD COLUMN memory_strength INTEGER DEFAULT 5"
+                )
+            except Exception:
+                pass
+
+            # ==================== Feature 3: Director Style + Writing Techniques ====================
+
+            # 导演文风表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS director_style (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    rules TEXT NOT NULL,
+                    priority INTEGER DEFAULT 5,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # 章节技法追踪表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chapter_techniques (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chapter INTEGER NOT NULL,
+                    technique_name TEXT NOT NULL,
+                    technique_category TEXT NOT NULL,
+                    usage_context TEXT,
+                    effectiveness TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # 写作技法分类表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS writing_techniques (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    category TEXT NOT NULL,
+                    sub_category TEXT,
+                    description TEXT NOT NULL,
+                    when_to_use TEXT,
+                    example TEXT,
+                    anti_pattern TEXT,
+                    difficulty INTEGER DEFAULT 5,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Feature 3 索引
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_director_style_category ON director_style(category)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_director_style_active ON director_style(is_active)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_chapter_techniques_chapter ON chapter_techniques(chapter)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_chapter_techniques_category ON chapter_techniques(technique_category)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_writing_techniques_category ON writing_techniques(category)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_writing_techniques_name ON writing_techniques(name)"
+            )
+
+            # ==================== v5.6 新增表：过程数据存储 ====================
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS agent_execution_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chapter INTEGER NOT NULL,
+                    agent_name TEXT NOT NULL,
+                    step TEXT NOT NULL,
+                    input_summary TEXT,
+                    output_summary TEXT,
+                    duration_ms INTEGER DEFAULT 0,
+                    token_count INTEGER DEFAULT 0,
+                    error_msg TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ael_chapter ON agent_execution_log(chapter)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ael_agent ON agent_execution_log(agent_name)")
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS debate_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chapter INTEGER NOT NULL,
+                    actor_id TEXT NOT NULL,
+                    issue_category TEXT NOT NULL,
+                    actor_argument TEXT NOT NULL,
+                    director_ruling TEXT NOT NULL,
+                    ruling_reason TEXT,
+                    impact_on_script INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_dr_chapter ON debate_records(chapter)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_dr_actor ON debate_records(actor_id)")
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS scene_scripts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chapter INTEGER NOT NULL,
+                    scene_id TEXT NOT NULL,
+                    scene_goal TEXT,
+                    characters_involved TEXT,
+                    location TEXT,
+                    script_text TEXT,
+                    revision_count INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ss_chapter ON scene_scripts(chapter)")
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chapter_enhancements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chapter INTEGER NOT NULL,
+                    enhancement_type TEXT NOT NULL,
+                    content_before TEXT,
+                    content_after TEXT,
+                    applied_by TEXT DEFAULT 'chapter-writer',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ce_chapter ON chapter_enhancements(chapter)")
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS writing_iterations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chapter INTEGER NOT NULL,
+                    iteration INTEGER NOT NULL,
+                    actor_feedback_count INTEGER DEFAULT 0,
+                    director_changes_count INTEGER DEFAULT 0,
+                    final_word_count INTEGER DEFAULT 0,
+                    duration_seconds INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_wi_chapter ON writing_iterations(chapter)")
+
+            # ==================== v5.7 新增表：名家文风采集 ====================
+
+            # 名家采集章节表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS collected_chapters (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    author TEXT NOT NULL,
+                    work_title TEXT NOT NULL,
+                    chapter_num INTEGER NOT NULL,
+                    chapter_title TEXT,
+                    content TEXT NOT NULL,
+                    source_url TEXT,
+                    word_count INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'raw',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cc_author ON collected_chapters(author)"
+            )
+
+            # 文风总结表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS style_summaries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    author TEXT NOT NULL,
+                    work_title TEXT,
+                    summary_title TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    examples TEXT DEFAULT '[]',
+                    keywords TEXT DEFAULT '[]',
+                    quality_score REAL DEFAULT 0,
+                    chapter_range TEXT,
+                    model_used TEXT DEFAULT 'qwen3.5_9B_Q4',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ss_author ON style_summaries(author)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ss_category ON style_summaries(category)"
+            )
+
+            # 采集报告表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS collection_reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    author TEXT NOT NULL,
+                    task_id TEXT NOT NULL UNIQUE,
+                    status TEXT DEFAULT 'pending',
+                    progress TEXT DEFAULT '{}',
+                    steps_json TEXT DEFAULT '[]',
+                    start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    end_time TIMESTAMP,
+                    chapters_collected INTEGER DEFAULT 0,
+                    summaries_generated INTEGER DEFAULT 0,
+                    error_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cr_author ON collection_reports(author)"
+            )
 
     @contextmanager
     def _get_conn(self):
@@ -712,6 +1089,167 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
         return True
 
     # ==================== 章节操作 ====================
+
+    # ==================== 角色事件管理 ====================
+
+    def get_character_events(
+        self,
+        actor_id: Optional[str] = None,
+        status: Optional[str] = None,
+        order_by: str = "urgency",
+    ) -> List[Dict]:
+        """查询角色事件，支持按 actor_id / status 过滤。
+
+        Args:
+            actor_id: 角色 ID（可选）
+            status: 事件状态筛选（可选）
+            order_by: 排序字段 — urgency / created_at / id（默认 urgency）
+
+        Returns:
+            事件字典列表，prerequisites 字段已从 JSON 字符串解析。
+        """
+        valid_order = {"urgency", "created_at", "id"}
+        if order_by not in valid_order:
+            order_by = "urgency"
+
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            conditions = []
+            params: List[Any] = []
+
+            if actor_id:
+                conditions.append("actor_id = ?")
+                params.append(actor_id)
+
+            if status:
+                conditions.append("status = ?")
+                params.append(status)
+
+            where_clause = ""
+            if conditions:
+                where_clause = "WHERE " + " AND ".join(conditions)
+
+            order_dir = "DESC" if order_by in ("urgency", "created_at") else "ASC"
+            sql = f"""
+                SELECT * FROM character_events
+                {where_clause}
+                ORDER BY {order_by} {order_dir}, created_at DESC
+            """
+            cursor.execute(sql, params)
+            return [
+                self._row_to_dict(row, parse_json=["prerequisites"])
+                for row in cursor.fetchall()
+            ]
+
+    def upsert_character_event(self, data: Dict[str, Any]) -> Dict:
+        """插入或更新角色事件。
+
+        如果有 'id' 且 id 存在 → UPDATE；
+        否则 → INSERT（ID 自增）。
+
+        Args:
+            data: 事件字段字典，键名需匹配 character_events 列。
+
+        Returns:
+            创建或更新后的事件行（dict）。
+        """
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+
+            event_id = data.get("id")
+            if event_id:
+                cursor.execute(
+                    "SELECT id FROM character_events WHERE id = ?", (event_id,)
+                )
+                if cursor.fetchone():
+                    set_fields = []
+                    set_params: List[Any] = []
+                    for col in (
+                        "status", "urgency", "description", "target_chapter",
+                        "event_type", "trigger_condition", "prerequisites",
+                        "resolved_chapter",
+                    ):
+                        if col in data:
+                            set_fields.append(f"{col} = ?")
+                            set_params.append(data[col])
+
+                    if set_fields:
+                        set_fields.append("updated_at = CURRENT_TIMESTAMP")
+                        set_params.append(event_id)
+                        cursor.execute(
+                            f"UPDATE character_events SET {', '.join(set_fields)} WHERE id = ?",
+                            set_params,
+                        )
+                        conn.commit()
+
+                    cursor.execute(
+                        "SELECT * FROM character_events WHERE id = ?", (event_id,)
+                    )
+                    return self._row_to_dict(
+                        cursor.fetchone(), parse_json=["prerequisites"]
+                    )
+
+            columns = [
+                "actor_id", "event_type", "description", "source_chapter",
+            ]
+            values: List[Any] = [
+                data.get("actor_id", ""),
+                data.get("event_type", "planned"),
+                data.get("description", ""),
+                data.get("source_chapter", 0),
+            ]
+
+            optional_cols = [
+                "target_chapter", "prerequisites", "trigger_condition",
+                "status", "urgency",
+            ]
+            for col in optional_cols:
+                if col in data:
+                    columns.append(col)
+                    values.append(data[col])
+
+            placeholders = ", ".join("?" for _ in values)
+            cols_str = ", ".join(columns)
+            cursor.execute(
+                f"INSERT INTO character_events ({cols_str}) VALUES ({placeholders})",
+                values,
+            )
+            conn.commit()
+            new_id = cursor.lastrowid
+
+            cursor.execute(
+                "SELECT * FROM character_events WHERE id = ?", (new_id,)
+            )
+            return self._row_to_dict(cursor.fetchone(), parse_json=["prerequisites"])
+
+    def get_overdue_events(
+        self, current_chapter: int, threshold: int = 10
+    ) -> List[Dict]:
+        """查询逾期未完成的事件。
+
+        Args:
+            current_chapter: 当前章节号
+            threshold: 逾期阈值（target_chapter + threshold < current_chapter）
+
+        Returns:
+            逾期事件列表（dict）。
+        """
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM character_events
+                WHERE status IN ('pending', 'in_progress')
+                  AND target_chapter IS NOT NULL
+                  AND (target_chapter + ?) < ?
+                ORDER BY urgency DESC, target_chapter ASC
+                """,
+                (threshold, current_chapter),
+            )
+            return [
+                self._row_to_dict(row, parse_json=["prerequisites"])
+                for row in cursor.fetchall()
+            ]
 
 # ==================== CLI 接口 ====================
 
