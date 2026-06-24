@@ -22,7 +22,7 @@ compatibility: opencode
 
 | # | 禁止 | 正确做法 |
 |---|------|---------|
-| 1 | 口头描述代替 `Agent()` 调用 | 必须使用 Agent 工具调用 context-agent / chapter-writer-agent / reviewer / data-agent |
+| 1 | 口头描述代替 `Agent()` 调用 | 必须使用 Agent 工具调用 director-agent / chapter-writer-agent / reviewer / data-agent |
 | 2 | 跳过审查 | 每章必须运行 reviewer Agent + review-pipeline。blocking=false 也不能跳过 |
 | 3 | 用 Read 工具代替验证命令 | 每步后必须运行 bash 验证命令（test -s / ls / python -c） |
 | 4 | "稍后更新" batch_state | 每章完成后立即用 python -c 写 JSON，写完后重新读取验证 |
@@ -133,14 +133,14 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pre
 
 ### 逐章检查清单（每章开始前重现）
 
-**步骤映射：** 0=环境变量验证, A=上章完整性, 1=刷新合同, 1b=结构自检, 2=context-agent, 3=写作, 4=审查, 5=review-pipeline, 6=修复轮, 7=data-agent, 8=commit+验证, 9=更新状态
+**步骤映射：** 0=环境变量验证, A=上章完整性, 1=刷新合同, 1b=结构自检, 2=director-agent(PHASE1), 3=写作, 4=审查, 5=review-pipeline, 6=修复轮, 7=data-agent, 8=commit+验证, 9=更新状态
 
 ```
 □ 0. 环境变量验证
 □ A. 上章完整性检查（N > S 时）
 □ 1. 刷新合同树
 □ 1b. 结构自检
-□ 2. Agent(context-agent) → 写作任务书
+□ 2. Agent(director-agent) → 写作任务书
 □ 3. Agent(chapter-writer-agent) → 起草+润色
 □ 4. Agent(reviewer) → 审查结果
 □ 5. review-pipeline → 判定 blocking
@@ -256,14 +256,14 @@ if not d.get('passed'):
 
 ---
 
-### Step 2: Agent(context-agent) → 写作任务书
+### Step 2: Agent(director-agent) → 写作任务书
 
-**必须使用 Agent 工具调用 context-agent，不得由主流程自行整理。**
+**必须使用 Agent 工具调用 director-agent（PHASE 1），不得由主流程自行整理。**
 
 ```text
 Agent(
-  subagent_type: "context-agent",
-  prompt: "chapter={N}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; storage_path=${PROJECT_ROOT}/.webnovel; state_file=${PROJECT_ROOT}/.webnovel/state.json（projection/read-model，仅兼容读取）。先 research，再按 本章硬性约束→CBN/CPNs/CEN→本章禁区→风格指引→dynamic_context补充参考 的顺序输出五段写作任务书。"
+  subagent_type: "director-agent",
+  prompt: "PHASE 1 写前研究模式。chapter={N}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; storage_path=${PROJECT_ROOT}/.webnovel; state_file=${PROJECT_ROOT}/.webnovel/state.json（projection/read-model，仅兼容读取）。先 research，再按 本章硬性约束→CBN/CPNs/CEN→本章禁区→风格指引→dynamic_context补充参考 的顺序输出五段写作任务书。"
 )
 ```
 
@@ -285,7 +285,7 @@ Agent(
 【字数】2000-2500 字
 
 【写作任务书】
-{context-agent 产出的完整任务书}
+{director-agent 产出的完整任务书}
 
 【章纲约束】
 {从 chapter_{NNN}.json 提取的 chapter_directive.goal / time_anchor / countdown / chapter_end_open_question / must_cover_nodes / forbidden_zones}
@@ -577,7 +577,7 @@ print(f'✅ batch_state 已验证 ({done}/{total_in_batch} 章已记录)')
 | 上章完整性失败 | 立即停止 | 阻断 |
 | preflight 失败（批前） | 修复环境→重试1次→停止 | 阻断 |
 | 合同树刷新失败 | 检查缺失文件→修复→重试1次→停止 | 阻断 |
-| context-agent 失败 | 重试1次→停止 | 阻断 |
+| director-agent 失败 | 重试1次→停止 | 阻断 |
 | chapter-writer-agent 失败 | 重试1次→停止 | 阻断 |
 | 字数不足 | 重试 chapter-writer-agent | 章内 |
 | reviewer blocking(1-2轮) | 提取反馈→回传 chapter-writer-agent→重审 | 章内 |

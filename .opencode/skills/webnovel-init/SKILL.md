@@ -25,47 +25,25 @@ compatibility: opencode
 
 路径说明：`references/` 指 skill 私有 `skills/webnovel-init/references/`；`../../references/` 指共享 references。
 
-### md 必读
+| Step | Trigger | Reference / 检索命令 |
+|------|---------|---------------------|
+| Step 1 | always | `${SKILL_ROOT}/references/system-data-flow.md`, `${SKILL_ROOT}/references/genre-tropes.md` |
+| 卖点/题材采集 | always | `${SKILL_ROOT}/../../references/genre-profiles.md` |
+| Step 2 | 人物扁平 | `${SKILL_ROOT}/references/worldbuilding/character-design.md` |
+| Step 4 | always | `${SKILL_ROOT}/references/worldbuilding/faction-systems.md`, `${SKILL_ROOT}/references/worldbuilding/world-rules.md` |
+| Step 4 | 修仙/玄幻/高武 | `${SKILL_ROOT}/references/worldbuilding/power-systems.md` |
+| Step 5 | always | `${SKILL_ROOT}/references/creativity/creativity-constraints.md`, `${SKILL_ROOT}/references/creativity/selling-points.md` |
+| Step 5 | 复合题材/卡顿/反套路 | `${SKILL_ROOT}/references/creativity/creative-combination.md`, `${SKILL_ROOT}/references/creativity/inspiration-collection.md`, `${SKILL_ROOT}/references/creativity/anti-trope-*.md` |
+| Step 6 | always | `${SKILL_ROOT}/references/worldbuilding/setting-consistency.md` |
+| 命名设定 | 用户开始命名 | `reference_search.py --skill init --table 命名规则 --query "{命名对象} {题材}" --genre {题材}` |
 
-| Step | Trigger | Reference | 实际路径 |
-|------|---------|-----------|---------|
-| Step 1 | always | 数据流规范 | `${SKILL_ROOT}/references/system-data-flow.md` |
-| Step 1 | always | 题材套路库 | `${SKILL_ROOT}/references/genre-tropes.md` |
-| 卖点/题材采集 | always | 题材配置 | `${SKILL_ROOT}/../../references/genre-profiles.md` |
+## 工具策略
 
-### md 按需
-
-| Step | Trigger | Reference | 实际路径 |
-|------|---------|-----------|---------|
-| Step 2 | 用户人物扁平 | 角色设计 | `${SKILL_ROOT}/references/worldbuilding/character-design.md` |
-| Step 4 | always | 势力格局 | `${SKILL_ROOT}/references/worldbuilding/faction-systems.md` |
-| Step 4 | 涉及修仙/玄幻/高武/异能 | 力量体系 | `${SKILL_ROOT}/references/worldbuilding/power-systems.md` |
-| Step 4 | always | 世界规则 | `${SKILL_ROOT}/references/worldbuilding/world-rules.md` |
-| Step 5 | always | 创意约束 | `${SKILL_ROOT}/references/creativity/creativity-constraints.md` |
-| Step 5 | always | 卖点生成 | `${SKILL_ROOT}/references/creativity/selling-points.md` |
-| Step 5 | 复合题材 | 题材融合 | `${SKILL_ROOT}/references/creativity/creative-combination.md` |
-| Step 5 | 卡顿 | 灵感候选 | `${SKILL_ROOT}/references/creativity/inspiration-collection.md` |
-| Step 5 | 题材映射命中 | 反套路库 | `${SKILL_ROOT}/references/creativity/anti-trope-*.md` |
-| Step 6 | always | 设定一致性 | `${SKILL_ROOT}/references/worldbuilding/setting-consistency.md` |
-
-### CSV 检索
-
-| Step | Trigger | 检索命令 |
-|------|---------|---------|
-| 角色/书名/势力设定 | 用户开始设定命名 | `python -X utf8 "${SCRIPTS_DIR}/reference_search.py" --skill init --table 命名规则 --query "{命名对象} {题材}" --genre {题材}` |
-
-## 工具策略（按需）
-
-- `Read/Grep`：读取项目上下文与参考文件（`README.md`、`CLAUDE.md`、`templates/genres/*`、`references/*`）。
-- `Bash`：执行 `init_project.py`、文件存在性检查、最小验证命令。
-- `Agent`：拆分并行子任务（如题材映射、约束包候选生成、文件验证）；Step 1.5 用户选择参考书拆解作为灵感来源时，调用 `deconstruction-agent`。
-- `AskUserQuestion`：用于关键分歧裁决、候选方案选择、最终确认。
-- `WebSearch`：用于检索最新市场趋势、平台风向、题材数据（可带域名过滤）。
-- `WebFetch`：用于抓取已确定来源页面内容并做事实核验。
-- 外部检索触发条件：
-  - 用户明确要求参考市场趋势或平台风向；
-  - 创意约束需要"时间敏感依据"；
-  - 对题材信息存在明显不确定。
+- `Read/Grep`：读取项目上下文与参考文件。
+- `Bash`：执行 `init_project.py`、文件检查、验证命令。
+- `Agent`：拆分并行子任务；Step 1.5 调用 `deconstruction-agent` 做参考书拆解。
+- `AskUserQuestion`：关键分歧裁决、候选方案选择、最终确认。
+- `WebSearch/WebFetch`：仅在用户要求参考市场趋势或创意约束需要"时间敏感依据"时触发。
 
 ## 交互流程（Deep）
 
@@ -140,15 +118,7 @@ Agent(
 - 核心冲突
 - 目标读者/平台
 
-题材集合（用于归一化与映射）：
-- 玄幻修仙类：修仙 | 系统流 | 高武 | 西幻 | 无限流 | 末世 | 科幻
-- 都市现代类：都市异能 | 都市日常 | 都市脑洞 | 现实题材 | 黑暗题材 | 电竞 | 直播文
-- 言情类：古言 | 宫斗宅斗 | 青春甜宠 | 豪门总裁 | 职场婚恋 | 民国言情 | 幻想言情 | 现言脑洞 | 女频悬疑 | 狗血言情 | 替身文 | 多子多福 | 种田 | 年代
-- 特殊题材：规则怪谈 | 悬疑脑洞 | 悬疑灵异 | 历史古代 | 历史脑洞 | 游戏体育 | 抗战谍战 | 知乎短篇 | 克苏鲁
-
-交互方式：
-- 优先让用户自由描述，再二次结构化确认。
-- 若用户卡住，给 2-4 个候选方向供选。
+题材集合（归一化与映射）：玄幻修仙(修仙/系统流/高武/西幻/无限流/末世/科幻)、都市现代(都市异能/日常/脑洞/现实/黑暗/电竞/直播)、言情(古言/宫斗/甜宠/总裁/职场/民国/幻想/现言脑洞/女频悬疑/狗血/替身/多子多福/种田/年代)、特殊(规则怪谈/悬疑脑洞/灵异/历史/游戏体育/抗战谍战/知乎短篇/克苏鲁)。交互：先自由描述再确认，卡住给 2-4 候选。
 
 ### Step 3：角色骨架与关系冲突
 
@@ -284,16 +254,14 @@ python "${SCRIPTS_DIR}/webnovel.py" init "${PROJECT_ROOT}" "{title}" "{genre}" \
   --heroine-config "{heroine_config}" --heroine-names "{heroine_names}" --heroine-role "{heroine_role}" \
   --co-protagonists "{co_protagonists}" --co-protagonist-roles "{co_protagonist_roles}" \
   --antagonist-tiers "{antagonist_tiers}" --world-scale "{world_scale}" --factions "{factions}" \
-  --power-system-type "{power_system_type}" --social-class "{social_class}" \
-  --resource-distribution "{resource_distribution}" --gf-visibility "{gf_visibility}" \
-  --gf-irreversible-cost "{gf_irreversible_cost}" --currency-system "{currency_system}" \
-  --currency-exchange "{currency_exchange}" --sect-hierarchy "{sect_hierarchy}" \
-  --cultivation-chain "{cultivation_chain}" --cultivation-subtiers "{cultivation_subtiers}" \
-  --protagonist-desire "{protagonist_desire}" --protagonist-flaw "{protagonist_flaw}" \
-  --protagonist-archetype "{protagonist_archetype}" --antagonist-level "{antagonist_level}" \
+  --power-system-type "{power_system_type}" --social-class "{social_class}" --gf-visibility "{gf_visibility}" \
+  --gf-irreversible-cost "{gf_irreversible_cost}" --protagonist-desire "{protagonist_desire}" \
+  --protagonist-flaw "{protagonist_flaw}" --protagonist-archetype "{protagonist_archetype}" \
   --one-liner "{one_liner}" --core-conflict "{core_conflict}" \
   --target-reader "{target_reader}" --platform "{platform}"
 ```
+
+可选字段：`--currency-system`、`--currency-exchange`、`--sect-hierarchy`、`--cultivation-chain`、`--cultivation-subtiers`、`--resource-distribution`、`--antagonist-level`——仅当用户提供了对应信息时传入。
 
 ### 2) 写入 `idea_bank.json`
 
