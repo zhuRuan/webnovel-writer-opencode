@@ -17,12 +17,21 @@ sleep 2
 # ── 后端 (FastAPI, port 8765) ──
 echo "[backend] 启动 → http://127.0.0.1:8765"
 cd "$ROOT_DIR/.opencode"
-setsid python3 -m dashboard --project-root "$WEBNOVEL_PROJECT_ROOT" > /tmp/dashboard.log 2>&1 &
-for i in $(seq 1 15); do
-  curl -s http://127.0.0.1:8765/api/projects > /dev/null 2>&1 && break
-  sleep 1
+RETRIES=3
+for r in $(seq 1 $RETRIES); do
+  setsid python3 -m dashboard --project-root "$WEBNOVEL_PROJECT_ROOT" > /tmp/dashboard.log 2>&1 &
+  for i in $(seq 1 15); do
+    curl -s http://127.0.0.1:8765/api/projects > /dev/null 2>&1 && break
+    sleep 1
+  done
+  if curl -s http://127.0.0.1:8765/api/projects > /dev/null 2>&1; then
+    break
+  fi
+  echo "[backend] 重试 $r/$RETRIES — 端口未就绪"
+  fuser -k 8765/tcp 2>/dev/null
+  sleep 2
 done
-echo "[backend] 就绪"
+curl -s http://127.0.0.1:8765/api/projects > /dev/null 2>&1 && echo "[backend] 就绪" || echo "[backend] 启动失败（端口 8765 无法绑定）"
 
 # ── 前端 (Vite, port 5173) ──
 if [ "${1:-}" != "--no-frontend" ]; then
